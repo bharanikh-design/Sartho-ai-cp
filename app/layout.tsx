@@ -7,6 +7,7 @@ import "./product.css";
 import "./onboarding.css";
 import "./onboarding-responsive.css";
 import "./shell-refinement.css";
+import "./account-and-journey.css";
 import { AppShell } from "@/components/app-shell";
 
 export const metadata: Metadata = {

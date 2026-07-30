@@ -1,0 +1,283 @@
+/* Profile controls and the continuously animated Sartho journey. */
+
+.top-actions {
+  position: relative;
+}
+
+.profile-menu-wrap {
+  position: relative;
+}
+
+.avatar-button.is-open {
+  border-color: rgba(143, 183, 255, .4);
+  background: linear-gradient(145deg, rgba(124, 160, 255, .22), rgba(255,255,255,.055));
+  box-shadow: 0 0 0 4px rgba(113, 162, 255, .08);
+}
+
+.profile-menu {
+  position: absolute;
+  z-index: 140;
+  top: calc(100% + 11px);
+  right: 0;
+  width: min(310px, calc(100vw - 28px));
+  padding: 10px;
+  border: 1px solid rgba(255,255,255,.11);
+  border-radius: 22px;
+  background: linear-gradient(160deg, rgba(23,28,39,.98), rgba(9,12,18,.97));
+  box-shadow: 0 28px 70px rgba(0,0,0,.48), inset 0 1px 0 rgba(255,255,255,.055);
+  backdrop-filter: blur(28px) saturate(145%);
+  -webkit-backdrop-filter: blur(28px) saturate(145%);
+  animation: profileMenuIn .18s ease both;
+}
+
+.profile-menu-identity {
+  padding: 11px 12px 12px;
+}
+
+.profile-menu-identity strong {
+  display: block;
+  font-size: 13px;
+  letter-spacing: -.02em;
+}
+
+.profile-menu-identity span {
+  display: block;
+  margin-top: 4px;
+  overflow: hidden;
+  color: var(--text-tertiary);
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-menu-divider {
+  height: 1px;
+  margin: 7px 5px;
+  background: rgba(255,255,255,.07);
+}
+
+.profile-menu-link,
+.profile-menu-action {
+  width: 100%;
+  min-height: 43px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 9px 11px;
+  border: 1px solid transparent;
+  border-radius: 13px;
+  color: var(--text-secondary);
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  transition: color .18s ease, background .18s ease, border-color .18s ease;
+}
+
+.profile-menu-link:hover,
+.profile-menu-action:hover {
+  color: white;
+  border-color: rgba(255,255,255,.07);
+  background: rgba(255,255,255,.045);
+}
+
+.profile-menu-link > span,
+.profile-menu-action > span {
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.profile-menu-action small {
+  max-width: 120px;
+  color: var(--text-tertiary);
+  font-size: 7px;
+  line-height: 1.35;
+  text-align: right;
+}
+
+.profile-menu-action.danger {
+  color: #ffb6c3;
+}
+
+.profile-menu-action.danger:hover {
+  border-color: rgba(255,142,163,.14);
+  background: rgba(255,142,163,.055);
+}
+
+.profile-protection-layer {
+  position: fixed;
+  z-index: 1500;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+
+.profile-protection-backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(2,4,8,.72);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  cursor: default;
+}
+
+.profile-protection-dialog {
+  position: relative;
+  width: min(480px, 100%);
+  padding: 28px;
+  border: 1px solid rgba(255,255,255,.11);
+  border-radius: 26px;
+  background: linear-gradient(155deg, rgba(25,30,42,.98), rgba(9,12,18,.98));
+  box-shadow: 0 35px 90px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.06);
+  animation: profileDialogIn .2s ease both;
+}
+
+.profile-protection-kicker {
+  color: #ffb6c3;
+  font-size: 8px;
+  font-weight: 750;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+
+.profile-protection-dialog h2 {
+  margin: 10px 0 0;
+  font-size: 25px;
+  letter-spacing: -.045em;
+}
+
+.profile-protection-dialog p {
+  margin: 13px 0 0;
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.7;
+}
+
+.profile-protection-note {
+  margin-top: 16px;
+  padding: 13px;
+  border: 1px solid rgba(255,211,122,.13);
+  border-radius: 14px;
+  color: #ffe1a3;
+  background: rgba(255,211,122,.055);
+  font-size: 9px;
+  line-height: 1.55;
+}
+
+.profile-protection-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 9px;
+  margin-top: 22px;
+}
+
+/* Continuous light flows through Discover → Align → Stand out → Prepare → Land it. */
+.auth-route-preview {
+  position: relative;
+  isolation: isolate;
+}
+
+.auth-route-preview::before {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  top: 50%;
+  right: 18px;
+  left: 18px;
+  height: 2px;
+  transform: translateY(-50%);
+  background: rgba(255,255,255,.055);
+  box-shadow: 0 0 12px rgba(102,145,255,.05);
+}
+
+.auth-route-preview::after {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  left: -130px;
+  width: 130px;
+  height: 3px;
+  transform: translateY(-50%);
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent, rgba(110,157,255,.25), #b7d0ff 70%, rgba(112,230,190,.9), transparent);
+  filter: drop-shadow(0 0 8px rgba(125,173,255,.85));
+  animation: routeLightFlow 5s linear infinite;
+}
+
+.auth-route-preview > * {
+  position: relative;
+  z-index: 2;
+}
+
+.auth-route-preview i {
+  background: rgba(255,255,255,.055);
+}
+
+.route-node {
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  animation: routeNodeGlow 5s ease-in-out infinite;
+}
+
+.auth-route-preview .route-node:nth-of-type(1) { animation-delay: 0s; }
+.auth-route-preview .route-node:nth-of-type(2) { animation-delay: 1s; }
+.auth-route-preview .route-node:nth-of-type(3) { animation-delay: 2s; }
+.auth-route-preview .route-node:nth-of-type(4) { animation-delay: 3s; }
+.auth-route-preview .route-node:nth-of-type(5) { animation-delay: 4s; }
+
+@keyframes profileMenuIn {
+  from { opacity: 0; transform: translateY(-6px) scale(.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes profileDialogIn {
+  from { opacity: 0; transform: translateY(10px) scale(.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes routeLightFlow {
+  from { left: -130px; }
+  to { left: 100%; }
+}
+
+@keyframes routeNodeGlow {
+  0%, 13% {
+    color: white;
+    border-color: rgba(154,190,255,.52);
+    background: rgba(113,153,255,.2);
+    box-shadow: 0 0 0 4px rgba(113,153,255,.07), 0 0 28px rgba(105,150,255,.34);
+  }
+  25%, 100% {
+    color: var(--text-tertiary);
+    border-color: rgba(255,255,255,.08);
+    background: rgba(255,255,255,.025);
+    box-shadow: none;
+  }
+}
+
+@media (max-width: 620px) {
+  .profile-menu {
+    position: fixed;
+    top: 80px;
+    right: 12px;
+    left: 12px;
+    width: auto;
+  }
+
+  .profile-protection-dialog { padding: 22px; }
+  .profile-protection-actions { flex-direction: column-reverse; }
+  .profile-protection-actions .primary-button,
+  .profile-protection-actions .secondary-button { width: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .profile-menu,
+  .profile-protection-dialog,
+  .auth-route-preview::after,
+  .route-node {
+    animation: none;
+  }
+}

@@ -92,6 +92,7 @@ export default function LoginPage() {
           <span className="route-node is-active">Discover</span><i />
           <span className="route-node">Align</span><i />
           <span className="route-node">Stand out</span><i />
+          <span className="route-node">Prepare</span><i />
           <span className="route-node">Land it</span>
         </div>
       </section>

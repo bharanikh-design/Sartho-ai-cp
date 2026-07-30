@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import type { ReactNode } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase";
 import { OnboardingCarousel } from "@/components/onboarding-carousel";
@@ -25,6 +25,8 @@ type NavigationItem = {
   icon: IconName;
 };
 
+type ProtectedAction = "Delete Profile" | "Wipe Data";
+
 const navigation: NavigationItem[] = [
   { label: "Home", shortLabel: "Home", href: "/", icon: "home" },
   { label: "Career Profile", shortLabel: "Profile", href: "/career-truth", icon: "truth" },
@@ -38,8 +40,11 @@ export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
+  const profileMenuRef = useRef<HTMLDivElement>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [protectedAction, setProtectedAction] = useState<ProtectedAction | null>(null);
   const currentPage = navigation.find((item) => isActive(pathname, item.href))?.label ?? "Sartho";
 
   useEffect(() => {
@@ -68,6 +73,31 @@ export function AppShell({ children }: { children: ReactNode }) {
     }
   }, [loading, pathname, router, session]);
 
+  useEffect(() => {
+    setProfileOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!profileOpen) return;
+
+    function closeOnOutsidePress(event: PointerEvent) {
+      if (!profileMenuRef.current?.contains(event.target as Node)) {
+        setProfileOpen(false);
+      }
+    }
+
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") setProfileOpen(false);
+    }
+
+    document.addEventListener("pointerdown", closeOnOutsidePress);
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutsidePress);
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [profileOpen]);
+
   if (pathname === "/login") return <>{children}</>;
 
   if (loading || !session) {
@@ -84,9 +114,15 @@ export function AppShell({ children }: { children: ReactNode }) {
   const initials = fullName.split(" ").slice(0, 2).map((part) => part[0]?.toUpperCase()).join("") || "U";
 
   async function signOut() {
+    setProfileOpen(false);
     await supabase.auth.signOut();
     router.replace("/login");
     router.refresh();
+  }
+
+  function showProtectedAction(action: ProtectedAction) {
+    setProfileOpen(false);
+    setProtectedAction(action);
   }
 
   return (
@@ -146,7 +182,43 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
           <div className="top-actions">
             <span className="sync-status"><span className="live-dot" /> Workspace ready</span>
-            <button type="button" className="avatar-button" onClick={signOut} aria-label="Sign out" title="Sign out">{initials}</button>
+            <div className="profile-menu-wrap" ref={profileMenuRef}>
+              <button
+                type="button"
+                className={`avatar-button${profileOpen ? " is-open" : ""}`}
+                onClick={() => setProfileOpen((current) => !current)}
+                aria-label="Open profile menu"
+                aria-haspopup="menu"
+                aria-expanded={profileOpen}
+                aria-controls="profile-menu"
+                title="Profile and account"
+              >
+                {initials}
+              </button>
+
+              {profileOpen ? (
+                <div id="profile-menu" className="profile-menu" role="menu" aria-label="Profile and account">
+                  <div className="profile-menu-identity">
+                    <strong>{fullName}</strong>
+                    <span>{session.user.email}</span>
+                  </div>
+                  <div className="profile-menu-divider" />
+                  <Link href="/career-truth" className="profile-menu-link" role="menuitem">
+                    <span>Career Profile</span><small aria-hidden="true">→</small>
+                  </Link>
+                  <button type="button" className="profile-menu-action" role="menuitem" onClick={() => void signOut()}>
+                    <span>Log out</span><small>End this secure session</small>
+                  </button>
+                  <div className="profile-menu-divider" />
+                  <button type="button" className="profile-menu-action danger" role="menuitem" onClick={() => showProtectedAction("Delete Profile")}>
+                    <span>Delete Profile</span><small>Protected until migration</small>
+                  </button>
+                  <button type="button" className="profile-menu-action danger" role="menuitem" onClick={() => showProtectedAction("Wipe Data")}>
+                    <span>Wipe Data</span><small>Protected until migration</small>
+                  </button>
+                </div>
+              ) : null}
+            </div>
           </div>
         </header>
 
@@ -166,6 +238,26 @@ export function AppShell({ children }: { children: ReactNode }) {
       </nav>
 
       <OnboardingCarousel user={session.user} />
+
+      {protectedAction ? (
+        <div className="profile-protection-layer" role="dialog" aria-modal="true" aria-labelledby="protected-action-title">
+          <button type="button" className="profile-protection-backdrop" onClick={() => setProtectedAction(null)} aria-label="Close protected action" />
+          <section className="profile-protection-dialog">
+            <span className="profile-protection-kicker">Protected action</span>
+            <h2 id="protected-action-title">{protectedAction}</h2>
+            <p>
+              This control is visible, but intentionally locked until Work Package 2 moves your Career Profile and evidence out of <code>data/profile.ts</code> and into your private Supabase records.
+            </p>
+            <div className="profile-protection-note">
+              Enabling this today would be misleading: it could delete database rows while the same personal information remains embedded in the application source. No data has been deleted.
+            </div>
+            <div className="profile-protection-actions">
+              <button type="button" className="secondary-button" onClick={() => setProtectedAction(null)}>Close</button>
+              <Link href="/career-truth" className="primary-button" onClick={() => setProtectedAction(null)}>Open Career Profile</Link>
+            </div>
+          </section>
+        </div>
+      ) : null}
     </div>
   );
 }
