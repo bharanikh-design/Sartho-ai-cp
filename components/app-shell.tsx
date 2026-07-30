@@ -1,21 +1,87 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import type { ReactNode } from "react";
+import { useEffect, useMemo, useState } from "react";
+import type { Session } from "@supabase/supabase-js";
+import { createClient } from "@/lib/supabase";
+import { ProductTour } from "@/components/product-tour";
 
 type IconName = "home" | "truth" | "analyse" | "applications" | "sparkles" | "shield";
 
-const navigation: Array<{ label: string; shortLabel: string; href: string; icon: IconName }> = [
-  { label: "Overview", shortLabel: "Home", href: "/", icon: "home" },
-  { label: "Career Truth", shortLabel: "Truth", href: "/career-truth", icon: "truth" },
-  { label: "Analyse a Job", shortLabel: "Analyse", href: "/jobs", icon: "analyse" },
-  { label: "Applications", shortLabel: "Track", href: "/applications", icon: "applications" },
+type NavigationItem = {
+  label: string;
+  shortLabel: string;
+  href: string;
+  icon: IconName;
+  tour?: string;
+};
+
+const navigation: NavigationItem[] = [
+  { label: "Home", shortLabel: "Home", href: "/", icon: "home" },
+  { label: "Career Profile", shortLabel: "Profile", href: "/career-truth", icon: "truth", tour: "career-profile" },
+  { label: "Analyse a Role", shortLabel: "Analyse", href: "/jobs", icon: "analyse" },
+  { label: "Applications", shortLabel: "Track", href: "/applications", icon: "applications", tour: "applications" },
 ];
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const supabase = useMemo(() => createClient(), []);
+  const [session, setSession] = useState<Session | null>(null);
+  const [loading, setLoading] = useState(true);
   const currentPage = navigation.find((item) => isActive(pathname, item.href))?.label ?? "Sartho";
+  const shellless = pathname === "/login" || pathname === "/welcome";
+
+  useEffect(() => {
+    let active = true;
+
+    supabase.auth.getSession().then(({ data }) => {
+      if (!active) return;
+      setSession(data.session);
+      setLoading(false);
+    });
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      setSession(nextSession);
+      setLoading(false);
+    });
+
+    return () => {
+      active = false;
+      listener.subscription.unsubscribe();
+    };
+  }, [supabase]);
+
+  useEffect(() => {
+    if (!loading && !session && pathname !== "/login") {
+      router.replace("/login");
+    }
+  }, [loading, pathname, router, session]);
+
+  if (pathname === "/login") return <>{children}</>;
+
+  if (loading || !session) {
+    return (
+      <main className="auth-loading" aria-live="polite">
+        <span className="brand-mark" aria-hidden="true"><span>S</span></span>
+        <div><strong>Opening your Sartho workspace</strong><small>Securing your session…</small></div>
+      </main>
+    );
+  }
+
+  if (shellless) return <>{children}</>;
+
+  const fullName = (session.user.user_metadata?.full_name as string | undefined) || session.user.email?.split("@")[0] || "User";
+  const firstName = fullName.split(" ")[0];
+  const initials = fullName.split(" ").slice(0, 2).map((part) => part[0]?.toUpperCase()).join("") || "U";
+
+  async function signOut() {
+    await supabase.auth.signOut();
+    router.replace("/login");
+    router.refresh();
+  }
 
   return (
     <div className="app-shell">
@@ -23,11 +89,11 @@ export function AppShell({ children }: { children: ReactNode }) {
       <div className="ambient ambient-two" aria-hidden="true" />
 
       <aside className="desktop-rail glass-strong" aria-label="Primary navigation">
-        <Link href="/" className="brand-lockup" aria-label="Sartho overview">
+        <Link href="/" className="brand-lockup" aria-label="Sartho home">
           <span className="brand-mark" aria-hidden="true"><span>S</span></span>
           <span>
             <strong>Sartho</strong>
-            <small>Your career, intelligently guided.</small>
+            <small>AI Career Copilot</small>
           </span>
         </Link>
 
@@ -38,7 +104,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           ))}
         </nav>
 
-        <Link href="/jobs" className="rail-primary-action">
+        <Link href="/jobs" className="rail-primary-action" data-tour="analyse-role">
           <Icon name="sparkles" />
           <span>Analyse a new role</span>
           <span className="rail-action-arrow" aria-hidden="true">↗</span>
@@ -49,14 +115,14 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className="privacy-card">
           <span className="privacy-icon"><Icon name="shield" /></span>
           <div>
-            <strong>Private workspace</strong>
+            <strong>Human-controlled</strong>
             <p>Nothing is submitted without your approval.</p>
           </div>
         </div>
 
         <div className="rail-footer">
           <span className="live-dot" />
-          <span>Private alpha</span>
+          <span>Secure session</span>
           <span>·</span>
           <span>Evidence-led</span>
         </div>
@@ -69,12 +135,12 @@ export function AppShell({ children }: { children: ReactNode }) {
             <span><strong>Sartho</strong><small>{currentPage}</small></span>
           </div>
           <div className="desktop-context">
-            <span className="context-kicker">Career command centre</span>
+            <span className="context-kicker">{getGreeting()}, {firstName}</span>
             <strong>{currentPage}</strong>
           </div>
           <div className="top-actions">
             <span className="sync-status"><span className="live-dot" /> Workspace ready</span>
-            <button type="button" className="avatar-button" aria-label="Open profile menu">BK</button>
+            <button type="button" className="avatar-button" onClick={signOut} aria-label="Sign out" title="Sign out">{initials}</button>
           </div>
         </header>
 
@@ -85,20 +151,22 @@ export function AppShell({ children }: { children: ReactNode }) {
         {navigation.map((item) => {
           const active = isActive(pathname, item.href);
           return (
-            <Link key={item.href} href={item.href} className={`dock-item${active ? " is-active" : ""}`} aria-current={active ? "page" : undefined}>
+            <Link key={item.href} href={item.href} className={`dock-item${active ? " is-active" : ""}`} aria-current={active ? "page" : undefined} data-tour={item.tour}>
               <span className="dock-icon"><Icon name={item.icon} /></span>
               <span>{item.shortLabel}</span>
             </Link>
           );
         })}
       </nav>
+
+      <ProductTour />
     </div>
   );
 }
 
-function NavItem({ item, active }: { item: (typeof navigation)[number]; active: boolean }) {
+function NavItem({ item, active }: { item: NavigationItem; active: boolean }) {
   return (
-    <Link href={item.href} className={`rail-link${active ? " is-active" : ""}`} aria-current={active ? "page" : undefined}>
+    <Link href={item.href} className={`rail-link${active ? " is-active" : ""}`} aria-current={active ? "page" : undefined} data-tour={item.tour}>
       <span className="rail-link-icon"><Icon name={item.icon} /></span>
       <span>{item.label}</span>
       {active ? <span className="active-pip" aria-hidden="true" /> : null}
@@ -108,6 +176,13 @@ function NavItem({ item, active }: { item: (typeof navigation)[number]; active: 
 
 function isActive(pathname: string, href: string) {
   return href === "/" ? pathname === "/" : pathname.startsWith(href);
+}
+
+function getGreeting() {
+  const hour = new Date().getHours();
+  if (hour < 12) return "Good morning";
+  if (hour < 18) return "Good afternoon";
+  return "Good evening";
 }
 
 function Icon({ name }: { name: IconName }) {
