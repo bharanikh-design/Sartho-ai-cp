@@ -8,7 +8,15 @@ import type { Session } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase";
 import { OnboardingCarousel } from "@/components/onboarding-carousel";
 
-type IconName = "home" | "truth" | "analyse" | "applications" | "sparkles" | "shield";
+type IconName =
+  | "home"
+  | "truth"
+  | "analyse"
+  | "resume"
+  | "interview"
+  | "applications"
+  | "sparkles"
+  | "shield";
 
 type NavigationItem = {
   label: string;
@@ -21,6 +29,8 @@ const navigation: NavigationItem[] = [
   { label: "Home", shortLabel: "Home", href: "/", icon: "home" },
   { label: "Career Profile", shortLabel: "Profile", href: "/career-truth", icon: "truth" },
   { label: "Analyse a Role", shortLabel: "Analyse", href: "/jobs", icon: "analyse" },
+  { label: "Résumé Studio", shortLabel: "Résumé", href: "/resume-studio", icon: "resume" },
+  { label: "Interview Prep", shortLabel: "Prepare", href: "/interview-prep", icon: "interview" },
   { label: "Applications", shortLabel: "Track", href: "/applications", icon: "applications" },
 ];
 
@@ -191,6 +201,10 @@ function Icon({ name }: { name: IconName }) {
       return <svg {...common}><path d="M12 3 4.5 6v5.5c0 4.7 3.1 7.9 7.5 9.5 4.4-1.6 7.5-4.8 7.5-9.5V6L12 3Z" /><path d="m8.8 12 2.1 2.1 4.5-4.7" /></svg>;
     case "analyse":
       return <svg {...common}><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4.5 4.5" /><path d="M8.5 11h5M11 8.5v5" /></svg>;
+    case "resume":
+      return <svg {...common}><path d="M7 3.5h7l3 3V20.5H7z" /><path d="M14 3.5v4h4" /><path d="M9.5 11h5M9.5 14h5M9.5 17h3" /></svg>;
+    case "interview":
+      return <svg {...common}><path d="M5 5.5h14v10H9l-4 3v-13Z" /><path d="M9 9h6M9 12h4" /></svg>;
     case "applications":
       return <svg {...common}><rect x="4" y="3.5" width="16" height="17" rx="3" /><path d="M8 8h8M8 12h8M8 16h4" /></svg>;
     case "sparkles":
