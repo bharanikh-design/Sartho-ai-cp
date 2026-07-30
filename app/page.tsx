@@ -9,7 +9,6 @@ const actions = [
     value: String(evidenceItems.length),
     note: "Confirm what Sartho may use",
     action: "Review Career Profile",
-    tour: "career-profile",
   },
   {
     href: "/jobs",
@@ -18,7 +17,6 @@ const actions = [
     value: "New",
     note: "Requirements, recruiter signals and fit",
     action: "Start role analysis",
-    tour: "analyse-role",
   },
   {
     href: "/resume-studio",
@@ -43,7 +41,6 @@ const actions = [
     value: "0",
     note: "Track messages, interviews and outcomes",
     action: "Open applications",
-    tour: "applications",
   },
 ];
 
@@ -59,8 +56,8 @@ export default function HomePage() {
             shape the right résumé and walk into every opportunity ready.
           </p>
           <div className="hero-actions">
-            <Link href="/jobs" className="primary-button" data-tour="analyse-role">Analyse a role <span aria-hidden="true">↗</span></Link>
-            <Link href="/welcome?replay=1" className="secondary-button">Play product tour</Link>
+            <Link href="/jobs" className="primary-button">Analyse a role <span aria-hidden="true">↗</span></Link>
+            <Link href="/?tour=1" className="secondary-button">Replay welcome</Link>
           </div>
         </div>
 
@@ -74,7 +71,7 @@ export default function HomePage() {
 
       <section className="metric-grid action-metric-grid" aria-label="Your Sartho journey">
         {actions.map((action) => (
-          <Link key={action.href} href={action.href} className="glass-card-soft metric-card action-metric" data-tour={action.tour}>
+          <Link key={action.href} href={action.href} className="glass-card-soft metric-card action-metric">
             <span className="metric-icon" aria-hidden="true">{action.symbol}</span>
             <div className="metric-label">{action.label}</div>
             <div className="metric-value">{action.value}</div>

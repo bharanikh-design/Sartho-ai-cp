@@ -10,8 +10,8 @@ export async function GET(request: Request) {
   const code = url.searchParams.get("code");
   const providerError = url.searchParams.get("error_description") ?? url.searchParams.get("error");
   const errorCode = url.searchParams.get("error_code");
-  const requestedNext = url.searchParams.get("next") ?? "/welcome";
-  const next = requestedNext.startsWith("/") && !requestedNext.startsWith("//") ? requestedNext : "/welcome";
+  const requestedNext = url.searchParams.get("next") ?? "/";
+  const next = requestedNext.startsWith("/") && !requestedNext.startsWith("//") ? requestedNext : "/";
 
   if (providerError) {
     const message = safeMessage(providerError, "Google sign-in was rejected by the authentication provider.");

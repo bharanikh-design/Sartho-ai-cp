@@ -43,7 +43,7 @@ export default function LoginPage() {
     if (error) setMessage(friendlyAuthMessage(error));
 
     supabase.auth.getSession().then(({ data }) => {
-      if (data.session) router.replace("/welcome");
+      if (data.session) router.replace("/");
     });
   }, [router, supabase]);
 
@@ -54,7 +54,7 @@ export default function LoginPage() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/auth/callback?next=/welcome`,
+        redirectTo: `${window.location.origin}/auth/callback?next=/`,
       },
     });
 

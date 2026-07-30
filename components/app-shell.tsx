@@ -6,7 +6,7 @@ import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase";
-import { ProductTour } from "@/components/product-tour";
+import { OnboardingCarousel } from "@/components/onboarding-carousel";
 
 type IconName = "home" | "truth" | "analyse" | "applications" | "sparkles" | "shield";
 
@@ -15,14 +15,13 @@ type NavigationItem = {
   shortLabel: string;
   href: string;
   icon: IconName;
-  tour?: string;
 };
 
 const navigation: NavigationItem[] = [
   { label: "Home", shortLabel: "Home", href: "/", icon: "home" },
-  { label: "Career Profile", shortLabel: "Profile", href: "/career-truth", icon: "truth", tour: "career-profile" },
+  { label: "Career Profile", shortLabel: "Profile", href: "/career-truth", icon: "truth" },
   { label: "Analyse a Role", shortLabel: "Analyse", href: "/jobs", icon: "analyse" },
-  { label: "Applications", shortLabel: "Track", href: "/applications", icon: "applications", tour: "applications" },
+  { label: "Applications", shortLabel: "Track", href: "/applications", icon: "applications" },
 ];
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -32,7 +31,6 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const currentPage = navigation.find((item) => isActive(pathname, item.href))?.label ?? "Sartho";
-  const shellless = pathname === "/login" || pathname === "/welcome";
 
   useEffect(() => {
     let active = true;
@@ -71,8 +69,6 @@ export function AppShell({ children }: { children: ReactNode }) {
     );
   }
 
-  if (shellless) return <>{children}</>;
-
   const fullName = (session.user.user_metadata?.full_name as string | undefined) || session.user.email?.split("@")[0] || "User";
   const firstName = fullName.split(" ")[0];
   const initials = fullName.split(" ").slice(0, 2).map((part) => part[0]?.toUpperCase()).join("") || "U";
@@ -104,7 +100,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           ))}
         </nav>
 
-        <Link href="/jobs" className="rail-primary-action" data-tour="analyse-role">
+        <Link href="/jobs" className="rail-primary-action">
           <Icon name="sparkles" />
           <span>Analyse a new role</span>
           <span className="rail-action-arrow" aria-hidden="true">↗</span>
@@ -151,7 +147,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         {navigation.map((item) => {
           const active = isActive(pathname, item.href);
           return (
-            <Link key={item.href} href={item.href} className={`dock-item${active ? " is-active" : ""}`} aria-current={active ? "page" : undefined} data-tour={item.tour}>
+            <Link key={item.href} href={item.href} className={`dock-item${active ? " is-active" : ""}`} aria-current={active ? "page" : undefined}>
               <span className="dock-icon"><Icon name={item.icon} /></span>
               <span>{item.shortLabel}</span>
             </Link>
@@ -159,14 +155,14 @@ export function AppShell({ children }: { children: ReactNode }) {
         })}
       </nav>
 
-      <ProductTour />
+      <OnboardingCarousel user={session.user} />
     </div>
   );
 }
 
 function NavItem({ item, active }: { item: NavigationItem; active: boolean }) {
   return (
-    <Link href={item.href} className={`rail-link${active ? " is-active" : ""}`} aria-current={active ? "page" : undefined} data-tour={item.tour}>
+    <Link href={item.href} className={`rail-link${active ? " is-active" : ""}`} aria-current={active ? "page" : undefined}>
       <span className="rail-link-icon"><Icon name={item.icon} /></span>
       <span>{item.label}</span>
       {active ? <span className="active-pip" aria-hidden="true" /> : null}
