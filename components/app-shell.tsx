@@ -25,7 +25,7 @@ type NavigationItem = {
   icon: IconName;
 };
 
-type ProtectedAction = "Delete Profile" | "Wipe Data";
+type AccountAction = "delete" | "wipe";
 
 const navigation: NavigationItem[] = [
   { label: "Home", shortLabel: "Home", href: "/", icon: "home" },
@@ -44,7 +44,10 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [profileOpen, setProfileOpen] = useState(false);
-  const [protectedAction, setProtectedAction] = useState<ProtectedAction | null>(null);
+  const [accountAction, setAccountAction] = useState<AccountAction | null>(null);
+  const [confirmation, setConfirmation] = useState("");
+  const [accountBusy, setAccountBusy] = useState(false);
+  const [accountError, setAccountError] = useState<string | null>(null);
   const currentPage = navigation.find((item) => isActive(pathname, item.href))?.label ?? "Sartho";
 
   useEffect(() => {
@@ -68,9 +71,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, [supabase]);
 
   useEffect(() => {
-    if (!loading && !session && pathname !== "/login") {
-      router.replace("/login");
-    }
+    if (!loading && !session && pathname !== "/login") router.replace("/login");
   }, [loading, pathname, router, session]);
 
   useEffect(() => {
@@ -81,9 +82,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     if (!profileOpen) return;
 
     function closeOnOutsidePress(event: PointerEvent) {
-      if (!profileMenuRef.current?.contains(event.target as Node)) {
-        setProfileOpen(false);
-      }
+      if (!profileMenuRef.current?.contains(event.target as Node)) setProfileOpen(false);
     }
 
     function closeOnEscape(event: KeyboardEvent) {
@@ -120,10 +119,52 @@ export function AppShell({ children }: { children: ReactNode }) {
     router.refresh();
   }
 
-  function showProtectedAction(action: ProtectedAction) {
+  function openAccountAction(action: AccountAction) {
     setProfileOpen(false);
-    setProtectedAction(action);
+    setAccountAction(action);
+    setConfirmation("");
+    setAccountError(null);
   }
+
+  function closeAccountAction() {
+    if (accountBusy) return;
+    setAccountAction(null);
+    setConfirmation("");
+    setAccountError(null);
+  }
+
+  async function confirmAccountAction() {
+    if (!accountAction || accountBusy) return;
+    const requiredPhrase = accountAction === "delete" ? "DELETE" : "WIPE";
+    if (confirmation.trim().toUpperCase() !== requiredPhrase) return;
+
+    setAccountBusy(true);
+    setAccountError(null);
+    const functionName = accountAction === "delete" ? "delete_my_account" : "wipe_my_data";
+    const { error } = await supabase.rpc(functionName);
+
+    if (error) {
+      setAccountError(error.message);
+      setAccountBusy(false);
+      return;
+    }
+
+    if (accountAction === "delete") {
+      await supabase.auth.signOut();
+      router.replace("/login?account=deleted");
+      router.refresh();
+      return;
+    }
+
+    setAccountAction(null);
+    setConfirmation("");
+    setAccountBusy(false);
+    router.replace("/");
+    router.refresh();
+  }
+
+  const actionTitle = accountAction === "delete" ? "Delete Profile" : "Wipe Data";
+  const requiredPhrase = accountAction === "delete" ? "DELETE" : "WIPE";
 
   return (
     <div className="app-shell">
@@ -133,17 +174,12 @@ export function AppShell({ children }: { children: ReactNode }) {
       <aside className="desktop-rail glass-strong" aria-label="Primary navigation">
         <Link href="/" className="brand-lockup" aria-label="Sartho home">
           <span className="brand-mark" aria-hidden="true"><span>S</span></span>
-          <span>
-            <strong>Sartho</strong>
-            <small>AI Career Copilot</small>
-          </span>
+          <span><strong>Sartho</strong><small>AI Career Copilot</small></span>
         </Link>
 
         <div className="rail-section-label">Workspace</div>
         <nav className="rail-nav">
-          {navigation.map((item) => (
-            <NavItem key={item.href} item={item} active={isActive(pathname, item.href)} />
-          ))}
+          {navigation.map((item) => <NavItem key={item.href} item={item} active={isActive(pathname, item.href)} />)}
         </nav>
 
         <Link href="/jobs" className="rail-primary-action">
@@ -153,21 +189,11 @@ export function AppShell({ children }: { children: ReactNode }) {
         </Link>
 
         <div className="rail-spacer" />
-
         <div className="privacy-card">
           <span className="privacy-icon"><Icon name="shield" /></span>
-          <div>
-            <strong>Human-controlled</strong>
-            <p>Nothing is submitted without your approval.</p>
-          </div>
+          <div><strong>Human-controlled</strong><p>Nothing is submitted without your approval.</p></div>
         </div>
-
-        <div className="rail-footer">
-          <span className="live-dot" />
-          <span>Secure session</span>
-          <span>·</span>
-          <span>Evidence-led</span>
-        </div>
+        <div className="rail-footer"><span className="live-dot" /><span>Secure session</span><span>·</span><span>Evidence-led</span></div>
       </aside>
 
       <div className="app-stage">
@@ -198,24 +224,13 @@ export function AppShell({ children }: { children: ReactNode }) {
 
               {profileOpen ? (
                 <div id="profile-menu" className="profile-menu" role="menu" aria-label="Profile and account">
-                  <div className="profile-menu-identity">
-                    <strong>{fullName}</strong>
-                    <span>{session.user.email}</span>
-                  </div>
+                  <div className="profile-menu-identity"><strong>{fullName}</strong><span>{session.user.email}</span></div>
                   <div className="profile-menu-divider" />
-                  <Link href="/career-truth" className="profile-menu-link" role="menuitem">
-                    <span>Career Profile</span><small aria-hidden="true">→</small>
-                  </Link>
-                  <button type="button" className="profile-menu-action" role="menuitem" onClick={() => void signOut()}>
-                    <span>Log out</span><small>End this secure session</small>
-                  </button>
+                  <Link href="/career-truth" className="profile-menu-link" role="menuitem"><span>Career Profile</span><small aria-hidden="true">→</small></Link>
+                  <button type="button" className="profile-menu-action" role="menuitem" onClick={() => void signOut()}><span>Log out</span><small>End this secure session</small></button>
                   <div className="profile-menu-divider" />
-                  <button type="button" className="profile-menu-action danger" role="menuitem" onClick={() => showProtectedAction("Delete Profile")}>
-                    <span>Delete Profile</span><small>Protected until migration</small>
-                  </button>
-                  <button type="button" className="profile-menu-action danger" role="menuitem" onClick={() => showProtectedAction("Wipe Data")}>
-                    <span>Wipe Data</span><small>Protected until migration</small>
-                  </button>
+                  <button type="button" className="profile-menu-action danger" role="menuitem" onClick={() => openAccountAction("delete")}><span>Delete Profile</span><small>Delete account and all private data</small></button>
+                  <button type="button" className="profile-menu-action danger" role="menuitem" onClick={() => openAccountAction("wipe")}><span>Wipe Data</span><small>Keep login, erase workspace data</small></button>
                 </div>
               ) : null}
             </div>
@@ -230,8 +245,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           const active = isActive(pathname, item.href);
           return (
             <Link key={item.href} href={item.href} className={`dock-item${active ? " is-active" : ""}`} aria-current={active ? "page" : undefined}>
-              <span className="dock-icon"><Icon name={item.icon} /></span>
-              <span>{item.shortLabel}</span>
+              <span className="dock-icon"><Icon name={item.icon} /></span><span>{item.shortLabel}</span>
             </Link>
           );
         })}
@@ -239,21 +253,39 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       <OnboardingCarousel user={session.user} />
 
-      {protectedAction ? (
-        <div className="profile-protection-layer" role="dialog" aria-modal="true" aria-labelledby="protected-action-title">
-          <button type="button" className="profile-protection-backdrop" onClick={() => setProtectedAction(null)} aria-label="Close protected action" />
-          <section className="profile-protection-dialog">
-            <span className="profile-protection-kicker">Protected action</span>
-            <h2 id="protected-action-title">{protectedAction}</h2>
+      {accountAction ? (
+        <div className="profile-protection-layer" role="dialog" aria-modal="true" aria-labelledby="account-action-title">
+          <button type="button" className="profile-protection-backdrop" onClick={closeAccountAction} aria-label="Close account action" />
+          <section className="profile-protection-dialog account-danger-dialog">
+            <span className="profile-protection-kicker">Permanent action</span>
+            <h2 id="account-action-title">{actionTitle}</h2>
             <p>
-              This control is visible, but intentionally locked until Work Package 2 moves your Career Profile and evidence out of <code>data/profile.ts</code> and into your private Supabase records.
+              {accountAction === "delete"
+                ? "This permanently removes your Sartho login, Career Profile, evidence, jobs, analyses, résumé drafts and application history."
+                : "This permanently removes your Career Profile, evidence, jobs, analyses, résumé drafts and application history, but keeps your Google login connected."}
             </p>
-            <div className="profile-protection-note">
-              Enabling this today would be misleading: it could delete database rows while the same personal information remains embedded in the application source. No data has been deleted.
-            </div>
+            <div className="profile-protection-note">This cannot be undone. Type <strong>{requiredPhrase}</strong> to confirm.</div>
+            <label className="account-confirmation-field">
+              <span>Confirmation</span>
+              <input
+                autoFocus
+                value={confirmation}
+                onChange={(event) => setConfirmation(event.target.value)}
+                placeholder={requiredPhrase}
+                autoComplete="off"
+              />
+            </label>
+            {accountError ? <div className="inline-error" role="alert">{accountError}</div> : null}
             <div className="profile-protection-actions">
-              <button type="button" className="secondary-button" onClick={() => setProtectedAction(null)}>Close</button>
-              <Link href="/career-truth" className="primary-button" onClick={() => setProtectedAction(null)}>Open Career Profile</Link>
+              <button type="button" className="secondary-button" onClick={closeAccountAction} disabled={accountBusy}>Cancel</button>
+              <button
+                type="button"
+                className="danger-button"
+                onClick={() => void confirmAccountAction()}
+                disabled={accountBusy || confirmation.trim().toUpperCase() !== requiredPhrase}
+              >
+                {accountBusy ? "Deleting…" : accountAction === "delete" ? "Delete everything" : "Wipe my data"}
+              </button>
             </div>
           </section>
         </div>

@@ -1,85 +1,101 @@
-import { careerProfile, evidenceItems } from "@/data/profile";
+import { EvidenceReview } from "@/components/evidence-review";
+import { requireUser } from "@/lib/auth";
+import { getCareerWorkspace } from "@/lib/data/career";
 
-export default function CareerTruthPage() {
+export const dynamic = "force-dynamic";
+
+export default async function CareerTruthPage() {
+  const { supabase, user } = await requireUser();
+  const { profile, lanes, evidence } = await getCareerWorkspace(supabase, user.id);
+
+  const approved = evidence.filter((item) => item.approval_status === "approved").length;
+  const rejected = evidence.filter((item) => item.approval_status === "rejected").length;
+  const pending = evidence.length - approved - rejected;
+
   return (
     <div className="page-stack">
       <section className="glass-card page-header-card">
         <div className="page-eyebrow"><span className="live-dot" /> Career foundation</div>
-        <h1 className="page-title">Career Truth</h1>
+        <h1 className="page-title">Career Profile</h1>
         <p className="page-description">
-          The factual source behind every match, résumé and application answer. Sartho will never invent a skill,
-          metric, certification or responsibility—and it will only use claims you have approved.
+          The factual source behind every match, résumé and interview answer. Sartho uses only evidence you approve and never invents a skill, metric, employer, certification or responsibility.
         </p>
 
         <div className="summary-grid">
-          <Summary label="Evidence records" value={String(evidenceItems.length)} />
-          <Summary label="Approved for use" value="0" />
-          <Summary label="Awaiting review" value={String(evidenceItems.length)} />
+          <Summary label="Evidence records" value={String(evidence.length)} />
+          <Summary label="Approved for use" value={String(approved)} />
+          <Summary label="Awaiting review" value={String(pending)} />
         </div>
       </section>
+
+      {!profile ? (
+        <section className="glass-card empty-ledger">
+          <div className="empty-ledger-inner">
+            <div className="empty-ledger-icon" aria-hidden="true">◎</div>
+            <h3>Your private Career Profile is ready to be loaded</h3>
+            <p>
+              The application no longer reads personal career information from source code. Run the one-time private seed in Supabase to load your profile, target lanes and evidence into your protected account.
+            </p>
+          </div>
+        </section>
+      ) : (
+        <section className="glass-card content-card profile-overview-card">
+          <div className="card-header">
+            <div>
+              <div className="page-eyebrow">Current positioning</div>
+              <h2 className="position-title">{profile.headline ?? "Career positioning"}</h2>
+              {profile.summary ? <p className="section-subtitle profile-summary">{profile.summary}</p> : null}
+            </div>
+            <span className="meta-pill">
+              {profile.total_experience_years ? `${profile.total_experience_years}+ years` : "Experience profile"}
+              {profile.location ? ` · ${profile.location}` : ""}
+            </span>
+          </div>
+
+          <div className="profile-facts-grid">
+            <div><span>Work authorisation</span><strong>{profile.work_authorisation ?? "Not recorded"}</strong></div>
+            <div><span>Approved evidence</span><strong>{approved} records</strong></div>
+            <div><span>Honest exclusions</span><strong>{profile.exclusions.length} guardrails</strong></div>
+          </div>
+        </section>
+      )}
 
       <section className="glass-card content-card">
         <div className="card-header">
           <div>
             <h2 className="section-heading">Target role strategy</h2>
-            <p className="section-subtitle">Leadership first. ServiceNow remains the platform—not your entire identity.</p>
+            <p className="section-subtitle">Leadership first. Platforms support your value; they do not define your entire identity.</p>
           </div>
-          <span className="meta-pill">100% search allocation</span>
+          <span className="meta-pill">{lanes.reduce((total, lane) => total + lane.weight, 0)}% search allocation</span>
         </div>
 
-        <div className="strategy-grid">
-          {careerProfile.targetLanes.map((lane, index) => (
-            <article key={lane.name} className="strategy-card">
-              <span className="strategy-number">0{index + 1}</span>
-              <h3>{lane.name}</h3>
-              <footer><span>Priority lane</span><strong>{lane.weight}%</strong></footer>
-            </article>
-          ))}
-        </div>
+        {lanes.length ? (
+          <div className="strategy-grid">
+            {lanes.map((lane, index) => (
+              <article key={lane.id} className="strategy-card">
+                <span className="strategy-number">{String(index + 1).padStart(2, "0")}</span>
+                <h3>{lane.name}</h3>
+                <footer><span>Priority lane</span><strong>{lane.weight}%</strong></footer>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <div className="empty-inline-state">No target role lanes are configured yet.</div>
+        )}
       </section>
 
       <section className="glass-card content-card">
         <div className="card-header">
           <div>
-            <h2 className="section-heading">Evidence awaiting approval</h2>
-            <p className="section-subtitle">Review each claim before Sartho uses it for matching or application content.</p>
+            <h2 className="section-heading">Career evidence review</h2>
+            <p className="section-subtitle">Approve, edit or reject every claim before Sartho can use it. Focus a card and press A to approve or R to reject.</p>
           </div>
-          <span className="status-chip status-pending">{evidenceItems.length} pending</span>
+          <span className={`status-chip ${pending ? "status-pending" : "status-approved"}`}>
+            {pending ? `${pending} pending` : "Review complete"}
+          </span>
         </div>
 
-        <div className="evidence-toolbar" aria-label="Evidence filters">
-          <div className="toolbar-group">
-            <button type="button" className="toolbar-pill is-active">All evidence</button>
-            <button type="button" className="toolbar-pill">EUC & ITSM</button>
-            <button type="button" className="toolbar-pill">ServiceNow</button>
-            <button type="button" className="toolbar-pill">Leadership</button>
-          </div>
-          <span className="meta-pill">Newest first</span>
-        </div>
-
-        <div className="evidence-list">
-          {evidenceItems.map((item) => (
-            <article key={item.id} className="evidence-card">
-              <div className="evidence-meta">
-                <div className="evidence-employer">{item.employer} · {item.role}</div>
-                <span className="status-chip status-pending">Needs approval</span>
-              </div>
-              <p className="evidence-claim">{item.claim}</p>
-              {item.metrics.length ? <div className="evidence-metrics">{item.metrics.join(" · ")}</div> : null}
-              <div className="chip-row">
-                {item.domains.map((domain) => <span key={domain} className="domain-chip">{domain}</span>)}
-              </div>
-              <footer className="evidence-footer">
-                <span className="evidence-source">Source: {item.source} · {item.sourceLocator}</span>
-                <div className="review-actions" title="Approval actions are enabled in the next functional milestone">
-                  <button type="button" className="review-button" disabled>Approve</button>
-                  <button type="button" className="review-button" disabled>Edit</button>
-                  <button type="button" className="review-button" disabled>Reject</button>
-                </div>
-              </footer>
-            </article>
-          ))}
-        </div>
+        <EvidenceReview initialItems={evidence} />
       </section>
     </div>
   );

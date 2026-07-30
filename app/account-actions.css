@@ -1,0 +1,58 @@
+.account-confirmation-field {
+  display: grid;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.account-confirmation-field > span {
+  color: var(--text-secondary);
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.account-confirmation-field input {
+  width: 100%;
+  min-height: 46px;
+  padding: 0 13px;
+  border: 1px solid rgba(255, 142, 163, .22);
+  border-radius: 13px;
+  color: white;
+  background: rgba(5, 8, 13, .55);
+  outline: none;
+  font-size: 12px;
+  letter-spacing: .08em;
+}
+
+.account-confirmation-field input:focus-visible {
+  border-color: rgba(255, 142, 163, .5);
+  box-shadow: 0 0 0 4px rgba(255, 142, 163, .09);
+}
+
+.danger-button {
+  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 16px;
+  border: 1px solid rgba(255, 142, 163, .28);
+  border-radius: 13px;
+  color: #ffe4e9;
+  background: rgba(201, 55, 82, .2);
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 750;
+}
+
+.danger-button:hover:not(:disabled) {
+  border-color: rgba(255, 142, 163, .48);
+  background: rgba(201, 55, 82, .3);
+}
+
+.danger-button:disabled {
+  opacity: .42;
+  cursor: not-allowed;
+}
+
+.account-danger-dialog .profile-protection-note strong {
+  color: white;
+}

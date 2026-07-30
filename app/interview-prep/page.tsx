@@ -1,44 +1,51 @@
 import Link from "next/link";
+import { requireUser } from "@/lib/auth";
+import { getJobs } from "@/lib/data/jobs";
+
+export const dynamic = "force-dynamic";
 
 const preparationAreas = [
   {
     title: "Likely questions",
-    description: "Turn the job description into the leadership, delivery, commercial and role-specific questions you are most likely to face.",
+    description: "Use the saved requirements and recruiter signals to focus on the questions most likely to test leadership, delivery and judgment.",
   },
   {
     title: "Your strongest stories",
-    description: "Select the most relevant evidence from your career and shape it into clear STAR answers with real outcomes and metrics.",
+    description: "Choose approved evidence that proves the required capability and shape it into a concise STAR answer.",
   },
   {
     title: "Recruiter lens",
-    description: "Understand what the interviewer may be testing beneath the words: seniority, ownership, judgment, influence and readiness.",
+    description: "Separate written requirements from clearly labelled AI inference about seniority, ownership, influence and readiness.",
   },
   {
     title: "Follow-up pressure",
-    description: "Prepare for the second question, the challenge question and the details that expose vague or unsupported answers.",
+    description: "Prepare the second question, the challenge question and the details that expose unsupported answers.",
   },
 ];
 
-export default function InterviewPrepPage() {
+export default async function InterviewPrepPage() {
+  const { supabase, user } = await requireUser();
+  const jobs = await getJobs(supabase, user.id);
+  const readyJobs = jobs.filter((job) => job.deep_analysis_status === "complete");
+  const activeInterviews = jobs.filter((job) => job.status === "interview" || job.status === "assessment");
+
   return (
     <div className="page-stack">
       <section className="hero-panel glass-card">
         <div className="hero-copy">
           <div className="page-eyebrow"><span className="live-dot" /> Interview Prep</div>
           <h1>Be ready when<br />the moment arrives.</h1>
-          <p>
-            Sartho connects the role, the recruiter’s likely priorities and your strongest real career stories—so your answers sound credible, relevant and unmistakably yours.
-          </p>
+          <p>Sartho connects a real opportunity, the recruiter’s likely priorities and your strongest approved career stories—so your answers are relevant, credible and unmistakably yours.</p>
           <div className="hero-actions">
             <Link href="/jobs" className="primary-button">Choose a role <span aria-hidden="true">↗</span></Link>
             <Link href="/career-truth" className="secondary-button">Review my evidence</Link>
           </div>
         </div>
 
-        <div className="home-hero-signal" aria-label="Interview preparation principle">
+        <div className="home-hero-signal" aria-label="Interview preparation readiness">
           <span className="signal-label">Preparation principle</span>
           <strong>Do not memorise a script. Own your story.</strong>
-          <p>Strong preparation gives you structure, proof and confidence without making the answer sound artificial.</p>
+          <p>{readyJobs.length} roles have completed evidence-led analysis; {activeInterviews.length} currently need assessment or interview attention.</p>
         </div>
       </section>
 
@@ -52,28 +59,56 @@ export default function InterviewPrepPage() {
         ))}
       </section>
 
+      <section className="glass-card content-card">
+        <div className="card-header">
+          <div>
+            <h2 className="section-heading">Roles ready for preparation</h2>
+            <p className="section-subtitle">Open a role to review its requirement mapping, evidence citations, recruiter lens and résumé draft together.</p>
+          </div>
+          <span className="meta-pill">{readyJobs.length} ready</span>
+        </div>
+
+        {readyJobs.length ? (
+          <div className="saved-job-list">
+            {readyJobs.map((job) => (
+              <Link href={`/jobs/${job.id}`} className="saved-job-row" key={job.id}>
+                <div>
+                  <span className="saved-job-employer">{job.employer ?? "Employer not recorded"}</span>
+                  <strong>{job.title}</strong>
+                  <small>{job.deep_analysis_summary?.mandatoryMet ?? 0} of {job.deep_analysis_summary?.mandatoryTotal ?? 0} mandatory requirements supported</small>
+                </div>
+                <div className="saved-job-signals">
+                  <span className={`status-chip status-${job.status}`}>{job.status}</span>
+                  <span aria-hidden="true">→</span>
+                </div>
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <div className="empty-ledger-inner">
+            <div className="empty-ledger-icon" aria-hidden="true">Q</div>
+            <h3>No role is ready for evidence-backed preparation yet</h3>
+            <p>Save a job and complete deep analysis. That requirement mapping becomes the foundation for role-specific interview preparation.</p>
+            <Link href="/jobs" className="primary-button">Analyse a role <span aria-hidden="true">→</span></Link>
+          </div>
+        )}
+      </section>
+
       <section className="dashboard-grid">
         <article className="glass-card content-card">
           <div className="card-header">
-            <div>
-              <div className="page-eyebrow">Answer architecture</div>
-              <h2 className="position-title">A clear answer, built from real evidence.</h2>
-            </div>
+            <div><div className="page-eyebrow">Answer architecture</div><h2 className="position-title">A clear answer, built from real evidence.</h2></div>
             <span className="meta-pill">Role-specific</span>
           </div>
-
           <div className="lane-list">
             {[
               ["Open with the point", "Answer the question directly before adding context."],
-              ["Use the right career story", "Choose the example that best proves the capability the interviewer is testing."],
+              ["Use the right career story", "Choose approved evidence that proves the capability being tested."],
               ["Show your decisions", "Explain what you owned, how you judged the situation and what you changed."],
-              ["Land the outcome", "Close with a measurable result, learning or business impact."],
+              ["Land the outcome", "Close with a supported result, learning or business impact."],
             ].map(([title, description], index) => (
               <div className="lane-row" key={title}>
-                <div className="lane-top">
-                  <span className="lane-index">0{index + 1}</span>
-                  <span className="lane-name">{title}</span>
-                </div>
+                <div className="lane-top"><span className="lane-index">{String(index + 1).padStart(2, "0")}</span><span className="lane-name">{title}</span></div>
                 <p className="metric-note">{description}</p>
               </div>
             ))}
@@ -81,14 +116,12 @@ export default function InterviewPrepPage() {
         </article>
 
         <article className="glass-card content-card next-card action-next-card">
-          <div className="page-eyebrow">Start with a real opportunity</div>
-          <h3>Interview preparation begins after the role is understood.</h3>
-          <p>
-            Analyse the job first. Sartho will then use the requirements, likely recruiter signals and your approved evidence to build the preparation pack.
-          </p>
-          <div className="impact-row"><span>Output</span><strong>Questions, answer guidance and follow-ups</strong></div>
-          <div className="impact-row"><span>Grounding</span><strong>Your approved career evidence</strong></div>
-          <Link href="/jobs" className="primary-button">Analyse a role <span aria-hidden="true">→</span></Link>
+          <div className="page-eyebrow">Trust boundary</div>
+          <h3>Preparation guides you; it does not manufacture a persona.</h3>
+          <p>Every story, metric and claimed capability must remain grounded in approved evidence. Unknowns remain honest gaps.</p>
+          <div className="impact-row"><span>Output</span><strong>Question themes, evidence and follow-up preparation</strong></div>
+          <div className="impact-row"><span>Control</span><strong>You decide what to say and how to say it</strong></div>
+          <Link href="/career-truth" className="primary-button">Strengthen my evidence <span aria-hidden="true">→</span></Link>
         </article>
       </section>
     </div>

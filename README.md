@@ -2,33 +2,72 @@
 
 **Your career, intelligently guided.**
 
-Sartho is a private, evidence-led career intelligence and application workflow for senior technology professionals. The first user profile is focused on EUC, Digital Workplace, ITSM and ServiceNow transformation leadership.
+Sartho is a private, evidence-led career intelligence and application workflow for senior professionals.
 
-## What is working in this foundation
+## Working product flow
 
-- Responsive Next.js application shell.
-- Career Truth evidence library seeded from the approved source CVs.
-- Transparent target-role strategy and explicit exclusions.
-- Working rule-based job screener for role-lane fit and technical heaviness.
-- Application-status ledger shell.
-- Supabase schema with Row Level Security.
+1. Sign in through Supabase Auth.
+2. Review the private Career Profile and approve, edit or reject evidence.
+3. Paste and analyse a job description using the transparent rule-based first pass.
+4. Save the job and preserve its analysis.
+5. Move the opportunity through the Applications pipeline.
+6. Explicitly run server-side deep analysis against approved evidence only.
+7. Review the persisted requirement-to-evidence mapping and honest gaps.
+8. Explicitly draft a separate tailored résumé with a complete change log.
 
 ## Product guardrails
 
-- Human approval before any application submission.
-- No invented skills, certifications, metrics or responsibilities.
-- Avoid ServiceNow developer-heavy and deep technical-architecture roles.
-- Prioritise EUC / Digital Workplace / ITSM transformation leadership, followed by ServiceNow engagement and delivery leadership.
-- Preserve the original job description and a full change log for every tailored résumé.
-- Treat job matching as evidence mapping, not keyword inflation.
+- Human approval before any external action.
+- No automatic application submission or email sending.
+- No invented skills, certifications, employers, dates, metrics or responsibilities.
+- Only evidence with `approval_status = 'approved'` is sent for deep analysis.
+- Every AI-cited evidence ID is validated server-side against the authenticated user’s approved records.
+- Résumé drafting uses only approved evidence marked safe for résumé use.
+- The original job description and every tailored-résumé change remain preserved.
+- AI calls are server-side only; provider keys must never use a `NEXT_PUBLIC_` prefix.
 
 ## Technology
 
-- Next.js App Router + TypeScript
+- Next.js 16 App Router and TypeScript
 - Tailwind CSS
-- Supabase PostgreSQL, Auth and Storage
+- Supabase PostgreSQL and Auth with Row Level Security
 - Vercel deployment
-- Provider-independent AI layer planned for later phases
+- Provider-independent server AI adapter for OpenAI or Anthropic
+
+## Database setup
+
+The existing foundation schema is in `supabase/schema.sql`.
+
+Apply the current product migration:
+
+```text
+supabase/migrations/20260731_work_packages_2_6.sql
+```
+
+Private profile seed files must never be committed. `.gitignore` explicitly excludes them.
+
+## Environment variables
+
+Required:
+
+```text
+NEXT_PUBLIC_SUPABASE_URL
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+```
+
+Configure one server-side AI provider:
+
+```text
+OPENAI_API_KEY
+```
+
+or:
+
+```text
+ANTHROPIC_API_KEY
+```
+
+Optional model overrides are documented in `.env.example`.
 
 ## Local setup
 
@@ -46,13 +85,10 @@ npm run lint
 npm run build
 ```
 
-## Next milestone
+## Security boundaries
 
-1. Create a Supabase project.
-2. Run `supabase/schema.sql` in the SQL Editor.
-3. Add Supabase Auth and protect all private routes.
-4. Migrate Career Truth seed data into the database.
-5. Add approve / edit / reject evidence actions.
-6. Add evidence-led AI job matching after Career Truth is validated.
-
-See `docs/product-brief.md` and `docs/architecture.md` for the current decisions.
+- `proxy.ts` refreshes Supabase sessions and performs early redirects.
+- Every route handler independently verifies the authenticated user.
+- Row Level Security scopes profile, evidence, jobs, requirements and applications to their owner.
+- Deep-analysis writes are atomic through `replace_job_requirements`.
+- Profile deletion and workspace wiping require explicit typed confirmation.

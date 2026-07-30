@@ -1,39 +1,33 @@
 import Link from "next/link";
+import { requireUser } from "@/lib/auth";
+import { getJobs } from "@/lib/data/jobs";
+import type { ApplicationRecord } from "@/lib/types";
 
-const versionTypes = [
-  {
-    title: "Master résumé",
-    state: "Protected source",
-    description: "Your complete career record. Sartho will never overwrite this version when tailoring for a role.",
-    action: "Review Career Profile",
-    href: "/career-truth",
-  },
-  {
-    title: "Role-positioning versions",
-    state: "Ready to configure",
-    description: "Create focused versions for Transition & Transformation, EUC & Digital Workplace, and ServiceNow delivery leadership.",
-    action: "Set role direction",
-    href: "/career-truth",
-  },
-  {
-    title: "Job-specific versions",
-    state: "Starts with an analysis",
-    description: "Every analysed role can create a separate evidence-backed résumé delta without changing your master résumé.",
-    action: "Analyse a role",
-    href: "/jobs",
-  },
-];
+export const dynamic = "force-dynamic";
 
-export default function ResumeStudioPage() {
+export default async function ResumeStudioPage() {
+  const { supabase, user } = await requireUser();
+  const [jobs, applicationsResult, approvedResult] = await Promise.all([
+    getJobs(supabase, user.id),
+    supabase.from("applications").select("*").eq("user_id", user.id).not("resume_draft", "is", null).order("updated_at", { ascending: false }),
+    supabase.from("evidence_items").select("id", { count: "exact", head: true }).eq("user_id", user.id).eq("approval_status", "approved").eq("safe_for_resume", true),
+  ]);
+
+  if (applicationsResult.error) throw applicationsResult.error;
+  if (approvedResult.error) throw approvedResult.error;
+
+  const jobById = new Map(jobs.map((job) => [job.id, job]));
+  const applications = (applicationsResult.data ?? []) as ApplicationRecord[];
+  const readyJobs = jobs.filter((job) => job.deep_analysis_status === "complete" && !applications.some((application) => application.job_id === job.id));
+  const approvedCount = approvedResult.count ?? 0;
+
   return (
     <div className="page-stack">
       <section className="hero-panel glass-card">
         <div className="hero-copy">
           <div className="page-eyebrow"><span className="live-dot" /> Résumé Studio</div>
           <h1>Shape the résumé<br />the role deserves.</h1>
-          <p>
-            Keep one protected master résumé, create focused career-positioning versions and produce a role-specific version that highlights the evidence recruiters need to see.
-          </p>
+          <p>Keep one protected evidence base and produce separate job-specific drafts that highlight the right proof without rewriting history.</p>
           <div className="hero-actions">
             <Link href="/jobs" className="primary-button">Analyse a role <span aria-hidden="true">↗</span></Link>
             <Link href="/career-truth" className="secondary-button">Strengthen Career Profile</Link>
@@ -43,60 +37,81 @@ export default function ResumeStudioPage() {
         <div className="home-hero-signal" aria-label="Résumé Studio readiness">
           <span className="signal-label">Résumé principle</span>
           <strong>Tailor the story. Never invent it.</strong>
-          <p>Every suggested change must be connected to verified career evidence and approved by you.</p>
+          <p>{approvedCount} approved résumé-safe evidence records are available for drafting.</p>
         </div>
       </section>
 
-      <section className="metric-grid action-metric-grid" aria-label="Résumé version types">
-        {versionTypes.map((item, index) => (
-          <Link key={item.title} href={item.href} className="glass-card-soft metric-card action-metric">
-            <span className="metric-icon" aria-hidden="true">{String(index + 1).padStart(2, "0")}</span>
-            <div className="metric-label">{item.title}</div>
-            <div className="metric-value">{item.state}</div>
-            <div className="metric-note">{item.description}</div>
-            <span className="metric-action">{item.action}<span aria-hidden="true">→</span></span>
-          </Link>
-        ))}
+      <section className="metric-grid action-metric-grid" aria-label="Résumé workspace status">
+        <article className="glass-card-soft metric-card action-metric">
+          <span className="metric-icon" aria-hidden="true">01</span>
+          <div className="metric-label">Protected evidence base</div>
+          <div className="metric-value">{approvedCount}</div>
+          <div className="metric-note">Approved records available for truthful drafting</div>
+          <Link href="/career-truth" className="metric-action">Review Career Profile<span aria-hidden="true">→</span></Link>
+        </article>
+        <article className="glass-card-soft metric-card action-metric">
+          <span className="metric-icon" aria-hidden="true">02</span>
+          <div className="metric-label">Jobs ready to draft</div>
+          <div className="metric-value">{readyJobs.length}</div>
+          <div className="metric-note">Deep analysis complete, no draft yet</div>
+          <Link href="/jobs" className="metric-action">Open jobs<span aria-hidden="true">→</span></Link>
+        </article>
+        <article className="glass-card-soft metric-card action-metric">
+          <span className="metric-icon" aria-hidden="true">03</span>
+          <div className="metric-label">Tailored drafts</div>
+          <div className="metric-value">{applications.length}</div>
+          <div className="metric-note">Separate versions with complete change logs</div>
+          <span className="metric-action">Review below<span aria-hidden="true">↓</span></span>
+        </article>
       </section>
 
-      <section className="dashboard-grid">
-        <article className="glass-card content-card">
+      {readyJobs.length ? (
+        <section className="glass-card content-card">
           <div className="card-header">
-            <div>
-              <div className="page-eyebrow">Résumé Delta</div>
-              <h2 className="position-title">See exactly what should change—and why.</h2>
-            </div>
-            <span className="meta-pill">Human approval required</span>
+            <div><h2 className="section-heading">Ready for a tailored draft</h2><p className="section-subtitle">These roles already have evidence-led requirement mappings.</p></div>
+            <span className="meta-pill">{readyJobs.length} ready</span>
           </div>
-
-          <div className="lane-list">
-            {[
-              ["Emphasise", "Bring the most relevant achievements and outcomes higher."],
-              ["Reframe", "Use language that matches the role while preserving the truth."],
-              ["De-emphasise", "Reduce details that make your profile look too technical, narrow or operational."],
-              ["Verify", "Flag claims that need your confirmation before they can be used."],
-            ].map(([title, description], index) => (
-              <div className="lane-row" key={title}>
-                <div className="lane-top">
-                  <span className="lane-index">0{index + 1}</span>
-                  <span className="lane-name">{title}</span>
-                </div>
-                <p className="metric-note">{description}</p>
-              </div>
+          <div className="saved-job-list">
+            {readyJobs.map((job) => (
+              <Link href={`/jobs/${job.id}`} className="saved-job-row" key={job.id}>
+                <div><span className="saved-job-employer">{job.employer ?? "Employer not recorded"}</span><strong>{job.title}</strong><small>Open the role to draft a résumé</small></div>
+                <span aria-hidden="true">→</span>
+              </Link>
             ))}
           </div>
-        </article>
+        </section>
+      ) : null}
 
-        <article className="glass-card content-card next-card action-next-card">
-          <div className="page-eyebrow">Download readiness</div>
-          <h3>Downloads will follow the secure data migration.</h3>
-          <p>
-            Word and PDF downloads become reliable only after the master résumé and approved evidence are stored in Supabase instead of the source code.
-          </p>
-          <div className="impact-row"><span>Planned formats</span><strong>ATS-safe Word and PDF</strong></div>
-          <div className="impact-row"><span>Protection</span><strong>Master résumé never overwritten</strong></div>
-          <Link href="/career-truth" className="primary-button">Prepare the evidence <span aria-hidden="true">→</span></Link>
-        </article>
+      <section className="glass-card content-card">
+        <div className="card-header">
+          <div><h2 className="section-heading">Job-specific résumé drafts</h2><p className="section-subtitle">Every draft remains clearly labelled for review and keeps its change log.</p></div>
+          <span className="meta-pill">{applications.length} versions</span>
+        </div>
+
+        {applications.length ? (
+          <div className="resume-version-list">
+            {applications.map((application) => {
+              const job = jobById.get(application.job_id);
+              return (
+                <Link href={`/jobs/${application.job_id}`} className="resume-version-row" key={application.id}>
+                  <div>
+                    <span>Draft — review before use</span>
+                    <strong>{application.resume_version ?? job?.title ?? "Tailored résumé"}</strong>
+                    <small>{job?.employer ?? "Employer not recorded"} · {application.resume_change_log.length} change-log entries</small>
+                  </div>
+                  <span aria-hidden="true">→</span>
+                </Link>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="empty-ledger-inner">
+            <div className="empty-ledger-icon" aria-hidden="true">R</div>
+            <h3>No tailored drafts yet</h3>
+            <p>Save a role, complete deep analysis and create the first evidence-backed résumé draft from its job page.</p>
+            <Link href="/jobs" className="primary-button">Analyse a role <span aria-hidden="true">→</span></Link>
+          </div>
+        )}
       </section>
     </div>
   );

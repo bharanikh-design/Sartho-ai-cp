@@ -1,50 +1,69 @@
 import Link from "next/link";
-import { careerProfile, evidenceItems } from "@/data/profile";
+import { requireUser } from "@/lib/auth";
+import { getCareerWorkspace } from "@/lib/data/career";
+import type { JobStatus } from "@/lib/types";
 
-const actions = [
-  {
-    href: "/career-truth",
-    symbol: "✓",
-    label: "Evidence to review",
-    value: String(evidenceItems.length),
-    note: "Confirm what Sartho may use",
-    action: "Review Career Profile",
-  },
-  {
-    href: "/jobs",
-    symbol: "✦",
-    label: "Analyse a role",
-    value: "New",
-    note: "Requirements, recruiter signals and fit",
-    action: "Start role analysis",
-  },
-  {
-    href: "/resume-studio",
-    symbol: "R",
-    label: "Résumé Studio",
-    value: "Build",
-    note: "Master, role-focused and job-specific versions",
-    action: "Open Résumé Studio",
-  },
-  {
-    href: "/interview-prep",
-    symbol: "Q",
-    label: "Interview Prep",
-    value: "Prepare",
-    note: "Likely questions and evidence-backed answers",
-    action: "Start preparation",
-  },
-  {
-    href: "/applications",
-    symbol: "↗",
-    label: "Application journey",
-    value: "0",
-    note: "Track messages, interviews and outcomes",
-    action: "Open applications",
-  },
-];
+export const dynamic = "force-dynamic";
 
-export default function HomePage() {
+export default async function HomePage() {
+  const { supabase, user } = await requireUser();
+  const { profile, lanes, evidence } = await getCareerWorkspace(supabase, user.id);
+  const { data: jobs, error: jobsError } = await supabase
+    .from("jobs")
+    .select("id,status")
+    .eq("user_id", user.id);
+
+  if (jobsError) throw jobsError;
+
+  const approvedEvidence = evidence.filter((item) => item.approval_status === "approved").length;
+  const pendingEvidence = evidence.filter((item) => item.approval_status === "pending").length;
+  const jobRows = (jobs ?? []) as Array<{ id: string; status: JobStatus }>;
+  const activeApplications = jobRows.filter((job) => !["offer", "rejected", "withdrawn"].includes(job.status)).length;
+  const interviewCount = jobRows.filter((job) => job.status === "interview" || job.status === "assessment").length;
+
+  const actions = [
+    {
+      href: "/career-truth",
+      symbol: "✓",
+      label: "Evidence to review",
+      value: String(pendingEvidence),
+      note: pendingEvidence ? "Confirm what Sartho may use" : "Your approved evidence base is ready",
+      action: pendingEvidence ? "Review Career Profile" : "Open Career Profile",
+    },
+    {
+      href: "/jobs",
+      symbol: "✦",
+      label: "Saved opportunities",
+      value: String(jobRows.length),
+      note: "Analyse, save and revisit roles",
+      action: "Open role workspace",
+    },
+    {
+      href: "/resume-studio",
+      symbol: "R",
+      label: "Résumé Studio",
+      value: approvedEvidence ? "Ready" : "Setup",
+      note: approvedEvidence ? `${approvedEvidence} approved evidence records available` : "Approve evidence before tailoring",
+      action: "Open Résumé Studio",
+    },
+    {
+      href: "/interview-prep",
+      symbol: "Q",
+      label: "Interview Prep",
+      value: String(interviewCount),
+      note: interviewCount ? "Opportunities need preparation" : "Prepare from a saved role",
+      action: "Start preparation",
+    },
+    {
+      href: "/applications",
+      symbol: "↗",
+      label: "Active journey",
+      value: String(activeApplications),
+      note: "Track applications, interviews and outcomes",
+      action: "Open applications",
+    },
+  ];
+
   return (
     <div className="page-stack">
       <section className="hero-panel home-hero glass-card">
@@ -61,11 +80,15 @@ export default function HomePage() {
           </div>
         </div>
 
-        <div className="home-hero-signal" aria-label={`${evidenceItems.length} career evidence items awaiting review`}>
+        <div className="home-hero-signal" aria-label="Career workspace readiness">
           <span className="signal-label">Your next chapter</span>
           <strong>One right role can change everything.</strong>
-          <p>{evidenceItems.length} career evidence records are ready to strengthen your next application.</p>
-          <Link href="/career-truth">Build my Career Profile <span aria-hidden="true">→</span></Link>
+          <p>
+            {profile
+              ? `${approvedEvidence} approved evidence records can support honest matching and preparation.`
+              : "Load your private Career Profile to begin evidence-backed matching."}
+          </p>
+          <Link href="/career-truth">{profile ? "Strengthen my Career Profile" : "Set up my Career Profile"} <span aria-hidden="true">→</span></Link>
         </div>
       </section>
 
@@ -86,36 +109,49 @@ export default function HomePage() {
           <div className="card-header">
             <div>
               <div className="page-eyebrow">Current positioning</div>
-              <h2 className="position-title">{careerProfile.headline}</h2>
+              <h2 className="position-title">{profile?.headline ?? "Build your evidence-backed career positioning"}</h2>
             </div>
-            <span className="meta-pill">{careerProfile.experienceYears}+ years · {careerProfile.location}</span>
+            <span className="meta-pill">
+              {profile?.total_experience_years ? `${profile.total_experience_years}+ years` : "Private profile"}
+              {profile?.location ? ` · ${profile.location}` : ""}
+            </span>
           </div>
 
-          <div className="lane-list">
-            {careerProfile.targetLanes.map((lane, index) => (
-              <div key={lane.name} className="lane-row">
-                <div className="lane-top">
-                  <span className="lane-index">0{index + 1}</span>
-                  <span className="lane-name">{lane.name}</span>
-                  <span className="lane-weight">{lane.weight}%</span>
+          {lanes.length ? (
+            <div className="lane-list">
+              {lanes.map((lane, index) => (
+                <div key={lane.id} className="lane-row">
+                  <div className="lane-top">
+                    <span className="lane-index">{String(index + 1).padStart(2, "0")}</span>
+                    <span className="lane-name">{lane.name}</span>
+                    <span className="lane-weight">{lane.weight}%</span>
+                  </div>
+                  <div className="progress-track"><div className="progress-fill" style={{ width: `${lane.weight}%` }} /></div>
                 </div>
-                <div className="progress-track"><div className="progress-fill" style={{ width: `${lane.weight}%` }} /></div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className="empty-inline-state">Your target role lanes will appear here after the Career Profile is loaded.</div>
+          )}
         </article>
 
         <article className="glass-card content-card next-card action-next-card">
           <div className="page-eyebrow">Next best action</div>
-          <h3>Analyse the NTT Transition & Transformation role</h3>
-          <p>Use the first real recruiter-led opportunity to test Sartho’s match reasoning, résumé direction and interview preparation journey.</p>
-          <div className="impact-row"><span>Impact</span><strong>Creates the first complete role journey</strong></div>
-          <div className="impact-row"><span>Then</span><strong>Résumé Studio and Interview Prep</strong></div>
+          <h3>{pendingEvidence ? `Verify ${Math.min(pendingEvidence, 3)} career evidence records` : "Analyse the next promising role"}</h3>
+          <p>
+            {pendingEvidence
+              ? "Approved evidence is the foundation for accurate job matching, truthful résumé tailoring and confident interview answers."
+              : "Paste a complete job description, understand the opportunity and preserve the analysis in your private workspace."}
+          </p>
+          <div className="impact-row"><span>Impact</span><strong>{pendingEvidence ? "Unlocks evidence-led AI" : "Creates a complete opportunity journey"}</strong></div>
+          <div className="impact-row"><span>Estimated effort</span><strong>{pendingEvidence ? "3–5 minutes" : "2 minutes"}</strong></div>
           <div className="next-action-buttons">
-            <Link href="/jobs" className="primary-button">Start analysis <span aria-hidden="true">→</span></Link>
+            <Link href={pendingEvidence ? "/career-truth" : "/jobs"} className="primary-button">
+              {pendingEvidence ? "Review evidence" : "Start analysis"} <span aria-hidden="true">→</span>
+            </Link>
             <details className="why-details">
               <summary>Why this?</summary>
-              <p>This role arrived through a real recruiter redirect and strongly matches your transition, EUC, infrastructure, ITSM and operational-handover experience. It is the right first case for the complete Sartho workflow.</p>
+              <p>Sartho can only make strong recommendations and drafts when its evidence base is both relevant and explicitly approved by you.</p>
             </details>
           </div>
         </article>

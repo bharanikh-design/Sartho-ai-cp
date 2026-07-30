@@ -10,3 +10,8 @@ build/
 next-env.d.ts
 .vercel/
 coverage/
+
+# Private account seeds contain personal career evidence and must never be committed.
+supabase/seed.sql
+supabase/seed.private.sql
+supabase/*private*seed*.sql
