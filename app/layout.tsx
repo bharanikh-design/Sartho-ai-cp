@@ -5,6 +5,7 @@ import "./auth.css";
 import "./auth-refinement.css";
 import "./product.css";
 import "./onboarding.css";
+import "./onboarding-responsive.css";
 import { AppShell } from "@/components/app-shell";
 
 export const metadata: Metadata = {

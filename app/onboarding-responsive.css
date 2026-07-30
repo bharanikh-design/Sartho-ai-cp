@@ -1,0 +1,202 @@
+/* Responsive onboarding proportions.
+   Desktop uses a restrained 16:10 landscape dialog sized for 13-inch laptops.
+   Tablet and phone layouts progressively collapse without becoming a full-screen takeover. */
+
+@media (min-width: 761px) {
+  .onboarding-overlay {
+    padding: 36px;
+  }
+
+  .onboarding-phone {
+    width: min(900px, calc(100vw - 72px), calc((100vh - 72px) * 1.6));
+    height: auto;
+    min-height: 0;
+    aspect-ratio: 16 / 10;
+    display: grid;
+    grid-template-columns: minmax(260px, .82fr) minmax(360px, 1.18fr);
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      "handle handle"
+      "header progress"
+      "visual copy"
+      "footer footer";
+    column-gap: clamp(24px, 3vw, 40px);
+    row-gap: 14px;
+    padding: 20px 24px 22px;
+    border-radius: 30px;
+  }
+
+  .onboarding-phone-handle {
+    grid-area: handle;
+    width: 48px;
+    height: 4px;
+    margin: 0 auto 2px;
+  }
+
+  .onboarding-header {
+    grid-area: header;
+  }
+
+  .onboarding-progress-label {
+    grid-area: progress;
+    align-self: center;
+    justify-content: flex-end;
+    gap: 18px;
+    margin: 0;
+  }
+
+  .onboarding-visual {
+    grid-area: visual;
+    min-height: 0;
+    height: 100%;
+    margin: 0;
+    border-radius: 22px;
+  }
+
+  .onboarding-symbol {
+    width: 96px;
+    height: 96px;
+    border-radius: 30px;
+    font-size: 34px;
+  }
+
+  .onboarding-mini-path {
+    width: min(210px, 70%);
+  }
+
+  .onboarding-copy {
+    grid-area: copy;
+    align-self: center;
+    margin: 0;
+    padding: 4px 8px 4px 0;
+  }
+
+  .onboarding-copy h2 {
+    max-width: 480px;
+    font-size: clamp(32px, 3vw, 42px);
+    line-height: 1.03;
+  }
+
+  .onboarding-copy p {
+    max-width: 500px;
+    font-size: 14px;
+    line-height: 1.65;
+  }
+
+  .onboarding-outcome {
+    max-width: 500px;
+    font-size: 12px;
+  }
+
+  .onboarding-footer {
+    grid-area: footer;
+    display: grid;
+    grid-template-columns: minmax(120px, 1fr) auto;
+    align-items: center;
+    gap: 24px;
+    margin: 0;
+    padding-top: 14px;
+    border-top: 1px solid rgba(255,255,255,.065);
+  }
+
+  .onboarding-dots {
+    justify-content: flex-start;
+  }
+
+  .onboarding-actions {
+    min-width: 340px;
+    margin: 0;
+  }
+
+  .onboarding-next {
+    min-width: 150px;
+    flex: 0 1 190px;
+  }
+}
+
+@media (min-width: 761px) and (max-height: 680px) {
+  .onboarding-overlay {
+    padding: 24px;
+  }
+
+  .onboarding-phone {
+    width: min(820px, calc(100vw - 48px), calc((100vh - 48px) * 1.6));
+    padding: 15px 20px 17px;
+    row-gap: 9px;
+    border-radius: 27px;
+  }
+
+  .onboarding-phone-handle {
+    margin-bottom: 0;
+  }
+
+  .onboarding-symbol {
+    width: 76px;
+    height: 76px;
+    border-radius: 24px;
+    font-size: 28px;
+  }
+
+  .onboarding-mini-path {
+    margin-top: 13px;
+  }
+
+  .onboarding-copy h2 {
+    margin-top: 7px;
+    font-size: 30px;
+  }
+
+  .onboarding-copy p {
+    margin-top: 9px;
+    font-size: 12px;
+    line-height: 1.55;
+  }
+
+  .onboarding-outcome {
+    margin-top: 10px;
+    padding: 8px 10px;
+    font-size: 10px;
+  }
+
+  .onboarding-footer {
+    padding-top: 10px;
+  }
+
+  .onboarding-skip,
+  .onboarding-back,
+  .onboarding-next {
+    min-height: 40px;
+  }
+}
+
+@media (max-width: 760px) {
+  .onboarding-overlay {
+    padding: 16px;
+  }
+
+  .onboarding-phone {
+    width: min(600px, calc(100vw - 32px));
+    height: min(700px, calc(100vh - 32px));
+    min-height: min(580px, calc(100vh - 32px));
+    aspect-ratio: auto;
+    border-radius: 30px;
+  }
+}
+
+@media (max-width: 480px) {
+  .onboarding-overlay {
+    align-items: end;
+    padding: 10px;
+  }
+
+  .onboarding-phone {
+    width: 100%;
+    height: min(720px, calc(100vh - 20px));
+    min-height: min(560px, calc(100vh - 20px));
+    border-radius: 29px;
+  }
+
+  .onboarding-copy h2 {
+    font-size: 28px;
+  }
+}
