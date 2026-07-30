@@ -1,42 +1,99 @@
+import Link from "next/link";
+import type { CSSProperties } from "react";
 import { careerProfile, evidenceItems } from "@/data/profile";
+
+const flow = [
+  ["Career Truth", "Verify the experience Sartho may use."],
+  ["Role Intelligence", "Read the role beyond keyword matching."],
+  ["Application", "Create an honest, targeted application."],
+  ["Outcome", "Track every response and next action."],
+];
 
 export default function HomePage() {
   return (
-    <div className="space-y-6">
-      <section className="panel overflow-hidden p-8">
-        <div className="muted text-sm">Career command centre</div>
-        <h1 className="mt-3 max-w-3xl text-4xl font-semibold tracking-tight md:text-6xl">
-          Find work worthy of your experience.
-        </h1>
-        <p className="muted mt-5 max-w-2xl text-base leading-7">
-          Sartho turns verified career evidence into focused job discovery, honest fit analysis,
-          tailored applications and outcome tracking.
-        </p>
-      </section>
-
-      <section className="grid gap-4 md:grid-cols-3">
-        <Metric label="Verified evidence" value={String(evidenceItems.length)} note="Awaiting approval" />
-        <Metric label="Target role lanes" value="3" note="Leadership first" />
-        <Metric label="Automatic submissions" value="0" note="Human approval required" />
-      </section>
-
-      <section className="panel p-6">
-        <div className="flex items-end justify-between gap-4">
-          <div>
-            <div className="muted text-xs uppercase tracking-[0.2em]">Current positioning</div>
-            <h2 className="mt-2 text-2xl font-semibold">{careerProfile.headline}</h2>
+    <div className="page-stack">
+      <section className="hero-panel glass-card">
+        <div className="hero-copy">
+          <div className="page-eyebrow"><span className="live-dot" /> Evidence-led career intelligence</div>
+          <h1>Find work worthy of your experience.</h1>
+          <p>
+            Sartho turns your verified career evidence into focused job discovery, honest fit analysis,
+            tailored applications and one clear view of every outcome.
+          </p>
+          <div className="hero-actions">
+            <Link href="/jobs" className="primary-button">Analyse a job <span aria-hidden="true">↗</span></Link>
+            <Link href="/career-truth" className="secondary-button">Review Career Truth</Link>
           </div>
-          <div className="muted text-sm">{careerProfile.experienceYears}+ years · {careerProfile.location}</div>
         </div>
-        <div className="mt-6 grid gap-3">
-          {careerProfile.targetLanes.map((lane) => (
-            <div key={lane.name} className="rounded-2xl border border-white/10 bg-black/20 p-4">
-              <div className="flex justify-between gap-4 text-sm">
-                <span>{lane.name}</span><span className="muted">{lane.weight}%</span>
+
+        <div className="hero-focus" aria-label={`${evidenceItems.length} career evidence items awaiting review`}>
+          <div className="focus-orbit">
+            <span className="orbit-label orbit-label-one">Human approved</span>
+            <span className="orbit-label orbit-label-two">Evidence first</span>
+            <div className="focus-core"><strong>{evidenceItems.length}</strong><span>truth items</span></div>
+          </div>
+        </div>
+      </section>
+
+      <section className="metric-grid" aria-label="Workspace status">
+        <Metric symbol="✓" label="Career evidence" value={String(evidenceItems.length)} note="Ready for your review" />
+        <Metric symbol="◎" label="Target role lanes" value="3" note="Leadership positioning locked" />
+        <Metric symbol="↗" label="Unattended submissions" value="0" note="You remain in control" />
+      </section>
+
+      <section className="dashboard-grid">
+        <article className="glass-card content-card">
+          <div className="card-header">
+            <div>
+              <div className="page-eyebrow">Current positioning</div>
+              <h2 className="position-title">{careerProfile.headline}</h2>
+            </div>
+            <span className="meta-pill">{careerProfile.experienceYears}+ years · {careerProfile.location}</span>
+          </div>
+
+          <div className="lane-list">
+            {careerProfile.targetLanes.map((lane, index) => (
+              <div key={lane.name} className="lane-row">
+                <div className="lane-top">
+                  <span className="lane-index">0{index + 1}</span>
+                  <span className="lane-name">{lane.name}</span>
+                  <span className="lane-weight">{lane.weight}%</span>
+                </div>
+                <div className="progress-track"><div className="progress-fill" style={{ width: `${lane.weight}%` }} /></div>
               </div>
-              <div className="mt-3 h-1.5 rounded-full bg-white/10">
-                <div className="h-1.5 rounded-full bg-white" style={{ width: `${lane.weight}%` }} />
-              </div>
+            ))}
+          </div>
+        </article>
+
+        <article className="glass-card content-card next-card">
+          <div className="next-card-visual">
+            <div className="progress-ring" style={{ "--progress": "0deg" } as CSSProperties}>
+              <div className="progress-ring-content"><strong>0%</strong><span>approved</span></div>
+            </div>
+          </div>
+          <div className="next-card-copy">
+            <div className="page-eyebrow">Next best action</div>
+            <h3>Confirm your career evidence</h3>
+            <p>Review the first evidence records so future matching and résumé tailoring can be grounded in facts you trust.</p>
+            <Link href="/career-truth" className="primary-button">Start review <span aria-hidden="true">→</span></Link>
+          </div>
+        </article>
+      </section>
+
+      <section className="glass-card flow-card">
+        <div className="card-header">
+          <div>
+            <h2 className="section-heading">How Sartho works</h2>
+            <p className="section-subtitle">One controlled path from experience to opportunity.</p>
+          </div>
+          <span className="meta-pill"><span className="live-dot" /> Foundation active</span>
+        </div>
+        <div className="flow-grid">
+          {flow.map(([title, description], index) => (
+            <div key={title} className={`flow-step${index === 0 ? " is-current" : ""}`}>
+              <span className="flow-step-number">0{index + 1}</span>
+              <strong>{title}</strong>
+              <p>{description}</p>
             </div>
           ))}
         </div>
@@ -45,12 +102,13 @@ export default function HomePage() {
   );
 }
 
-function Metric({ label, value, note }: { label: string; value: string; note: string }) {
+function Metric({ symbol, label, value, note }: { symbol: string; label: string; value: string; note: string }) {
   return (
-    <div className="panel p-5">
-      <div className="muted text-sm">{label}</div>
-      <div className="mt-3 text-3xl font-semibold">{value}</div>
-      <div className="muted mt-2 text-xs">{note}</div>
-    </div>
+    <article className="glass-card-soft metric-card">
+      <span className="metric-icon" aria-hidden="true">{symbol}</span>
+      <div className="metric-label">{label}</div>
+      <div className="metric-value">{value}</div>
+      <div className="metric-note">{note}</div>
+    </article>
   );
 }

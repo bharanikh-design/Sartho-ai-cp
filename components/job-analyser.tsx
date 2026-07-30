@@ -18,26 +18,38 @@ export function JobAnalyser() {
   );
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
-      <section className="panel p-6">
-        <label className="text-sm font-medium" htmlFor="job-description">
-          Complete job description
-        </label>
+    <div className="analyser-layout">
+      <section className="glass-card analyser-card">
+        <div className="card-header">
+          <div>
+            <h2 className="section-heading">Opportunity input</h2>
+            <p className="section-subtitle">Use the complete description so Sartho can see the real responsibilities and constraints.</p>
+          </div>
+          <span className="meta-pill">Private analysis</span>
+        </div>
+
+        <div className="input-mode-bar" aria-label="Job input method">
+          <button type="button" className="input-mode is-active">Job description</button>
+          <button type="button" className="input-mode" disabled>Job link · soon</button>
+        </div>
+
+        <label className="analyser-label" htmlFor="job-description">Complete job description</label>
         <textarea
           id="job-description"
           value={description}
           onChange={(event) => setDescription(event.target.value)}
-          className="mt-3 min-h-[420px] w-full resize-y rounded-2xl border border-white/10 bg-black/30 p-4 text-sm leading-6 outline-none placeholder:text-white/30 focus:border-white/30"
-          placeholder="Paste the full job description here…"
+          className="job-textarea"
+          placeholder="Paste the role title, responsibilities, requirements and preferred qualifications here…"
         />
-        <div className="mt-4 flex flex-wrap gap-3">
+
+        <div className="action-row">
           <button
             type="button"
             onClick={() => setSubmittedText(description)}
-            className="rounded-full bg-white px-5 py-3 text-sm font-semibold text-black disabled:cursor-not-allowed disabled:opacity-40"
+            className="primary-button disabled:cursor-not-allowed disabled:opacity-40"
             disabled={!description.trim()}
           >
-            Analyse role
+            Analyse role <span aria-hidden="true">↗</span>
           </button>
           <button
             type="button"
@@ -45,31 +57,37 @@ export function JobAnalyser() {
               setDescription("");
               setSubmittedText("");
             }}
-            className="rounded-full border border-white/15 px-5 py-3 text-sm"
+            className="secondary-button"
           >
             Clear
           </button>
         </div>
-        <p className="muted mt-4 text-xs">
-          This first build uses transparent rule-based screening. Evidence-led AI matching comes after Career Truth approval.
+
+        <p className="analyser-note">
+          This build uses transparent rule-based screening. Evidence-led AI matching follows after your Career Truth approval.
         </p>
       </section>
 
-      <section className="panel p-6" aria-live="polite">
-        <div className="muted text-xs uppercase tracking-[0.2em]">Preliminary decision</div>
+      <section className="glass-card decision-card" aria-live="polite">
+        <div className="card-header">
+          <div>
+            <div className="page-eyebrow">Preliminary decision</div>
+            <h2 className="section-heading" style={{ marginTop: 8 }}>Opportunity signal</h2>
+          </div>
+          {analysis ? <span className="meta-pill">Confidence · {analysis.confidence}</span> : <span className="meta-pill">Awaiting input</span>}
+        </div>
+
         {!analysis ? (
-          <div className="muted mt-5 rounded-2xl border border-dashed border-white/15 p-6 text-sm leading-6">
-            Paste a job description to assess career-lane fit and technical heaviness.
+          <div className="empty-decision">
+            <span className="empty-decision-icon" aria-hidden="true">◎</span>
+            <h3>Your analysis will appear here</h3>
+            <p>Paste a complete job description to assess leadership fit, career-lane alignment and technical heaviness.</p>
           </div>
         ) : (
-          <div className="mt-5 space-y-5">
+          <div className="decision-result">
             <div className="flex flex-wrap items-center gap-3">
-              <span
-                className={`rounded-full border px-4 py-2 text-sm font-semibold uppercase tracking-wide ${recommendationStyles[analysis.recommendation]}`}
-              >
-                {analysis.recommendation}
-              </span>
-              <span className="muted text-sm">Confidence: {analysis.confidence}</span>
+              <span className={`decision-badge ${recommendationStyles[analysis.recommendation]}`}>{analysis.recommendation}</span>
+              <span className="muted text-xs">Sartho recommendation</span>
             </div>
 
             <Result label="Best-fit lane" value={analysis.primaryLane} />
@@ -78,7 +96,7 @@ export function JobAnalyser() {
             <SignalList title="Relevant signals" values={analysis.matchedSignals} empty="No strong lane signals detected." />
             <SignalList title="Caution signals" values={analysis.cautionSignals} empty="No material technical or support-heavy warning detected." />
 
-            <p className="muted border-t border-white/10 pt-5 text-sm leading-6">{analysis.explanation}</p>
+            <p className="analysis-explanation">{analysis.explanation}</p>
           </div>
         )}
       </section>
@@ -87,29 +105,18 @@ export function JobAnalyser() {
 }
 
 function Result({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-      <div className="muted text-xs uppercase tracking-wide">{label}</div>
-      <div className="mt-2 text-base font-medium">{value}</div>
-    </div>
-  );
+  return <div className="result-tile"><span>{label}</span><strong>{value}</strong></div>;
 }
 
 function SignalList({ title, values, empty }: { title: string; values: string[]; empty: string }) {
   return (
-    <div>
-      <div className="text-sm font-medium">{title}</div>
+    <div className="signal-section">
+      <h4>{title}</h4>
       {values.length ? (
-        <div className="mt-3 flex flex-wrap gap-2">
-          {values.map((value) => (
-            <span key={value} className="rounded-full border border-white/10 bg-white/6 px-3 py-1.5 text-xs">
-              {value}
-            </span>
-          ))}
+        <div className="chip-row">
+          {values.map((value) => <span key={value} className="signal-chip">{value}</span>)}
         </div>
-      ) : (
-        <p className="muted mt-2 text-sm">{empty}</p>
-      )}
+      ) : <p>{empty}</p>}
     </div>
   );
 }
