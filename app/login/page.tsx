@@ -4,6 +4,85 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 
+/*
+ * Sign-in — the product's front door.
+ *
+ * Deliberately light and quiet: the workspace behind it is dark and dense, so
+ * this page stays calm, uncluttered and legible. Styles are inlined here to
+ * keep the page self-contained. Nothing glows, and no text is below 12px.
+ */
+const styles = `
+.signin {
+  color-scheme: light;
+  position: relative;
+  z-index: 1;
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: 24px;
+  padding: clamp(20px, 4vw, 40px);
+  color: #1d1d1f;
+  background: #f5f5f7;
+  font-family: "Segoe UI Variable Display", "Segoe UI", -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+.signin-bar { display: flex; align-items: center; gap: 10px; }
+.signin-mark {
+  width: 30px; height: 30px; display: grid; place-items: center;
+  border-radius: 9px; color: #fff; background: #1d1d1f;
+  font-size: 15px; font-weight: 600; letter-spacing: -0.02em;
+}
+.signin-wordmark { font-size: 17px; font-weight: 600; letter-spacing: -0.022em; }
+.signin-stage { display: grid; place-items: center; padding: clamp(12px, 4vw, 32px) 0; }
+.signin-panel { width: min(100%, 400px); text-align: center; }
+.signin-panel h1 {
+  margin: 0;
+  font-size: clamp(27px, 3.1vw, 34px);
+  line-height: 1.14;
+  letter-spacing: -0.021em;
+  font-weight: 600;
+  text-wrap: balance;
+}
+.signin-lede {
+  margin: 10px 0 0; color: #6e6e73;
+  font-size: 16px; line-height: 1.5; letter-spacing: -0.01em;
+}
+.signin-card {
+  margin-top: clamp(22px, 3vw, 28px);
+  padding: clamp(22px, 4vw, 30px);
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0,0,0,.05), 0 8px 28px rgba(0,0,0,.06);
+}
+.signin-google {
+  width: 100%; min-height: 52px;
+  display: flex; align-items: center; justify-content: center; gap: 12px;
+  border: 0; border-radius: 12px;
+  color: #fff; background: #131314;
+  cursor: pointer; font: inherit;
+  font-size: 16px; font-weight: 500; letter-spacing: -0.01em;
+  transition: background .2s ease, transform .2s ease;
+}
+.signin-google:hover:not(:disabled) { background: #2a2a2c; }
+.signin-google:active:not(:disabled) { transform: scale(.99); }
+.signin-google:disabled { opacity: .55; cursor: progress; }
+.signin-google svg { flex: none; }
+.signin-note { margin: 16px 0 0; color: #6e6e73; font-size: 13px; line-height: 1.5; }
+.signin-error {
+  margin: 0 0 16px; padding: 12px 14px; border-radius: 12px;
+  color: #8c1d18; background: #fdeceb;
+  font-size: 13px; line-height: 1.55; text-align: left;
+}
+.signin-foot { display: flex; justify-content: center; color: #6e6e73; font-size: 12px; }
+.signin :is(button, a):focus-visible { outline: 2px solid #0071e3; outline-offset: 3px; }
+@media (max-width: 480px) {
+  .signin-card { padding: 20px; }
+  .signin-lede { font-size: 15px; }
+}
+@media (prefers-reduced-motion: reduce) { .signin-google { transition: none; } }
+`;
+
 function friendlyAuthMessage(message: string) {
   const value = message.toLowerCase();
 
@@ -40,6 +119,9 @@ export default function LoginPage() {
       searchParams.get("error") ??
       hashParams.get("error");
 
+    // Reads browser-only URL/hash params unavailable during SSR, so this must
+    // run in an effect rather than being derived during render.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (error) setMessage(friendlyAuthMessage(error));
 
     supabase.auth.getSession().then(({ data }) => {
@@ -65,67 +147,40 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="auth-page">
-      <div className="auth-ambient auth-ambient-one" aria-hidden="true" />
-      <div className="auth-ambient auth-ambient-two" aria-hidden="true" />
+    <main className="signin">
+      <style>{styles}</style>
 
-      <section className="auth-story" aria-label="About Sartho">
-        <div className="auth-brand">
-          <span className="brand-mark" aria-hidden="true"><span>S</span></span>
-          <div><strong>Sartho AI</strong><small>Your career, intelligently guided.</small></div>
-        </div>
+      <header className="signin-bar">
+        <span className="signin-mark" aria-hidden="true">S</span>
+        <span className="signin-wordmark">Sartho</span>
+      </header>
 
-        <div className="auth-story-copy">
-          <span className="page-eyebrow"><span className="live-dot" /> Your next chapter starts here</span>
-          <h1>One right role<br />can change everything.</h1>
-          <p>
-            Sartho helps you find work worthy of your experience, prove why you belong, prepare with confidence,
-            and be ready to land the opportunity when it appears.
-          </p>
-          <div className="auth-promise">
-            <strong>Find it. Align for it. Stand out. Prepare. Land it.</strong>
-            <span>Evidence-backed career intelligence, always under your control.</span>
+      <div className="signin-stage">
+        <section className="signin-panel">
+          <h1>Your career, intelligently guided.</h1>
+          <p className="signin-lede">Sign in to continue.</p>
+
+          <div className="signin-card">
+            {message ? <p className="signin-error" role="alert">{message}</p> : null}
+
+            <button type="button" className="signin-google" onClick={signInWithGoogle} disabled={busy}>
+              <GoogleIcon />
+              <span>{busy ? "Connecting…" : "Continue with Google"}</span>
+            </button>
+
+            <p className="signin-note">Private beta — approved accounts only.</p>
           </div>
-        </div>
+        </section>
+      </div>
 
-        <div className="auth-route-preview" aria-label="Your Sartho journey">
-          <span className="route-node is-active">Discover</span><i />
-          <span className="route-node">Align</span><i />
-          <span className="route-node">Stand out</span><i />
-          <span className="route-node">Prepare</span><i />
-          <span className="route-node">Land it</span>
-        </div>
-      </section>
-
-      <section className="auth-card glass-strong">
-        <div className="auth-card-heading">
-          <span className="auth-kicker">Your secure career workspace</span>
-          <h2>Welcome to Sartho</h2>
-          <p>Use your Google account. No new password and no separate account-registration form.</p>
-        </div>
-
-        <button type="button" className="oauth-button" onClick={signInWithGoogle} disabled={busy}>
-          <GoogleIcon />
-          <span>{busy ? "Connecting to Google…" : "Continue with Google"}</span>
-        </button>
-
-        {message ? <div className="auth-message error" role="alert">{message}</div> : null}
-
-        <p className="auth-access-note">
-          During private beta, access is limited to approved Google accounts.
-        </p>
-
-        <p className="auth-footnote">
-          Signing in only verifies who you are. Sartho will not read Gmail or submit an application unless you separately approve that connection and action.
-        </p>
-      </section>
+      <footer className="signin-foot">Nothing is submitted without your approval.</footer>
     </main>
   );
 }
 
 function GoogleIcon() {
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
+    <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
       <path fill="#4285F4" d="M21.6 12.23c0-.71-.06-1.4-.18-2.07H12v3.92h5.38a4.6 4.6 0 0 1-2 3.02v2.54h3.24c1.9-1.75 2.98-4.33 2.98-7.41Z" />
       <path fill="#34A853" d="M12 22c2.7 0 4.97-.9 6.62-2.36l-3.24-2.54c-.9.6-2.05.96-3.38.96-2.6 0-4.8-1.76-5.59-4.12H3.06v2.62A10 10 0 0 0 12 22Z" />
       <path fill="#FBBC05" d="M6.41 13.94A6.02 6.02 0 0 1 6.1 12c0-.67.12-1.33.31-1.94V7.44H3.06A10 10 0 0 0 2 12c0 1.61.38 3.14 1.06 4.56l3.35-2.62Z" />
