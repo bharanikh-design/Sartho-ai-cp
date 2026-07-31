@@ -7,16 +7,20 @@ import { createClient } from "@/lib/supabase";
 /*
  * Sign-in — the product's front door.
  *
- * Shares the workspace's dark canvas and design tokens so the app reads as one
- * product. The restraint is in the type scale and the word count, not in the
- * colour: a balanced headline (not 88px), copy that stays legible (nothing
- * below 12px), and a two-column composition that uses the full canvas on
- * desktop instead of stranding a mobile-sized card in the middle.
+ * Restrained violet on near-black, aligned to the app's existing tokens. Applied
+ * sparingly (mark, active stage, focus, CTA) so it reads considered
+ * rather than gaudy. The journey strip animates through the five stages so the
+ * page feels alive without a carousel's weight.
+ *
+ * Copy is deliberately sparse — the tagline sits with the mark, the headline is
+ * one line, and the card says only what the moment needs.
  *
  * Styles are inlined so this page can be deployed as a single file.
  */
 const styles = `
 .signin {
+  --accent: #a68cff;
+  --accent-deep: #6f8cf5;
   position: relative;
   width: min(100%, 1280px);
   min-height: 100vh;
@@ -24,127 +28,139 @@ const styles = `
   margin: 0 auto;
   display: grid;
   grid-template-rows: auto 1fr auto;
-  gap: clamp(24px, 4vw, 48px);
+  gap: clamp(24px, 4vw, 44px);
   padding: clamp(22px, 4vw, 56px);
   color: var(--text, #f7f8fb);
+  isolation: isolate;
+}
+
+/* A single cool wash, low and slow — depth without noise. */
+.signin::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  top: -18%; left: 42%;
+  width: min(70vw, 780px); aspect-ratio: 1;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(139,124,246,.16), transparent 62%);
+  filter: blur(28px);
+  animation: drift 26s ease-in-out infinite alternate;
 }
 
 /* Masthead */
-.signin-top { display: flex; align-items: center; gap: 12px; }
-.signin-mark {
-  width: 38px; height: 38px; display: grid; place-items: center;
-  border-radius: 12px;
-  color: #fff;
-  background: linear-gradient(150deg, #5b7fe4, #8f7ae6);
-  box-shadow: 0 8px 22px rgba(84,112,214,.28);
-  font-size: 17px; font-weight: 650; letter-spacing: -0.02em;
+.signin-top { display: flex; align-items: center; gap: 13px; animation: rise .6s ease both; }
+.signin-top strong { display: block; font-size: 17px; font-weight: 650; letter-spacing: -0.02em; }
+.signin-top small {
+  display: block; margin-top: 3px;
+  font-size: 12.5px; letter-spacing: .005em;
+  color: var(--text-tertiary, rgba(239,242,249,.48));
 }
-.signin-top strong { display: block; font-size: 16px; font-weight: 650; letter-spacing: -0.02em; }
-.signin-top small { display: block; margin-top: 2px; font-size: 12px; color: var(--text-tertiary, rgba(239,242,249,.44)); }
 
-/* Two-column stage */
+/* Stage */
 .signin-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.05fr) minmax(360px, .82fr);
-  gap: clamp(36px, 6vw, 88px);
+  grid-template-columns: minmax(0, 1.08fr) minmax(350px, .78fr);
+  gap: clamp(36px, 6vw, 84px);
   align-items: center;
 }
 
 .signin-intro h1 {
   margin: 0;
-  max-width: 15ch;
-  font-size: clamp(34px, 4.6vw, 56px);
-  line-height: 1.04;
-  letter-spacing: -0.035em;
+  max-width: 13ch;
+  font-size: clamp(36px, 4.9vw, 60px);
+  line-height: 1.03;
+  letter-spacing: -0.036em;
   font-weight: 640;
   text-wrap: balance;
+  animation: rise .7s ease .06s both;
 }
-.signin-intro p {
-  max-width: 46ch;
-  margin: 20px 0 0;
-  color: var(--text-secondary, rgba(239,242,249,.68));
-  font-size: clamp(15px, 1.3vw, 17px);
-  line-height: 1.6;
-  letter-spacing: -0.005em;
+.signin-intro h1 em {
+  font-style: normal;
+  background: linear-gradient(100deg, #b6a4ff, #cfc4ff 50%, #7f9cf7);
+  -webkit-background-clip: text; background-clip: text;
+  color: transparent;
 }
 
-/* Journey strip — the five stages, stated without paragraphs */
+/* Journey strip — cycles so the page has a pulse */
 .signin-stages {
-  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
-  margin-top: clamp(26px, 3vw, 36px);
+  display: flex; flex-wrap: wrap; align-items: center; gap: 7px;
+  margin-top: clamp(30px, 3.4vw, 42px);
+  animation: rise .7s ease .14s both;
 }
 .signin-stages span {
-  display: inline-flex; align-items: center; min-height: 32px;
-  padding: 0 13px;
-  border: 1px solid var(--line, rgba(255,255,255,.095));
+  position: relative;
+  display: inline-flex; align-items: center; min-height: 34px;
+  padding: 0 14px;
+  border: 1px solid var(--line, rgba(255,255,255,.1));
   border-radius: 999px;
   background: rgba(255,255,255,.03);
-  color: var(--text-tertiary, rgba(239,242,249,.44));
-  font-size: 12px; font-weight: 600;
+  color: var(--text-tertiary, rgba(239,242,249,.46));
+  font-size: 12.5px; font-weight: 600;
+  animation: stageOn 11s linear infinite;
+  animation-delay: calc(var(--i) * 2.2s);
 }
-.signin-stages span:first-child {
-  border-color: rgba(143,176,255,.28);
-  background: rgba(112,148,255,.12);
-  color: #dbe6ff;
+.signin-stages i {
+  position: relative;
+  width: 20px; height: 1px;
+  background: rgba(255,255,255,.12);
+  overflow: hidden;
 }
-.signin-stages i { width: 14px; height: 1px; background: var(--line, rgba(255,255,255,.12)); }
+.signin-stages i::after {
+  content: "";
+  position: absolute; inset: 0;
+  background: linear-gradient(90deg, var(--accent-deep), var(--accent));
+  transform: scaleX(0); transform-origin: left;
+  animation: linkOn 11s linear infinite;
+  animation-delay: calc(var(--i) * 2.2s);
+}
 
 /* Card */
 .signin-card {
   justify-self: end;
   width: 100%;
-  max-width: 430px;
-  padding: clamp(26px, 3vw, 36px);
-  border: 1px solid var(--line, rgba(255,255,255,.095));
+  max-width: 410px;
+  padding: clamp(26px, 3vw, 34px);
+  border: 1px solid var(--line, rgba(255,255,255,.1));
   border-radius: 24px;
   background: var(--glass-strong, rgba(16,20,29,.82));
-  box-shadow: 0 24px 70px rgba(0,0,0,.34);
+  box-shadow: 0 26px 74px rgba(0,0,0,.4);
   backdrop-filter: blur(18px);
+  animation: rise .7s ease .2s both;
 }
 .signin-card h2 {
   margin: 0;
-  font-size: 24px; line-height: 1.15;
+  font-size: 23px; line-height: 1.15;
   letter-spacing: -0.028em; font-weight: 640;
-}
-.signin-sub {
-  margin: 9px 0 0;
-  color: var(--text-secondary, rgba(239,242,249,.68));
-  font-size: 14px; line-height: 1.55;
 }
 
 .signin-google {
   width: 100%; min-height: 52px;
   display: flex; align-items: center; justify-content: center; gap: 11px;
-  margin-top: 24px;
-  border: 1px solid rgba(255,255,255,.13);
+  margin-top: 22px;
+  border: 1px solid rgba(166,140,255,.3);
   border-radius: 14px;
   color: #f8f9fc;
-  background: rgba(255,255,255,.06);
+  background: rgba(166,140,255,.08);
   cursor: pointer; font: inherit;
   font-size: 15px; font-weight: 600;
-  transition: background .2s ease, border-color .2s ease, transform .2s ease;
+  transition: background .22s ease, border-color .22s ease, transform .22s ease, box-shadow .22s ease;
 }
 .signin-google:hover:not(:disabled) {
   transform: translateY(-1px);
-  border-color: rgba(255,255,255,.22);
-  background: rgba(255,255,255,.1);
+  border-color: rgba(166,140,255,.5);
+  background: rgba(166,140,255,.14);
+  box-shadow: 0 10px 30px rgba(124,108,240,.22);
 }
 .signin-google:disabled { opacity: .6; cursor: progress; }
 .signin-google svg { flex: none; }
 
 .signin-note {
-  margin: 16px 0 0;
+  margin: 15px 0 0;
   color: var(--text-tertiary, rgba(239,242,249,.44));
-  font-size: 12px; line-height: 1.5; text-align: center;
-}
-.signin-fine {
-  margin: 20px 0 0; padding-top: 18px;
-  border-top: 1px solid rgba(255,255,255,.07);
-  color: var(--text-tertiary, rgba(239,242,249,.44));
-  font-size: 12px; line-height: 1.6;
+  font-size: 12.5px; text-align: center;
 }
 .signin-error {
-  margin: 20px 0 0; padding: 12px 14px;
+  margin: 18px 0 0; padding: 12px 14px;
   border: 1px solid rgba(255,142,163,.24);
   border-radius: 12px;
   color: #ffc2ce; background: rgba(255,142,163,.08);
@@ -154,28 +170,53 @@ const styles = `
 .signin-foot {
   display: flex; align-items: center; gap: 8px;
   color: var(--text-tertiary, rgba(239,242,249,.44));
-  font-size: 12px;
+  font-size: 12.5px;
+  animation: rise .7s ease .26s both;
 }
 .signin-foot i {
   width: 6px; height: 6px; border-radius: 999px;
-  background: var(--mint, #72e6bd);
-  box-shadow: 0 0 10px rgba(114,230,189,.6);
+  background: var(--accent);
+  box-shadow: 0 0 10px rgba(166,140,255,.75);
 }
 
-.signin :is(button, a):focus-visible { outline: 2px solid rgba(143,183,255,.92); outline-offset: 3px; }
+.signin :is(button, a):focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+@keyframes rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+@keyframes drift { from { transform: translate3d(0,0,0) scale(1); } to { transform: translate3d(-4%, 3%, 0) scale(1.08); } }
+@keyframes stageOn {
+  0%, 18%, 100% {
+    border-color: var(--line, rgba(255,255,255,.1));
+    background: rgba(255,255,255,.03);
+    color: var(--text-tertiary, rgba(239,242,249,.46));
+  }
+  3%, 15% {
+    border-color: rgba(166,140,255,.45);
+    background: rgba(166,140,255,.14);
+    color: #ded6ff;
+  }
+}
+@keyframes linkOn {
+  0%, 100% { transform: scaleX(0); }
+  4% { transform: scaleX(0); }
+  15%, 82% { transform: scaleX(1); }
+}
 
 @media (max-width: 940px) {
-  .signin-grid { grid-template-columns: 1fr; gap: 32px; align-items: start; }
+  .signin-grid { grid-template-columns: 1fr; gap: 30px; align-items: start; }
   .signin-card { justify-self: stretch; max-width: none; }
-  .signin-intro h1 { max-width: none; font-size: clamp(32px, 7vw, 46px); }
+  .signin-intro h1 { max-width: none; font-size: clamp(33px, 7.4vw, 48px); }
 }
 @media (max-width: 560px) {
-  .signin { gap: 22px; }
-  .signin-stages { gap: 6px; }
+  .signin { gap: 20px; }
   .signin-stages i { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .signin-google { transition: none; }
+  .signin *, .signin::before { animation: none !important; transition: none !important; }
+  .signin-stages span:first-child {
+    border-color: rgba(166,140,255,.45);
+    background: rgba(166,140,255,.14);
+    color: #ded6ff;
+  }
 }
 `;
 
@@ -249,23 +290,22 @@ export default function LoginPage() {
       <style>{styles}</style>
 
       <header className="signin-top">
-        <span className="signin-mark" aria-hidden="true">S</span>
+        <SarthoMark />
         <span>
           <strong>Sartho</strong>
-          <small>AI Career Copilot</small>
+          <small>Your career, intelligently guided.</small>
         </span>
       </header>
 
       <div className="signin-grid">
         <section className="signin-intro">
-          <h1>Your career, intelligently guided.</h1>
-          <p>Find roles worthy of your experience, prove the fit with real evidence, and walk in prepared.</p>
+          <h1>Find work <em>worthy</em> of your experience.</h1>
 
           <div className="signin-stages" aria-label="How Sartho works">
             {stages.map((stage, index) => (
               <Fragment key={stage}>
-                {index > 0 ? <i aria-hidden="true" /> : null}
-                <span>{stage}</span>
+                {index > 0 ? <i style={{ ["--i" as string]: index - 1 }} aria-hidden="true" /> : null}
+                <span style={{ ["--i" as string]: index }}>{stage}</span>
               </Fragment>
             ))}
           </div>
@@ -273,7 +313,6 @@ export default function LoginPage() {
 
         <section className="signin-card">
           <h2>Welcome to Sartho</h2>
-          <p className="signin-sub">Continue with your Google account. No new password to remember.</p>
 
           <button type="button" className="signin-google" onClick={signInWithGoogle} disabled={busy}>
             <GoogleIcon />
@@ -283,18 +322,66 @@ export default function LoginPage() {
           {message ? <p className="signin-error" role="alert">{message}</p> : null}
 
           <p className="signin-note">Private beta — approved accounts only.</p>
-
-          <p className="signin-fine">
-            Signing in only verifies who you are. Sartho never submits an application without your approval.
-          </p>
         </section>
       </div>
 
       <footer className="signin-foot">
         <i aria-hidden="true" />
-        <span>Private and evidence-led — your data stays yours.</span>
+        <span>Nothing is submitted without your approval.</span>
       </footer>
     </main>
+  );
+}
+
+/*
+ * Brand mark — a path winding through an open doorway: the career journey and
+ * the opening it leads to, with the path doubling as the "S".
+ *
+ * Kept to three elements (portal, path, tip) with a single brightest accent, so
+ * it still reads at favicon size. No filled slab competing with the path.
+ */
+function SarthoMark({ size = 44 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 64 64" aria-hidden="true">
+      <defs>
+        <linearGradient id="sv-portal" x1="20" y1="14" x2="46" y2="48" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stopColor="#a78bfa" />
+          <stop offset="1" stopColor="#5b7ff0" />
+        </linearGradient>
+        <linearGradient id="sv-path" x1="24" y1="58" x2="38" y2="20" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stopColor="#7c6cf0" />
+          <stop offset="1" stopColor="#b9a6ff" />
+        </linearGradient>
+        <linearGradient id="sv-tile" x1="0" y1="0" x2="0" y2="64" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stopColor="#1e1f26" />
+          <stop offset="1" stopColor="#111218" />
+        </linearGradient>
+      </defs>
+
+      <rect x="1.5" y="1.5" width="61" height="61" rx="17" fill="url(#sv-tile)" stroke="rgba(166,140,255,.34)" strokeWidth="1.3" />
+
+      {/* Open doorway — a wide arch, lit along its edge */}
+      <path
+        d="M18.5 48V28.5C18.5 21 24.5 15 32 15s13.5 6 13.5 13.5V48"
+        fill="none"
+        stroke="url(#sv-portal)"
+        strokeWidth="3.6"
+        strokeLinecap="round"
+      />
+
+      {/* The path travelling up to the opening — two turns, not three */}
+      <path
+        d="M25 57.5c8.5-3.4 2.5-9.5 7-13.5"
+        fill="none"
+        stroke="url(#sv-path)"
+        strokeWidth="5.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+
+      {/* The single brightest element: the opening the path arrives at */}
+      <circle cx="32" cy="34" r="3.4" fill="#f1ecff" />
+    </svg>
   );
 }
 
