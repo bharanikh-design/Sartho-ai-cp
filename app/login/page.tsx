@@ -1,7 +1,9 @@
 "use client";
 
 import { Fragment, useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
+import sarthoIcon from "@/sartho.png";
 import { createClient } from "@/lib/supabase";
 
 /*
@@ -49,6 +51,7 @@ const styles = `
 
 /* Masthead */
 .signin-top { display: flex; align-items: center; gap: 13px; animation: rise .6s ease both; }
+.signin-logo { width: 46px; height: 46px; border-radius: 13px; }
 .signin-top strong { display: block; font-size: 17px; font-weight: 650; letter-spacing: -0.02em; }
 .signin-top small {
   display: block; margin-top: 3px;
@@ -290,7 +293,7 @@ export default function LoginPage() {
       <style>{styles}</style>
 
       <header className="signin-top">
-        <SarthoMark />
+        <Image className="signin-logo" src={sarthoIcon} alt="" width={46} height={46} priority />
         <span>
           <strong>Sartho</strong>
           <small>Your career, intelligently guided.</small>
@@ -330,58 +333,6 @@ export default function LoginPage() {
         <span>Nothing is submitted without your approval.</span>
       </footer>
     </main>
-  );
-}
-
-/*
- * Brand mark — a path winding through an open doorway: the career journey and
- * the opening it leads to, with the path doubling as the "S".
- *
- * Kept to three elements (portal, path, tip) with a single brightest accent, so
- * it still reads at favicon size. No filled slab competing with the path.
- */
-function SarthoMark({ size = 44 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 64 64" aria-hidden="true">
-      <defs>
-        <linearGradient id="sv-portal" x1="20" y1="14" x2="46" y2="48" gradientUnits="userSpaceOnUse">
-          <stop offset="0" stopColor="#a78bfa" />
-          <stop offset="1" stopColor="#5b7ff0" />
-        </linearGradient>
-        <linearGradient id="sv-path" x1="24" y1="58" x2="38" y2="20" gradientUnits="userSpaceOnUse">
-          <stop offset="0" stopColor="#7c6cf0" />
-          <stop offset="1" stopColor="#b9a6ff" />
-        </linearGradient>
-        <linearGradient id="sv-tile" x1="0" y1="0" x2="0" y2="64" gradientUnits="userSpaceOnUse">
-          <stop offset="0" stopColor="#1e1f26" />
-          <stop offset="1" stopColor="#111218" />
-        </linearGradient>
-      </defs>
-
-      <rect x="1.5" y="1.5" width="61" height="61" rx="17" fill="url(#sv-tile)" stroke="rgba(166,140,255,.34)" strokeWidth="1.3" />
-
-      {/* Open doorway — a wide arch, lit along its edge */}
-      <path
-        d="M18.5 48V28.5C18.5 21 24.5 15 32 15s13.5 6 13.5 13.5V48"
-        fill="none"
-        stroke="url(#sv-portal)"
-        strokeWidth="3.6"
-        strokeLinecap="round"
-      />
-
-      {/* The path travelling up to the opening — two turns, not three */}
-      <path
-        d="M25 57.5c8.5-3.4 2.5-9.5 7-13.5"
-        fill="none"
-        stroke="url(#sv-path)"
-        strokeWidth="5.4"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-
-      {/* The single brightest element: the opening the path arrives at */}
-      <circle cx="32" cy="34" r="3.4" fill="#f1ecff" />
-    </svg>
   );
 }
 
