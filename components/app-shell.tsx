@@ -1,6 +1,8 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
+import sarthoIcon from "@/sartho.png";
 import { usePathname, useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -75,6 +77,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, [loading, pathname, router, session]);
 
   useEffect(() => {
+    // Close the profile menu when the route changes — synchronising UI with
+    // navigation is a valid effect, but the react-hooks rule flags the setState.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setProfileOpen(false);
   }, [pathname]);
 
@@ -102,7 +107,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   if (loading || !session) {
     return (
       <main className="auth-loading" aria-live="polite">
-        <span className="brand-mark" aria-hidden="true"><span>S</span></span>
+        <Image className="brand-mark" src={sarthoIcon} alt="" width={44} height={44} priority />
         <div><strong>Opening your Sartho workspace</strong><small>Securing your session…</small></div>
       </main>
     );
@@ -173,7 +178,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       <aside className="desktop-rail glass-strong" aria-label="Primary navigation">
         <Link href="/" className="brand-lockup" aria-label="Sartho home">
-          <span className="brand-mark" aria-hidden="true"><span>S</span></span>
+          <Image className="brand-mark" src={sarthoIcon} alt="" width={44} height={44} priority />
           <span><strong>Sartho</strong><small>AI Career Copilot</small></span>
         </Link>
 
@@ -199,7 +204,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <div className="app-stage">
         <header className="top-bar glass-soft">
           <div className="mobile-brand">
-            <span className="brand-mark brand-mark-small" aria-hidden="true"><span>S</span></span>
+            <Image className="brand-mark brand-mark-small" src={sarthoIcon} alt="" width={34} height={34} />
             <span><strong>Sartho</strong><small>{currentPage}</small></span>
           </div>
           <div className="desktop-context">
