@@ -73,6 +73,12 @@ export function OnboardingCarousel({ user }: { user: User }) {
     const shouldReplay = new URLSearchParams(window.location.search).get("tour") === "1";
     const dismissedThisSession = window.sessionStorage.getItem(SESSION_DISMISS_KEY) === "true";
 
+    /*
+     * Both reads are browser-only and unavailable while the page renders on the
+     * server, so this state cannot be derived during render — it has to settle
+     * once, in an effect, after hydration.
+     */
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setReplay(shouldReplay);
     setDontShowAgain(completed);
     setVisible(pathname === "/" && (shouldReplay || (!completed && !dismissedThisSession)));
