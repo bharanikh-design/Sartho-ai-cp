@@ -1,229 +1,249 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import sarthoIcon from "@/sartho.png";
 import { createClient } from "@/lib/supabase";
+import sarthoIcon from "@/sartho.png";
 
 /*
- * Sign-in — the product's front door.
+ * Sign-in.
  *
- * Restrained violet on near-black, aligned to the app's existing tokens. Applied
- * sparingly (mark, active stage, focus, CTA) so it reads considered
- * rather than gaudy. The journey strip animates through the five stages so the
- * page feels alive without a carousel's weight.
+ * Split composition: the promise holds the left, every way in sits on the
+ * right. The brand lockup stays whole — mark, wordmark and tagline together —
+ * because the front door is where identity should be most complete, not least.
  *
- * Copy is deliberately sparse — the tagline sits with the mark, the headline is
- * one line, and the card says only what the moment needs.
- *
- * Styles are inlined so this page can be deployed as a single file.
+ * Styling runs on the shared design tokens, so the page follows the Dark/Light
+ * switch along with the rest of the product.
  */
+
+type Provider = "google" | "apple" | "github";
+type Mode = "signin" | "reset";
+
 const styles = `
-.signin {
-  --accent: #a68cff;
-  --accent-deep: #6f8cf5;
+.si {
   position: relative;
-  width: min(100%, 1280px);
   min-height: 100vh;
   min-height: 100dvh;
-  margin: 0 auto;
   display: grid;
-  grid-template-rows: auto 1fr auto;
-  gap: clamp(24px, 4vw, 44px);
-  padding: clamp(22px, 4vw, 56px);
-  color: var(--text, #f7f8fb);
-  isolation: isolate;
+  grid-template-rows: auto 1fr;
+  gap: clamp(22px, 3vw, 38px);
+  padding: clamp(22px, 3.2vw, 46px);
+  color: var(--text);
+  overflow: hidden;
 }
-
-/* A single cool wash, low and slow — depth without noise. */
-.signin::before {
+.si::before {
   content: "";
-  position: absolute;
-  z-index: -1;
-  top: -18%; left: 42%;
-  width: min(70vw, 780px); aspect-ratio: 1;
+  position: absolute; z-index: 0;
+  top: -32%; left: 4%;
+  width: min(72vw, 820px); aspect-ratio: 1;
   border-radius: 999px;
-  background: radial-gradient(circle, rgba(139,124,246,.16), transparent 62%);
-  filter: blur(28px);
-  animation: drift 26s ease-in-out infinite alternate;
+  background: radial-gradient(circle, color-mix(in srgb, var(--violet) 20%, transparent), transparent 64%);
+  filter: blur(44px);
+  pointer-events: none;
 }
 
-/* Masthead */
-.signin-top { display: flex; align-items: center; gap: 13px; animation: rise .6s ease both; }
-.signin-logo { width: 46px; height: 46px; border-radius: 13px; }
-.signin-top strong { display: block; font-size: 17px; font-weight: 650; letter-spacing: -0.02em; }
-.signin-top small {
-  display: block; margin-top: 3px;
-  font-size: 12.5px; letter-spacing: .005em;
-  color: var(--text-tertiary, rgba(239,242,249,.48));
+/* Brand lockup — kept whole. */
+.si-brand {
+  position: relative; z-index: 2;
+  display: flex; align-items: center; gap: 13px;
+  animation: siRise .8s ease both;
 }
+.si-logo { width: 46px; height: 46px; border-radius: 13px; flex: none; }
+.si-brand strong { display: block; font-size: 21px; font-weight: 650; letter-spacing: -0.028em; }
+.si-brand small { display: block; margin-top: 3px; font-size: 12.5px; color: var(--text-tertiary); }
 
 /* Stage */
-.signin-grid {
+.si-stage {
+  position: relative; z-index: 2;
   display: grid;
-  grid-template-columns: minmax(0, 1.08fr) minmax(350px, .78fr);
-  gap: clamp(36px, 6vw, 84px);
+  grid-template-columns: minmax(0, 1.06fr) minmax(340px, 430px);
+  gap: clamp(38px, 6vw, 90px);
   align-items: center;
 }
 
-.signin-intro h1 {
+.si-pitch h1 {
+  max-width: 12ch;
   margin: 0;
-  max-width: 13ch;
-  font-size: clamp(36px, 4.9vw, 60px);
-  line-height: 1.03;
-  letter-spacing: -0.036em;
-  font-weight: 640;
+  font-size: clamp(40px, 6.4vw, 92px);
+  line-height: .94;
+  letter-spacing: -0.05em;
+  font-weight: 600;
   text-wrap: balance;
-  animation: rise .7s ease .06s both;
+  animation: siRise 1s cubic-bezier(.2,.7,.2,1) .08s both;
 }
-.signin-intro h1 em {
+.si-pitch h1 em {
   font-style: normal;
-  background: linear-gradient(100deg, #b6a4ff, #cfc4ff 50%, #7f9cf7);
-  -webkit-background-clip: text; background-clip: text;
-  color: transparent;
+  text-shadow: 0 0 60px color-mix(in srgb, var(--violet) 50%, transparent);
+}
+.si-pitch p {
+  max-width: 40ch;
+  margin: clamp(18px, 2vw, 26px) 0 0;
+  color: var(--text-secondary);
+  font-size: clamp(15px, 1.3vw, 17px);
+  line-height: 1.6;
+  animation: siRise 1s ease .18s both;
 }
 
-/* Journey strip — cycles so the page has a pulse */
-.signin-stages {
-  display: flex; flex-wrap: wrap; align-items: center; gap: 7px;
-  margin-top: clamp(30px, 3.4vw, 42px);
-  animation: rise .7s ease .14s both;
-}
-.signin-stages span {
-  position: relative;
-  display: inline-flex; align-items: center; min-height: 34px;
-  padding: 0 14px;
-  border: 1px solid var(--line, rgba(255,255,255,.1));
-  border-radius: 999px;
-  background: rgba(255,255,255,.03);
-  color: var(--text-tertiary, rgba(239,242,249,.46));
-  font-size: 12.5px; font-weight: 600;
-  animation: stageOn 11s linear infinite;
-  animation-delay: calc(var(--i) * 2.2s);
-}
-.signin-stages i {
-  position: relative;
-  width: 20px; height: 1px;
-  background: rgba(255,255,255,.12);
-  overflow: hidden;
-}
-.signin-stages i::after {
-  content: "";
-  position: absolute; inset: 0;
-  background: linear-gradient(90deg, var(--accent-deep), var(--accent));
-  transform: scaleX(0); transform-origin: left;
-  animation: linkOn 11s linear infinite;
-  animation-delay: calc(var(--i) * 2.2s);
-}
-
-/* Card */
-.signin-card {
+/* Panel */
+.si-panel {
   justify-self: end;
   width: 100%;
-  max-width: 410px;
-  padding: clamp(26px, 3vw, 34px);
-  border: 1px solid var(--line, rgba(255,255,255,.1));
-  border-radius: 24px;
-  background: var(--glass-strong, rgba(16,20,29,.82));
-  box-shadow: 0 26px 74px rgba(0,0,0,.4);
-  backdrop-filter: blur(18px);
-  animation: rise .7s ease .2s both;
+  padding: clamp(24px, 2.6vw, 34px);
+  border: 1px solid var(--line);
+  border-radius: 26px;
+  background: var(--glass-strong);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(20px);
+  animation: siRise 1s ease .26s both;
 }
-.signin-card h2 {
-  margin: 0;
-  font-size: 23px; line-height: 1.15;
-  letter-spacing: -0.028em; font-weight: 640;
-}
+.si-panel h2 { margin: 0; font-size: 20px; font-weight: 640; letter-spacing: -0.026em; }
+.si-sub { margin: 7px 0 0; color: var(--text-secondary); font-size: 13px; line-height: 1.5; }
 
-.signin-google {
-  width: 100%; min-height: 52px;
-  display: flex; align-items: center; justify-content: center; gap: 11px;
-  margin-top: 22px;
-  border: 1px solid rgba(166,140,255,.3);
-  border-radius: 14px;
-  color: #f8f9fc;
-  background: rgba(166,140,255,.08);
+.si-providers { display: grid; gap: 9px; margin-top: 20px; }
+.si-provider {
+  width: 100%; min-height: 48px;
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  border: 1px solid var(--line-bright);
+  border-radius: 13px;
+  color: var(--text);
+  background: color-mix(in srgb, var(--text) 5%, transparent);
   cursor: pointer; font: inherit;
-  font-size: 15px; font-weight: 600;
-  transition: background .22s ease, border-color .22s ease, transform .22s ease, box-shadow .22s ease;
+  font-size: 14px; font-weight: 560;
+  transition: background .2s ease, border-color .2s ease, transform .2s ease;
 }
-.signin-google:hover:not(:disabled) {
+.si-provider:hover:not(:disabled) {
   transform: translateY(-1px);
-  border-color: rgba(166,140,255,.5);
-  background: rgba(166,140,255,.14);
-  box-shadow: 0 10px 30px rgba(124,108,240,.22);
+  border-color: color-mix(in srgb, var(--text) 28%, transparent);
+  background: color-mix(in srgb, var(--text) 9%, transparent);
 }
-.signin-google:disabled { opacity: .6; cursor: progress; }
-.signin-google svg { flex: none; }
+.si-provider:disabled { opacity: .55; cursor: progress; }
+.si-provider svg { flex: none; }
 
-.signin-note {
-  margin: 15px 0 0;
-  color: var(--text-tertiary, rgba(239,242,249,.44));
-  font-size: 12.5px; text-align: center;
+.si-or {
+  display: flex; align-items: center; gap: 12px;
+  margin: 18px 0;
+  color: var(--text-tertiary); font-size: 11.5px;
 }
-.signin-error {
-  margin: 18px 0 0; padding: 12px 14px;
-  border: 1px solid rgba(255,142,163,.24);
+.si-or::before, .si-or::after { content: ""; height: 1px; flex: 1; background: var(--line); }
+
+.si-form { display: grid; gap: 11px; }
+.si-form label { display: grid; gap: 6px; }
+.si-form label > span { font-size: 12px; font-weight: 560; color: var(--text-secondary); }
+.si-form input {
+  width: 100%; min-height: 46px;
+  padding: 0 13px;
+  border: 1px solid var(--line-bright);
   border-radius: 12px;
-  color: #ffc2ce; background: rgba(255,142,163,.08);
-  font-size: 13px; line-height: 1.55;
+  color: var(--text);
+  background: color-mix(in srgb, var(--canvas) 55%, transparent);
+  font-size: 14px;
+  outline: none;
+  transition: border-color .2s ease, box-shadow .2s ease;
+}
+.si-form input::placeholder { color: var(--text-tertiary); }
+.si-form input:focus {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--blue) 18%, transparent);
 }
 
-.signin-foot {
-  display: flex; align-items: center; gap: 8px;
-  color: var(--text-tertiary, rgba(239,242,249,.44));
+.si-submit {
+  width: 100%; min-height: 48px;
+  margin-top: 3px;
+  border: 0; border-radius: 13px;
+  color: var(--canvas); background: var(--text);
+  cursor: pointer; font: inherit;
+  font-size: 14px; font-weight: 620;
+  transition: transform .2s ease, opacity .2s ease;
+}
+.si-submit:hover:not(:disabled) { transform: translateY(-1px); }
+.si-submit:disabled { opacity: .55; cursor: progress; }
+
+.si-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 13px; }
+.si-link {
+  border: 0; padding: 0; background: none;
+  color: var(--blue); cursor: pointer; font: inherit;
   font-size: 12.5px;
-  animation: rise .7s ease .26s both;
 }
-.signin-foot i {
-  width: 6px; height: 6px; border-radius: 999px;
-  background: var(--accent);
-  box-shadow: 0 0 10px rgba(166,140,255,.75);
+.si-link:hover { text-decoration: underline; }
+
+.si-msg {
+  margin: 14px 0 0; padding: 11px 13px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  font-size: 12.5px; line-height: 1.5;
+}
+.si-msg.is-error { border-color: color-mix(in srgb, var(--rose) 40%, transparent); color: var(--rose); background: color-mix(in srgb, var(--rose) 10%, transparent); }
+.si-msg.is-ok { border-color: color-mix(in srgb, var(--mint) 40%, transparent); color: var(--mint); background: color-mix(in srgb, var(--mint) 10%, transparent); }
+
+.si-note {
+  margin: 16px 0 0; padding-top: 15px;
+  border-top: 1px solid var(--line);
+  color: var(--text-tertiary); font-size: 11.5px; line-height: 1.55; text-align: center;
 }
 
-.signin :is(button, a):focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.si :is(button, a, input):focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; }
 
-@keyframes rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
-@keyframes drift { from { transform: translate3d(0,0,0) scale(1); } to { transform: translate3d(-4%, 3%, 0) scale(1.08); } }
-@keyframes stageOn {
-  0%, 18%, 100% {
-    border-color: var(--line, rgba(255,255,255,.1));
-    background: rgba(255,255,255,.03);
-    color: var(--text-tertiary, rgba(239,242,249,.46));
-  }
-  3%, 15% {
-    border-color: rgba(166,140,255,.45);
-    background: rgba(166,140,255,.14);
-    color: #ded6ff;
-  }
+/* ---- entry: you walk through the door ---------------------------------- */
+.si-splash {
+  position: fixed; inset: 0; z-index: 60;
+  display: grid; place-items: center;
+  background: #04050a;
+  cursor: pointer;
+  animation: splashOut .85s cubic-bezier(.6,.02,.28,1) 1.5s forwards;
 }
-@keyframes linkOn {
-  0%, 100% { transform: scaleX(0); }
-  4% { transform: scaleX(0); }
-  15%, 82% { transform: scaleX(1); }
+.si-splash.is-skipping { animation: splashOut .5s cubic-bezier(.6,.02,.28,1) forwards; }
+
+/* the corridor floor running to the door */
+.si-splash-floor {
+  position: absolute; bottom: 0; left: 50%;
+  width: 150vw; height: 52vh;
+  transform: translateX(-50%);
+  background: radial-gradient(ellipse at 50% 0%, color-mix(in srgb, var(--violet) 30%, transparent), transparent 62%);
 }
+/* the door itself */
+.si-splash-door {
+  position: relative;
+  width: min(19vw, 130px);
+  aspect-ratio: 5 / 9;
+  border-radius: 50% 50% 0 0 / 26% 26% 0 0;
+  background: linear-gradient(180deg, #ffffff, #d9e4ff 46%, #9fb6ff);
+  box-shadow:
+    0 0 70px 20px color-mix(in srgb, var(--violet) 55%, transparent),
+    0 0 190px 70px color-mix(in srgb, var(--blue) 34%, transparent);
+  animation: doorIn 1.5s cubic-bezier(.2,.7,.2,1) both, doorThrough .85s cubic-bezier(.6,.02,.28,1) 1.5s forwards;
+}
+.si-splash.is-skipping .si-splash-door { animation: doorThrough .5s cubic-bezier(.6,.02,.28,1) forwards; }
+
+.si-splash-word {
+  position: absolute; left: 50%; bottom: 13vh;
+  transform: translateX(-50%);
+  text-align: center;
+  animation: siRise 1s ease .25s both;
+}
+.si-splash-word strong { display: block; font-size: clamp(22px, 2.6vw, 34px); font-weight: 650; letter-spacing: -0.03em; color: #f4f6ff; }
+.si-splash-word small { display: block; margin-top: 6px; font-size: 12.5px; color: rgba(226,232,255,.5); }
+.si-splash-skip {
+  position: absolute; right: 26px; bottom: 22px;
+  color: rgba(226,232,255,.34); font-size: 11.5px;
+}
+
+@keyframes doorIn { from { transform: scale(.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@keyframes doorThrough { to { transform: scale(26); opacity: 0; } }
+@keyframes splashOut { to { opacity: 0; visibility: hidden; } }
+
+@keyframes siRise { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
 
 @media (max-width: 940px) {
-  .signin-grid { grid-template-columns: 1fr; gap: 30px; align-items: start; }
-  .signin-card { justify-self: stretch; max-width: none; }
-  .signin-intro h1 { max-width: none; font-size: clamp(33px, 7.4vw, 48px); }
-}
-@media (max-width: 560px) {
-  .signin { gap: 20px; }
-  .signin-stages i { display: none; }
+  .si-stage { grid-template-columns: 1fr; gap: 30px; align-items: start; }
+  .si-panel { justify-self: stretch; }
+  .si-pitch h1 { max-width: none; font-size: clamp(34px, 8vw, 52px); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .signin *, .signin::before { animation: none !important; transition: none !important; }
-  .signin-stages span:first-child {
-    border-color: rgba(166,140,255,.45);
-    background: rgba(166,140,255,.14);
-    color: #ded6ff;
-  }
+  .si * { animation: none !important; transition: none !important; }
+  .si-splash { display: none; }
 }
 `;
-
-const stages = ["Discover", "Align", "Stand out", "Prepare", "Land it"];
 
 function friendlyAuthMessage(message: string) {
   const value = message.toLowerCase();
@@ -233,7 +253,7 @@ function friendlyAuthMessage(message: string) {
   }
 
   if (value.includes("unsupported provider") || value.includes("provider is not enabled")) {
-    return "Google sign-in has not been enabled for Sartho yet. Complete the one-time Google connection in Supabase, then try again.";
+    return "That sign-in method has not been switched on for Sartho yet. Enable it in Supabase, then try again.";
   }
 
   if (
@@ -241,7 +261,7 @@ function friendlyAuthMessage(message: string) {
     value.includes("invalid_client") ||
     value.includes("client secret")
   ) {
-    return "Google accepted your account, but Supabase could not complete the secure code exchange. The Google Client Secret saved in Supabase does not match this Client ID.";
+    return "The provider accepted your account, but Supabase could not complete the secure code exchange. The client secret saved in Supabase does not match this client ID.";
   }
 
   return message;
@@ -250,13 +270,37 @@ function friendlyAuthMessage(message: string) {
 export default function LoginPage() {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
-  const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
+  const [mode, setMode] = useState<Mode>("signin");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [splash, setSplash] = useState<"showing" | "skipping" | "done">("showing");
+
+  useEffect(() => {
+    // The door is a welcome, not a toll gate: it plays once per session, and
+    // never when the page is a landing from an OAuth round trip.
+    const returning =
+      window.sessionStorage.getItem("sartho-entered") === "1" ||
+      window.location.hash.length > 1 ||
+      window.location.search.length > 1;
+
+    if (returning) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setSplash("done");
+      return;
+    }
+
+    window.sessionStorage.setItem("sartho-entered", "1");
+    const timer = window.setTimeout(() => setSplash("done"), 2350);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search);
     const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
-    const error =
+    const failure =
       hashParams.get("error_description") ??
       searchParams.get("error") ??
       hashParams.get("error");
@@ -264,85 +308,206 @@ export default function LoginPage() {
     // Reads browser-only URL/hash params unavailable during SSR, so this must
     // run in an effect rather than being derived during render.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (error) setMessage(friendlyAuthMessage(error));
+    if (failure) setError(friendlyAuthMessage(failure));
 
     supabase.auth.getSession().then(({ data }) => {
       if (data.session) router.replace("/");
     });
   }, [router, supabase]);
 
-  async function signInWithGoogle() {
-    setBusy(true);
-    setMessage(null);
+  function walkThrough() {
+    if (splash !== "showing") return;
+    setSplash("skipping");
+    window.setTimeout(() => setSplash("done"), 500);
+  }
 
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback?next=/`,
-      },
+  async function signInWithProvider(provider: Provider) {
+    setBusy(provider);
+    setError(null);
+    setNotice(null);
+
+    const { error: failure } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: { redirectTo: `${window.location.origin}/auth/callback?next=/` },
     });
 
-    if (error) {
-      setBusy(false);
-      setMessage(friendlyAuthMessage(error.message));
+    if (failure) {
+      setBusy(null);
+      setError(friendlyAuthMessage(failure.message));
     }
   }
 
+  async function submit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError(null);
+    setNotice(null);
+
+    if (mode === "reset") {
+      setBusy("reset");
+      const { error: failure } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth/callback?next=/`,
+      });
+      setBusy(null);
+      if (failure) setError(friendlyAuthMessage(failure.message));
+      else setNotice("If that address has an account, a reset link is on its way.");
+      return;
+    }
+
+    setBusy("email");
+    const { error: failure } = await supabase.auth.signInWithPassword({ email, password });
+    setBusy(null);
+    if (failure) setError(friendlyAuthMessage(failure.message));
+    else router.replace("/");
+  }
+
   return (
-    <main className="signin">
+    <main className="si">
       <style>{styles}</style>
 
-      <header className="signin-top">
-        <Image className="signin-logo" src={sarthoIcon} alt="" width={46} height={46} priority />
+      {splash !== "done" ? (
+        <div
+          className={`si-splash${splash === "skipping" ? " is-skipping" : ""}`}
+          onClick={walkThrough}
+          role="presentation"
+        >
+          <div className="si-splash-floor" aria-hidden="true" />
+          <div className="si-splash-door" aria-hidden="true" />
+          <div className="si-splash-word">
+            <strong>Sartho</strong>
+            <small>Your Career CoPilot</small>
+          </div>
+          <span className="si-splash-skip">Click to enter</span>
+        </div>
+      ) : null}
+
+      <header className="si-brand">
+        <Image className="si-logo" src={sarthoIcon} alt="" width={46} height={46} priority />
         <span>
           <strong>Sartho</strong>
-          <small>Your career, intelligently guided.</small>
+          <small>Your Career CoPilot</small>
         </span>
       </header>
 
-      <div className="signin-grid">
-        <section className="signin-intro">
-          <h1>Find work <em>worthy</em> of your experience.</h1>
-
-          <div className="signin-stages" aria-label="How Sartho works">
-            {stages.map((stage, index) => (
-              <Fragment key={stage}>
-                {index > 0 ? <i style={{ ["--i" as string]: index - 1 }} aria-hidden="true" /> : null}
-                <span style={{ ["--i" as string]: index }}>{stage}</span>
-              </Fragment>
-            ))}
-          </div>
+      <div className="si-stage">
+        <section className="si-pitch">
+          <h1>Your own headhunter. <em>Finally.</em></h1>
+          <p>
+            Someone who knows your whole career, finds the roles worth your
+            experience, and makes sure you walk in ready.
+          </p>
         </section>
 
-        <section className="signin-card">
-          <h2>Welcome to Sartho</h2>
+        <section className="si-panel">
+          <h2>{mode === "reset" ? "Reset your password" : "Welcome to Sartho"}</h2>
+          <p className="si-sub">
+            {mode === "reset"
+              ? "We'll email you a link to set a new one."
+              : "Choose how you'd like to sign in."}
+          </p>
 
-          <button type="button" className="signin-google" onClick={signInWithGoogle} disabled={busy}>
-            <GoogleIcon />
-            <span>{busy ? "Connecting…" : "Continue with Google"}</span>
-          </button>
+          {mode === "signin" ? (
+            <>
+              <div className="si-providers">
+                <button type="button" className="si-provider" onClick={() => signInWithProvider("google")} disabled={busy !== null}>
+                  <GoogleIcon /><span>{busy === "google" ? "Opening…" : "Continue with Google"}</span>
+                </button>
+                <button type="button" className="si-provider" onClick={() => signInWithProvider("apple")} disabled={busy !== null}>
+                  <AppleIcon /><span>{busy === "apple" ? "Opening…" : "Continue with Apple"}</span>
+                </button>
+                <button type="button" className="si-provider" onClick={() => signInWithProvider("github")} disabled={busy !== null}>
+                  <GitHubIcon /><span>{busy === "github" ? "Opening…" : "Continue with GitHub"}</span>
+                </button>
+              </div>
 
-          {message ? <p className="signin-error" role="alert">{message}</p> : null}
+              <div className="si-or">or</div>
+            </>
+          ) : null}
 
-          <p className="signin-note">Private beta — approved accounts only.</p>
+          <form className="si-form" onSubmit={submit}>
+            <label>
+              <span>Email</span>
+              <input
+                type="email"
+                required
+                autoComplete="email"
+                placeholder="you@company.com"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+              />
+            </label>
+
+            {mode === "signin" ? (
+              <label>
+                <span>Password</span>
+                <input
+                  type="password"
+                  required
+                  autoComplete="current-password"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                />
+              </label>
+            ) : null}
+
+            <button type="submit" className="si-submit" disabled={busy !== null}>
+              {busy === "email" || busy === "reset"
+                ? "Working…"
+                : mode === "reset"
+                  ? "Send reset link"
+                  : "Sign in"}
+            </button>
+          </form>
+
+          <div className="si-row">
+            <button
+              type="button"
+              className="si-link"
+              onClick={() => {
+                setMode(mode === "reset" ? "signin" : "reset");
+                setError(null);
+                setNotice(null);
+              }}
+            >
+              {mode === "reset" ? "Back to sign in" : "Forgot password?"}
+            </button>
+          </div>
+
+          {error ? <p className="si-msg is-error" role="alert">{error}</p> : null}
+          {notice ? <p className="si-msg is-ok" role="status">{notice}</p> : null}
+
+          <p className="si-note">
+            Private beta — approved accounts only. Nothing is submitted without your approval.
+          </p>
         </section>
       </div>
-
-      <footer className="signin-foot">
-        <i aria-hidden="true" />
-        <span>Nothing is submitted without your approval.</span>
-      </footer>
     </main>
   );
 }
 
 function GoogleIcon() {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+    <svg width="17" height="17" viewBox="0 0 24 24" aria-hidden="true">
       <path fill="#4285F4" d="M21.6 12.23c0-.71-.06-1.4-.18-2.07H12v3.92h5.38a4.6 4.6 0 0 1-2 3.02v2.54h3.24c1.9-1.75 2.98-4.33 2.98-7.41Z" />
       <path fill="#34A853" d="M12 22c2.7 0 4.97-.9 6.62-2.36l-3.24-2.54c-.9.6-2.05.96-3.38.96-2.6 0-4.8-1.76-5.59-4.12H3.06v2.62A10 10 0 0 0 12 22Z" />
       <path fill="#FBBC05" d="M6.41 13.94A6.02 6.02 0 0 1 6.1 12c0-.67.12-1.33.31-1.94V7.44H3.06A10 10 0 0 0 2 12c0 1.61.38 3.14 1.06 4.56l3.35-2.62Z" />
       <path fill="#EA4335" d="M12 5.94c1.47 0 2.79.5 3.83 1.5l2.87-2.88A9.62 9.62 0 0 0 12 2a10 10 0 0 0-8.94 5.44l3.35 2.62C7.2 7.7 9.4 5.94 12 5.94Z" />
+    </svg>
+  );
+}
+
+function AppleIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M16.36 12.72c.02 2.6 2.28 3.47 2.3 3.48-.02.06-.36 1.24-1.19 2.45-.72 1.05-1.47 2.1-2.65 2.12-1.16.02-1.53-.69-2.86-.69-1.32 0-1.74.67-2.83.71-1.14.04-2.01-1.13-2.73-2.18-1.48-2.15-2.61-6.07-1.09-8.72.75-1.31 2.1-2.15 3.57-2.17 1.11-.02 2.17.75 2.85.75.68 0 1.96-.93 3.3-.79.56.02 2.14.23 3.15 1.71-.08.05-1.88 1.1-1.86 3.33M14.2 4.9c.6-.73 1.01-1.75.9-2.76-.87.04-1.92.58-2.55 1.31-.56.65-1.05 1.68-.92 2.68.97.07 1.96-.49 2.57-1.23" />
+    </svg>
+  );
+}
+
+function GitHubIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M12 2C6.48 2 2 6.48 2 12c0 4.42 2.87 8.17 6.84 9.5.5.09.68-.22.68-.48l-.01-1.7c-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.61.07-.61 1 .07 1.53 1.03 1.53 1.03.89 1.53 2.34 1.09 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02A9.6 9.6 0 0 1 12 6.8c.85 0 1.71.11 2.51.34 1.91-1.29 2.75-1.02 2.75-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.69-4.57 4.94.36.31.68.92.68 1.85l-.01 2.75c0 .27.18.58.69.48A10 10 0 0 0 22 12c0-5.52-4.48-10-10-10Z" />
     </svg>
   );
 }
