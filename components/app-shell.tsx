@@ -126,7 +126,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   if (loading || !session) {
     return (
       <main className="auth-loading" aria-live="polite">
-        <Image className="brand-mark" src={sarthoIcon} alt="" width={44} height={44} priority />
+        <Image className="brand-mark" src={sarthoIcon} alt="" width={176} height={176} quality={95} priority />
         <div><strong>Opening your Sartho workspace</strong><small>Securing your session…</small></div>
       </main>
     );
@@ -197,7 +197,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       <aside className="desktop-rail glass-strong" aria-label="Primary navigation">
         <Link href="/" className="brand-lockup" aria-label="Sartho home">
-          <Image className="brand-mark" src={sarthoIcon} alt="" width={44} height={44} priority />
+          <Image className="brand-mark" src={sarthoIcon} alt="" width={176} height={176} quality={95} priority />
           <span><strong>Sartho</strong><small>AI Career Copilot</small></span>
         </Link>
 
@@ -223,7 +223,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <div className="app-stage">
         <header className="top-bar glass-soft">
           <div className="mobile-brand">
-            <Image className="brand-mark brand-mark-small" src={sarthoIcon} alt="" width={34} height={34} />
+            <Image className="brand-mark brand-mark-small" src={sarthoIcon} alt="" width={144} height={144} quality={95} />
             <span><strong>Sartho</strong><small>{currentPage}</small></span>
           </div>
           <div className="desktop-context">
