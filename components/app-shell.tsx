@@ -50,7 +50,26 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [confirmation, setConfirmation] = useState("");
   const [accountBusy, setAccountBusy] = useState(false);
   const [accountError, setAccountError] = useState<string | null>(null);
+  const [theme, setTheme] = useState<"dark" | "light">("dark");
   const currentPage = navigation.find((item) => isActive(pathname, item.href))?.label ?? "Sartho";
+
+  useEffect(() => {
+    // The inline script in the document head already applied this before paint;
+    // mirror it into React so the switch renders in the right position.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setTheme(document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark");
+  }, []);
+
+  function toggleTheme() {
+    const next = theme === "dark" ? "light" : "dark";
+    setTheme(next);
+    document.documentElement.setAttribute("data-theme", next);
+    try {
+      window.localStorage.setItem("sartho-theme", next);
+    } catch {
+      // Private browsing can refuse storage; the theme still applies this session.
+    }
+  }
 
   useEffect(() => {
     let active = true;
@@ -230,6 +249,19 @@ export function AppShell({ children }: { children: ReactNode }) {
               {profileOpen ? (
                 <div id="profile-menu" className="profile-menu" role="menu" aria-label="Profile and account">
                   <div className="profile-menu-identity"><strong>{fullName}</strong><span>{session.user.email}</span></div>
+                  <div className="profile-menu-divider" />
+                  <div className="theme-row">
+                    <span>{theme === "dark" ? "Dark" : "Light"} theme</span>
+                    <button
+                      type="button"
+                      className="theme-switch"
+                      data-on={theme === "light"}
+                      role="menuitemcheckbox"
+                      aria-checked={theme === "light"}
+                      aria-label="Switch between dark and light theme"
+                      onClick={toggleTheme}
+                    />
+                  </div>
                   <div className="profile-menu-divider" />
                   <Link href="/career-truth" className="profile-menu-link" role="menuitem"><span>Career Profile</span><small aria-hidden="true">→</small></Link>
                   <button type="button" className="profile-menu-action" role="menuitem" onClick={() => void signOut()}><span>Log out</span><small>End this secure session</small></button>
