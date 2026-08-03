@@ -87,18 +87,29 @@ const styles = `
 
 /* Panel */
 .si-panel {
+  position: relative;
   justify-self: end;
   width: 100%;
   padding: clamp(24px, 2.6vw, 34px);
   border: 1px solid var(--line);
   border-radius: 26px;
   background: var(--glass-strong);
-  box-shadow: var(--shadow);
+  box-shadow:
+    var(--shadow),
+    0 0 90px -10px color-mix(in srgb, var(--violet) 42%, transparent),
+    0 0 160px 10px color-mix(in srgb, var(--blue) 20%, transparent);
   backdrop-filter: blur(20px);
   animation: siRise 1s ease .26s both;
 }
-.si-panel h2 { margin: 0; font-size: 20px; font-weight: 640; letter-spacing: -0.026em; }
-.si-sub { margin: 7px 0 0; color: var(--text-secondary); font-size: 13px; line-height: 1.5; }
+/* The mark crowns the card — the door you are about to walk through. */
+.si-card-mark {
+  display: block;
+  width: 54px; height: 54px;
+  margin: 0 auto 16px;
+  border-radius: 15px;
+}
+.si-panel h2 { margin: 0; font-size: 20px; font-weight: 640; letter-spacing: -0.026em; text-align: center; }
+.si-sub { margin: 7px 0 0; color: var(--text-secondary); font-size: 13px; line-height: 1.5; text-align: center; }
 
 .si-providers { display: grid; gap: 9px; margin-top: 20px; }
 .si-provider {
@@ -151,12 +162,14 @@ const styles = `
   width: 100%; min-height: 48px;
   margin-top: 3px;
   border: 0; border-radius: 13px;
-  color: var(--canvas); background: var(--text);
+  color: #fff;
+  background: linear-gradient(135deg, #7c5cf0, #5b7ff0);
   cursor: pointer; font: inherit;
   font-size: 14px; font-weight: 620;
-  transition: transform .2s ease, opacity .2s ease;
+  box-shadow: 0 10px 26px color-mix(in srgb, var(--violet) 34%, transparent);
+  transition: transform .2s ease, filter .2s ease;
 }
-.si-submit:hover:not(:disabled) { transform: translateY(-1px); }
+.si-submit:hover:not(:disabled) { transform: translateY(-1px); filter: brightness(1.08); }
 .si-submit:disabled { opacity: .55; cursor: progress; }
 
 .si-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 13px; }
@@ -190,9 +203,9 @@ const styles = `
   display: grid; place-items: center;
   background: #04050a;
   cursor: pointer;
-  animation: splashOut .9s cubic-bezier(.55,.02,.3,1) 2.25s forwards;
+  animation: splashOut .7s ease 3.95s forwards;
 }
-.si-splash.is-skipping { animation: splashOut .62s cubic-bezier(.55,.02,.3,1) forwards; }
+.si-splash.is-skipping { animation: splashOut .55s ease .18s forwards; }
 
 /* the corridor floor running to the door */
 .si-splash-floor {
@@ -211,9 +224,9 @@ const styles = `
   box-shadow:
     0 0 70px 20px color-mix(in srgb, var(--violet) 55%, transparent),
     0 0 190px 70px color-mix(in srgb, var(--blue) 34%, transparent);
-  animation: doorIn .8s cubic-bezier(.18,.72,.24,1) both, doorGlow 1.5s ease-in-out .8s, doorThrough 1.05s cubic-bezier(.55,.02,.3,1) 2.15s forwards;
+  animation: doorIn .85s cubic-bezier(.18,.72,.24,1) both, doorGlow 2.4s ease-in-out .85s, doorThrough 1.15s cubic-bezier(.7,0,.85,.2) 3.1s forwards;
 }
-.si-splash.is-skipping .si-splash-door { animation: doorThrough .62s cubic-bezier(.55,.02,.3,1) forwards; }
+.si-splash.is-skipping .si-splash-door { animation: doorThrough .6s cubic-bezier(.7,0,.85,.2) forwards; }
 
 .si-splash-word {
   position: absolute; left: 50%; bottom: 13vh;
@@ -223,6 +236,15 @@ const styles = `
 }
 .si-splash-word strong { display: block; font-size: clamp(22px, 2.6vw, 34px); font-weight: 650; letter-spacing: -0.03em; color: #f4f6ff; }
 .si-splash-word small { display: block; margin-top: 6px; font-size: 12.5px; color: rgba(226,232,255,.5); }
+.si-splash::after {
+  content: "";
+  position: absolute; inset: 0;
+  background: radial-gradient(circle at 50% 46%, #ffffff, rgba(214,226,255,.7) 34%, transparent 72%);
+  opacity: 0;
+  pointer-events: none;
+  animation: bloom 1.1s ease-out 3.55s forwards;
+}
+.si-splash.is-skipping::after { animation: bloom .6s ease-out .05s forwards; }
 .si-splash-skip {
   position: absolute; right: 26px; bottom: 22px;
   color: rgba(226,232,255,.34); font-size: 11.5px;
@@ -230,7 +252,16 @@ const styles = `
 
 @keyframes doorIn { from { transform: scale(.62); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 @keyframes doorGlow { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.16); } }
-@keyframes doorThrough { to { transform: scale(26); opacity: 0; } }
+@keyframes doorThrough {
+  0%   { transform: scale(1); filter: blur(0); }
+  55%  { transform: scale(5.5); filter: blur(2px); }
+  100% { transform: scale(34); filter: blur(16px); opacity: .6; }
+}
+@keyframes bloom {
+  0%   { opacity: 0; }
+  42%  { opacity: 1; }
+  100% { opacity: 0; }
+}
 @keyframes splashOut { to { opacity: 0; visibility: hidden; } }
 
 @keyframes siRise { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
@@ -294,7 +325,7 @@ export default function LoginPage() {
     }
 
     window.sessionStorage.setItem("sartho-entered", "1");
-    const timer = window.setTimeout(() => setSplash("done"), 3250);
+    const timer = window.setTimeout(() => setSplash("done"), 4700);
     return () => window.clearTimeout(timer);
   }, []);
 
@@ -319,7 +350,7 @@ export default function LoginPage() {
   function walkThrough() {
     if (splash !== "showing") return;
     setSplash("skipping");
-    window.setTimeout(() => setSplash("done"), 640);
+    window.setTimeout(() => setSplash("done"), 760);
   }
 
   async function signInWithProvider(provider: Provider) {
@@ -382,7 +413,7 @@ export default function LoginPage() {
       ) : null}
 
       <header className="si-brand">
-        <Image className="si-logo" src={sarthoIcon} alt="" width={46} height={46} priority />
+        <Image className="si-logo" src={sarthoIcon} alt="" width={184} height={184} quality={95} priority />
         <span>
           <strong>Sartho</strong>
           <small>Your Career CoPilot</small>
@@ -399,6 +430,7 @@ export default function LoginPage() {
         </section>
 
         <section className="si-panel">
+          <Image className="si-card-mark" src={sarthoIcon} alt="" width={216} height={216} quality={95} />
           <h2>{mode === "reset" ? "Reset your password" : "Welcome to Sartho"}</h2>
           <p className="si-sub">
             {mode === "reset"
