@@ -15,3 +15,6 @@ coverage/
 supabase/seed.sql
 supabase/seed.private.sql
 supabase/*private*seed*.sql
+
+# TypeScript incremental build cache — regenerated on every build.
+tsconfig.tsbuildinfo
