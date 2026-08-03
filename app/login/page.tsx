@@ -190,9 +190,9 @@ const styles = `
   display: grid; place-items: center;
   background: #04050a;
   cursor: pointer;
-  animation: splashOut .85s cubic-bezier(.6,.02,.28,1) 1.5s forwards;
+  animation: splashOut .9s cubic-bezier(.55,.02,.3,1) 2.25s forwards;
 }
-.si-splash.is-skipping { animation: splashOut .5s cubic-bezier(.6,.02,.28,1) forwards; }
+.si-splash.is-skipping { animation: splashOut .62s cubic-bezier(.55,.02,.3,1) forwards; }
 
 /* the corridor floor running to the door */
 .si-splash-floor {
@@ -211,9 +211,9 @@ const styles = `
   box-shadow:
     0 0 70px 20px color-mix(in srgb, var(--violet) 55%, transparent),
     0 0 190px 70px color-mix(in srgb, var(--blue) 34%, transparent);
-  animation: doorIn 1.5s cubic-bezier(.2,.7,.2,1) both, doorThrough .85s cubic-bezier(.6,.02,.28,1) 1.5s forwards;
+  animation: doorIn .8s cubic-bezier(.18,.72,.24,1) both, doorGlow 1.5s ease-in-out .8s, doorThrough 1.05s cubic-bezier(.55,.02,.3,1) 2.15s forwards;
 }
-.si-splash.is-skipping .si-splash-door { animation: doorThrough .5s cubic-bezier(.6,.02,.28,1) forwards; }
+.si-splash.is-skipping .si-splash-door { animation: doorThrough .62s cubic-bezier(.55,.02,.3,1) forwards; }
 
 .si-splash-word {
   position: absolute; left: 50%; bottom: 13vh;
@@ -228,7 +228,8 @@ const styles = `
   color: rgba(226,232,255,.34); font-size: 11.5px;
 }
 
-@keyframes doorIn { from { transform: scale(.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@keyframes doorIn { from { transform: scale(.62); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@keyframes doorGlow { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.16); } }
 @keyframes doorThrough { to { transform: scale(26); opacity: 0; } }
 @keyframes splashOut { to { opacity: 0; visibility: hidden; } }
 
@@ -293,7 +294,7 @@ export default function LoginPage() {
     }
 
     window.sessionStorage.setItem("sartho-entered", "1");
-    const timer = window.setTimeout(() => setSplash("done"), 2350);
+    const timer = window.setTimeout(() => setSplash("done"), 3250);
     return () => window.clearTimeout(timer);
   }, []);
 
@@ -318,7 +319,7 @@ export default function LoginPage() {
   function walkThrough() {
     if (splash !== "showing") return;
     setSplash("skipping");
-    window.setTimeout(() => setSplash("done"), 500);
+    window.setTimeout(() => setSplash("done"), 640);
   }
 
   async function signInWithProvider(provider: Provider) {
