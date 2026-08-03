@@ -197,22 +197,37 @@ const styles = `
 
 .si :is(button, a, input):focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; }
 
-/* ---- entry: you walk through the door ---------------------------------- */
+/* ---- the landing screen: the door waits for you ------------------------- */
+/*
+ * This is a screen, not a transition. It arrives, it settles, and then it
+ * holds — indefinitely — until the visitor presses Continue. Nothing here is
+ * on a timer, because a screen nobody gets to read is a screen nobody built.
+ */
+/*
+ * Laid out as a flow column rather than absolutely positioned pieces. The
+ * centring transform an absolute layout needs collides with the transforms the
+ * entrance animations run, and the animation wins — which is exactly how the
+ * headline and the button ended up half a width off centre.
+ */
 .si-splash {
   position: fixed; inset: 0; z-index: 60;
-  display: grid; place-items: center;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: space-between;
+  padding: clamp(48px, 11vh, 130px) 24px clamp(40px, 9vh, 104px);
   background: #04050a;
-  cursor: pointer;
-  animation: splashOut .7s ease 3.95s forwards;
+  overflow: hidden;
 }
-.si-splash.is-skipping { animation: splashOut .55s ease .18s forwards; }
+.si-splash.is-leaving { animation: splashOut .6s ease .38s forwards; }
 
 /* the corridor floor running to the door */
 .si-splash-floor {
-  position: absolute; bottom: 0; left: 50%;
-  width: 150vw; height: 52vh;
-  transform: translateX(-50%);
-  background: radial-gradient(ellipse at 50% 0%, color-mix(in srgb, var(--violet) 30%, transparent), transparent 62%);
+  position: absolute; bottom: -12vh; left: 50%;
+  width: 150vw; height: 64vh;
+  margin-left: -75vw;
+  background: radial-gradient(ellipse at 50% 22%, color-mix(in srgb, var(--violet) 32%, transparent), transparent 60%);
+  /* blurred so the element's own edge never reads as a seam across the page */
+  filter: blur(30px);
+  pointer-events: none;
 }
 /* the door itself */
 .si-splash-door {
@@ -221,37 +236,114 @@ const styles = `
   aspect-ratio: 5 / 9;
   border-radius: 50% 50% 0 0 / 26% 26% 0 0;
   background: linear-gradient(180deg, #ffffff, #d9e4ff 46%, #9fb6ff);
-  box-shadow:
-    0 0 70px 20px color-mix(in srgb, var(--violet) 55%, transparent),
-    0 0 190px 70px color-mix(in srgb, var(--blue) 34%, transparent);
-  animation: doorIn .85s cubic-bezier(.18,.72,.24,1) both, doorGlow 2.4s ease-in-out .85s, doorThrough 1.15s cubic-bezier(.7,0,.85,.2) 3.1s forwards;
+  /* breathes on a loop while it waits — alive, not frozen */
+  animation:
+    doorIn .9s cubic-bezier(.18,.72,.24,1) both,
+    doorGlow 4.2s ease-in-out .9s infinite;
 }
-.si-splash.is-skipping .si-splash-door { animation: doorThrough .6s cubic-bezier(.7,0,.85,.2) forwards; }
+/*
+ * The halo is a gradient rather than a pair of very large box-shadows: at these
+ * radii Chromium tiles the shadow blur and the tile edges show as banding.
+ */
+.si-splash-door::before {
+  content: "";
+  position: absolute; left: 50%; top: 50%;
+  width: 640px; height: 640px;
+  margin: -320px 0 0 -320px;
+  border-radius: 999px;
+  background:
+    radial-gradient(circle, rgba(190,205,255,.55), rgba(140,120,250,.28) 30%, transparent 62%);
+  pointer-events: none;
+}
 
-.si-splash-word {
-  position: absolute; left: 50%; bottom: 13vh;
-  transform: translateX(-50%);
+/* headline sits above the door, the promise you are walking towards */
+.si-splash-line {
+  position: relative;
+  margin: 0;
+  width: min(92vw, 15ch);
   text-align: center;
-  animation: siRise 1s ease .25s both;
+  font-size: clamp(30px, 5.2vw, 68px);
+  line-height: .96;
+  letter-spacing: -0.05em;
+  font-weight: 600;
+  color: #f4f6ff;
+  text-wrap: balance;
+  animation: siRise 1.1s cubic-bezier(.2,.7,.2,1) .3s both;
 }
-.si-splash-word strong { display: block; font-size: clamp(22px, 2.6vw, 34px); font-weight: 650; letter-spacing: -0.03em; color: #f4f6ff; }
-.si-splash-word small { display: block; margin-top: 6px; font-size: 12.5px; color: rgba(226,232,255,.5); }
+.si-splash-line em {
+  font-style: normal;
+  text-shadow: 0 0 64px rgba(150,130,255,.75);
+}
+
+/* brand lockup + the way in, together at the foot of the corridor */
+.si-splash-foot {
+  position: relative;
+  display: grid; justify-items: center; gap: 24px;
+  animation: siRise 1.1s ease .62s both;
+}
+.si-splash-lockup { display: flex; align-items: center; gap: 11px; }
+.si-splash-lockup img { width: 38px; height: 38px; border-radius: 11px; flex: none; }
+.si-splash-lockup strong { display: block; font-size: 18px; font-weight: 650; letter-spacing: -0.028em; color: #f4f6ff; }
+.si-splash-lockup small { display: block; margin-top: 2px; font-size: 12px; color: rgba(226,232,255,.5); }
+
+.si-splash-enter {
+  min-height: 50px;
+  padding: 0 30px;
+  border: 0; border-radius: 14px;
+  color: #fff;
+  background: linear-gradient(135deg, #7c5cf0, #5b7ff0);
+  cursor: pointer; font: inherit;
+  font-size: 14.5px; font-weight: 620; letter-spacing: -0.01em;
+  box-shadow: 0 12px 34px rgba(124,92,240,.42);
+  transition: transform .2s ease, filter .2s ease, box-shadow .2s ease;
+}
+.si-splash-enter:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.09);
+  box-shadow: 0 18px 44px rgba(124,92,240,.52);
+}
+.si-splash-enter:focus-visible { outline: 2px solid #9fb6ff; outline-offset: 3px; }
+
 .si-splash::after {
   content: "";
   position: absolute; inset: 0;
   background: radial-gradient(circle at 50% 46%, #ffffff, rgba(214,226,255,.7) 34%, transparent 72%);
   opacity: 0;
   pointer-events: none;
-  animation: bloom 1.1s ease-out 3.55s forwards;
 }
-.si-splash.is-skipping::after { animation: bloom .6s ease-out .05s forwards; }
-.si-splash-skip {
-  position: absolute; right: 26px; bottom: 22px;
-  color: rgba(226,232,255,.34); font-size: 11.5px;
+.si-splash.is-leaving::after { animation: bloom .9s ease-out .1s forwards; }
+
+/* on the way out, the words and the button clear so the door can take over */
+.si-splash.is-leaving .si-splash-line,
+.si-splash.is-leaving .si-splash-foot { animation: splashLift .38s ease forwards; }
+
+/*
+ * Light theme. The corridor cannot simply stay black or the entry would flash
+ * dark and then hand over to a white sign-in screen. On a light field a glowing
+ * white door would vanish, so the aperture inverts: the opening becomes the
+ * saturated violet and the room around it goes bright.
+ */
+:root[data-theme="light"] .si-splash { background: #f4f6fb; }
+:root[data-theme="light"] .si-splash-line { color: #0b0d16; }
+:root[data-theme="light"] .si-splash-line em { text-shadow: 0 0 52px rgba(124,92,240,.42); }
+:root[data-theme="light"] .si-splash-door {
+  background: linear-gradient(180deg, #8f79ff, #6f8cff 52%, #aebfff);
+}
+:root[data-theme="light"] .si-splash-door::before {
+  background: radial-gradient(circle, rgba(124,92,240,.4), rgba(91,127,240,.18) 32%, transparent 62%);
+}
+:root[data-theme="light"] .si-splash-floor {
+  background: radial-gradient(ellipse at 50% 22%, color-mix(in srgb, var(--violet) 22%, transparent), transparent 58%);
+}
+:root[data-theme="light"] .si-splash-lockup strong { color: #0b0d16; }
+:root[data-theme="light"] .si-splash-lockup small { color: #5b6278; }
+:root[data-theme="light"] .si-splash::after {
+  background: radial-gradient(circle at 50% 46%, #ffffff, rgba(226,232,255,.85) 34%, transparent 72%);
 }
 
 @keyframes doorIn { from { transform: scale(.62); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 @keyframes doorGlow { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.16); } }
+@keyframes splashLift { to { opacity: 0; transform: translateY(-10px); } }
 @keyframes doorThrough {
   0%   { transform: scale(1); filter: blur(0); }
   55%  { transform: scale(5.5); filter: blur(2px); }
@@ -270,10 +362,18 @@ const styles = `
   .si-stage { grid-template-columns: 1fr; gap: 30px; align-items: start; }
   .si-panel { justify-self: stretch; }
   .si-pitch h1 { max-width: none; font-size: clamp(34px, 8vw, 52px); }
+  .si-splash { padding: clamp(40px, 8vh, 72px) 22px clamp(34px, 7vh, 64px); }
+  .si-splash-door { width: min(34vw, 104px); }
+  .si-splash-door::before { width: 420px; height: 420px; margin: -210px 0 0 -210px; }
+  .si-splash-foot { gap: 20px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .si * { animation: none !important; transition: none !important; }
-  .si-splash { display: none; }
+  /*
+   * The landing screen still shows — it is content, and it waits on a click
+   * either way. Only the motion goes.
+   */
+  .si *, .si-splash, .si-splash * { animation: none !important; transition: none !important; }
+  .si-splash.is-leaving { opacity: 0; visibility: hidden; }
 }
 `;
 
@@ -308,25 +408,21 @@ export default function LoginPage() {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [splash, setSplash] = useState<"showing" | "skipping" | "done">("showing");
+  const [splash, setSplash] = useState<"showing" | "leaving" | "done">("showing");
 
   useEffect(() => {
-    // The door is a welcome, not a toll gate: it plays once per session, and
-    // never when the page is a landing from an OAuth round trip.
+    // The landing screen is shown once per session, and never when the page is
+    // a return leg from an OAuth round trip — the visitor is mid-sign-in then,
+    // and a front door in the middle of a journey is an obstacle.
     const returning =
       window.sessionStorage.getItem("sartho-entered") === "1" ||
       window.location.hash.length > 1 ||
       window.location.search.length > 1;
 
-    if (returning) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setSplash("done");
-      return;
-    }
-
-    window.sessionStorage.setItem("sartho-entered", "1");
-    const timer = window.setTimeout(() => setSplash("done"), 4700);
-    return () => window.clearTimeout(timer);
+    // Reads browser-only session/URL state unavailable during SSR, so it has to
+    // settle in an effect rather than during render.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (returning) setSplash("done");
   }, []);
 
   useEffect(() => {
@@ -347,10 +443,12 @@ export default function LoginPage() {
     });
   }, [router, supabase]);
 
+  // The only way past the landing screen. Nothing else dismisses it.
   function walkThrough() {
     if (splash !== "showing") return;
-    setSplash("skipping");
-    window.setTimeout(() => setSplash("done"), 760);
+    window.sessionStorage.setItem("sartho-entered", "1");
+    setSplash("leaving");
+    window.setTimeout(() => setSplash("done"), 980);
   }
 
   async function signInWithProvider(provider: Provider) {
@@ -397,18 +495,24 @@ export default function LoginPage() {
       <style>{styles}</style>
 
       {splash !== "done" ? (
-        <div
-          className={`si-splash${splash === "skipping" ? " is-skipping" : ""}`}
-          onClick={walkThrough}
-          role="presentation"
-        >
+        <div className={`si-splash${splash === "leaving" ? " is-leaving" : ""}`}>
           <div className="si-splash-floor" aria-hidden="true" />
+          <h1 className="si-splash-line">
+            Your own headhunter. <em>Finally.</em>
+          </h1>
           <div className="si-splash-door" aria-hidden="true" />
-          <div className="si-splash-word">
-            <strong>Sartho</strong>
-            <small>Your Career CoPilot</small>
+          <div className="si-splash-foot">
+            <span className="si-splash-lockup">
+              <Image src={sarthoIcon} alt="" width={152} height={152} quality={95} priority />
+              <span>
+                <strong>Sartho</strong>
+                <small>Your Career CoPilot</small>
+              </span>
+            </span>
+            <button type="button" className="si-splash-enter" onClick={walkThrough}>
+              Continue to Sign In
+            </button>
           </div>
-          <span className="si-splash-skip">Click to enter</span>
         </div>
       ) : null}
 
