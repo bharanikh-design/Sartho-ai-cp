@@ -674,3 +674,104 @@ button:focus-visible, a:focus-visible, textarea:focus-visible, input:focus-visib
   .glass-strong { background: #111620; }
   .glass-soft, .glass-card, .glass-card-soft, .panel { background: #11151e; }
 }
+
+/* ===================================================================
+ * Theme
+ *
+ * The dark tokens above are the default. Light mode re-points the same
+ * variables so every screen follows without per-component work, and the
+ * few surfaces that hardcode dark gradients are re-stated here.
+ * =================================================================== */
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --canvas: #f6f7f9;
+  --canvas-soft: #ffffff;
+  --text: #14161b;
+  --text-secondary: rgba(20, 22, 27, 0.68);
+  --text-tertiary: rgba(20, 22, 27, 0.48);
+  --glass: rgba(255, 255, 255, 0.72);
+  --glass-soft: rgba(255, 255, 255, 0.58);
+  --glass-strong: rgba(255, 255, 255, 0.88);
+  --line: rgba(18, 20, 26, 0.1);
+  --line-bright: rgba(18, 20, 26, 0.18);
+  --blue: #3f6fe0;
+  --blue-strong: #2b59c9;
+  --violet: #7c5cf0;
+  --mint: #12a37a;
+  --amber: #b7791f;
+  --rose: #d4506a;
+  --shadow: 0 24px 60px rgba(18, 20, 26, 0.1);
+  --shadow-soft: 0 12px 32px rgba(18, 20, 26, 0.07);
+}
+
+:root[data-theme="light"] body {
+  background:
+    radial-gradient(circle at 12% -8%, rgba(124, 140, 255, 0.13), transparent 32rem),
+    radial-gradient(circle at 95% 8%, rgba(80, 190, 235, 0.1), transparent 29rem),
+    linear-gradient(145deg, #f8f9fb 0%, #f2f4f8 48%, #eef1f6 100%);
+}
+:root[data-theme="light"] body::before { opacity: 0.5; }
+:root[data-theme="light"] ::selection { background: rgba(63, 111, 224, 0.22); color: #0d1017; }
+
+/* Surfaces that hardcode a dark gradient need a light counterpart. */
+:root[data-theme="light"] .glass-strong { background: linear-gradient(160deg, rgba(255,255,255,.94), rgba(248,250,253,.86)); }
+:root[data-theme="light"] .glass-soft { background: linear-gradient(160deg, rgba(255,255,255,.78), rgba(246,248,252,.62)); }
+:root[data-theme="light"] .glass-card,
+:root[data-theme="light"] .panel {
+  background: linear-gradient(145deg, rgba(255,255,255,.96), rgba(250,251,253,.9));
+}
+:root[data-theme="light"] .glass-card-soft { background: linear-gradient(145deg, rgba(255,255,255,.9), rgba(248,250,252,.76)); }
+:root[data-theme="light"] .glass-strong,
+:root[data-theme="light"] .glass-soft,
+:root[data-theme="light"] .glass-card,
+:root[data-theme="light"] .glass-card-soft,
+:root[data-theme="light"] .panel {
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.9), var(--shadow-soft);
+}
+:root[data-theme="light"] .ambient { opacity: 0.16; }
+:root[data-theme="light"] .rail-link:hover { background: rgba(18,20,26,.045); }
+:root[data-theme="light"] .rail-link.is-active {
+  background: linear-gradient(110deg, rgba(63,111,224,.14), rgba(18,20,26,.04));
+  color: #10131a;
+}
+:root[data-theme="light"] .rail-link-icon { color: rgba(20,22,27,.6); background: rgba(18,20,26,.05); }
+:root[data-theme="light"] .rail-link.is-active .rail-link-icon { color: #23409c; background: rgba(63,111,224,.16); }
+
+/* The mark is artwork with its own tile — never paint a gradient behind it. */
+.brand-mark:has(img),
+.brand-mark:has(svg) {
+  background: none;
+  box-shadow: none;
+}
+.brand-mark:has(img)::before,
+.brand-mark:has(svg)::before { content: none; }
+.brand-mark img, .brand-mark svg { width: 100%; height: 100%; border-radius: inherit; }
+
+/* Theme control inside the profile menu. */
+.theme-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 10px 12px;
+}
+.theme-row > span { font-size: 12px; color: var(--text-secondary); }
+.theme-switch {
+  position: relative;
+  width: 46px; height: 26px; flex: none;
+  padding: 0;
+  border: 1px solid var(--line-bright);
+  border-radius: 999px;
+  background: rgba(127,127,127,.16);
+  cursor: pointer;
+  transition: background .22s ease, border-color .22s ease;
+}
+.theme-switch::after {
+  content: "";
+  position: absolute; top: 2px; left: 2px;
+  width: 20px; height: 20px;
+  border-radius: 999px;
+  background: var(--text);
+  opacity: .82;
+  transition: transform .24s cubic-bezier(.2,.7,.2,1);
+}
+.theme-switch[data-on="true"]::after { transform: translateX(20px); }
+.theme-switch:focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; }
