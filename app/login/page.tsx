@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 import sarthoIcon from "@/sartho.png";
+import { entryArt } from "./entry-art";
 
 /*
  * Sign-in.
@@ -197,7 +198,7 @@ const styles = `
 
 .si :is(button, a, input):focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; }
 
-/* ---- the landing screen: the door waits for you ------------------------- */
+/* ---- the landing screen -------------------------------------------------- */
 /*
  * This is a screen, not a transition. It arrives, it settles, and then it
  * holds — indefinitely — until the visitor presses Continue. Nothing here is
@@ -213,67 +214,74 @@ const styles = `
   position: fixed; inset: 0; z-index: 60;
   display: flex; flex-direction: column;
   align-items: center; justify-content: space-between;
-  /* a floor under the spacing, so space-between can never collapse to nothing */
-  gap: clamp(16px, 3.4vh, 48px);
-  padding: clamp(32px, 8vh, 110px) 24px clamp(28px, 7vh, 92px);
+  gap: clamp(20px, 4vh, 48px);
+  padding: clamp(30px, 7vh, 96px) 24px clamp(28px, 6vh, 76px);
   background: #04050a;
   overflow: hidden;
 }
 .si-splash.is-leaving { animation: splashOut .6s ease .38s forwards; }
 
-/* the corridor floor running to the door */
-.si-splash-floor {
-  position: absolute; bottom: -12vh; left: 50%;
-  width: 150vw; height: 64vh;
-  margin-left: -75vw;
-  background: radial-gradient(ellipse at 50% 22%, color-mix(in srgb, var(--violet) 32%, transparent), transparent 60%);
-  /* blurred so the element's own edge never reads as a seam across the page */
-  filter: blur(30px);
+/*
+ * The corridor.
+ *
+ * This is the artwork itself, not a drawing of it — the lit doorway at the end
+ * of a floor running away to a vanishing point. A doorway only reads as a
+ * doorway when something leads to it; the perspective is the whole idea, and
+ * the opening is small because it is far away.
+ *
+ * Painted as a backdrop behind the words, never in the content flow, so it can
+ * never crowd the headline or the button no matter the window.
+ */
+.si-scene {
+  position: absolute; left: 50%; top: 58%;
+  z-index: 0;
+  /*
+   * The whole frame, fitted to the height rather than cropped to fill. The
+   * artwork is 4:3 and a laptop window is closer to 2:1, so filling the frame
+   * ate the edges and enlarged the doorway until it loomed — precisely the
+   * quality that had to be designed out. Its own edges are already near-black,
+   * so masking them into the page reads as a lit scene in a dark room.
+   */
+  /*
+   * Sat low and a little under full height: the doorway falls near the top of
+   * the artwork, and at dead centre it collided with the last line of the
+   * headline on a short window.
+   */
+  height: 96%;
+  aspect-ratio: 2200 / 1675;
+  transform: translate(-50%, -50%);
+  /* the zoom on exit runs into the doorway, not the middle of the frame */
+  transform-origin: 50% 46%;
+  background-image: url("${entryArt}");
+  background-size: cover;
+  background-position: 50% 50%;
+  background-repeat: no-repeat;
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 10%, #000 90%, transparent 100%);
+          mask-image: linear-gradient(to right, transparent 0, #000 10%, #000 90%, transparent 100%);
   pointer-events: none;
-}
-/* the door itself */
-/*
- * Sized off the viewport HEIGHT, not the width. Driven by width alone it kept
- * a fixed 234px height, so on a short window it grew into both its neighbours
- * and the spacing between them collapsed to zero. It also shrinks below its
- * preferred height rather than pushing anything off the screen.
- */
-.si-splash-door {
-  position: relative;
-  height: min(234px, 30vh);
-  width: auto;
-  flex: 0 1 auto;
-  min-height: 84px;
-  aspect-ratio: 5 / 9;
-  border-radius: 50% 50% 0 0 / 26% 26% 0 0;
-  background: linear-gradient(180deg, #ffffff, #d9e4ff 46%, #9fb6ff);
-  /* breathes on a loop while it waits — alive, not frozen */
-  animation:
-    doorIn .9s cubic-bezier(.18,.72,.24,1) both,
-    doorGlow 4.2s ease-in-out .9s infinite;
+  animation: sceneIn 1.6s ease .2s both;
 }
 /*
- * The halo is a gradient rather than a pair of very large box-shadows: at these
- * radii Chromium tiles the shadow blur and the tile edges show as banding.
+ * The words sit on top of a photograph, so the top and bottom are pulled down
+ * to hold them. The middle is left alone — that is where the light is, and
+ * dimming it would be dimming the only thing worth looking at.
  */
-.si-splash-door::before {
+.si-splash::before {
   content: "";
-  position: absolute; left: 50%; top: 50%;
-  width: 640px; height: 640px;
-  margin: -320px 0 0 -320px;
-  border-radius: 999px;
-  background:
-    radial-gradient(circle, rgba(190,205,255,.55), rgba(140,120,250,.28) 30%, transparent 62%);
+  position: absolute; inset: 0;
+  z-index: 1;
+  background: linear-gradient(to bottom,
+    rgba(4,5,10,.88) 0%, rgba(4,5,10,.5) 20%, rgba(4,5,10,.1) 42%,
+    rgba(4,5,10,.3) 66%, rgba(4,5,10,.92) 100%);
   pointer-events: none;
 }
 
-/* headline sits above the door, the promise you are walking towards */
 .si-splash-line {
-  position: relative;
+  position: relative; z-index: 2;
   margin: 0;
-  width: min(92vw, 15ch);
+  width: min(92vw, 14ch);
   text-align: center;
-  font-size: clamp(30px, 5.2vw, 68px);
+  font-size: clamp(34px, 6.4vw, 92px);
   line-height: .96;
   letter-spacing: -0.05em;
   font-weight: 600;
@@ -288,14 +296,14 @@ const styles = `
 
 /* brand lockup + the way in, together at the foot of the corridor */
 .si-splash-foot {
-  position: relative;
+  position: relative; z-index: 2;
   display: grid; justify-items: center; gap: 24px;
   animation: siRise 1.1s ease .62s both;
 }
-.si-splash-lockup { display: flex; align-items: center; gap: 11px; }
-.si-splash-lockup img { width: 38px; height: 38px; border-radius: 11px; flex: none; }
-.si-splash-lockup strong { display: block; font-size: 18px; font-weight: 650; letter-spacing: -0.028em; color: #f4f6ff; }
-.si-splash-lockup small { display: block; margin-top: 2px; font-size: 12px; color: rgba(226,232,255,.5); }
+.si-splash-lockup { display: flex; align-items: center; gap: 12px; }
+.si-splash-lockup img { width: 46px; height: 46px; border-radius: 13px; flex: none; }
+.si-splash-lockup strong { display: block; font-size: 21px; font-weight: 650; letter-spacing: -0.028em; color: #f4f6ff; }
+.si-splash-lockup small { display: block; margin-top: 3px; font-size: 12.5px; color: rgba(226,232,255,.5); }
 
 .si-splash-enter {
   min-height: 50px;
@@ -318,47 +326,38 @@ const styles = `
 .si-splash::after {
   content: "";
   position: absolute; inset: 0;
+  z-index: 3;
   background: radial-gradient(circle at 50% 46%, #ffffff, rgba(214,226,255,.7) 34%, transparent 72%);
   opacity: 0;
   pointer-events: none;
 }
 .si-splash.is-leaving::after { animation: bloom .9s ease-out .1s forwards; }
 
-/* on the way out, the words and the button clear so the door can take over */
-.si-splash.is-leaving .si-splash-line,
-.si-splash.is-leaving .si-splash-foot { animation: splashLift .38s ease forwards; }
+/*
+ * The exit: you walk down the corridor and through the opening. The words
+ * clear first so nothing is in the way, then the door rushes up to meet you.
+ */
+.si-splash.is-leaving .si-splash-line { animation: lineThrough .8s cubic-bezier(.6,0,.75,.2) forwards; }
+.si-splash.is-leaving .si-splash-foot { animation: splashLift .4s ease forwards; }
+.si-splash.is-leaving .si-scene { animation: sceneThrough .95s cubic-bezier(.7,0,.85,.2) forwards; }
 
 /*
- * Light theme. The corridor cannot simply stay black or the entry would flash
- * dark and then hand over to a white sign-in screen. On a light field a glowing
- * white door would vanish, so the aperture inverts: the opening becomes the
- * saturated violet and the room around it goes bright.
+ * The landing screen stays dark in both themes. The artwork is a photograph of
+ * a lit doorway in an unlit room — there is no light-mode version of it, and
+ * laying light-mode type over it makes the words unreadable. The exit bloom
+ * washes to white, which is what carries a light-mode visitor across to the
+ * sign-in page rather than dropping them off a cliff.
  */
-:root[data-theme="light"] .si-splash { background: #f4f6fb; }
-:root[data-theme="light"] .si-splash-line { color: #0b0d16; }
-:root[data-theme="light"] .si-splash-line em { text-shadow: 0 0 52px rgba(124,92,240,.42); }
-:root[data-theme="light"] .si-splash-door {
-  background: linear-gradient(180deg, #8f79ff, #6f8cff 52%, #aebfff);
-}
-:root[data-theme="light"] .si-splash-door::before {
-  background: radial-gradient(circle, rgba(124,92,240,.4), rgba(91,127,240,.18) 32%, transparent 62%);
-}
-:root[data-theme="light"] .si-splash-floor {
-  background: radial-gradient(ellipse at 50% 22%, color-mix(in srgb, var(--violet) 22%, transparent), transparent 58%);
-}
-:root[data-theme="light"] .si-splash-lockup strong { color: #0b0d16; }
-:root[data-theme="light"] .si-splash-lockup small { color: #5b6278; }
-:root[data-theme="light"] .si-splash::after {
-  background: radial-gradient(circle at 50% 46%, #ffffff, rgba(226,232,255,.85) 34%, transparent 72%);
-}
 
-@keyframes doorIn { from { transform: scale(.62); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-@keyframes doorGlow { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.16); } }
 @keyframes splashLift { to { opacity: 0; transform: translateY(-10px); } }
-@keyframes doorThrough {
-  0%   { transform: scale(1); filter: blur(0); }
-  55%  { transform: scale(5.5); filter: blur(2px); }
-  100% { transform: scale(34); filter: blur(16px); opacity: .6; }
+@keyframes lineThrough {
+  0%   { transform: scale(1); opacity: 1; filter: blur(0); }
+  100% { transform: scale(1.3); opacity: 0; filter: blur(7px); }
+}
+@keyframes sceneIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes sceneThrough {
+  0%   { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+  100% { transform: translate(-50%, -50%) scale(5.5); opacity: 0; }
 }
 @keyframes bloom {
   0%   { opacity: 0; }
@@ -374,23 +373,21 @@ const styles = `
   .si-panel { justify-self: stretch; }
   .si-pitch h1 { max-width: none; font-size: clamp(34px, 8vw, 52px); }
   .si-splash { padding: clamp(32px, 7vh, 72px) 22px clamp(28px, 6vh, 64px); }
-  .si-splash-door::before { width: 420px; height: 420px; margin: -210px 0 0 -210px; }
   .si-splash-foot { gap: 20px; }
 }
 /*
- * Short windows — a laptop with the browser chrome and a taskbar eating the
- * screen. The headline has to come down with everything else or it takes the
- * room the door and the button need.
+ * Short windows — a laptop with browser chrome and a taskbar taking their cut.
+ * The headline comes down with everything else so it never crowds the way in.
  */
 @media (max-height: 720px) {
-  .si-splash-line { font-size: clamp(24px, 3.8vw, 44px); }
-  .si-splash-lockup img { width: 32px; height: 32px; }
-  .si-splash-foot { gap: 16px; }
-  .si-splash-enter { min-height: 44px; font-size: 13.5px; }
+  .si-splash-line { font-size: clamp(28px, 5vw, 62px); }
+  .si-splash-foot { gap: 18px; }
+  .si-splash-enter { min-height: 46px; }
 }
 @media (max-height: 560px) {
-  .si-splash-line { font-size: clamp(21px, 3.2vw, 32px); }
-  .si-splash-door::before { width: 360px; height: 360px; margin: -180px 0 0 -180px; }
+  .si-splash-line { font-size: clamp(24px, 4vw, 46px); }
+  .si-splash-lockup img { width: 34px; height: 34px; }
+  .si-splash-foot { gap: 14px; }
 }
 @media (prefers-reduced-motion: reduce) {
   /*
@@ -449,6 +446,36 @@ export default function LoginPage() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     if (returning) setSplash("done");
   }, []);
+
+  useEffect(() => {
+    if (splash === "done") return;
+
+    /*
+     * The landing screen covers the viewport, but the sign-in page underneath
+     * is taller than a short window and stays scrollable — which puts a
+     * scrollbar down the side of a full-bleed screen and lets the wheel drag
+     * the hidden page around. Locking the body removes the scrollbar, so its
+     * width is handed back as padding to stop the page shifting sideways.
+     */
+    const root = document.documentElement;
+    const body = document.body;
+    const scrollbar = window.innerWidth - root.clientWidth;
+    const previousRootOverflow = root.style.overflow;
+    const previousBodyOverflow = body.style.overflow;
+    const previousPadding = body.style.paddingRight;
+
+    // Both elements: overflow on body alone stops the wheel but leaves the
+    // viewport scrollbar drawn, because that scrollbar belongs to the root.
+    root.style.overflow = "hidden";
+    body.style.overflow = "hidden";
+    if (scrollbar > 0) body.style.paddingRight = `${scrollbar}px`;
+
+    return () => {
+      root.style.overflow = previousRootOverflow;
+      body.style.overflow = previousBodyOverflow;
+      body.style.paddingRight = previousPadding;
+    };
+  }, [splash]);
 
   useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search);
@@ -521,11 +548,10 @@ export default function LoginPage() {
 
       {splash !== "done" ? (
         <div className={`si-splash${splash === "leaving" ? " is-leaving" : ""}`}>
-          <div className="si-splash-floor" aria-hidden="true" />
+          <div className="si-scene" aria-hidden="true" />
           <h1 className="si-splash-line">
             Your own headhunter. <em>Finally.</em>
           </h1>
-          <div className="si-splash-door" aria-hidden="true" />
           <div className="si-splash-foot">
             <span className="si-splash-lockup">
               <Image src={sarthoIcon} alt="" width={152} height={152} quality={95} priority />
