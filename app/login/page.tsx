@@ -213,7 +213,9 @@ const styles = `
   position: fixed; inset: 0; z-index: 60;
   display: flex; flex-direction: column;
   align-items: center; justify-content: space-between;
-  padding: clamp(48px, 11vh, 130px) 24px clamp(40px, 9vh, 104px);
+  /* a floor under the spacing, so space-between can never collapse to nothing */
+  gap: clamp(16px, 3.4vh, 48px);
+  padding: clamp(32px, 8vh, 110px) 24px clamp(28px, 7vh, 92px);
   background: #04050a;
   overflow: hidden;
 }
@@ -230,9 +232,18 @@ const styles = `
   pointer-events: none;
 }
 /* the door itself */
+/*
+ * Sized off the viewport HEIGHT, not the width. Driven by width alone it kept
+ * a fixed 234px height, so on a short window it grew into both its neighbours
+ * and the spacing between them collapsed to zero. It also shrinks below its
+ * preferred height rather than pushing anything off the screen.
+ */
 .si-splash-door {
   position: relative;
-  width: min(19vw, 130px);
+  height: min(234px, 30vh);
+  width: auto;
+  flex: 0 1 auto;
+  min-height: 84px;
   aspect-ratio: 5 / 9;
   border-radius: 50% 50% 0 0 / 26% 26% 0 0;
   background: linear-gradient(180deg, #ffffff, #d9e4ff 46%, #9fb6ff);
@@ -362,10 +373,24 @@ const styles = `
   .si-stage { grid-template-columns: 1fr; gap: 30px; align-items: start; }
   .si-panel { justify-self: stretch; }
   .si-pitch h1 { max-width: none; font-size: clamp(34px, 8vw, 52px); }
-  .si-splash { padding: clamp(40px, 8vh, 72px) 22px clamp(34px, 7vh, 64px); }
-  .si-splash-door { width: min(34vw, 104px); }
+  .si-splash { padding: clamp(32px, 7vh, 72px) 22px clamp(28px, 6vh, 64px); }
   .si-splash-door::before { width: 420px; height: 420px; margin: -210px 0 0 -210px; }
   .si-splash-foot { gap: 20px; }
+}
+/*
+ * Short windows — a laptop with the browser chrome and a taskbar eating the
+ * screen. The headline has to come down with everything else or it takes the
+ * room the door and the button need.
+ */
+@media (max-height: 720px) {
+  .si-splash-line { font-size: clamp(24px, 3.8vw, 44px); }
+  .si-splash-lockup img { width: 32px; height: 32px; }
+  .si-splash-foot { gap: 16px; }
+  .si-splash-enter { min-height: 44px; font-size: 13.5px; }
+}
+@media (max-height: 560px) {
+  .si-splash-line { font-size: clamp(21px, 3.2vw, 32px); }
+  .si-splash-door::before { width: 360px; height: 360px; margin: -180px 0 0 -180px; }
 }
 @media (prefers-reduced-motion: reduce) {
   /*
