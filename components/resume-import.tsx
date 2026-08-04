@@ -27,6 +27,7 @@ export function ResumeImport({ hasEvidence }: { hasEvidence: boolean }) {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<Result | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
+  const [dragging, setDragging] = useState(false);
 
   async function upload(file: File) {
     setBusy(true);
@@ -57,20 +58,20 @@ export function ResumeImport({ hasEvidence }: { hasEvidence: boolean }) {
     }
   }
 
-  return (
-    <div className="resume-import">
-      <input
-        ref={inputRef}
-        type="file"
-        accept={ACCEPT}
-        className="resume-import-input"
-        disabled={busy}
-        onChange={(event) => {
-          const file = event.target.files?.[0];
-          if (file) void upload(file);
-        }}
-      />
+  function onDrop(event: React.DragEvent) {
+    event.preventDefault();
+    setDragging(false);
+    const file = event.dataTransfer.files?.[0];
+    if (file && !busy) void upload(file);
+  }
 
+  return (
+    <div
+      className={`resume-import${dragging ? " is-dragging" : ""}`}
+      onDragOver={(event) => { event.preventDefault(); setDragging(true); }}
+      onDragLeave={() => setDragging(false)}
+      onDrop={onDrop}
+    >
       <div className="resume-import-body">
         <p className="resume-import-lead">
           {hasEvidence
@@ -78,16 +79,31 @@ export function ResumeImport({ hasEvidence }: { hasEvidence: boolean }) {
             : "Upload your résumé and Sartho will read every role and achievement out of it. Nothing it finds is used anywhere until you have approved it."}
         </p>
 
-        <button
-          type="button"
-          className="review-button is-primary"
-          disabled={busy}
-          onClick={() => inputRef.current?.click()}
-        >
+        {/*
+          * A label wrapping the input, not a button that calls .click() on a
+          * hidden one. Programmatic clicks on file inputs are blocked or
+          * ignored by several browsers, which leaves a button that visibly
+          * does nothing — and a file picker is exactly what a label for a file
+          * input opens natively, with no JavaScript in the path at all.
+          */}
+        <label className={`resume-import-trigger${busy ? " is-busy" : ""}`}>
+          <input
+            ref={inputRef}
+            type="file"
+            accept={ACCEPT}
+            className="resume-import-input"
+            disabled={busy}
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (file) void upload(file);
+            }}
+          />
           {busy ? `Reading ${fileName ?? "your résumé"}…` : hasEvidence ? "Upload another résumé" : "Upload your résumé"}
-        </button>
+        </label>
 
-        <p className="resume-import-note">PDF, Word (.docx) or plain text, up to 8MB.</p>
+        <p className="resume-import-note">
+          PDF, Word (.docx) or plain text, up to 8MB. You can also drop a file anywhere in this box.
+        </p>
       </div>
 
       {busy ? (

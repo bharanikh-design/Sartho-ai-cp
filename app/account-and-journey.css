@@ -304,7 +304,28 @@
   white-space: nowrap;
   border: 0;
 }
+.resume-import.is-dragging {
+  border-color: var(--violet);
+  background: color-mix(in srgb, var(--violet) 12%, transparent);
+}
 .resume-import-body { display: grid; justify-items: start; gap: 14px; }
+
+/* The label is the control. Styled as the primary button it replaces. */
+.resume-import-trigger {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-height: 46px;
+  padding: 0 24px;
+  border: 0; border-radius: 13px;
+  color: #fff;
+  background: linear-gradient(135deg, #7c5cf0, #5b7ff0);
+  cursor: pointer;
+  font-size: 14px; font-weight: 620; letter-spacing: -0.01em;
+  box-shadow: 0 10px 26px color-mix(in srgb, var(--violet) 34%, transparent);
+  transition: transform .2s ease, filter .2s ease;
+}
+.resume-import-trigger:hover { transform: translateY(-1px); filter: brightness(1.08); }
+.resume-import-trigger:focus-within { outline: 2px solid var(--blue); outline-offset: 3px; }
+.resume-import-trigger.is-busy { opacity: .6; cursor: progress; }
 .resume-import-lead {
   margin: 0;
   max-width: 62ch;
