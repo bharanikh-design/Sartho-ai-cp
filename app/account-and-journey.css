@@ -401,3 +401,66 @@ a.journey-link:hover { transform: translateY(-1px); border-color: var(--line-bri
   background: color-mix(in srgb, var(--mint) 12%, transparent);
 }
 .journey-step.is-done .journey-text strong { color: var(--text-secondary); }
+
+/* ---- skill set ----------------------------------------------------------- */
+/*
+ * Every row carries its receipts. A skill shown across several employers over
+ * years is a different claim from one bullet on one job, and a list that
+ * cannot tell them apart is no use for deciding whether to apply.
+ */
+.skill-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+  gap: 10px;
+  margin: 0; padding: 0;
+  list-style: none;
+}
+.skill-row {
+  display: grid; gap: 8px;
+  align-content: start;
+  min-width: 0;
+  padding: 15px 16px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--line-bright);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--text) 3%, transparent);
+}
+.skill-row.is-core { border-left-color: var(--violet); }
+.skill-row.is-strong { border-left-color: var(--blue); }
+.skill-row.is-supporting { border-left-color: color-mix(in srgb, var(--blue) 45%, transparent); }
+.skill-row.is-emerging { border-left-color: var(--line-bright); }
+
+.skill-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.skill-name { font-size: 14px; font-weight: 630; letter-spacing: -0.012em; }
+.skill-badge {
+  flex: none;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 10.5px; font-weight: 640; letter-spacing: .04em; text-transform: uppercase;
+  color: var(--text-secondary);
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+}
+.skill-badge.is-core { color: var(--violet); background: color-mix(in srgb, var(--violet) 15%, transparent); }
+.skill-badge.is-strong { color: var(--blue); background: color-mix(in srgb, var(--blue) 15%, transparent); }
+
+.skill-facts { display: flex; flex-wrap: wrap; gap: 6px 12px; color: var(--text-tertiary); font-size: 12px; }
+.skill-facts .skill-current { color: var(--mint); }
+.skill-claim {
+  margin: 2px 0 0;
+  min-width: 0;
+  color: var(--text-secondary);
+  font-size: 12.5px; line-height: 1.55;
+  /*
+   * Clamped by height as well as by line count. The prefixed line-clamp alone
+   * was not holding — a longer claim rendered a third line and spilled past
+   * the card's border — and a max-height derived from the same line-height
+   * cannot be ignored.
+   */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  max-height: calc(12.5px * 1.55 * 2);
+  overflow: hidden;
+}
+.skill-footnote { margin: 14px 0 0; color: var(--text-tertiary); font-size: 12px; line-height: 1.55; }

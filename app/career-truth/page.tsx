@@ -1,14 +1,16 @@
 import Link from "next/link";
 import { EvidenceReview } from "@/components/evidence-review";
 import { ResumeImport } from "@/components/resume-import";
+import { SkillSet } from "@/components/skill-set";
 import { requireUser } from "@/lib/auth";
 import { getCareerWorkspace } from "@/lib/data/career";
+import { buildSkillProfile } from "@/lib/matching/skill-profile";
 
 export const dynamic = "force-dynamic";
 
 export default async function CareerTruthPage() {
   const { supabase, user } = await requireUser();
-  const { profile, lanes, evidence } = await getCareerWorkspace(supabase, user.id);
+  const { profile, lanes, roles, evidence } = await getCareerWorkspace(supabase, user.id);
 
   const approved = evidence.filter((item) => item.approval_status === "approved").length;
   const rejected = evidence.filter((item) => item.approval_status === "rejected").length;
@@ -23,6 +25,7 @@ export default async function CareerTruthPage() {
    * the import comes first and the rest waits its turn.
    */
   const isEmpty = evidence.length === 0;
+  const skillProfile = buildSkillProfile(evidence, roles);
 
   const importCard = (
     <section className="glass-card content-card">
@@ -102,6 +105,24 @@ export default async function CareerTruthPage() {
 
       {isEmpty ? null : reviewCard}
 
+      {isEmpty ? null : (
+        <section className="glass-card content-card">
+          <div className="card-header">
+            <div>
+              <h2 className="section-heading">Your skill set</h2>
+              <p className="section-subtitle">
+                Built from the evidence you approved, not from what anyone claims about themselves. Each skill shows what backs it.
+              </p>
+            </div>
+            <span className="meta-pill">
+              {skillProfile.skills.length} skill{skillProfile.skills.length === 1 ? "" : "s"} from {skillProfile.totalApproved} approved claim{skillProfile.totalApproved === 1 ? "" : "s"}
+            </span>
+          </div>
+
+          <SkillSet profile={skillProfile} />
+        </section>
+      )}
+
       {/*
         * Target lanes describe how to weight a search. That is a question worth
         * asking once there is something to search with, and noise before it.
@@ -164,7 +185,7 @@ function CareerJourney({
     {
       title: "Approve what is true",
       detail: approvedCount
-        ? `${approvedCount} approved${pendingCount ? `, ${pendingCount} still waiting` : ""}`
+        ? `${approvedCount} approved — your skill set is built from these`
         : pendingCount
           ? `${pendingCount} claim${pendingCount === 1 ? "" : "s"} waiting for you`
           : "Nothing is used until you say yes",
