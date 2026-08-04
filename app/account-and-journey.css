@@ -281,3 +281,47 @@
     animation: none;
   }
 }
+
+/* ---- résumé import ------------------------------------------------------- */
+/*
+ * The one place career evidence enters the product, so it is given room rather
+ * than tucked into a corner as a file field.
+ */
+.resume-import {
+  display: grid;
+  gap: 16px;
+  padding: clamp(20px, 2.4vw, 28px);
+  border: 1px dashed var(--line-bright);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--violet) 6%, transparent);
+}
+.resume-import-input {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+.resume-import-body { display: grid; justify-items: start; gap: 14px; }
+.resume-import-lead {
+  margin: 0;
+  max-width: 62ch;
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.6;
+}
+.resume-import-note { margin: 0; color: var(--text-tertiary); font-size: 12px; }
+.resume-import-status { margin: 0; color: var(--text-secondary); font-size: 13px; }
+.resume-import-result {
+  display: grid; gap: 4px;
+  padding: 14px 16px;
+  border: 1px solid color-mix(in srgb, var(--mint) 40%, transparent);
+  border-radius: 13px;
+  background: color-mix(in srgb, var(--mint) 10%, transparent);
+  font-size: 13px;
+  line-height: 1.55;
+}
+.resume-import-result strong { font-weight: 620; }
+.resume-import-result span { color: var(--text-secondary); }

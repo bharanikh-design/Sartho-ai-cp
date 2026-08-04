@@ -36,6 +36,16 @@ export async function updateSession(request: NextRequest) {
   const isPublic = PUBLIC_PATHS.has(pathname);
 
   if (!user && !isPublic) {
+    /*
+     * An API caller needs an answer it can parse, not a login page. Redirecting
+     * here hands a fetch() an HTML document with a 307, which then fails inside
+     * response.json() and surfaces to the user as a parse error rather than
+     * "your session expired".
+     */
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json({ error: "Your session has expired. Sign in again." }, { status: 401 });
+    }
+
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = "/login";
     loginUrl.searchParams.set("next", `${pathname}${request.nextUrl.search}`);

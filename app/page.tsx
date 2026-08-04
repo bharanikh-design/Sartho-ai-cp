@@ -64,6 +64,44 @@ export default async function HomePage() {
     },
   ];
 
+  /*
+   * A brand-new account has no evidence, and every tile below reads zero. The
+   * dashboard is meaningless until a career is in, so the first screen after
+   * signing in should point at the one thing that matters rather than at five
+   * empty counters.
+   */
+  if (!evidence.length) {
+    return (
+      <div className="page-stack">
+        <section className="hero-panel home-hero glass-card">
+          <div className="hero-copy">
+            <div className="page-eyebrow"><span className="live-dot" /> First step</div>
+            <h1>Start with<br />your résumé.</h1>
+            <p>
+              Sartho reads it and records every role and achievement it finds — as claims for
+              you to approve, never as facts it decided on your behalf. Nothing reaches a
+              match, a résumé or an interview answer until you have said yes to it.
+            </p>
+            <div className="hero-actions">
+              <Link href="/career-truth" className="primary-button">
+                Upload your résumé <span aria-hidden="true">↗</span>
+              </Link>
+            </div>
+          </div>
+
+          <div className="home-hero-signal" aria-label="Why this comes first">
+            <span className="signal-label">Why this first</span>
+            <strong>A headhunter who knows you has to know you.</strong>
+            <p>
+              Matching, résumé tailoring and interview preparation all read from your approved
+              evidence. Until it exists, there is nothing honest to match against.
+            </p>
+          </div>
+        </section>
+      </div>
+    );
+  }
+
   return (
     <div className="page-stack">
       <section className="hero-panel home-hero glass-card">

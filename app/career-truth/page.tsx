@@ -1,4 +1,5 @@
 import { EvidenceReview } from "@/components/evidence-review";
+import { ResumeImport } from "@/components/resume-import";
 import { requireUser } from "@/lib/auth";
 import { getCareerWorkspace } from "@/lib/data/career";
 
@@ -82,6 +83,17 @@ export default async function CareerTruthPage() {
         ) : (
           <div className="empty-inline-state">No target role lanes are configured yet.</div>
         )}
+      </section>
+
+      <section className="glass-card content-card">
+        <div className="card-header">
+          <div>
+            <h2 className="section-heading">Bring your career in</h2>
+            <p className="section-subtitle">Sartho reads your résumé and records what it says — it never writes anything you did not.</p>
+          </div>
+        </div>
+
+        <ResumeImport hasEvidence={evidence.length > 0} />
       </section>
 
       <section className="glass-card content-card">
