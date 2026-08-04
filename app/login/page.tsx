@@ -440,13 +440,33 @@ export default function LoginPage() {
   const [splash, setSplash] = useState<"showing" | "leaving" | "done">("showing");
 
   useEffect(() => {
-    // The landing screen is shown once per session, and never when the page is
-    // a return leg from an OAuth round trip — the visitor is mid-sign-in then,
-    // and a front door in the middle of a journey is an obstacle.
+    /*
+     * The landing screen is shown once per session, and never on the return leg
+     * of an auth round trip — the visitor is mid-sign-in then, and a front door
+     * in the middle of a journey is an obstacle.
+     *
+     * That has to be decided on the specific parameters a provider sends back,
+     * not on whether a query string exists at all. Anyone arriving at the site
+     * root is redirected here as /login?next=/, and treating that as a round
+     * trip meant the main URL — the one people actually type — silently skipped
+     * the entry screen. Only a bare /login ever showed it.
+     */
+    const roundTripKeys = [
+      "code",
+      "error",
+      "error_code",
+      "error_description",
+      "access_token",
+      "refresh_token",
+      "token_hash",
+      "type",
+    ];
+    const query = new URLSearchParams(window.location.search);
+    const hash = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+    const midRoundTrip = roundTripKeys.some((key) => query.has(key) || hash.has(key));
+
     const returning =
-      window.sessionStorage.getItem("sartho-entered") === "1" ||
-      window.location.hash.length > 1 ||
-      window.location.search.length > 1;
+      window.sessionStorage.getItem("sartho-entered") === "1" || midRoundTrip;
 
     // Reads browser-only session/URL state unavailable during SSR, so it has to
     // settle in an effect rather than during render.
