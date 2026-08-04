@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { analyseJobDescription, type JobAnalysis } from "@/lib/matching/analyse-job";
+import type { SkillProfile } from "@/lib/matching/skill-profile";
 import type { JobRecord } from "@/lib/types";
 
 const recommendationStyles: Record<JobAnalysis["recommendation"], string> = {
@@ -12,7 +13,7 @@ const recommendationStyles: Record<JobAnalysis["recommendation"], string> = {
   skip: "border-rose-300/30 bg-rose-300/10 text-rose-100",
 };
 
-export function JobAnalyser({ initialJobs }: { initialJobs: JobRecord[] }) {
+export function JobAnalyser({ initialJobs, skillProfile }: { initialJobs: JobRecord[]; skillProfile: SkillProfile }) {
   const router = useRouter();
   const [title, setTitle] = useState("");
   const [employer, setEmployer] = useState("");
@@ -25,8 +26,8 @@ export function JobAnalyser({ initialJobs }: { initialJobs: JobRecord[] }) {
   const [error, setError] = useState<string | null>(null);
 
   const analysis = useMemo(
-    () => (submittedText ? analyseJobDescription(submittedText) : null),
-    [submittedText],
+    () => (submittedText ? analyseJobDescription(submittedText, skillProfile) : null),
+    [submittedText, skillProfile],
   );
 
   function analyse() {
@@ -130,10 +131,10 @@ export function JobAnalyser({ initialJobs }: { initialJobs: JobRecord[] }) {
                 <span className="muted text-xs">Sartho recommendation</span>
               </div>
 
-              <Result label="Best-fit lane" value={analysis.primaryLane} />
-              <Result label="Technical heaviness" value={`${analysis.technicalHeaviness}/100`} />
-              <SignalList title="Relevant signals" values={analysis.matchedSignals} empty="No strong lane signals detected." />
-              <SignalList title="Caution signals" values={analysis.cautionSignals} empty="No material technical or support-heavy warning detected." />
+              <Result label="Strongest match" value={analysis.primaryStrength ?? "Nothing you have evidenced"} />
+              <Result label="Backed by your evidence" value={`${analysis.evidenceBacking}/100`} />
+              <SignalList title="Your skills this role asks for" values={analysis.matchedSignals} empty="None of your evidenced skills appear in this role." />
+              <SignalList title="Your strengths it does not use" values={analysis.cautionSignals} empty="This role calls on all of your strongest skills." />
               <p className="analysis-explanation">{analysis.explanation}</p>
 
               <div className="analysis-save-row">

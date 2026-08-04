@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/lib/auth";
+import { getCareerWorkspace } from "@/lib/data/career";
 import { analyseJobDescription } from "@/lib/matching/analyse-job";
+import { buildSkillProfile } from "@/lib/matching/skill-profile";
 
 export async function POST(request: Request) {
   const { supabase, user } = await getAuthenticatedUser();
@@ -23,7 +25,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Paste a fuller job description before saving." }, { status: 400 });
   }
 
-  const analysis = analyseJobDescription(description);
+  /*
+   * Read against this user's own evidence. The matcher has no career of its
+   * own to fall back on, which is the point — a role can only be judged
+   * against skills the person has actually approved.
+   */
+  const { roles, evidence } = await getCareerWorkspace(supabase, user.id);
+  const analysis = analyseJobDescription(description, buildSkillProfile(evidence, roles));
   const { data, error } = await supabase
     .from("jobs")
     .insert({
@@ -35,7 +43,7 @@ export async function POST(request: Request) {
       location: body?.location?.trim() || null,
       raw_description: description,
       status: "saved",
-      technical_heaviness: analysis.technicalHeaviness,
+      technical_heaviness: analysis.evidenceBacking,
       recommendation: analysis.recommendation,
       rule_analysis: analysis,
     })
