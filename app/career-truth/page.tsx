@@ -1,16 +1,23 @@
 import Link from "next/link";
 import { EvidenceReview } from "@/components/evidence-review";
 import { ResumeImport } from "@/components/resume-import";
+import { CareerHistory } from "@/components/career-history";
+import { ResumeLibrary } from "@/components/resume-library";
+import { ResumeStrengthPanel } from "@/components/resume-strength";
 import { SkillSet } from "@/components/skill-set";
 import { requireUser } from "@/lib/auth";
-import { getCareerWorkspace } from "@/lib/data/career";
+import { getCareerWorkspace, getResumeImports } from "@/lib/data/career";
 import { buildSkillProfile } from "@/lib/matching/skill-profile";
+import { assessResume } from "@/lib/resume/strength";
 
 export const dynamic = "force-dynamic";
 
 export default async function CareerTruthPage() {
   const { supabase, user } = await requireUser();
-  const { profile, lanes, roles, evidence } = await getCareerWorkspace(supabase, user.id);
+  const [{ profile, lanes, roles, evidence }, imports] = await Promise.all([
+    getCareerWorkspace(supabase, user.id),
+    getResumeImports(supabase, user.id),
+  ]);
 
   const approved = evidence.filter((item) => item.approval_status === "approved").length;
   const rejected = evidence.filter((item) => item.approval_status === "rejected").length;
@@ -26,6 +33,7 @@ export default async function CareerTruthPage() {
    */
   const isEmpty = evidence.length === 0;
   const skillProfile = buildSkillProfile(evidence, roles);
+  const strength = assessResume(evidence, roles, skillProfile);
 
   const importCard = (
     <section className="glass-card content-card">
@@ -123,6 +131,35 @@ export default async function CareerTruthPage() {
         </section>
       )}
 
+      {isEmpty ? null : (
+        <section className="glass-card content-card">
+          <div className="card-header">
+            <div>
+              <h2 className="section-heading">What would make this stronger</h2>
+              <p className="section-subtitle">
+                Checks an interviewer applies without announcing them: can you say what changed, by how much, and prove it happened.
+              </p>
+            </div>
+          </div>
+
+          <ResumeStrengthPanel strength={strength} />
+        </section>
+      )}
+
+      {isEmpty ? null : (
+        <section className="glass-card content-card">
+          <div className="card-header">
+            <div>
+              <h2 className="section-heading">Career history</h2>
+              <p className="section-subtitle">Where you have worked, for how long, and how much approved evidence each role carries.</p>
+            </div>
+            <span className="meta-pill">{roles.length} role{roles.length === 1 ? "" : "s"}</span>
+          </div>
+
+          <CareerHistory roles={roles} evidence={evidence} />
+        </section>
+      )}
+
       {/*
         * Target lanes describe how to weight a search. That is a question worth
         * asking once there is something to search with, and noise before it.
@@ -154,6 +191,20 @@ export default async function CareerTruthPage() {
       )}
 
       {isEmpty ? null : importCard}
+
+      {imports.length ? (
+        <section className="glass-card content-card">
+          <div className="card-header">
+            <div>
+              <h2 className="section-heading">Your résumés</h2>
+              <p className="section-subtitle">Every document you have handed over is kept, so a claim can always point at where it came from.</p>
+            </div>
+            <span className="meta-pill">{imports.length} document{imports.length === 1 ? "" : "s"}</span>
+          </div>
+
+          <ResumeLibrary imports={imports} />
+        </section>
+      ) : null}
     </div>
   );
 }

@@ -464,3 +464,87 @@ a.journey-link:hover { transform: translateY(-1px); border-color: var(--line-bri
   overflow: hidden;
 }
 .skill-footnote { margin: 14px 0 0; color: var(--text-tertiary); font-size: 12px; line-height: 1.55; }
+
+/* ---- résumé strength ----------------------------------------------------- */
+.strength { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: clamp(18px, 3vw, 30px); align-items: start; }
+.strength-score {
+  display: grid; justify-items: center; align-content: center; gap: 2px;
+  width: 108px; height: 108px;
+  border-radius: 22px;
+  border: 1px solid var(--line-bright);
+  background: color-mix(in srgb, var(--text) 4%, transparent);
+}
+.strength-score strong { font-size: 34px; font-weight: 660; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+.strength-score span { color: var(--text-tertiary); font-size: 11px; }
+.strength-score.is-good { border-color: color-mix(in srgb, var(--mint) 45%, transparent); background: color-mix(in srgb, var(--mint) 10%, transparent); }
+.strength-score.is-good strong { color: var(--mint); }
+.strength-score.is-fair { border-color: color-mix(in srgb, var(--amber, #d7a253) 45%, transparent); }
+.strength-score.is-weak { border-color: color-mix(in srgb, var(--rose) 45%, transparent); background: color-mix(in srgb, var(--rose) 9%, transparent); }
+.strength-score.is-weak strong { color: var(--rose); }
+
+.strength-body { display: grid; gap: 14px; min-width: 0; }
+.strength-lead { margin: 0; font-size: 14.5px; line-height: 1.6; }
+.strength-clear { margin: 0; color: var(--text-secondary); font-size: 14px; line-height: 1.6; }
+.strength-findings { display: grid; gap: 9px; margin: 0; padding: 0; list-style: none; }
+.strength-finding {
+  display: grid; gap: 5px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--line-bright);
+  border-radius: 13px;
+  background: color-mix(in srgb, var(--text) 3%, transparent);
+}
+.strength-finding.is-high { border-left-color: var(--rose); }
+.strength-finding.is-medium { border-left-color: #d7a253; }
+.strength-finding-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.strength-finding-head strong { font-size: 13.5px; font-weight: 620; }
+.strength-finding p { margin: 0; color: var(--text-tertiary); font-size: 12.5px; line-height: 1.55; }
+.strength-tag {
+  flex: none;
+  padding: 3px 9px; border-radius: 999px;
+  font-size: 10px; font-weight: 640; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--text-secondary); background: color-mix(in srgb, var(--text) 8%, transparent);
+}
+.strength-tag.is-high { color: var(--rose); background: color-mix(in srgb, var(--rose) 14%, transparent); }
+
+@media (max-width: 620px) {
+  .strength { grid-template-columns: 1fr; }
+}
+
+/* ---- career history ------------------------------------------------------ */
+.history { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; }
+.history-role { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 14px; padding-bottom: 22px; position: relative; }
+.history-role:not(:last-child)::before {
+  content: ""; position: absolute; left: 11px; top: 20px; bottom: 0;
+  width: 1px; background: var(--line);
+}
+.history-marker {
+  width: 11px; height: 11px; margin: 6px auto 0;
+  border-radius: 999px;
+  border: 2px solid var(--line-bright);
+  background: var(--canvas);
+}
+.history-role.is-current .history-marker { border-color: transparent; background: linear-gradient(135deg, #7c5cf0, #5b7ff0); }
+.history-body { display: grid; gap: 4px; min-width: 0; }
+.history-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px; }
+.history-head strong { font-size: 15px; font-weight: 630; letter-spacing: -0.014em; }
+.history-period { color: var(--text-tertiary); font-size: 12.5px; }
+.history-employer { margin: 0; color: var(--text-secondary); font-size: 13.5px; }
+.history-summary { margin: 4px 0 0; color: var(--text-tertiary); font-size: 13px; line-height: 1.55; }
+.history-count { margin-top: 4px; color: var(--text-tertiary); font-size: 12px; }
+
+/* ---- résumé library ------------------------------------------------------ */
+.library { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.library-row {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 13px 16px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: color-mix(in srgb, var(--text) 3%, transparent);
+}
+.library-main { display: grid; gap: 3px; min-width: 0; }
+.library-name { font-size: 13.5px; font-weight: 610; overflow-wrap: anywhere; }
+.library-meta { color: var(--text-tertiary); font-size: 12px; }
+.library-result { color: var(--text-secondary); font-size: 12.5px; text-align: right; }
+.library-result.is-failed { color: var(--rose); }
+.library-row.is-failed { border-color: color-mix(in srgb, var(--rose) 35%, transparent); }

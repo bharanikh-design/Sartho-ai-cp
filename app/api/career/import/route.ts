@@ -145,6 +145,9 @@ export async function POST(request: Request) {
       mime_type: file.type || null,
       byte_size: file.size,
       status: "processing",
+      // Kept, not consumed. A résumé that can only be read once is a log entry.
+      extracted_text: text,
+      character_count: text.length,
     })
     .select("id")
     .single();
