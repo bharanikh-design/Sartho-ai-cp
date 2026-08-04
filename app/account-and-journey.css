@@ -346,3 +346,58 @@
 }
 .resume-import-result strong { font-weight: 620; }
 .resume-import-result span { color: var(--text-secondary); }
+
+/* ---- the four steps ------------------------------------------------------ */
+/*
+ * Each stage of the product depends on the one before it, and none of that was
+ * visible: pages sat empty until the right thing happened somewhere else, with
+ * nothing saying what the right thing was.
+ */
+.journey-steps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 10px;
+  margin: 0; padding: 0;
+  list-style: none;
+  counter-reset: none;
+}
+.journey-step { margin: 0; }
+.journey-link {
+  display: flex; align-items: flex-start; gap: 12px;
+  height: 100%;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  background: color-mix(in srgb, var(--text) 3%, transparent);
+  color: inherit; text-decoration: none;
+  transition: border-color .2s ease, background .2s ease, transform .2s ease;
+}
+a.journey-link:hover { transform: translateY(-1px); border-color: var(--line-bright); }
+.journey-number {
+  flex: none;
+  display: grid; place-items: center;
+  width: 26px; height: 26px;
+  border-radius: 999px;
+  border: 1px solid var(--line-bright);
+  color: var(--text-secondary);
+  font-size: 12px; font-weight: 640;
+}
+.journey-text { display: grid; gap: 4px; min-width: 0; }
+.journey-text strong { font-size: 13.5px; font-weight: 620; letter-spacing: -0.01em; }
+.journey-text small { color: var(--text-tertiary); font-size: 12px; line-height: 1.5; }
+
+.journey-step.is-current .journey-link {
+  border-color: color-mix(in srgb, var(--violet) 55%, transparent);
+  background: color-mix(in srgb, var(--violet) 10%, transparent);
+}
+.journey-step.is-current .journey-number {
+  border-color: transparent;
+  color: #fff;
+  background: linear-gradient(135deg, #7c5cf0, #5b7ff0);
+}
+.journey-step.is-done .journey-number {
+  border-color: color-mix(in srgb, var(--mint) 55%, transparent);
+  color: var(--mint);
+  background: color-mix(in srgb, var(--mint) 12%, transparent);
+}
+.journey-step.is-done .journey-text strong { color: var(--text-secondary); }
