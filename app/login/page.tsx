@@ -441,15 +441,19 @@ export default function LoginPage() {
 
   useEffect(() => {
     /*
-     * The landing screen is shown once per session, and never on the return leg
-     * of an auth round trip — the visitor is mid-sign-in then, and a front door
-     * in the middle of a journey is an obstacle.
+     * The entry screen is the front door: it shows on every arrival at this
+     * page, not once and then never again.
      *
-     * That has to be decided on the specific parameters a provider sends back,
-     * not on whether a query string exists at all. Anyone arriving at the site
-     * root is redirected here as /login?next=/, and treating that as a round
-     * trip meant the main URL — the one people actually type — silently skipped
-     * the entry screen. Only a bare /login ever showed it.
+     * It used to be suppressed for the rest of the browser session once you had
+     * walked through it. That made the screen render for a single frame and
+     * then vanish on every later visit — it read as a flash and a glitch rather
+     * than a screen, and it meant the main URL behaved differently depending on
+     * invisible state nobody could see or clear.
+     *
+     * The one case it still steps aside for is the return leg of an auth round
+     * trip, decided on the parameters a provider actually sends back. A visitor
+     * mid sign-in is already through the door; putting one in front of them
+     * again is an obstacle.
      */
     const roundTripKeys = [
       "code",
@@ -465,13 +469,10 @@ export default function LoginPage() {
     const hash = new URLSearchParams(window.location.hash.replace(/^#/, ""));
     const midRoundTrip = roundTripKeys.some((key) => query.has(key) || hash.has(key));
 
-    const returning =
-      window.sessionStorage.getItem("sartho-entered") === "1" || midRoundTrip;
-
-    // Reads browser-only session/URL state unavailable during SSR, so it has to
-    // settle in an effect rather than during render.
+    // Reads browser-only URL state unavailable during SSR, so it has to settle
+    // in an effect rather than during render.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (returning) setSplash("done");
+    if (midRoundTrip) setSplash("done");
   }, []);
 
   useEffect(() => {
@@ -528,7 +529,6 @@ export default function LoginPage() {
   // The only way past the landing screen. Nothing else dismisses it.
   function walkThrough() {
     if (splash !== "showing") return;
-    window.sessionStorage.setItem("sartho-entered", "1");
     setSplash("leaving");
     window.setTimeout(() => setSplash("done"), 980);
   }
