@@ -144,15 +144,43 @@ describe("generateStructuredJson", () => {
     expect(result.headline).toBe("from openai");
   });
 
-  it("reports the last failure in plain words when every provider is out", async () => {
+  it("names every provider it tried when they all fail", async () => {
     vi.stubEnv("GEMINI_API_KEY", "g-key");
     vi.stubEnv("ANTHROPIC_API_KEY", "a-key");
 
-    fetchMock.mockImplementation(() =>
+    fetchMock.mockImplementationOnce(() => Promise.resolve(fails("API key not valid. Please pass a valid API key.")));
+    fetchMock.mockImplementationOnce(() =>
       Promise.resolve(fails("Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing.")),
     );
 
+    /*
+     * The defect this replaces: only the last failure was reported, so a
+     * rejected Gemini key hid behind an empty Anthropic account and the
+     * message pointed at the provider that was not the problem.
+     */
+    const failure = await generateStructuredJson(REQUEST).catch((error: Error) => error);
+
+    expect(failure).toBeInstanceOf(Error);
+    /* One run, both assertions — the mocks above are one-shot. */
+    expect((failure as Error).message).toContain("Gemini: key rejected");
+    expect((failure as Error).message).toContain("Anthropic: no credit left");
+  });
+
+  it("still speaks plainly when only one provider is configured", async () => {
+    vi.stubEnv("ANTHROPIC_API_KEY", "a-key");
+    fetchMock.mockImplementation(() =>
+      Promise.resolve(fails("Your credit balance is too low to access the Anthropic API.")),
+    );
+
     await expect(generateStructuredJson(REQUEST)).rejects.toThrow(/run out of credit/);
+  });
+
+  it("says a provider was never tried by leaving it out of the message", async () => {
+    vi.stubEnv("ANTHROPIC_API_KEY", "a-key");
+    fetchMock.mockImplementation(() => Promise.resolve(fails("nope")));
+
+    /* No Gemini key set, so Gemini must not appear — that absence is the clue. */
+    await expect(generateStructuredJson(REQUEST)).rejects.not.toThrow(/Gemini/);
   });
 
   it("names truncation as truncation rather than failing to parse", async () => {

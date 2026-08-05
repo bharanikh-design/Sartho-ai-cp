@@ -1,4 +1,4 @@
-import { describeAiFailure } from "./failure";
+import { describeProviderFailures } from "./failure";
 import { toGeminiSchema } from "./gemini-schema";
 
 type StructuredRequest = {
@@ -146,7 +146,7 @@ async function callGemini(request: StructuredRequest, apiKey: string) {
  * import then failed at the model call with a billing error, while a perfectly
  * good second key sat in the environment untouched. A configured provider that
  * cannot be reached is not a configured provider, so a failure moves on to the
- * next one and only the last failure is reported.
+ * next one and every failure is reported.
  *
  * Gemini leads because it is the one with a free tier — a deployment that sets
  * all three should exhaust what costs nothing before it starts spending. The
@@ -158,24 +158,31 @@ export async function generateStructuredJson(request: StructuredRequest) {
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
   const openAIKey = process.env.OPENAI_API_KEY;
 
-  const providers: Array<() => Promise<unknown>> = [];
-  if (geminiKey) providers.push(() => callGemini(request, geminiKey));
-  if (anthropicKey) providers.push(() => callAnthropic(request, anthropicKey));
-  if (openAIKey) providers.push(() => callOpenAI(request, openAIKey));
+  const providers: Array<{ name: string; run: () => Promise<unknown> }> = [];
+  if (geminiKey) providers.push({ name: "Gemini", run: () => callGemini(request, geminiKey) });
+  if (anthropicKey) providers.push({ name: "Anthropic", run: () => callAnthropic(request, anthropicKey) });
+  if (openAIKey) providers.push({ name: "OpenAI", run: () => callOpenAI(request, openAIKey) });
 
   if (!providers.length) {
     throw new Error("No server-side AI provider is configured. Add GEMINI_API_KEY, ANTHROPIC_API_KEY or OPENAI_API_KEY in Vercel.");
   }
 
-  let last: unknown;
-  for (const attempt of providers) {
+  /*
+   * Every failure is kept, not just the last one. Which providers were tried is
+   * as much of the answer as why they failed — a message naming only the final
+   * provider cannot say whether the one ahead of it was even configured.
+   */
+  const failures: Array<{ provider: string; message: string }> = [];
+  for (const provider of providers) {
     try {
-      return await attempt();
+      return await provider.run();
     } catch (caught) {
-      last = caught;
+      failures.push({
+        provider: provider.name,
+        message: caught instanceof Error ? caught.message : "failed for an unknown reason",
+      });
     }
   }
 
-  const message = last instanceof Error ? last.message : "The AI provider failed.";
-  throw new Error(describeAiFailure(message));
+  throw new Error(describeProviderFailures(failures));
 }

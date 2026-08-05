@@ -15,11 +15,19 @@ export type AiFailureKind = "credit" | "rate-limit" | "auth" | "timeout" | "unkn
 export function classifyAiFailure(message: string): AiFailureKind {
   const text = message.toLowerCase();
 
-  if (/insufficient_quota|no credits|exceeded your current quota|billing|payment|check your plan/.test(text)) {
+  /*
+   * Every alternative here is wording a provider actually used. Two of them
+   * were added after a test caught the classifier missing them: Google says
+   * "API key not valid", not "invalid API key"; and Anthropic's shorter refusal
+   * says "credit balance is too low" without the word billing anywhere in it.
+   * A near miss reads as an unrecognised failure and gets passed through raw,
+   * which is the behaviour this whole file exists to prevent.
+   */
+  if (/insufficient_quota|no credits|credit balance|purchase credits|exceeded your current quota|billing|payment|check your plan/.test(text)) {
     return "credit";
   }
-  if (/rate.?limit|too many requests|429|overloaded|capacity/.test(text)) return "rate-limit";
-  if (/invalid.*(api )?key|incorrect api key|unauthorized|401|authentication/.test(text)) return "auth";
+  if (/rate.?limit|too many requests|429|overloaded|capacity|exhausted/.test(text)) return "rate-limit";
+  if (/invalid.*api key|api key not valid|api_key_invalid|incorrect api key|unauthorized|permission_denied|401|authentication/.test(text)) return "auth";
   if (/timed? ?out|timeout|aborted|abort/.test(text)) return "timeout";
   return "unknown";
 }
@@ -41,4 +49,37 @@ export function describeAiFailure(message: string): string {
     default:
       return message;
   }
+}
+
+/*
+ * When every provider fails, name every provider.
+ *
+ * Reporting only the last failure was a real defect: the providers are tried
+ * in order, so a first provider that fails for one reason and a second that
+ * fails for another produced a message describing only the second. Someone
+ * reading "run out of credit" had no way to tell whether the free provider
+ * ahead of it was even reached, let alone why it did not answer — and the
+ * thing they needed to fix was the one the message did not mention.
+ */
+export function shortAiFailure(message: string): string {
+  switch (classifyAiFailure(message)) {
+    case "credit": return "no credit left";
+    case "auth": return "key rejected";
+    case "rate-limit": return "rate limited";
+    case "timeout": return "timed out";
+    default: return message.length > 140 ? `${message.slice(0, 137)}…` : message;
+  }
+}
+
+export function describeProviderFailures(
+  failures: Array<{ provider: string; message: string }>,
+): string {
+  if (!failures.length) return "Sartho could not reach an AI provider.";
+  if (failures.length === 1) return describeAiFailure(failures[0].message);
+
+  const named = failures
+    .map((failure) => `${failure.provider}: ${shortAiFailure(failure.message)}`)
+    .join(". ");
+
+  return `Sartho tried ${failures.length} AI providers and none could read the document. ${named}. Nothing is wrong with your résumé — fix whichever provider you meant to use and upload it again.`;
 }
