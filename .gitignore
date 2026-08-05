@@ -18,3 +18,4 @@ supabase/*private*seed*.sql
 
 # TypeScript incremental build cache — regenerated on every build.
 tsconfig.tsbuildinfo
+.gemini-probe/
