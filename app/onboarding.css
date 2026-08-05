@@ -1,10 +1,29 @@
+/*
+ * This panel is dark in both themes, so its text has to be too.
+ *
+ * Every surface in here is a hardcoded dark gradient, but the type was reading
+ * --text, --text-secondary and --text-tertiary from the page. In the light
+ * theme those resolve to near-black — so the headline, the stage label, the
+ * step counter and Skip were rendered black on a black panel and simply were
+ * not there. The whole tour was invisible to anyone not using dark mode.
+ *
+ * Redefining the three tokens on the overlay fixes it once for everything
+ * inside, rather than hunting down each rule that happened to use one. The
+ * panel does not follow the theme, so neither should the text on it.
+ */
 .onboarding-overlay {
+  --text: #f7f8fb;
+  --text-secondary: rgba(239, 242, 249, 0.72);
+  --text-tertiary: rgba(239, 242, 249, 0.5);
+  --mint: #72e6bd;
+
   position: fixed;
   inset: 0;
   z-index: 1000;
   display: grid;
   place-items: center;
   padding: 16px;
+  color: var(--text);
 }
 
 .onboarding-backdrop {
