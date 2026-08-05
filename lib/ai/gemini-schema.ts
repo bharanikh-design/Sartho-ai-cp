@@ -51,11 +51,11 @@ export function toGeminiSchema(schema: JsonSchema): JsonSchema {
       names.map((name) => [name, toGeminiSchema(properties[name])]),
     );
     /*
-     * Gemini emits keys in whatever order it likes unless told. Fixing the
-     * order to the schema's own makes two runs over the same document
-     * comparable, which matters when the point is deciding what changed.
+     * propertyOrdering used to be set here so two runs over one document came
+     * back in the same order. It is the least standard field in this request
+     * and worth exactly nothing next to the request being accepted, so it goes.
+     * Ordering is a comparison convenience; being read at all is the product.
      */
-    out.propertyOrdering = names;
     if (Array.isArray(schema.required)) out.required = schema.required;
   }
 

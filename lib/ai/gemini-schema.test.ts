@@ -75,12 +75,18 @@ describe("toGeminiSchema", () => {
     });
   });
 
-  it("fixes the key order so two runs over one document are comparable", () => {
+  /*
+   * Sends nothing beyond what Gemini documents. propertyOrdering was set here
+   * once and removed: it is a comparison convenience, and the request being
+   * accepted matters more than the keys arriving in a predictable order.
+   */
+  it("sends no field Gemini has not asked for", () => {
     const out = toGeminiSchema({
       type: "object",
       properties: { employer: { type: "string" }, title: { type: "string" } },
     });
-    expect(out.propertyOrdering).toEqual(["employer", "title"]);
+    expect(out).not.toHaveProperty("propertyOrdering");
+    expect(Object.keys(out).sort()).toEqual(["properties", "type"]);
   });
 
   it("refuses a union it cannot express rather than silently picking one", () => {

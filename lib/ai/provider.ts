@@ -134,7 +134,12 @@ async function callGeminiModel(request: StructuredRequest, apiKey: string, model
         contents: [{ role: "user", parts: [{ text: request.prompt }] }],
         generationConfig: {
           temperature: 0,
-          maxOutputTokens: 32_768,
+          /*
+           * 8192 is accepted by every current flash model; larger values are
+           * rejected outright by some, and a rejection is worse than a
+           * truncation we already detect and name.
+           */
+          maxOutputTokens: 8_192,
           responseMimeType: "application/json",
           responseSchema: toGeminiSchema(request.schema),
         },
@@ -144,10 +149,30 @@ async function callGeminiModel(request: StructuredRequest, apiKey: string, model
   );
 
   const result = await response.json() as {
-    error?: { message?: string };
+    error?: {
+      message?: string;
+      status?: string;
+      details?: Array<{ fieldViolations?: Array<{ field?: string; description?: string }> }>;
+    };
     candidates?: Array<{ finishReason?: string; content?: { parts?: Array<{ text?: string }> } }>;
   };
-  if (!response.ok) throw new Error(result.error?.message ?? "Gemini request failed.");
+
+  /*
+   * Google's summary line is often useless on its own — "Request contains an
+   * invalid argument" says nothing about which argument. The field violations
+   * underneath it name the field, and throwing those away is how a five-minute
+   * fix becomes an afternoon of guessing. Both are kept.
+   */
+  if (!response.ok) {
+    const violations = (result.error?.details ?? [])
+      .flatMap((entry) => entry.fieldViolations ?? [])
+      .map((violation) => [violation.field, violation.description].filter(Boolean).join(": "))
+      .filter((line) => line.length > 0);
+
+    throw new Error(
+      [`${result.error?.message ?? "Gemini request failed."} (model: ${model})`, ...violations].join(" — "),
+    );
+  }
 
   const candidate = result.candidates?.[0];
   if (candidate?.finishReason === "MAX_TOKENS") {
