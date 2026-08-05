@@ -347,6 +347,151 @@
 .resume-import-result strong { font-weight: 620; }
 .resume-import-result span { color: var(--text-secondary); }
 
+/* Shown only where the claims landed on a different page than the uploader. */
+.resume-import-continue {
+  display: inline-flex; align-items: center; gap: 8px;
+  justify-self: start;
+  margin-top: 8px;
+  min-height: 40px;
+  padding: 0 16px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--mint) 46%, transparent);
+  background: color-mix(in srgb, var(--mint) 16%, transparent);
+  font-size: 13px; font-weight: 640;
+  transition: transform .2s ease, background .2s ease;
+}
+.resume-import-continue:hover {
+  transform: translateY(-1px);
+  background: color-mix(in srgb, var(--mint) 24%, transparent);
+}
+
+/*
+ * The uploader standing in the hero of an empty home page, where a button that
+ * only navigated used to be. It takes the place — and the top margin — of the
+ * .hero-actions row it replaced.
+ */
+/* ---- the import, while it is happening ----------------------------------- */
+/*
+ * No percentage anywhere in here. The model does not report one, so a bar
+ * filling at an invented rate would be a lie — and the honest alternative is
+ * better anyway: the document itself, moving, with a light passing over it.
+ */
+.import-progress {
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+  border: 1px solid var(--line-bright);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--canvas) 55%, transparent);
+}
+.import-progress-head {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
+}
+.import-progress-eyebrow {
+  display: block;
+  color: var(--violet);
+  font-size: 11px; font-weight: 640; letter-spacing: .08em; text-transform: uppercase;
+}
+.import-progress-file {
+  display: block; margin-top: 4px;
+  font-size: 15px; font-weight: 620; letter-spacing: -0.015em;
+  overflow-wrap: anywhere;
+}
+.import-progress-clock {
+  flex: none;
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--text-secondary);
+  font-size: 12px; font-variant-numeric: tabular-nums;
+}
+
+/* The document being read, dimmed under a moving light. */
+.import-scan {
+  position: relative;
+  height: 140px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--canvas-soft) 70%, transparent);
+  overflow: hidden;
+}
+.import-scan-text {
+  height: 100%; margin: 0;
+  padding: 14px 16px;
+  overflow: hidden;
+  color: var(--text-tertiary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px; line-height: 1.75;
+  white-space: pre-wrap; word-break: break-word;
+  /* Softened top and bottom so lines enter and leave rather than clip. */
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 18%, #000 82%, transparent);
+          mask-image: linear-gradient(to bottom, transparent, #000 18%, #000 82%, transparent);
+}
+.import-scan-beam {
+  position: absolute; left: 0; right: 0; top: 0;
+  height: 46%;
+  background: linear-gradient(to bottom,
+    transparent,
+    color-mix(in srgb, var(--violet) 20%, transparent) 55%,
+    color-mix(in srgb, var(--violet) 42%, transparent) 88%,
+    color-mix(in srgb, var(--blue) 52%, transparent) 100%);
+  opacity: 0;
+  pointer-events: none;
+}
+.import-scan.is-scanning .import-scan-beam {
+  opacity: 1;
+  animation: importSweep 2.6s cubic-bezier(.5,0,.5,1) infinite;
+}
+@keyframes importSweep {
+  0%   { transform: translateY(-110%); }
+  100% { transform: translateY(240%); }
+}
+
+.import-steps { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.import-step { display: flex; align-items: flex-start; gap: 11px; }
+.import-step-dot {
+  flex: none;
+  width: 22px; height: 22px;
+  display: grid; place-items: center;
+  border: 1px solid var(--line-bright);
+  border-radius: 999px;
+  color: var(--text-tertiary);
+  font-size: 11px; font-weight: 640;
+}
+.import-step-body { display: grid; gap: 1px; }
+.import-step-body strong { font-size: 13px; font-weight: 580; color: var(--text-secondary); }
+.import-step-body small { font-size: 11.5px; color: var(--text-tertiary); }
+
+.import-step.is-active .import-step-dot {
+  border-color: var(--violet);
+  color: var(--violet);
+  animation: importPulse 1.6s ease-in-out infinite;
+}
+.import-step.is-active .import-step-body strong { color: var(--text); font-weight: 620; }
+.import-step.is-done .import-step-dot {
+  border-color: color-mix(in srgb, var(--mint) 55%, transparent);
+  background: color-mix(in srgb, var(--mint) 16%, transparent);
+  color: var(--mint);
+}
+@keyframes importPulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--violet) 40%, transparent); }
+  50%      { box-shadow: 0 0 0 5px color-mix(in srgb, var(--violet) 0%, transparent); }
+}
+
+.import-progress-note { margin: 0; color: var(--text-tertiary); font-size: 11.5px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .import-scan.is-scanning .import-scan-beam { animation: none; opacity: .55; transform: translateY(120%); }
+  .import-step.is-active .import-step-dot { animation: none; }
+}
+
+.hero-upload { margin-top: 28px; }
+.hero-replay { margin: 18px 0 0; font-size: 13px; }
+.hero-replay a { color: var(--text-tertiary); }
+.hero-replay a:hover { color: var(--text-secondary); text-decoration: underline; }
+.hero-upload .resume-import { background: color-mix(in srgb, var(--violet) 9%, transparent); }
+.hero-upload .resume-import-body { gap: 12px; }
+
 /* ---- the four steps ------------------------------------------------------ */
 /*
  * Each stage of the product depends on the one before it, and none of that was
@@ -546,5 +691,22 @@ a.journey-link:hover { transform: translateY(-1px); border-color: var(--line-bri
 .library-name { font-size: 13.5px; font-weight: 610; overflow-wrap: anywhere; }
 .library-meta { color: var(--text-tertiary); font-size: 12px; }
 .library-result { color: var(--text-secondary); font-size: 12.5px; text-align: right; }
-.library-result.is-failed { color: var(--rose); }
+/*
+ * A failure is a sentence, not a status chip.
+ *
+ * Right-aligned in the row's spare inches, a two-line explanation of why an
+ * upload did not work wrapped into a ragged pink column that read as damage
+ * rather than as something to act on. Given the full width of the row and a
+ * left edge to start from, it reads as what it is.
+ */
+.library-result.is-failed {
+  flex-basis: 100%;
+  margin-top: 2px;
+  padding: 9px 12px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--rose) 32%, transparent);
+  background: color-mix(in srgb, var(--rose) 9%, transparent);
+  color: var(--rose);
+  font-size: 12.5px; line-height: 1.55; text-align: left;
+}
 .library-row.is-failed { border-color: color-mix(in srgb, var(--rose) 35%, transparent); }

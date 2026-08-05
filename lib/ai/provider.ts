@@ -1,3 +1,6 @@
+import { describeAiFailure } from "./failure";
+import { toGeminiSchema } from "./gemini-schema";
+
 type StructuredRequest = {
   system: string;
   prompt: string;
@@ -63,7 +66,8 @@ async function callAnthropic(request: StructuredRequest, apiKey: string) {
       "content-type": "application/json",
     },
     body: JSON.stringify({
-      model: process.env.ANTHROPIC_MODEL || "claude-sonnet-4-20250514",
+      // Overridable with ANTHROPIC_MODEL; the default tracks the current family.
+      model: process.env.ANTHROPIC_MODEL || "claude-sonnet-5",
       max_tokens: 7000,
       temperature: 0,
       system: `${request.system}\nReturn only one JSON object matching this JSON Schema:\n${JSON.stringify(request.schema)}`,
@@ -82,12 +86,96 @@ async function callAnthropic(request: StructuredRequest, apiKey: string) {
   return JSON.parse(extractJson(text)) as unknown;
 }
 
+/*
+ * Gemini, on Google's free tier.
+ *
+ * The key goes in a header rather than the query string so it never lands in a
+ * URL, a log line or a referrer. The schema is translated first — Gemini speaks
+ * an OpenAPI subset, not JSON Schema — and the finish reason is checked before
+ * the body is parsed, because a response cut short at the token ceiling is
+ * truncated JSON, and "unexpected end of input" is a useless thing to hand
+ * someone who uploaded a long CV.
+ */
+async function callGemini(request: StructuredRequest, apiKey: string) {
+  const model = process.env.GEMINI_MODEL || "gemini-2.0-flash";
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: request.system }] },
+        contents: [{ role: "user", parts: [{ text: request.prompt }] }],
+        generationConfig: {
+          temperature: 0,
+          maxOutputTokens: 32_768,
+          responseMimeType: "application/json",
+          responseSchema: toGeminiSchema(request.schema),
+        },
+      }),
+      signal: AbortSignal.timeout(90_000),
+    },
+  );
+
+  const result = await response.json() as {
+    error?: { message?: string };
+    candidates?: Array<{ finishReason?: string; content?: { parts?: Array<{ text?: string }> } }>;
+  };
+  if (!response.ok) throw new Error(result.error?.message ?? "Gemini request failed.");
+
+  const candidate = result.candidates?.[0];
+  if (candidate?.finishReason === "MAX_TOKENS") {
+    throw new Error("The document produced more detail than one reply can hold. Try a shorter résumé.");
+  }
+  if (candidate?.finishReason === "SAFETY" || candidate?.finishReason === "PROHIBITED_CONTENT") {
+    throw new Error("The provider declined to process that document.");
+  }
+
+  const text = candidate?.content?.parts?.map((part) => part.text ?? "").join("");
+  if (!text) throw new Error("Gemini returned no structured output.");
+  return JSON.parse(extractJson(text)) as unknown;
+}
+
+/*
+ * Three providers, tried in order — not one provider and a spare that never gets
+ * used.
+ *
+ * This previously picked Anthropic only when OPENAI_API_KEY was *absent*, which
+ * is the one case that almost never happens. The case that does happen is a key
+ * that is present and an account behind it that has run out of credit: every
+ * import then failed at the model call with a billing error, while a perfectly
+ * good second key sat in the environment untouched. A configured provider that
+ * cannot be reached is not a configured provider, so a failure moves on to the
+ * next one and only the last failure is reported.
+ *
+ * Gemini leads because it is the one with a free tier — a deployment that sets
+ * all three should exhaust what costs nothing before it starts spending. The
+ * order is cheapest-first, not best-first, and every provider is held to the
+ * same schema, so which one answered is not visible in the result.
+ */
 export async function generateStructuredJson(request: StructuredRequest) {
-  const openAIKey = process.env.OPENAI_API_KEY;
+  const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
+  const openAIKey = process.env.OPENAI_API_KEY;
 
-  if (openAIKey) return callOpenAI(request, openAIKey);
-  if (anthropicKey) return callAnthropic(request, anthropicKey);
+  const providers: Array<() => Promise<unknown>> = [];
+  if (geminiKey) providers.push(() => callGemini(request, geminiKey));
+  if (anthropicKey) providers.push(() => callAnthropic(request, anthropicKey));
+  if (openAIKey) providers.push(() => callOpenAI(request, openAIKey));
 
-  throw new Error("No server-side AI provider is configured. Add OPENAI_API_KEY or ANTHROPIC_API_KEY in Vercel.");
+  if (!providers.length) {
+    throw new Error("No server-side AI provider is configured. Add GEMINI_API_KEY, ANTHROPIC_API_KEY or OPENAI_API_KEY in Vercel.");
+  }
+
+  let last: unknown;
+  for (const attempt of providers) {
+    try {
+      return await attempt();
+    } catch (caught) {
+      last = caught;
+    }
+  }
+
+  const message = last instanceof Error ? last.message : "The AI provider failed.";
+  throw new Error(describeAiFailure(message));
 }

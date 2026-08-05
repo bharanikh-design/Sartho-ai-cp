@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ResumeImport } from "@/components/resume-import";
 import { requireUser } from "@/lib/auth";
 import { getCareerWorkspace } from "@/lib/data/career";
 import type { JobStatus } from "@/lib/types";
@@ -69,6 +70,11 @@ export default async function HomePage() {
    * dashboard is meaningless until a career is in, so the first screen after
    * signing in should point at the one thing that matters rather than at five
    * empty counters.
+   *
+   * And it points at it by doing it. This spot previously held a button reading
+   * "Upload your résumé" that only navigated to a page carrying an identical
+   * button — the second of which was the real one. A control that names an
+   * action has to perform it, so the uploader itself stands here now.
    */
   if (!evidence.length) {
     return (
@@ -82,11 +88,18 @@ export default async function HomePage() {
               you to approve, never as facts it decided on your behalf. Nothing reaches a
               match, a résumé or an interview answer until you have said yes to it.
             </p>
-            <div className="hero-actions">
-              <Link href="/career-truth" className="primary-button">
-                Upload your résumé <span aria-hidden="true">↗</span>
-              </Link>
+            <div className="hero-upload">
+              <ResumeImport hasEvidence={false} showLead={false} continueHref="/career-truth" />
             </div>
+
+            {/*
+              * The welcome tour is dismissible and stays dismissed, and this
+              * screen — the one a brand-new account actually lands on — had no
+              * way back to it. The dashboard below carries the same link.
+              */}
+            <p className="hero-replay">
+              <Link href="/?tour=1">Replay the welcome tour <span aria-hidden="true">→</span></Link>
+            </p>
           </div>
 
           <div className="home-hero-signal" aria-label="Why this comes first">

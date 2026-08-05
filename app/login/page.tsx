@@ -25,7 +25,11 @@ const entryArt =
  * switch along with the rest of the product.
  */
 
-type Provider = "google" | "apple" | "github";
+/*
+ * Supabase names the LinkedIn provider "linkedin_oidc"; the bare "linkedin"
+ * id is the retired OAuth 2.0 one and is rejected.
+ */
+type Provider = "google" | "apple" | "linkedin_oidc";
 type Mode = "signin" | "reset";
 
 const styles = `
@@ -35,39 +39,115 @@ const styles = `
   min-height: 100dvh;
   display: grid;
   grid-template-rows: auto 1fr;
-  gap: clamp(22px, 3vw, 38px);
+  gap: clamp(44px, 9vh, 96px);
   padding: clamp(22px, 3.2vw, 46px);
   color: var(--text);
   overflow: hidden;
 }
-.si::before {
+/*
+ * Colour, rather than a tint of it.
+ *
+ * One faint violet blur at 20% read as a smudge on an off-white page — the
+ * palette was present but never actually seen. Three overlapping fields at
+ * real strength give the page a light source: violet high on the left where
+ * the headline sits, blue behind the card, and a warm low note underneath so
+ * the wash is not a single hue stretched across the whole screen. All three
+ * are mixed from the theme tokens, so the dark theme deepens where the light
+ * theme brightens instead of needing a second set of colours.
+ */
+.si::before,
+.si::after {
   content: "";
   position: absolute; z-index: 0;
-  top: -32%; left: 4%;
-  width: min(72vw, 820px); aspect-ratio: 1;
   border-radius: 999px;
-  background: radial-gradient(circle, color-mix(in srgb, var(--violet) 20%, transparent), transparent 64%);
-  filter: blur(44px);
   pointer-events: none;
 }
+.si::before {
+  top: -30%; left: -6%;
+  width: min(88vw, 1000px); aspect-ratio: 1;
+  background:
+    radial-gradient(circle at 38% 42%, color-mix(in srgb, var(--violet) 62%, transparent), transparent 58%),
+    radial-gradient(circle at 74% 20%, color-mix(in srgb, var(--blue) 44%, transparent), transparent 62%);
+  filter: blur(60px);
+  opacity: .72;
+}
+.si::after {
+  right: -14%; bottom: -34%;
+  width: min(80vw, 900px); aspect-ratio: 1;
+  background:
+    radial-gradient(circle at 46% 50%, color-mix(in srgb, var(--blue) 52%, transparent), transparent 60%),
+    radial-gradient(circle at 24% 78%, color-mix(in srgb, var(--rose) 30%, transparent), transparent 64%);
+  filter: blur(72px);
+  opacity: .58;
+}
+/* The dark theme carries deeper colour before it turns to mud. */
+:root[data-theme="dark"] .si::before { opacity: .5; }
+:root[data-theme="dark"] .si::after { opacity: .42; }
 
-/* Brand lockup — kept whole. */
+/*
+ * Brand lockup — the first thing on the page, at full size, on its own.
+ *
+ * The mark is stated once and stated large. It used to appear twice on this
+ * screen, small in the corner and again on the card, which is two half-strength
+ * statements of the same thing; the card no longer carries a copy. What kept
+ * the corner from working before was not the position but the column beneath
+ * it drifting down against a taller card — the stage below now starts on the
+ * card's line, so the space under the lockup is a margin rather than a hole.
+ */
 .si-brand {
   position: relative; z-index: 2;
-  display: flex; align-items: center; gap: 13px;
+  display: flex; align-items: center; gap: 16px;
   animation: siRise .8s ease both;
 }
-.si-logo { width: 46px; height: 46px; border-radius: 13px; flex: none; }
-.si-brand strong { display: block; font-size: 21px; font-weight: 650; letter-spacing: -0.028em; }
-.si-brand small { display: block; margin-top: 3px; font-size: 12.5px; color: var(--text-tertiary); }
+.si-logo {
+  width: clamp(52px, 4vw, 64px); height: clamp(52px, 4vw, 64px);
+  border-radius: 18px; flex: none;
+}
+.si-brand strong { display: block; font-size: clamp(22px, 1.9vw, 27px); font-weight: 660; letter-spacing: -0.032em; }
+.si-brand small { display: block; margin-top: 4px; font-size: 13px; color: var(--text-tertiary); }
 
 /* Stage */
+/*
+ * The headline starts on the card's line.
+ *
+ * This is the whole trick, and it is what centring the shorter column inside
+ * the taller one's row got wrong: the card fills the row, so a centred pitch
+ * begins a hundred and ninety pixels below it and the two columns read as
+ * unrelated. Anchoring the pitch to the top of the row gives them a shared
+ * edge, and what is left over collects below the shorter column, where it is
+ * ordinary margin rather than a gap in the middle of the composition.
+ */
 .si-stage {
   position: relative; z-index: 2;
   display: grid;
   grid-template-columns: minmax(0, 1.06fr) minmax(340px, 430px);
+  /*
+   * One row, sized to its content and centred in whatever height is left.
+   *
+   * Left as 1fr the row swallowed the leftover space, so stretching the pitch
+   * stretched it past the card rather than to it. Sized to content, the row is
+   * exactly the card's height and both columns stretch to the same line.
+   */
+  grid-template-rows: auto;
+  align-content: center;
   gap: clamp(38px, 6vw, 90px);
-  align-items: center;
+  align-items: stretch;
+}
+
+/*
+ * The left column is given the card's height and spends it.
+ *
+ * The card is the taller of the two, so stretching the pitch to the row makes
+ * both columns start and finish on the same lines; the lead sits at the top and
+ * the proof line at the foot, with the slack collecting between them instead of
+ * trailing off below a column that stopped early. The gap is the floor, so on a
+ * short window the two blocks close up rather than overlapping.
+ */
+.si-pitch {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: clamp(28px, 5vh, 64px);
 }
 
 .si-pitch h1 {
@@ -85,12 +165,49 @@ const styles = `
   text-shadow: 0 0 60px color-mix(in srgb, var(--violet) 50%, transparent);
 }
 .si-pitch p {
+  /*
+   * Body copy at a body-copy size. 15px with a 1.6 leading is interface text,
+   * and this is a sentence someone is meant to read — 17-19px over a measure
+   * of about 40 characters at 1.65 is where prose stops being a caption. The
+   * space above it is set from viewport height so the headline and the
+   * sentence stay two separate thoughts on any window.
+   */
   max-width: 40ch;
-  margin: clamp(18px, 2vw, 26px) 0 0;
+  margin: clamp(38px, 8vh, 92px) 0 0;
   color: var(--text-secondary);
-  font-size: clamp(15px, 1.3vw, 17px);
-  line-height: 1.6;
+  font-size: clamp(16px, 1.35vw, 19px);
+  line-height: 1.65;
+  letter-spacing: -0.005em;
   animation: siRise 1s ease .18s both;
+}
+
+/*
+ * What the headline is promising, in two or three words each — and the foot
+ * the left column needs to hold its own beside the card.
+ */
+.si-proof {
+  display: flex; flex-wrap: wrap; align-items: center;
+  gap: 10px 14px;
+  /* Lifted off the foot so it reads as the column's last line rather than
+     something resting on the bottom edge. */
+  margin: 0 0 clamp(20px, 3vh, 34px); padding: 0;
+  list-style: none;
+  color: var(--text-tertiary);
+  font-size: 12.5px; font-weight: 560; letter-spacing: 0.055em; text-transform: uppercase;
+  animation: siRise 1s ease .3s both;
+}
+.si-proof li { display: flex; align-items: center; gap: 14px; }
+/*
+ * The separator trails its own item rather than leading the next one. Owned by
+ * the following item, a wrap carries the dot to the start of the new line and
+ * the list reads as though it began with a bullet.
+ */
+.si-proof li:not(:last-child)::after {
+  content: "";
+  width: 3px; height: 3px;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: .6;
 }
 
 /* Panel */
@@ -98,7 +215,7 @@ const styles = `
   position: relative;
   justify-self: end;
   width: 100%;
-  padding: clamp(24px, 2.6vw, 34px);
+  padding: clamp(22px, 2.1vw, 28px);
   border: 1px solid var(--line);
   border-radius: 26px;
   background: var(--glass-strong);
@@ -109,19 +226,12 @@ const styles = `
   backdrop-filter: blur(20px);
   animation: siRise 1s ease .26s both;
 }
-/* The mark crowns the card — the door you are about to walk through. */
-.si-card-mark {
-  display: block;
-  width: 54px; height: 54px;
-  margin: 0 auto 16px;
-  border-radius: 15px;
-}
 .si-panel h2 { margin: 0; font-size: 20px; font-weight: 640; letter-spacing: -0.026em; text-align: center; }
 .si-sub { margin: 7px 0 0; color: var(--text-secondary); font-size: 13px; line-height: 1.5; text-align: center; }
 
-.si-providers { display: grid; gap: 9px; margin-top: 20px; }
+.si-providers { display: grid; gap: 8px; margin-top: 16px; }
 .si-provider {
-  width: 100%; min-height: 48px;
+  width: 100%; min-height: 46px;
   display: flex; align-items: center; justify-content: center; gap: 10px;
   border: 1px solid var(--line-bright);
   border-radius: 13px;
@@ -141,12 +251,12 @@ const styles = `
 
 .si-or {
   display: flex; align-items: center; gap: 12px;
-  margin: 18px 0;
+  margin: 15px 0;
   color: var(--text-tertiary); font-size: 11.5px;
 }
 .si-or::before, .si-or::after { content: ""; height: 1px; flex: 1; background: var(--line); }
 
-.si-form { display: grid; gap: 11px; }
+.si-form { display: grid; gap: 10px; }
 .si-form label { display: grid; gap: 6px; }
 .si-form label > span { font-size: 12px; font-weight: 560; color: var(--text-secondary); }
 .si-form input {
@@ -180,7 +290,7 @@ const styles = `
 .si-submit:hover:not(:disabled) { transform: translateY(-1px); filter: brightness(1.08); }
 .si-submit:disabled { opacity: .55; cursor: progress; }
 
-.si-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 13px; }
+.si-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 12px; }
 .si-link {
   border: 0; padding: 0; background: none;
   color: var(--blue); cursor: pointer; font: inherit;
@@ -198,7 +308,7 @@ const styles = `
 .si-msg.is-ok { border-color: color-mix(in srgb, var(--mint) 40%, transparent); color: var(--mint); background: color-mix(in srgb, var(--mint) 10%, transparent); }
 
 .si-note {
-  margin: 16px 0 0; padding-top: 15px;
+  margin: 14px 0 0; padding-top: 13px;
   border-top: 1px solid var(--line);
   color: var(--text-tertiary); font-size: 11.5px; line-height: 1.55; text-align: center;
 }
@@ -240,7 +350,7 @@ const styles = `
  * never crowd the headline or the button no matter the window.
  */
 .si-scene {
-  position: absolute; left: 50%; top: 58%;
+  position: absolute; left: 50%; top: 66%;
   z-index: 0;
   /*
    * The whole frame, fitted to the height rather than cropped to fill. The
@@ -252,7 +362,9 @@ const styles = `
   /*
    * Sat low and a little under full height: the doorway falls near the top of
    * the artwork, and at dead centre it collided with the last line of the
-   * headline on a short window.
+   * headline on a short window. It sits lower again now that the lockup lives
+   * under the headline — the doorway is the brightest thing on the screen and
+   * a wordmark laid over it simply disappears.
    */
   height: 96%;
   aspect-ratio: 2200 / 1675;
@@ -263,8 +375,23 @@ const styles = `
   background-size: cover;
   background-position: 50% 50%;
   background-repeat: no-repeat;
-  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 10%, #000 90%, transparent 100%);
-          mask-image: linear-gradient(to right, transparent 0, #000 10%, #000 90%, transparent 100%);
+  /*
+   * Faded on all four edges, not just the sides.
+   *
+   * Sitting lower puts the artwork's top edge inside the visible area with a
+   * lit wall immediately below it, and a hard cut between near-black and a lit
+   * wall is a seam no amount of scrim covers. Two masks intersected fade the
+   * frame out on every side, so it reads as light in a dark room rather than
+   * as a picture pasted onto the page.
+   */
+  -webkit-mask-image:
+    linear-gradient(to right, transparent 0, #000 10%, #000 90%, transparent 100%),
+    linear-gradient(to bottom, transparent 0, #000 15%, #000 86%, transparent 100%);
+  -webkit-mask-composite: source-in;
+          mask-image:
+    linear-gradient(to right, transparent 0, #000 10%, #000 90%, transparent 100%),
+    linear-gradient(to bottom, transparent 0, #000 15%, #000 86%, transparent 100%);
+          mask-composite: intersect;
   pointer-events: none;
   animation: sceneIn 1.6s ease .2s both;
 }
@@ -301,13 +428,27 @@ const styles = `
   text-shadow: 0 0 64px rgba(150,130,255,.75);
 }
 
-/* brand lockup + the way in, together at the foot of the corridor */
+/*
+ * The name sits under the sentence it signs, above the doorway.
+ *
+ * It used to stack with the button at the foot, which put two things asking
+ * for attention in the same place and made the way in the second of them.
+ * Alone at the bottom, the button is the only thing down there to press.
+ */
+.si-splash-head {
+  position: relative; z-index: 2;
+  display: grid; justify-items: center;
+  gap: clamp(18px, 2.8vh, 34px);
+}
 .si-splash-foot {
   position: relative; z-index: 2;
-  display: grid; justify-items: center; gap: 24px;
+  display: grid; justify-items: center;
   animation: siRise 1.1s ease .62s both;
 }
-.si-splash-lockup { display: flex; align-items: center; gap: 12px; }
+.si-splash-lockup {
+  display: flex; align-items: center; gap: 12px;
+  animation: siRise 1.1s ease .5s both;
+}
 .si-splash-lockup img { width: 46px; height: 46px; border-radius: 13px; flex: none; }
 .si-splash-lockup strong { display: block; font-size: 21px; font-weight: 650; letter-spacing: -0.028em; color: #f4f6ff; }
 .si-splash-lockup small { display: block; margin-top: 3px; font-size: 12.5px; color: rgba(226,232,255,.5); }
@@ -345,7 +486,8 @@ const styles = `
  * clear first so nothing is in the way, then the door rushes up to meet you.
  */
 .si-splash.is-leaving .si-splash-line { animation: lineThrough .8s cubic-bezier(.6,0,.75,.2) forwards; }
-.si-splash.is-leaving .si-splash-foot { animation: splashLift .4s ease forwards; }
+.si-splash.is-leaving .si-splash-foot,
+.si-splash.is-leaving .si-splash-lockup { animation: splashLift .4s ease forwards; }
 .si-splash.is-leaving .si-scene { animation: sceneThrough .95s cubic-bezier(.7,0,.85,.2) forwards; }
 
 /*
@@ -377,24 +519,43 @@ const styles = `
 
 @media (max-width: 940px) {
   .si-stage { grid-template-columns: 1fr; gap: 30px; align-items: start; }
-  .si-panel { justify-self: stretch; }
+  /* Stacked: no second column to match, so the row goes back to flowing. */
+  .si-stage { grid-template-rows: none; align-content: start; }
+  .si-panel { justify-self: stretch; align-self: start; }
+  .si-pitch { display: block; }
+  .si-pitch p { margin-top: 24px; }
+  .si-proof { margin-top: 28px; font-size: 11.5px; }
   .si-pitch h1 { max-width: none; font-size: clamp(34px, 8vw, 52px); }
   .si-splash { padding: clamp(32px, 7vh, 72px) 22px clamp(28px, 6vh, 64px); }
-  .si-splash-foot { gap: 20px; }
+  .si-splash-head { gap: 24px; }
 }
 /*
  * Short windows — a laptop with browser chrome and a taskbar taking their cut.
  * The headline comes down with everything else so it never crowds the way in.
  */
+/*
+ * A sign-in card carrying three providers, an email pair and a footnote is
+ * about 690px however it is packed, so on a short window the room has to come
+ * from around it rather than out of it. The page chrome gives up its padding
+ * before the card gives up a button — a card cut off at the fold is the worst
+ * of the available outcomes.
+ */
+@media (max-height: 880px) and (min-width: 941px) {
+  /* Height is what is scarce, so only the vertical measurements give way. */
+  .si { padding: clamp(16px, 2.2vh, 30px) clamp(24px, 3.2vw, 46px); gap: clamp(30px, 6vh, 56px); }
+  .si-logo { width: 48px; height: 48px; border-radius: 15px; }
+  .si-brand strong { font-size: 22px; }
+  .si-panel { padding: clamp(20px, 1.8vw, 26px); }
+}
 @media (max-height: 720px) {
   .si-splash-line { font-size: clamp(28px, 5vw, 62px); }
-  .si-splash-foot { gap: 18px; }
+  .si-splash-head { gap: 22px; }
   .si-splash-enter { min-height: 46px; }
 }
 @media (max-height: 560px) {
   .si-splash-line { font-size: clamp(24px, 4vw, 46px); }
   .si-splash-lockup img { width: 34px; height: 34px; }
-  .si-splash-foot { gap: 14px; }
+  .si-splash-head { gap: 16px; }
 }
 @media (prefers-reduced-motion: reduce) {
   /*
@@ -579,10 +740,13 @@ export default function LoginPage() {
       {splash !== "done" ? (
         <div className={`si-splash${splash === "leaving" ? " is-leaving" : ""}`}>
           <div className="si-scene" aria-hidden="true" />
-          <h1 className="si-splash-line">
-            Your own headhunter. <em>Finally.</em>
-          </h1>
-          <div className="si-splash-foot">
+
+          {/* Head and foot, so space-between has two things to separate. The
+              lockup belongs to the sentence it signs, not to the button. */}
+          <div className="si-splash-head">
+            <h1 className="si-splash-line">
+              Your own headhunter. <em>Finally.</em>
+            </h1>
             <span className="si-splash-lockup">
               <Image src={sarthoIcon} alt="" width={152} height={152} quality={95} priority />
               <span>
@@ -590,6 +754,9 @@ export default function LoginPage() {
                 <small>Your Career CoPilot</small>
               </span>
             </span>
+          </div>
+
+          <div className="si-splash-foot">
             <button type="button" className="si-splash-enter" onClick={walkThrough}>
               Continue to Sign In
             </button>
@@ -604,7 +771,7 @@ export default function LoginPage() {
         * see, and a screen reader is handed both screens at once.
         */}
       <header className="si-brand" inert={covered}>
-        <Image className="si-logo" src={sarthoIcon} alt="" width={184} height={184} quality={95} priority />
+        <Image className="si-logo" src={sarthoIcon} alt="" width={256} height={256} quality={95} priority />
         <span>
           <strong>Sartho</strong>
           <small>Your Career CoPilot</small>
@@ -613,15 +780,24 @@ export default function LoginPage() {
 
       <div className="si-stage" inert={covered}>
         <section className="si-pitch">
-          <h1>Your own headhunter. <em>Finally.</em></h1>
-          <p>
-            Someone who knows your whole career, finds the roles worth your
-            experience, and makes sure you walk in ready.
-          </p>
+          {/* Grouped, so space-between puts the foot at the foot rather than
+              floating the sentence away from the headline it belongs to. */}
+          <div className="si-pitch-lead">
+            <h1>Your own headhunter. <em>Finally.</em></h1>
+            <p>
+              Someone who knows your whole career, finds the roles worth your
+              experience, and makes sure you walk in ready.
+            </p>
+          </div>
+
+          <ul className="si-proof">
+            <li>Role matching</li>
+            <li>Résumé tailoring</li>
+            <li>Interview preparation</li>
+          </ul>
         </section>
 
         <section className="si-panel">
-          <Image className="si-card-mark" src={sarthoIcon} alt="" width={216} height={216} quality={95} />
           <h2>{mode === "reset" ? "Reset your password" : "Welcome to Sartho"}</h2>
           <p className="si-sub">
             {mode === "reset"
@@ -638,8 +814,8 @@ export default function LoginPage() {
                 <button type="button" className="si-provider" onClick={() => signInWithProvider("apple")} disabled={busy !== null}>
                   <AppleIcon /><span>{busy === "apple" ? "Opening…" : "Continue with Apple"}</span>
                 </button>
-                <button type="button" className="si-provider" onClick={() => signInWithProvider("github")} disabled={busy !== null}>
-                  <GitHubIcon /><span>{busy === "github" ? "Opening…" : "Continue with GitHub"}</span>
+                <button type="button" className="si-provider" onClick={() => signInWithProvider("linkedin_oidc")} disabled={busy !== null}>
+                  <LinkedInIcon /><span>{busy === "linkedin_oidc" ? "Opening…" : "Continue with LinkedIn"}</span>
                 </button>
               </div>
 
@@ -728,10 +904,10 @@ function AppleIcon() {
   );
 }
 
-function GitHubIcon() {
+function LinkedInIcon() {
   return (
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <path d="M12 2C6.48 2 2 6.48 2 12c0 4.42 2.87 8.17 6.84 9.5.5.09.68-.22.68-.48l-.01-1.7c-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.61.07-.61 1 .07 1.53 1.03 1.53 1.03.89 1.53 2.34 1.09 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02A9.6 9.6 0 0 1 12 6.8c.85 0 1.71.11 2.51.34 1.91-1.29 2.75-1.02 2.75-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.69-4.57 4.94.36.31.68.92.68 1.85l-.01 2.75c0 .27.18.58.69.48A10 10 0 0 0 22 12c0-5.52-4.48-10-10-10Z" />
+    <svg width="17" height="17" viewBox="0 0 24 24" aria-hidden="true">
+      <path fill="#0A66C2" d="M20.45 20.45h-3.56v-5.57c0-1.33-.02-3.04-1.85-3.04-1.85 0-2.14 1.45-2.14 2.94v5.67H9.35V9h3.41v1.56h.05a3.74 3.74 0 0 1 3.37-1.85c3.6 0 4.27 2.37 4.27 5.46zM5.34 7.43a2.06 2.06 0 1 1 0-4.13 2.06 2.06 0 0 1 0 4.13M7.12 20.45H3.55V9h3.57zM22.22 0H1.77C.79 0 0 .77 0 1.73v20.54C0 23.23.79 24 1.77 24h20.45c.98 0 1.78-.77 1.78-1.73V1.73C24 .77 23.2 0 22.22 0" />
     </svg>
   );
 }

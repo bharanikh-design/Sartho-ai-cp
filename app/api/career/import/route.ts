@@ -112,6 +112,27 @@ const system = [
   "Split responsibilities into separate claims rather than merging several into one sentence.",
 ].join(" ");
 
+/*
+ * Progress is reported, not estimated.
+ *
+ * Reading a résumé takes as long as it takes — the model is the slow part and
+ * it does not report a percentage, so inventing one would be a progress bar
+ * that lies about a product whose whole argument is that it does not. What the
+ * server can say honestly is which stage it is on and what it has actually
+ * found, so it says exactly that, as it happens, down a newline-delimited JSON
+ * stream. The alternative is what this was: a request that returns nothing for
+ * up to two minutes while the page appears to have died.
+ */
+type Progress =
+  | { stage: "extracted"; characters: number; sample: string }
+  | { stage: "reading" }
+  | { stage: "saving"; roles: number; claims: number }
+  | { stage: "done"; importId: string; rolesCreated: number; evidenceCreated: number; evidenceSkipped: number }
+  | { stage: "error"; error: string };
+
+/* Enough of the document to show it being read, not enough to be the document. */
+const SAMPLE_CHARACTERS = 4000;
+
 export async function POST(request: Request) {
   const { supabase, user } = await getAuthenticatedUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -156,26 +177,45 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: importError?.message ?? "Could not start the import." }, { status: 400 });
   }
 
-  try {
+  /*
+   * Everything that could fail fast has now failed fast, with a real status
+   * code. From here the work is long and the answer is a stream, so failures
+   * arrive as an error event on a 200 — the client handles both shapes.
+   *
+   * The narrowed values are bound to plain constants first: the streaming body
+   * runs inside a closure, and a closure cannot rely on the narrowing that the
+   * guards above established.
+   */
+  const userId = user.id;
+  const importId = importRow.id;
+  const sourceName = file.name;
+  const resumeText = text;
+
+  const run = async (send: (event: Progress) => void) => {
+    send({ stage: "extracted", characters: resumeText.length, sample: resumeText.slice(0, SAMPLE_CHARACTERS) });
+    send({ stage: "reading" });
+
     const raw = await generateStructuredJson({
       schemaName: "sartho_resume_extraction",
       schema: jsonSchema,
       system,
-      prompt: JSON.stringify({ resumeText: text }),
+      prompt: JSON.stringify({ resumeText }),
     });
 
     const parsed = outputSchema.parse(raw);
     const { roles, evidence } = toRows(
       { roles: parsed.roles, evidence: parsed.evidence },
-      file.name,
+      sourceName,
     );
 
     if (!evidence.length) {
       throw new Error("Sartho did not find any career evidence in that document.");
     }
 
+    send({ stage: "saving", roles: roles.length, claims: evidence.length });
+
     const { data: applied, error: applyError } = await supabase.rpc("apply_resume_import", {
-      p_import_id: importRow.id,
+      p_import_id: importId,
       p_roles: roles,
       p_evidence: evidence,
     });
@@ -189,7 +229,7 @@ export async function POST(request: Request) {
     const { data: profile } = await supabase
       .from("profiles")
       .select("id,headline,summary,location,total_experience_years")
-      .eq("id", user.id)
+      .eq("id", userId)
       .maybeSingle();
 
     if (profile) {
@@ -201,22 +241,48 @@ export async function POST(request: Request) {
         patch.total_experience_years = parsed.totalExperienceYears;
       }
       if (Object.keys(patch).length) {
-        await supabase.from("profiles").update(patch).eq("id", user.id);
+        await supabase.from("profiles").update(patch).eq("id", userId);
       }
     }
 
-    return NextResponse.json({
-      importId: importRow.id,
-      ...(applied as Record<string, number>),
+    const counts = (applied ?? {}) as Record<string, number>;
+    send({
+      stage: "done",
+      importId,
+      rolesCreated: counts.rolesCreated ?? 0,
+      evidenceCreated: counts.evidenceCreated ?? 0,
+      evidenceSkipped: counts.evidenceSkipped ?? 0,
     });
-  } catch (caught) {
-    const message = caught instanceof Error ? caught.message : "The import failed.";
-    await supabase
-      .from("resume_imports")
-      .update({ status: "failed", error: message.slice(0, 500), completed_at: new Date().toISOString() })
-      .eq("id", importRow.id)
-      .eq("user_id", user.id);
+  };
 
-    return NextResponse.json({ error: message }, { status: 500 });
-  }
+  const encoder = new TextEncoder();
+  const body = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      const send = (event: Progress) =>
+        controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
+
+      try {
+        await run(send);
+      } catch (caught) {
+        const message = caught instanceof Error ? caught.message : "The import failed.";
+        await supabase
+          .from("resume_imports")
+          .update({ status: "failed", error: message.slice(0, 500), completed_at: new Date().toISOString() })
+          .eq("id", importId)
+          .eq("user_id", userId);
+        send({ stage: "error", error: message });
+      } finally {
+        controller.close();
+      }
+    },
+  });
+
+  return new Response(body, {
+    headers: {
+      "Content-Type": "application/x-ndjson; charset=utf-8",
+      "Cache-Control": "no-store, no-transform",
+      // Stops an intermediary buffering the whole stream and defeating the point.
+      "X-Accel-Buffering": "no",
+    },
+  });
 }
