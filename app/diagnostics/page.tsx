@@ -67,6 +67,12 @@ export default async function DiagnosticsPage() {
               <span className="diagnostic-body">
                 <strong>{provider.name}</strong>
                 <small>{provider.detail}</small>
+                {/* The provider's own words — the summary above cannot
+                    distinguish an empty account from a project without billing
+                    enabled, and whoever is fixing it needs to know which. */}
+                {provider.raw && provider.raw !== provider.detail ? (
+                  <code className="diagnostic-raw">{provider.raw}</code>
+                ) : null}
               </span>
               <code className="diagnostic-env">{provider.envVar}</code>
             </li>

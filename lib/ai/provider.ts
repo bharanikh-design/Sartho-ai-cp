@@ -205,6 +205,16 @@ export type ProviderProbe = {
   configured: boolean;
   reachable: boolean | null;
   detail: string;
+  /*
+   * The provider's own words, kept alongside the summary.
+   *
+   * "no credit left" is the right thing to tell someone uploading a CV and the
+   * wrong thing to tell whoever has to fix it: an account that is empty, a
+   * project without billing enabled and a region the free tier does not cover
+   * all summarise to the same three words, and only the raw text says which.
+   * This page is read by the person holding the keys, so it gets both.
+   */
+  raw: string | null;
 };
 
 const PROBE_SCHEMA = {
@@ -231,14 +241,14 @@ export async function probeProviders(): Promise<ProviderProbe[]> {
   return Promise.all(
     configured.map(async ({ name, envVar, key, call }): Promise<ProviderProbe> => {
       if (!key) {
-        return { name, envVar, configured: false, reachable: null, detail: `${envVar} is not set on this deployment` };
+        return { name, envVar, configured: false, reachable: null, detail: `${envVar} is not set on this deployment`, raw: null };
       }
       try {
         await call(request, key);
-        return { name, envVar, configured: true, reachable: true, detail: "answered" };
+        return { name, envVar, configured: true, reachable: true, detail: "answered", raw: null };
       } catch (caught) {
         const message = caught instanceof Error ? caught.message : "failed";
-        return { name, envVar, configured: true, reachable: false, detail: shortAiFailure(message) };
+        return { name, envVar, configured: true, reachable: false, detail: shortAiFailure(message), raw: message };
       }
     }),
   );

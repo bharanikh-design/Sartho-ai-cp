@@ -760,3 +760,14 @@ a.journey-link:hover { transform: translateY(-1px); border-color: var(--line-bri
   .diagnostic-row { flex-wrap: wrap; }
   .diagnostic-env { margin-left: 39px; }
 }
+.diagnostic-raw {
+  display: block;
+  margin-top: 6px;
+  padding: 7px 9px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--text) 5%, transparent);
+  color: var(--text-tertiary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px; line-height: 1.5;
+  overflow-wrap: anywhere;
+}
