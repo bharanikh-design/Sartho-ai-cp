@@ -1,5 +1,4 @@
 import { describeProviderFailures, shortAiFailure } from "./failure";
-import { toGeminiSchema } from "./gemini-schema";
 
 type StructuredRequest = {
   system: string;
@@ -89,12 +88,25 @@ async function callAnthropic(request: StructuredRequest, apiKey: string) {
 /*
  * Gemini, on Google's free tier.
  *
+ * Asked for JSON the same way Anthropic is: the schema goes in the instruction
+ * as text, the reply comes back as JSON, and zod decides whether it is
+ * acceptable. Gemini's responseSchema was used here at first and cost a day —
+ * it speaks an OpenAPI subset rather than JSON Schema, and each difference
+ * surfaced as its own separate production failure, one round trip apart:
+ * additionalProperties rejected, then nullable unions, then propertyOrdering,
+ * then an "invalid argument" naming no argument.
+ *
+ * None of it was buying anything. The response is parsed and validated against
+ * the same zod schema whichever provider answered, so responseSchema was a
+ * second, dialect-specific copy of a guarantee already enforced one layer up —
+ * and the only thing it reliably produced was a new way to fail. One code path
+ * for all three providers now, and no translation layer to keep correct.
+ *
  * The key goes in a header rather than the query string so it never lands in a
- * URL, a log line or a referrer. The schema is translated first — Gemini speaks
- * an OpenAPI subset, not JSON Schema — and the finish reason is checked before
- * the body is parsed, because a response cut short at the token ceiling is
- * truncated JSON, and "unexpected end of input" is a useless thing to hand
- * someone who uploaded a long CV.
+ * URL, a log line or a referrer, and the finish reason is checked before the
+ * body is parsed: a reply cut short at the token ceiling is truncated JSON, and
+ * "unexpected end of input" is a useless thing to hand someone who uploaded a
+ * long CV.
  */
 async function callGemini(request: StructuredRequest, apiKey: string): Promise<unknown> {
   /*
@@ -130,7 +142,11 @@ async function callGeminiModel(request: StructuredRequest, apiKey: string, model
       method: "POST",
       headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
       body: JSON.stringify({
-        systemInstruction: { parts: [{ text: request.system }] },
+        systemInstruction: {
+          parts: [{
+            text: `${request.system}\nReturn only one JSON object matching this JSON Schema:\n${JSON.stringify(request.schema)}`,
+          }],
+        },
         contents: [{ role: "user", parts: [{ text: request.prompt }] }],
         generationConfig: {
           temperature: 0,
@@ -141,7 +157,6 @@ async function callGeminiModel(request: StructuredRequest, apiKey: string, model
            */
           maxOutputTokens: 8_192,
           responseMimeType: "application/json",
-          responseSchema: toGeminiSchema(request.schema),
         },
       }),
       signal: AbortSignal.timeout(90_000),

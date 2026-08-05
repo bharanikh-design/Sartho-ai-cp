@@ -96,17 +96,33 @@ describe("generateStructuredJson", () => {
     expect((calls[0].init.headers as Record<string, string>)["x-goog-api-key"]).toBe("g-secret");
   });
 
-  it("sends Gemini a schema in its own dialect, not raw JSON Schema", async () => {
+  /*
+   * Gemini's responseSchema is not used. It speaks an OpenAPI subset rather
+   * than JSON Schema, and every difference between the two arrived as its own
+   * production failure while buying nothing: the reply is validated against the
+   * same zod schema whichever provider answered. The schema is asked for in
+   * words, exactly as Anthropic is asked.
+   */
+  it("asks Gemini for JSON in the instruction, not through responseSchema", async () => {
     vi.stubEnv("GEMINI_API_KEY", "g-key");
     await generateStructuredJson(REQUEST);
 
-    const config = bodyOf(calls[0]).generationConfig as Record<string, unknown>;
-    const schema = JSON.stringify(config.responseSchema);
+    const body = bodyOf(calls[0]);
+    const config = body.generationConfig as Record<string, unknown>;
+    const instruction = JSON.stringify(body.systemInstruction);
 
     expect(config.responseMimeType).toBe("application/json");
-    expect(schema).not.toContain("additionalProperties");
-    expect(schema).not.toContain('"null"');
-    expect(schema).toContain('"nullable":true');
+    expect(config).not.toHaveProperty("responseSchema");
+    expect(instruction).toContain("JSON Schema");
+    expect(instruction).toContain("additionalProperties");
+  });
+
+  it("keeps the output ceiling where every current flash model accepts it", async () => {
+    vi.stubEnv("GEMINI_API_KEY", "g-key");
+    await generateStructuredJson(REQUEST);
+
+    const config = bodyOf(calls[0]).generationConfig as Record<string, number>;
+    expect(config.maxOutputTokens).toBeLessThanOrEqual(8192);
   });
 
   it("moves to the next provider when the free one has nothing left", async () => {
