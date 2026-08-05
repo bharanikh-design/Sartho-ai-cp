@@ -97,7 +97,7 @@ async function callAnthropic(request: StructuredRequest, apiKey: string) {
  * someone who uploaded a long CV.
  */
 async function callGemini(request: StructuredRequest, apiKey: string) {
-  const model = process.env.GEMINI_MODEL || "gemini-2.0-flash";
+  const model = process.env.GEMINI_MODEL || "gemini-2.5-flash";
   const response = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
     {
@@ -199,12 +199,47 @@ export async function generateStructuredJson(request: StructuredRequest) {
  * The probe sends the smallest request each provider will accept. It never
  * returns a key, or any part of one.
  */
+/*
+ * The models this key may actually call.
+ *
+ * A quota error naming "limit: 0" for one model is not an exhausted account —
+ * it is an account that was never given an allowance for that model, usually
+ * because Google has moved the free tier on to a newer one. The fix is a
+ * different model name, and guessing at model names is what produced the
+ * problem in the first place. So the key is asked.
+ */
+export async function listGeminiModels(apiKey: string): Promise<string[]> {
+  try {
+    const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=200", {
+      headers: { "x-goog-api-key": apiKey },
+      signal: AbortSignal.timeout(20_000),
+    });
+    if (!response.ok) return [];
+
+    const body = await response.json() as {
+      models?: Array<{ name?: string; supportedGenerationMethods?: string[] }>;
+    };
+
+    return (body.models ?? [])
+      .filter((model) => model.supportedGenerationMethods?.includes("generateContent"))
+      .map((model) => (model.name ?? "").replace(/^models\//, ""))
+      .filter((name) => name.length > 0)
+      .sort();
+  } catch {
+    return [];
+  }
+}
+
 export type ProviderProbe = {
   name: string;
   envVar: string;
   configured: boolean;
   reachable: boolean | null;
   detail: string;
+  /* Set only when the provider can say which models the key may call. */
+  models?: string[];
+  /* The model this deployment is configured to use. */
+  model?: string;
   /*
    * The provider's own words, kept alongside the summary.
    *
@@ -248,7 +283,21 @@ export async function probeProviders(): Promise<ProviderProbe[]> {
         return { name, envVar, configured: true, reachable: true, detail: "answered", raw: null };
       } catch (caught) {
         const message = caught instanceof Error ? caught.message : "failed";
-        return { name, envVar, configured: true, reachable: false, detail: shortAiFailure(message), raw: message };
+        const probe: ProviderProbe = {
+          name, envVar, configured: true, reachable: false,
+          detail: shortAiFailure(message), raw: message,
+        };
+
+        /*
+         * "limit: 0" means no allowance was ever granted for this model, not
+         * that one was spent — so the useful next step is a different model,
+         * and the key itself can say which are available.
+         */
+        if (name === "Gemini") {
+          probe.model = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+          if (/limit:\s*0\b/.test(message)) probe.models = await listGeminiModels(key);
+        }
+        return probe;
       }
     }),
   );

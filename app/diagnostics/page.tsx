@@ -73,6 +73,24 @@ export default async function DiagnosticsPage() {
                 {provider.raw && provider.raw !== provider.detail ? (
                   <code className="diagnostic-raw">{provider.raw}</code>
                 ) : null}
+
+                {/*
+                  * "limit: 0" means no allowance was ever granted for the model
+                  * this deployment asks for — not that one was spent. The fix is
+                  * a different model name, and guessing at model names is what
+                  * caused this, so the key was asked which ones it may call.
+                  */}
+                {provider.models?.length ? (
+                  <span className="diagnostic-models">
+                    <strong>
+                      Your key has no free allowance for <code>{provider.model}</code>. It can call
+                      these — set <code>GEMINI_MODEL</code> in Vercel to one of them:
+                    </strong>
+                    <span className="diagnostic-model-list">
+                      {provider.models.map((model) => <code key={model}>{model}</code>)}
+                    </span>
+                  </span>
+                ) : null}
               </span>
               <code className="diagnostic-env">{provider.envVar}</code>
             </li>
