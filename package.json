@@ -14,7 +14,8 @@
     "lint:fix": "eslint . --fix",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "check:ai": "NODE_USE_ENV_PROXY=1 LIVE_AI_CHECK=1 vitest run lib/ai/gemini-live.test.ts"
   },
   "dependencies": {
     "@supabase/ssr": "0.12.3",
