@@ -1,4 +1,4 @@
-import { describeProviderFailures } from "./failure";
+import { describeProviderFailures, shortAiFailure } from "./failure";
 import { toGeminiSchema } from "./gemini-schema";
 
 type StructuredRequest = {
@@ -185,4 +185,61 @@ export async function generateStructuredJson(request: StructuredRequest) {
   }
 
   throw new Error(describeProviderFailures(failures));
+}
+
+/*
+ * Which providers are configured, and does each one actually answer.
+ *
+ * Built after an afternoon of not being able to tell the difference between a
+ * key that was never read, a key that was rejected, and an account with no
+ * money in it — all three of which surface to someone uploading a CV as the
+ * same failed import. Guessing at that from the outside is what turns a
+ * five-minute fix into a day.
+ *
+ * The probe sends the smallest request each provider will accept. It never
+ * returns a key, or any part of one.
+ */
+export type ProviderProbe = {
+  name: string;
+  envVar: string;
+  configured: boolean;
+  reachable: boolean | null;
+  detail: string;
+};
+
+const PROBE_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["ok"],
+  properties: { ok: { type: "boolean" } },
+};
+
+export async function probeProviders(): Promise<ProviderProbe[]> {
+  const configured = [
+    { name: "Gemini", envVar: "GEMINI_API_KEY", key: process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY, call: callGemini },
+    { name: "Anthropic", envVar: "ANTHROPIC_API_KEY", key: process.env.ANTHROPIC_API_KEY, call: callAnthropic },
+    { name: "OpenAI", envVar: "OPENAI_API_KEY", key: process.env.OPENAI_API_KEY, call: callOpenAI },
+  ];
+
+  const request: StructuredRequest = {
+    schemaName: "sartho_provider_probe",
+    system: "Reply with the JSON object {\"ok\": true} and nothing else.",
+    prompt: "ok",
+    schema: PROBE_SCHEMA,
+  };
+
+  return Promise.all(
+    configured.map(async ({ name, envVar, key, call }): Promise<ProviderProbe> => {
+      if (!key) {
+        return { name, envVar, configured: false, reachable: null, detail: `${envVar} is not set on this deployment` };
+      }
+      try {
+        await call(request, key);
+        return { name, envVar, configured: true, reachable: true, detail: "answered" };
+      } catch (caught) {
+        const message = caught instanceof Error ? caught.message : "failed";
+        return { name, envVar, configured: true, reachable: false, detail: shortAiFailure(message) };
+      }
+    }),
+  );
 }

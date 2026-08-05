@@ -710,3 +710,53 @@ a.journey-link:hover { transform: translateY(-1px); border-color: var(--line-bri
   font-size: 12.5px; line-height: 1.55; text-align: left;
 }
 .library-row.is-failed { border-color: color-mix(in srgb, var(--rose) 35%, transparent); }
+
+/* ---- deployment check ---------------------------------------------------- */
+.diagnostic-verdict { display: grid; gap: 10px; justify-items: start; }
+.diagnostic-verdict strong { font-size: 17px; font-weight: 640; letter-spacing: -0.02em; }
+.diagnostic-verdict p { margin: 0; color: var(--text-secondary); font-size: 14px; line-height: 1.6; }
+.diagnostic-verdict.is-good { border-color: color-mix(in srgb, var(--mint) 42%, transparent); }
+.diagnostic-verdict.is-good strong { color: var(--mint); }
+.diagnostic-verdict.is-bad { border-color: color-mix(in srgb, var(--rose) 42%, transparent); }
+.diagnostic-verdict.is-bad strong { color: var(--rose); }
+
+.diagnostic-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.diagnostic-row {
+  display: flex; align-items: center; gap: 13px;
+  padding: 13px 16px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: color-mix(in srgb, var(--text) 3%, transparent);
+}
+.diagnostic-mark {
+  flex: none;
+  width: 26px; height: 26px;
+  display: grid; place-items: center;
+  border-radius: 999px;
+  border: 1px solid var(--line-bright);
+  font-size: 12px; font-weight: 700;
+}
+.diagnostic-row.is-ok .diagnostic-mark { color: var(--mint); border-color: color-mix(in srgb, var(--mint) 50%, transparent); background: color-mix(in srgb, var(--mint) 14%, transparent); }
+.diagnostic-row.is-failed .diagnostic-mark { color: var(--rose); border-color: color-mix(in srgb, var(--rose) 50%, transparent); background: color-mix(in srgb, var(--rose) 12%, transparent); }
+.diagnostic-row.is-absent .diagnostic-mark { color: var(--text-tertiary); }
+.diagnostic-row.is-ok { border-color: color-mix(in srgb, var(--mint) 32%, transparent); }
+.diagnostic-row.is-failed { border-color: color-mix(in srgb, var(--rose) 30%, transparent); }
+
+.diagnostic-body { display: grid; gap: 2px; min-width: 0; flex: 1; }
+.diagnostic-body strong { font-size: 14px; font-weight: 620; }
+.diagnostic-body small { color: var(--text-secondary); font-size: 12.5px; overflow-wrap: anywhere; }
+.diagnostic-env {
+  flex: none;
+  padding: 4px 9px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--text) 6%, transparent);
+  color: var(--text-tertiary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+}
+.diagnostic-note { margin: 14px 0 0; color: var(--text-tertiary); font-size: 12px; line-height: 1.6; }
+
+@media (max-width: 640px) {
+  .diagnostic-row { flex-wrap: wrap; }
+  .diagnostic-env { margin-left: 39px; }
+}
