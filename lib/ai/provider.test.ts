@@ -206,3 +206,59 @@ describe("generateStructuredJson", () => {
     expect(calls[0].url).toContain("gemini-2.5-flash:generateContent");
   });
 });
+
+/*
+ * Picking a model out of what the key actually offers.
+ *
+ * Two hard-coded defaults were wrong in two different ways — one carried a
+ * free-tier allowance of zero, the next had been withdrawn from new accounts.
+ * Google changes its catalogue without notice, so the only durable answer is
+ * to read the catalogue.
+ */
+describe("chooseGeminiModel", () => {
+  it("prefers a flash model, because reading a résumé is mechanical", async () => {
+    const { chooseGeminiModel } = await import("./provider");
+    expect(chooseGeminiModel(["gemini-2.5-pro", "gemini-2.5-flash"])).toBe("gemini-2.5-flash");
+  });
+
+  it("prefers the newer version, since the old ones get retired underneath us", async () => {
+    const { chooseGeminiModel } = await import("./provider");
+    expect(chooseGeminiModel(["gemini-1.5-flash", "gemini-2.0-flash", "gemini-3-flash"]))
+      .toBe("gemini-3-flash");
+  });
+
+  it("avoids preview and experimental names, which vanish first", async () => {
+    const { chooseGeminiModel } = await import("./provider");
+    expect(chooseGeminiModel(["gemini-3-flash-preview", "gemini-2.5-flash"])).toBe("gemini-2.5-flash");
+  });
+
+  it("skips models that cannot answer this request at all", async () => {
+    const { chooseGeminiModel } = await import("./provider");
+    expect(chooseGeminiModel(["text-embedding-004", "imagen-3.0", "gemini-2.0-flash"]))
+      .toBe("gemini-2.0-flash");
+  });
+
+  it("returns nothing rather than something unusable", async () => {
+    const { chooseGeminiModel } = await import("./provider");
+    expect(chooseGeminiModel([])).toBeNull();
+    expect(chooseGeminiModel(["text-embedding-004", "veo-2"])).toBeNull();
+  });
+});
+
+describe("isGeminiModelUnavailable", () => {
+  it("recognises both refusals seen from the live deployment", async () => {
+    const { isGeminiModelUnavailable } = await import("./provider");
+    expect(isGeminiModelUnavailable(
+      "Quota exceeded for metric: generate_content_free_tier_requests, limit: 0, model: gemini-2.0-flash",
+    )).toBe(true);
+    expect(isGeminiModelUnavailable(
+      "This model models/gemini-2.5-flash is no longer available to new users.",
+    )).toBe(true);
+  });
+
+  it("does not mistake an empty account or a bad key for a missing model", async () => {
+    const { isGeminiModelUnavailable } = await import("./provider");
+    expect(isGeminiModelUnavailable("API key not valid. Please pass a valid API key.")).toBe(false);
+    expect(isGeminiModelUnavailable("Your credit balance is too low.")).toBe(false);
+  });
+});

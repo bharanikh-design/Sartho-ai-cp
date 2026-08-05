@@ -96,8 +96,34 @@ async function callAnthropic(request: StructuredRequest, apiKey: string) {
  * truncated JSON, and "unexpected end of input" is a useless thing to hand
  * someone who uploaded a long CV.
  */
-async function callGemini(request: StructuredRequest, apiKey: string) {
-  const model = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+async function callGemini(request: StructuredRequest, apiKey: string): Promise<unknown> {
+  /*
+   * No hard-coded model that has to be right.
+   *
+   * Two defaults were guessed and both were wrong in different ways — one had
+   * a free-tier allowance of zero, the next was withdrawn from new accounts.
+   * Google changes what it offers without notice, so when the configured model
+   * is refused for being unavailable rather than for anything about the
+   * request, the key is asked what it may call and the best of those is used.
+   * Set GEMINI_MODEL to pin it and this never runs.
+   */
+  const configured = process.env.GEMINI_MODEL;
+  try {
+    return await callGeminiModel(request, apiKey, configured || DEFAULT_GEMINI_MODEL);
+  } catch (caught) {
+    const message = caught instanceof Error ? caught.message : "";
+    if (configured || !isGeminiModelUnavailable(message)) throw caught;
+
+    const alternative = chooseGeminiModel(await listGeminiModels(apiKey));
+    if (!alternative) throw caught;
+
+    return callGeminiModel(request, apiKey, alternative);
+  }
+}
+
+const DEFAULT_GEMINI_MODEL = "gemini-flash-latest";
+
+async function callGeminiModel(request: StructuredRequest, apiKey: string, model: string) {
   const response = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
     {
@@ -208,6 +234,44 @@ export async function generateStructuredJson(request: StructuredRequest) {
  * different model name, and guessing at model names is what produced the
  * problem in the first place. So the key is asked.
  */
+export function isGeminiModelUnavailable(message: string): boolean {
+  const text = message.toLowerCase();
+  return /limit:\s*0\b/.test(text)
+    || text.includes("no longer available")
+    || text.includes("is not found")
+    || text.includes("not found for api version")
+    || text.includes("is not supported");
+}
+
+/*
+ * Which of the listed models to actually use.
+ *
+ * Preferences, in order: a flash-class model, because reading a résumé is
+ * mechanical and the cheap tier does it; then the highest version number,
+ * because Google retires the old ones out from under you — that is what put us
+ * here twice. Anything specialised is skipped: embeddings, images, speech and
+ * live models cannot answer this request at all, and preview or experimental
+ * names are the ones most likely to vanish next.
+ */
+const UNSUITABLE = /embedding|aqa|image|imagen|vision|tts|audio|live|native|veo|robotics/;
+
+export function chooseGeminiModel(models: string[]): string | null {
+  const usable = models.filter((name) => !UNSUITABLE.test(name));
+  if (!usable.length) return null;
+
+  const score = (name: string) => {
+    const version = Number(/(\d+(?:\.\d+)?)/.exec(name)?.[1] ?? 0);
+    let points = version * 10;
+    if (name.includes("flash")) points += 5;
+    if (name.includes("lite")) points += 1;
+    if (/preview|exp|experimental/.test(name)) points -= 8;
+    if (name.includes("pro")) points -= 2;
+    return points;
+  };
+
+  return usable.slice().sort((a, b) => score(b) - score(a))[0] ?? null;
+}
+
 export async function listGeminiModels(apiKey: string): Promise<string[]> {
   try {
     const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=200", {
@@ -293,9 +357,15 @@ export async function probeProviders(): Promise<ProviderProbe[]> {
          * that one was spent — so the useful next step is a different model,
          * and the key itself can say which are available.
          */
+        /*
+         * The list is fetched for any Gemini failure, not only a zero
+         * allowance. Gating it on "limit: 0" meant the next refusal — a model
+         * withdrawn from new accounts — arrived with no list at all, which is
+         * the moment it was most needed.
+         */
         if (name === "Gemini") {
-          probe.model = process.env.GEMINI_MODEL || "gemini-2.5-flash";
-          if (/limit:\s*0\b/.test(message)) probe.models = await listGeminiModels(key);
+          probe.model = process.env.GEMINI_MODEL || "gemini-flash-latest (auto)";
+          probe.models = await listGeminiModels(key);
         }
         return probe;
       }
