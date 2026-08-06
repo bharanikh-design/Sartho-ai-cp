@@ -1,27 +1,38 @@
 # Start here
 
-The GitHub repository is now the source of truth for Sartho.
+`bharanikh-design/Sartho-ai-cp` is the Codex working repository for Sartho.
+Claude's `bharanikh-design/sartho-ai` repository is retained as the upstream
+reference and must not be used as the Codex push target.
 
 ## First local run
 
+1. Use Node.js 24 LTS.
+2. Install the locked dependency set with `npm ci`.
+3. Copy `.env.example` to `.env.local` and configure Supabase plus at least one
+   server-side AI provider.
+4. Apply the migrations in `supabase/migrations` to the intended Supabase
+   project.
+5. Run `npm run dev` and open `http://localhost:3000`.
+
+## Current baseline
+
+The application includes Supabase authentication, private career evidence,
+job analysis, application tracking, résumé import and drafting, provider
+diagnostics, and Row Level Security migrations. Generated claims must remain
+traceable to approved evidence.
+
+## Before deployment
+
+Run these checks from a clean checkout:
+
 ```bash
-git clone https://github.com/bharanikh-design/sartho-ai.git
-cd sartho-ai
-npm install
-npm run dev
+npm test
+npm run typecheck
+npm run lint
+npm run build
 ```
 
-Open `http://localhost:3000` and test **Analyse a Job** by pasting a complete job description.
-
-## Do not deploy publicly yet
-
-The current Career Truth content is static and the application does not yet have authentication. Create Supabase Auth and verify Row Level Security before connecting Vercel or sharing a deployment URL.
-
-## Next implementation task
-
-Build the Career Truth approval workflow:
-
-- authenticate the user;
-- seed evidence into Supabase;
-- approve, edit or reject every claim;
-- prevent unapproved evidence from being used in generated applications.
+The production build requires the public Supabase URL and publishable key.
+Before sharing a deployment, verify authentication redirects, Row Level
+Security, private storage, migrations, and each configured AI provider against
+the intended production services.
