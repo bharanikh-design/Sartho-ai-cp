@@ -3,7 +3,32 @@ import { NextResponse, type NextRequest } from "next/server";
 
 const PUBLIC_PATHS = new Set(["/login", "/auth/callback"]);
 
+/*
+ * Supabase normally returns an OAuth authorization code to /auth/callback.
+ * If the dashboard redirect allowlist falls back to the site URL, however,
+ * the code can arrive at / or /login instead. Sending that request through
+ * the ordinary auth guard loses the one-time code and makes the user start a
+ * second Google round trip. Recover it before any session lookup and route it
+ * through the same callback handler that performs the PKCE exchange.
+ */
+function recoverOAuthCallback(request: NextRequest) {
+  const pathname = request.nextUrl.pathname;
+  const code = request.nextUrl.searchParams.get("code");
+
+  if (!code || (pathname !== "/" && pathname !== "/login")) return null;
+
+  const callbackUrl = request.nextUrl.clone();
+  callbackUrl.pathname = "/auth/callback";
+  callbackUrl.search = "";
+  callbackUrl.searchParams.set("code", code);
+  callbackUrl.searchParams.set("next", "/");
+  return NextResponse.redirect(callbackUrl);
+}
+
 export async function updateSession(request: NextRequest) {
+  const recoveredCallback = recoverOAuthCallback(request);
+  if (recoveredCallback) return recoveredCallback;
+
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 

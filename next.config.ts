@@ -1,6 +1,11 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  turbopack: {
+    // Keep file tracing inside this application when parent folders contain
+    // unrelated lockfiles.
+    root: process.cwd(),
+  },
   images: {
     /*
      * Next only honours qualities listed here; anything else silently falls

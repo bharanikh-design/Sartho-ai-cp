@@ -32,7 +32,7 @@ Sartho is a private, evidence-led career intelligence and application workflow f
 - Tailwind CSS
 - Supabase PostgreSQL and Auth with Row Level Security
 - Vercel deployment
-- Provider-independent server AI adapter for OpenAI or Anthropic
+- Provider-independent server AI adapter for Gemini, Anthropic or OpenAI
 
 ## Database setup
 
@@ -55,24 +55,31 @@ NEXT_PUBLIC_SUPABASE_URL
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
 ```
 
-Configure one server-side AI provider:
+Configure at least one server-side AI provider. Sartho tries configured
+providers in this order:
 
 ```text
-OPENAI_API_KEY
+GEMINI_API_KEY
 ```
 
-or:
+then:
 
 ```text
 ANTHROPIC_API_KEY
+```
+
+then:
+
+```text
+OPENAI_API_KEY
 ```
 
 Optional model overrides are documented in `.env.example`.
 
 ## Local setup
 
-1. Install Node.js 20.9 or newer.
-2. Run `npm install`.
+1. Install Node.js 24 LTS.
+2. Run `npm ci`.
 3. Copy `.env.example` to `.env.local`.
 4. Run `npm run dev`.
 5. Open `http://localhost:3000`.
@@ -82,6 +89,7 @@ Quality checks:
 ```bash
 npm run typecheck
 npm run lint
+npm test
 npm run build
 ```
 
