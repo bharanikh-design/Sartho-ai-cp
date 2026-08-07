@@ -173,6 +173,7 @@ begin
 end;
 $$;
 
+revoke all on function public.apply_resume_import(uuid, jsonb, jsonb) from public, anon;
 grant execute on function public.apply_resume_import(uuid, jsonb, jsonb) to authenticated;
 
 -- Résumé imports belong to the account and must go when it is wiped.
@@ -193,7 +194,7 @@ begin
 end;
 $$;
 
-revoke all on function public.wipe_my_data() from public;
+revoke all on function public.wipe_my_data() from public, anon;
 grant execute on function public.wipe_my_data() to authenticated;
 
 commit;

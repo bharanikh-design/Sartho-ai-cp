@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { generateStructuredJson } from "@/lib/ai/provider";
+import { createSafetyIdentifier, generateStructuredJson } from "@/lib/ai/provider";
+import { aiQuotaResponse, checkAiQuota } from "@/lib/ai/quota";
 import { getAuthenticatedUser } from "@/lib/auth";
 
 const bulletSchema = z.object({
@@ -101,8 +102,13 @@ export async function POST(
     return NextResponse.json({ error: "No approved résumé-safe evidence is available." }, { status: 400 });
   }
 
+  const quota = await checkAiQuota(supabase, "resume_draft");
+  if (!quota.allowed) return aiQuotaResponse(quota);
+
   try {
     const raw = await generateStructuredJson({
+      workload: "quality",
+      safetyIdentifier: createSafetyIdentifier(user.id),
       schemaName: "sartho_tailored_resume",
       schema: jsonSchema,
       system: [

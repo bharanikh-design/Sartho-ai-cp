@@ -31,7 +31,9 @@ Supabase
 
 ## AI boundary
 
-The AI provider is replaceable. The application should call a provider-independent interface that returns validated structured output. Rule-based checks remain in place for technical heaviness, seniority mismatch and prohibited unsupported claims.
+The AI provider is replaceable but never selected implicitly from available keys. `AI_PROVIDER` names one active data processor for the deployment. OpenAI is the default: Luna handles high-volume extraction and Terra handles quality-critical analysis and drafting. Recovery stays inside that provider; cross-provider disaster recovery requires an explicit operator switch and a new deployment.
+
+Every provider returns the same validated structured-output contract. Prompts and outputs are never written to provider telemetry; only provider, model, workload, latency, outcome and token counts are logged. Rule-based checks remain in place for technical heaviness, seniority mismatch and prohibited unsupported claims.
 
 ## Future components
 

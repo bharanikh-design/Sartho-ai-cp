@@ -287,8 +287,11 @@ begin
 end;
 $$;
 
-revoke all on function public.wipe_my_data() from public;
-revoke all on function public.delete_my_account() from public;
+revoke all on function public.wipe_my_data() from public, anon;
+revoke all on function public.delete_my_account() from public, anon;
+revoke all on function public.set_updated_at() from public, anon, authenticated;
+revoke all on function public.replace_job_requirements(uuid, jsonb, jsonb) from public, anon;
+revoke all on function public.save_resume_draft(uuid, text, text, jsonb, jsonb) from public, anon;
 grant execute on function public.wipe_my_data() to authenticated;
 grant execute on function public.delete_my_account() to authenticated;
 grant execute on function public.replace_job_requirements(uuid, jsonb, jsonb) to authenticated;

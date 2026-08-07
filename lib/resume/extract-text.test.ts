@@ -3,6 +3,7 @@ import {
   detectKind,
   extractResumeText,
   MAX_UPLOAD_BYTES,
+  MAX_RESUME_CHARACTERS,
   MIN_USEFUL_CHARACTERS,
   normaliseWhitespace,
   ResumeExtractionError,
@@ -91,5 +92,19 @@ describe("extractResumeText", () => {
     await expect(
       extractResumeText({ name: "cv.txt", type: "text/plain", bytes: encoder.encode("Hi") }),
     ).rejects.toThrow(/not enough text/);
+  });
+
+  it("refuses extracted text large enough to create an unsafe model request", async () => {
+    const oversized = "Senior technology leader. ".repeat(
+      Math.ceil((MAX_RESUME_CHARACTERS + 1) / 26),
+    );
+
+    await expect(
+      extractResumeText({
+        name: "cv.txt",
+        type: "text/plain",
+        bytes: encoder.encode(oversized),
+      }),
+    ).rejects.toThrow(/too much text/);
   });
 });
