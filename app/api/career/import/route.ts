@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { generateStructuredJson } from "@/lib/ai/provider";
+import { createSafetyIdentifier, generateStructuredJson } from "@/lib/ai/provider";
+import { aiQuotaResponse, checkAiQuota } from "@/lib/ai/quota";
 import { getAuthenticatedUser } from "@/lib/auth";
 import { extractResumeText, ResumeExtractionError } from "@/lib/resume/extract-text";
 import {
@@ -9,6 +10,11 @@ import {
   RESUME_EXTRACTION_SYSTEM,
 } from "@/lib/resume/extraction-schema";
 import { toRows } from "@/lib/resume/normalise";
+import {
+  isOwnedResumeObjectPath,
+  MAX_UPLOAD_BYTES,
+  RESUME_UPLOAD_BUCKET,
+} from "@/lib/resume/upload";
 
 /*
  * Résumé import — the way career evidence enters Sartho.
@@ -77,38 +83,69 @@ type Progress =
 /* Enough of the document to show it being read, not enough to be the document. */
 const SAMPLE_CHARACTERS = 4000;
 
+const uploadRequestSchema = z.object({
+  objectPath: z.string().min(1).max(500),
+  fileName: z.string().min(1).max(255),
+  mimeType: z.string().max(255).nullable(),
+  byteSize: z.number().int().positive().max(MAX_UPLOAD_BYTES),
+});
+
 export async function POST(request: Request) {
   const { supabase, user } = await getAuthenticatedUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  let file: File | null = null;
+  let payload: z.infer<typeof uploadRequestSchema>;
   try {
-    const form = await request.formData();
-    const candidate = form.get("file");
-    if (candidate instanceof File) file = candidate;
+    payload = uploadRequestSchema.parse(await request.json());
   } catch {
-    return NextResponse.json({ error: "That upload could not be read." }, { status: 400 });
+    return NextResponse.json({ error: "That résumé upload is not valid." }, { status: 400 });
   }
-  if (!file) return NextResponse.json({ error: "Choose a résumé file to upload." }, { status: 400 });
+
+  if (!isOwnedResumeObjectPath(payload.objectPath, user.id)) {
+    return NextResponse.json({ error: "That résumé upload is not available." }, { status: 403 });
+  }
 
   let text: string;
+  let actualByteSize = 0;
+  let actualMimeType = payload.mimeType;
   try {
-    const bytes = new Uint8Array(await file.arrayBuffer());
-    ({ text } = await extractResumeText({ name: file.name, type: file.type || null, bytes }));
+    const { data: storedFile, error: downloadError } = await supabase.storage
+      .from(RESUME_UPLOAD_BUCKET)
+      .download(payload.objectPath);
+    if (downloadError || !storedFile) {
+      return NextResponse.json({ error: "That résumé upload could not be read." }, { status: 400 });
+    }
+
+    actualByteSize = storedFile.size;
+    actualMimeType = storedFile.type || payload.mimeType;
+    const bytes = new Uint8Array(await storedFile.arrayBuffer());
+    ({ text } = await extractResumeText({ name: payload.fileName, type: actualMimeType, bytes }));
   } catch (caught) {
     const message = caught instanceof ResumeExtractionError
       ? caught.message
       : "Sartho could not read that file.";
     return NextResponse.json({ error: message }, { status: 400 });
+  } finally {
+    // Original bytes are transient. The extracted text is the repository
+    // record; retention for that record is handled separately.
+    try {
+      await supabase.storage.from(RESUME_UPLOAD_BUCKET).remove([payload.objectPath]);
+    } catch {
+      // Cleanup is retried by the browser. Do not replace the real extraction
+      // result with a storage transport error.
+    }
   }
+
+  const quota = await checkAiQuota(supabase, "resume_import");
+  if (!quota.allowed) return aiQuotaResponse(quota);
 
   const { data: importRow, error: importError } = await supabase
     .from("resume_imports")
     .insert({
       user_id: user.id,
-      file_name: file.name,
-      mime_type: file.type || null,
-      byte_size: file.size,
+      file_name: payload.fileName,
+      mime_type: actualMimeType,
+      byte_size: actualByteSize,
       status: "processing",
       // Kept, not consumed. A résumé that can only be read once is a log entry.
       extracted_text: text,
@@ -132,7 +169,7 @@ export async function POST(request: Request) {
    */
   const userId = user.id;
   const importId = importRow.id;
-  const sourceName = file.name;
+  const sourceName = payload.fileName;
   const resumeText = text;
 
   const run = async (send: (event: Progress) => void) => {
@@ -140,6 +177,8 @@ export async function POST(request: Request) {
     send({ stage: "reading" });
 
     const raw = await generateStructuredJson({
+      workload: "fast",
+      safetyIdentifier: createSafetyIdentifier(userId),
       schemaName: RESUME_EXTRACTION_SCHEMA_NAME,
       schema: RESUME_EXTRACTION_SCHEMA,
       system: RESUME_EXTRACTION_SYSTEM,

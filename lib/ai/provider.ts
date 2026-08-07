@@ -1,11 +1,117 @@
-import { describeProviderFailures, shortAiFailure } from "./failure";
+import { createHash } from "node:crypto";
+import { classifyAiFailure, describeAiFailure, shortAiFailure } from "./failure";
+
+export type AiWorkload = "fast" | "quality";
+export type AiProviderName = "openai" | "gemini" | "anthropic";
 
 type StructuredRequest = {
+  workload: AiWorkload;
+  safetyIdentifier?: string;
   system: string;
   prompt: string;
   schemaName: string;
   schema: Record<string, unknown>;
 };
+
+type ProviderRoute = {
+  provider: AiProviderName;
+  key: string;
+  primaryModel: string;
+  fallbackModel: string | null;
+};
+
+type RetryKind = "transient" | "model_unavailable" | "terminal";
+
+class ProviderRequestError extends Error {
+  constructor(
+    message: string,
+    readonly retryKind: RetryKind,
+    readonly status?: number,
+  ) {
+    super(message);
+  }
+}
+
+const PROVIDER_NAMES: AiProviderName[] = ["openai", "gemini", "anthropic"];
+
+export function createSafetyIdentifier(userId: string) {
+  return createHash("sha256").update(`sartho:${userId}`).digest("hex");
+}
+
+export function getSelectedProvider(): AiProviderName {
+  const configured = (process.env.AI_PROVIDER || "openai").trim().toLowerCase();
+  if (!PROVIDER_NAMES.includes(configured as AiProviderName)) {
+    throw new Error("AI_PROVIDER must be openai, gemini or anthropic.");
+  }
+  return configured as AiProviderName;
+}
+
+function requiredKey(value: string | undefined, provider: string, envVar: string) {
+  if (!value) {
+    throw new Error(`${provider} is selected but ${envVar} is not configured.`);
+  }
+  return value;
+}
+
+export function getProviderRoute(workload: AiWorkload): ProviderRoute {
+  const provider = getSelectedProvider();
+
+  if (provider === "openai") {
+    const legacyModel = process.env.OPENAI_MODEL?.trim();
+    const primaryModel = legacyModel || (workload === "fast"
+      ? process.env.OPENAI_FAST_MODEL || "gpt-5.6-luna"
+      : process.env.OPENAI_QUALITY_MODEL || "gpt-5.6-terra");
+    const fallbackModel = process.env.OPENAI_FALLBACK_MODEL?.trim()
+      || (legacyModel ? null : workload === "fast" ? "gpt-5.6-terra" : "gpt-5.6-sol");
+
+    return {
+      provider,
+      key: requiredKey(process.env.OPENAI_API_KEY, "OpenAI", "OPENAI_API_KEY"),
+      primaryModel,
+      fallbackModel: fallbackModel === primaryModel ? null : fallbackModel,
+    };
+  }
+
+  if (provider === "gemini") {
+    if (process.env.GEMINI_DATA_TIER?.trim().toLowerCase() !== "paid") {
+      throw new Error(
+        "Gemini is disabled for résumé data until GEMINI_DATA_TIER=paid confirms paid-service data handling.",
+      );
+    }
+
+    const legacyModel = process.env.GEMINI_MODEL?.trim();
+    const primaryModel = legacyModel || (workload === "fast"
+      ? process.env.GEMINI_FAST_MODEL || "gemini-3.5-flash-lite"
+      : process.env.GEMINI_QUALITY_MODEL || "gemini-3.6-flash");
+    const fallbackModel = process.env.GEMINI_FALLBACK_MODEL?.trim()
+      || (legacyModel ? null : workload === "fast" ? "gemini-3.6-flash" : null);
+
+    return {
+      provider,
+      key: requiredKey(
+        process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY,
+        "Gemini",
+        "GEMINI_API_KEY",
+      ),
+      primaryModel,
+      fallbackModel: fallbackModel === primaryModel ? null : fallbackModel,
+    };
+  }
+
+  const legacyModel = process.env.ANTHROPIC_MODEL?.trim();
+  const primaryModel = legacyModel || (workload === "fast"
+    ? process.env.ANTHROPIC_FAST_MODEL || "claude-haiku-4-5"
+    : process.env.ANTHROPIC_QUALITY_MODEL || "claude-sonnet-5");
+  const fallbackModel = process.env.ANTHROPIC_FALLBACK_MODEL?.trim()
+    || (legacyModel ? null : workload === "fast" ? "claude-sonnet-5" : null);
+
+  return {
+    provider,
+    key: requiredKey(process.env.ANTHROPIC_API_KEY, "Anthropic", "ANTHROPIC_API_KEY"),
+    primaryModel,
+    fallbackModel: fallbackModel === primaryModel ? null : fallbackModel,
+  };
+}
 
 function extractJson(text: string) {
   const trimmed = text.trim();
@@ -16,127 +122,191 @@ function extractJson(text: string) {
   return trimmed.slice(first, last + 1);
 }
 
-async function callOpenAI(request: StructuredRequest, apiKey: string) {
-  const response = await fetch("https://api.openai.com/v1/responses", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: process.env.OPENAI_MODEL || "gpt-5",
-      store: false,
-      input: [
-        { role: "system", content: [{ type: "input_text", text: request.system }] },
-        { role: "user", content: [{ type: "input_text", text: request.prompt }] },
-      ],
-      text: {
-        format: {
-          type: "json_schema",
-          name: request.schemaName,
-          strict: true,
-          schema: request.schema,
-        },
-      },
-    }),
-    signal: AbortSignal.timeout(90_000),
-  });
+function failureKind(status: number, message: string): RetryKind {
+  // Some providers report an exhausted billing balance with HTTP 429. That is
+  // not a temporary rate limit, and retrying it only makes the user wait for a
+  // second request that cannot succeed.
+  const classified = classifyAiFailure(message);
+  if (classified === "credit" || classified === "auth") return "terminal";
+  if (status === 404 || isGeminiModelUnavailable(message) || /model.+(not found|unavailable|retired|deprecated)/i.test(message)) {
+    return "model_unavailable";
+  }
+  if (status === 408 || status === 409 || status === 429 || status >= 500) return "transient";
+  return "terminal";
+}
 
-  const result = await response.json() as {
+function logAttempt(details: {
+  provider: AiProviderName;
+  model: string;
+  workload: AiWorkload;
+  latencyMs: number;
+  outcome: "success" | "failed";
+  inputTokens?: number;
+  outputTokens?: number;
+  status?: number;
+}) {
+  if (process.env.NODE_ENV === "test") return;
+  // Operational metadata only. Prompts, outputs, filenames and user identity
+  // are deliberately excluded from logs.
+  console.info("ai_provider_call", JSON.stringify(details));
+}
+
+async function fetchProvider(
+  provider: AiProviderName,
+  model: string,
+  workload: AiWorkload,
+  url: string,
+  init: RequestInit,
+) {
+  const startedAt = Date.now();
+  let response: Response;
+  try {
+    response = await fetch(url, init);
+  } catch (caught) {
+    logAttempt({ provider, model, workload, latencyMs: Date.now() - startedAt, outcome: "failed" });
+    const message = caught instanceof Error ? caught.message : `${provider} request failed.`;
+    throw new ProviderRequestError(message, "transient");
+  }
+
+  let result: unknown;
+  try {
+    result = await response.json();
+  } catch {
+    logAttempt({
+      provider,
+      model,
+      workload,
+      latencyMs: Date.now() - startedAt,
+      outcome: "failed",
+      status: response.status,
+    });
+    throw new ProviderRequestError(
+      `${provider} returned an unreadable response.`,
+      response.status >= 500 ? "transient" : "terminal",
+      response.status,
+    );
+  }
+
+  return { response, result, startedAt };
+}
+
+async function callOpenAI(request: StructuredRequest, apiKey: string, model: string) {
+  const { response, result: unknownResult, startedAt } = await fetchProvider(
+    "openai",
+    model,
+    request.workload,
+    "https://api.openai.com/v1/responses",
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        store: false,
+        ...(request.safetyIdentifier ? { safety_identifier: request.safetyIdentifier } : {}),
+        reasoning: { effort: request.workload === "fast" ? "none" : "medium" },
+        input: [
+          { role: "system", content: [{ type: "input_text", text: request.system }] },
+          { role: "user", content: [{ type: "input_text", text: request.prompt }] },
+        ],
+        text: {
+          format: {
+            type: "json_schema",
+            name: request.schemaName,
+            strict: true,
+            schema: request.schema,
+          },
+        },
+      }),
+      signal: AbortSignal.timeout(90_000),
+    },
+  );
+
+  const result = unknownResult as {
     error?: { message?: string };
     output?: Array<{ content?: Array<{ type?: string; text?: string }> }>;
+    usage?: { input_tokens?: number; output_tokens?: number };
   };
-  if (!response.ok) throw new Error(result.error?.message ?? "OpenAI request failed.");
+  if (!response.ok) {
+    const message = result.error?.message ?? "OpenAI request failed.";
+    logAttempt({
+      provider: "openai", model, workload: request.workload,
+      latencyMs: Date.now() - startedAt, outcome: "failed", status: response.status,
+    });
+    throw new ProviderRequestError(message, failureKind(response.status, message), response.status);
+  }
 
   const text = result.output
     ?.flatMap((item) => item.content ?? [])
     .find((item) => item.type === "output_text")
     ?.text;
-  if (!text) throw new Error("OpenAI returned no structured output.");
+  if (!text) throw new ProviderRequestError("OpenAI returned no structured output.", "terminal");
+
+  logAttempt({
+    provider: "openai", model, workload: request.workload,
+    latencyMs: Date.now() - startedAt, outcome: "success",
+    inputTokens: result.usage?.input_tokens, outputTokens: result.usage?.output_tokens,
+  });
   return JSON.parse(extractJson(text)) as unknown;
 }
 
-async function callAnthropic(request: StructuredRequest, apiKey: string) {
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-      "content-type": "application/json",
+async function callAnthropic(request: StructuredRequest, apiKey: string, model: string) {
+  const { response, result: unknownResult, startedAt } = await fetchProvider(
+    "anthropic",
+    model,
+    request.workload,
+    "https://api.anthropic.com/v1/messages",
+    {
+      method: "POST",
+      headers: {
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: 7000,
+        // Sonnet 5 rejects non-default sampling parameters. The schema remains
+        // in the instruction and is still validated by the caller's Zod parser.
+        system: `${request.system}\nReturn only one JSON object matching this JSON Schema:\n${JSON.stringify(request.schema)}`,
+        messages: [{ role: "user", content: request.prompt }],
+      }),
+      signal: AbortSignal.timeout(90_000),
     },
-    body: JSON.stringify({
-      // Overridable with ANTHROPIC_MODEL; the default tracks the current family.
-      model: process.env.ANTHROPIC_MODEL || "claude-sonnet-5",
-      max_tokens: 7000,
-      temperature: 0,
-      system: `${request.system}\nReturn only one JSON object matching this JSON Schema:\n${JSON.stringify(request.schema)}`,
-      messages: [{ role: "user", content: request.prompt }],
-    }),
-    signal: AbortSignal.timeout(90_000),
-  });
+  );
 
-  const result = await response.json() as {
+  const result = unknownResult as {
     error?: { message?: string };
     content?: Array<{ type?: string; text?: string }>;
+    usage?: { input_tokens?: number; output_tokens?: number };
   };
-  if (!response.ok) throw new Error(result.error?.message ?? "Anthropic request failed.");
+  if (!response.ok) {
+    const message = result.error?.message ?? "Anthropic request failed.";
+    logAttempt({
+      provider: "anthropic", model, workload: request.workload,
+      latencyMs: Date.now() - startedAt, outcome: "failed", status: response.status,
+    });
+    throw new ProviderRequestError(message, failureKind(response.status, message), response.status);
+  }
+
   const text = result.content?.find((item) => item.type === "text")?.text;
-  if (!text) throw new Error("Anthropic returned no structured output.");
+  if (!text) throw new ProviderRequestError("Anthropic returned no structured output.", "terminal");
+
+  logAttempt({
+    provider: "anthropic", model, workload: request.workload,
+    latencyMs: Date.now() - startedAt, outcome: "success",
+    inputTokens: result.usage?.input_tokens, outputTokens: result.usage?.output_tokens,
+  });
   return JSON.parse(extractJson(text)) as unknown;
 }
 
-/*
- * Gemini, on Google's free tier.
- *
- * Asked for JSON the same way Anthropic is: the schema goes in the instruction
- * as text, the reply comes back as JSON, and zod decides whether it is
- * acceptable. Gemini's responseSchema was used here at first and cost a day —
- * it speaks an OpenAPI subset rather than JSON Schema, and each difference
- * surfaced as its own separate production failure, one round trip apart:
- * additionalProperties rejected, then nullable unions, then propertyOrdering,
- * then an "invalid argument" naming no argument.
- *
- * None of it was buying anything. The response is parsed and validated against
- * the same zod schema whichever provider answered, so responseSchema was a
- * second, dialect-specific copy of a guarantee already enforced one layer up —
- * and the only thing it reliably produced was a new way to fail. One code path
- * for all three providers now, and no translation layer to keep correct.
- *
- * The key goes in a header rather than the query string so it never lands in a
- * URL, a log line or a referrer, and the finish reason is checked before the
- * body is parsed: a reply cut short at the token ceiling is truncated JSON, and
- * "unexpected end of input" is a useless thing to hand someone who uploaded a
- * long CV.
- */
-async function callGemini(request: StructuredRequest, apiKey: string): Promise<unknown> {
-  /*
-   * No hard-coded model that has to be right.
-   *
-   * Two defaults were guessed and both were wrong in different ways — one had
-   * a free-tier allowance of zero, the next was withdrawn from new accounts.
-   * Google changes what it offers without notice, so when the configured model
-   * is refused for being unavailable rather than for anything about the
-   * request, the key is asked what it may call and the best of those is used.
-   * Set GEMINI_MODEL to pin it and this never runs.
-   */
-  const configured = process.env.GEMINI_MODEL;
-  try {
-    return await callGeminiModel(request, apiKey, configured || DEFAULT_GEMINI_MODEL);
-  } catch (caught) {
-    const message = caught instanceof Error ? caught.message : "";
-    if (configured || !isGeminiModelUnavailable(message)) throw caught;
-
-    const alternative = chooseGeminiModel(await listGeminiModels(apiKey));
-    if (!alternative) throw caught;
-
-    return callGeminiModel(request, apiKey, alternative);
-  }
-}
-
-const DEFAULT_GEMINI_MODEL = "gemini-flash-latest";
-
-async function callGeminiModel(request: StructuredRequest, apiKey: string, model: string) {
-  const response = await fetch(
+async function callGemini(request: StructuredRequest, apiKey: string, model: string) {
+  const { response, result: unknownResult, startedAt } = await fetchProvider(
+    "gemini",
+    model,
+    request.workload,
     `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
     {
       method: "POST",
@@ -149,12 +319,6 @@ async function callGeminiModel(request: StructuredRequest, apiKey: string, model
         },
         contents: [{ role: "user", parts: [{ text: request.prompt }] }],
         generationConfig: {
-          temperature: 0,
-          /*
-           * 8192 is accepted by every current flash model; larger values are
-           * rejected outright by some, and a rejection is worse than a
-           * truncation we already detect and name.
-           */
           maxOutputTokens: 8_192,
           responseMimeType: "application/json",
         },
@@ -163,140 +327,100 @@ async function callGeminiModel(request: StructuredRequest, apiKey: string, model
     },
   );
 
-  const result = await response.json() as {
+  const result = unknownResult as {
     error?: {
       message?: string;
-      status?: string;
       details?: Array<{ fieldViolations?: Array<{ field?: string; description?: string }> }>;
     };
     candidates?: Array<{ finishReason?: string; content?: { parts?: Array<{ text?: string }> } }>;
+    usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number };
   };
 
-  /*
-   * Google's summary line is often useless on its own — "Request contains an
-   * invalid argument" says nothing about which argument. The field violations
-   * underneath it name the field, and throwing those away is how a five-minute
-   * fix becomes an afternoon of guessing. Both are kept.
-   */
   if (!response.ok) {
     const violations = (result.error?.details ?? [])
       .flatMap((entry) => entry.fieldViolations ?? [])
       .map((violation) => [violation.field, violation.description].filter(Boolean).join(": "))
       .filter((line) => line.length > 0);
-
-    throw new Error(
-      [`${result.error?.message ?? "Gemini request failed."} (model: ${model})`, ...violations].join(" — "),
-    );
+    const message = [`${result.error?.message ?? "Gemini request failed."} (model: ${model})`, ...violations].join(" — ");
+    logAttempt({
+      provider: "gemini", model, workload: request.workload,
+      latencyMs: Date.now() - startedAt, outcome: "failed", status: response.status,
+    });
+    throw new ProviderRequestError(message, failureKind(response.status, message), response.status);
   }
 
   const candidate = result.candidates?.[0];
   if (candidate?.finishReason === "MAX_TOKENS") {
-    throw new Error("The document produced more detail than one reply can hold. Try a shorter résumé.");
+    throw new ProviderRequestError(
+      "The document produced more detail than one reply can hold. Try a shorter résumé.",
+      "terminal",
+    );
   }
   if (candidate?.finishReason === "SAFETY" || candidate?.finishReason === "PROHIBITED_CONTENT") {
-    throw new Error("The provider declined to process that document.");
+    throw new ProviderRequestError("The provider declined to process that document.", "terminal");
   }
 
   const text = candidate?.content?.parts?.map((part) => part.text ?? "").join("");
-  if (!text) throw new Error("Gemini returned no structured output.");
+  if (!text) throw new ProviderRequestError("Gemini returned no structured output.", "terminal");
+
+  logAttempt({
+    provider: "gemini", model, workload: request.workload,
+    latencyMs: Date.now() - startedAt, outcome: "success",
+    inputTokens: result.usageMetadata?.promptTokenCount,
+    outputTokens: result.usageMetadata?.candidatesTokenCount,
+  });
   return JSON.parse(extractJson(text)) as unknown;
 }
 
-/*
- * Three providers, tried in order — not one provider and a spare that never gets
- * used.
- *
- * This previously picked Anthropic only when OPENAI_API_KEY was *absent*, which
- * is the one case that almost never happens. The case that does happen is a key
- * that is present and an account behind it that has run out of credit: every
- * import then failed at the model call with a billing error, while a perfectly
- * good second key sat in the environment untouched. A configured provider that
- * cannot be reached is not a configured provider, so a failure moves on to the
- * next one and every failure is reported.
- *
- * Gemini leads because it is the one with a free tier — a deployment that sets
- * all three should exhaust what costs nothing before it starts spending. The
- * order is cheapest-first, not best-first, and every provider is held to the
- * same schema, so which one answered is not visible in the result.
- */
-export async function generateStructuredJson(request: StructuredRequest) {
-  const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
-  const anthropicKey = process.env.ANTHROPIC_API_KEY;
-  const openAIKey = process.env.OPENAI_API_KEY;
-
-  const providers: Array<{ name: string; run: () => Promise<unknown> }> = [];
-  if (geminiKey) providers.push({ name: "Gemini", run: () => callGemini(request, geminiKey) });
-  if (anthropicKey) providers.push({ name: "Anthropic", run: () => callAnthropic(request, anthropicKey) });
-  if (openAIKey) providers.push({ name: "OpenAI", run: () => callOpenAI(request, openAIKey) });
-
-  if (!providers.length) {
-    throw new Error("No server-side AI provider is configured. Add GEMINI_API_KEY, ANTHROPIC_API_KEY or OPENAI_API_KEY in Vercel.");
-  }
-
-  /*
-   * Every failure is kept, not just the last one. Which providers were tried is
-   * as much of the answer as why they failed — a message naming only the final
-   * provider cannot say whether the one ahead of it was even configured.
-   */
-  const failures: Array<{ provider: string; message: string }> = [];
-  for (const provider of providers) {
-    try {
-      return await provider.run();
-    } catch (caught) {
-      failures.push({
-        provider: provider.name,
-        message: caught instanceof Error ? caught.message : "failed for an unknown reason",
-      });
-    }
-  }
-
-  throw new Error(describeProviderFailures(failures));
+function callRoute(request: StructuredRequest, route: ProviderRoute, model: string) {
+  if (route.provider === "openai") return callOpenAI(request, route.key, model);
+  if (route.provider === "gemini") return callGemini(request, route.key, model);
+  return callAnthropic(request, route.key, model);
 }
 
 /*
- * Which providers are configured, and does each one actually answer.
- *
- * Built after an afternoon of not being able to tell the difference between a
- * key that was never read, a key that was rejected, and an account with no
- * money in it — all three of which surface to someone uploading a CV as the
- * same failed import. Guessing at that from the outside is what turns a
- * five-minute fix into a day.
- *
- * The probe sends the smallest request each provider will accept. It never
- * returns a key, or any part of one.
+ * One selected data processor, with at most one bounded recovery attempt.
+ * A transient failure retries the same model once. A retired or unavailable
+ * model moves to the configured fallback inside the same provider. No résumé
+ * or job data crosses company boundaries without an operator changing
+ * AI_PROVIDER for the whole deployment.
  */
-/*
- * The models this key may actually call.
- *
- * A quota error naming "limit: 0" for one model is not an exhausted account —
- * it is an account that was never given an allowance for that model, usually
- * because Google has moved the free tier on to a newer one. The fix is a
- * different model name, and guessing at model names is what produced the
- * problem in the first place. So the key is asked.
- */
+export async function generateStructuredJson(request: StructuredRequest) {
+  const route = getProviderRoute(request.workload);
+  try {
+    return await callRoute(request, route, route.primaryModel);
+  } catch (caught) {
+    if (!(caught instanceof ProviderRequestError)) throw caught;
+
+    try {
+      if (caught.retryKind === "transient") {
+        return await callRoute(request, route, route.primaryModel);
+      }
+      if (caught.retryKind === "model_unavailable" && route.fallbackModel) {
+        return await callRoute(request, route, route.fallbackModel);
+      }
+    } catch (retryFailure) {
+      if (retryFailure instanceof Error) throw new Error(describeAiFailure(retryFailure.message));
+      throw retryFailure;
+    }
+
+    throw new Error(describeAiFailure(caught.message));
+  }
+}
+
 export function isGeminiModelUnavailable(message: string): boolean {
   const text = message.toLowerCase();
   return /limit:\s*0\b/.test(text)
     || text.includes("no longer available")
-    || text.includes("is not found")
-    || text.includes("not found for api version")
-    || text.includes("is not supported");
+    || text.includes("model not found")
+    || text.includes("model is not found");
 }
 
-/*
- * Which of the listed models to actually use.
- *
- * Preferences, in order: a flash-class model, because reading a résumé is
- * mechanical and the cheap tier does it; then the highest version number,
- * because Google retires the old ones out from under you — that is what put us
- * here twice. Anything specialised is skipped: embeddings, images, speech and
- * live models cannot answer this request at all, and preview or experimental
- * names are the ones most likely to vanish next.
- */
-const UNSUITABLE = /embedding|aqa|image|imagen|vision|tts|audio|live|native|veo|robotics/;
-
 export function chooseGeminiModel(models: string[]): string | null {
-  const usable = models.filter((name) => !UNSUITABLE.test(name));
+  const usable = models.filter((name) =>
+    name.startsWith("gemini-")
+    && !/embedding|imagen|veo|tts|live|image/.test(name),
+  );
   if (!usable.length) return null;
 
   const score = (name: string) => {
@@ -323,7 +447,6 @@ export async function listGeminiModels(apiKey: string): Promise<string[]> {
     const body = await response.json() as {
       models?: Array<{ name?: string; supportedGenerationMethods?: string[] }>;
     };
-
     return (body.models ?? [])
       .filter((model) => model.supportedGenerationMethods?.includes("generateContent"))
       .map((model) => (model.name ?? "").replace(/^models\//, ""))
@@ -337,22 +460,12 @@ export async function listGeminiModels(apiKey: string): Promise<string[]> {
 export type ProviderProbe = {
   name: string;
   envVar: string;
+  selected: boolean;
   configured: boolean;
   reachable: boolean | null;
   detail: string;
-  /* Set only when the provider can say which models the key may call. */
   models?: string[];
-  /* The model this deployment is configured to use. */
   model?: string;
-  /*
-   * The provider's own words, kept alongside the summary.
-   *
-   * "no credit left" is the right thing to tell someone uploading a CV and the
-   * wrong thing to tell whoever has to fix it: an account that is empty, a
-   * project without billing enabled and a region the free tier does not cover
-   * all summarise to the same three words, and only the raw text says which.
-   * This page is read by the person holding the keys, so it gets both.
-   */
   raw: string | null;
 };
 
@@ -364,51 +477,81 @@ const PROBE_SCHEMA = {
 };
 
 export async function probeProviders(): Promise<ProviderProbe[]> {
-  const configured = [
-    { name: "Gemini", envVar: "GEMINI_API_KEY", key: process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY, call: callGemini },
-    { name: "Anthropic", envVar: "ANTHROPIC_API_KEY", key: process.env.ANTHROPIC_API_KEY, call: callAnthropic },
-    { name: "OpenAI", envVar: "OPENAI_API_KEY", key: process.env.OPENAI_API_KEY, call: callOpenAI },
-  ];
-
+  const selected = getSelectedProvider();
   const request: StructuredRequest = {
+    workload: "fast",
     schemaName: "sartho_provider_probe",
     system: "Reply with the JSON object {\"ok\": true} and nothing else.",
     prompt: "ok",
     schema: PROBE_SCHEMA,
   };
 
-  return Promise.all(
-    configured.map(async ({ name, envVar, key, call }): Promise<ProviderProbe> => {
-      if (!key) {
-        return { name, envVar, configured: false, reachable: null, detail: `${envVar} is not set on this deployment`, raw: null };
-      }
-      try {
-        await call(request, key);
-        return { name, envVar, configured: true, reachable: true, detail: "answered", raw: null };
-      } catch (caught) {
-        const message = caught instanceof Error ? caught.message : "failed";
-        const probe: ProviderProbe = {
-          name, envVar, configured: true, reachable: false,
-          detail: shortAiFailure(message), raw: message,
-        };
+  const configured = [
+    {
+      id: "gemini" as const,
+      name: "Gemini",
+      envVar: "GEMINI_API_KEY",
+      key: process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY,
+      model: process.env.GEMINI_MODEL || process.env.GEMINI_FAST_MODEL || "gemini-3.5-flash-lite",
+    },
+    {
+      id: "anthropic" as const,
+      name: "Anthropic",
+      envVar: "ANTHROPIC_API_KEY",
+      key: process.env.ANTHROPIC_API_KEY,
+      model: process.env.ANTHROPIC_MODEL || process.env.ANTHROPIC_FAST_MODEL || "claude-haiku-4-5",
+    },
+    {
+      id: "openai" as const,
+      name: "OpenAI",
+      envVar: "OPENAI_API_KEY",
+      key: process.env.OPENAI_API_KEY,
+      model: process.env.OPENAI_MODEL || process.env.OPENAI_FAST_MODEL || "gpt-5.6-luna",
+    },
+  ];
 
-        /*
-         * "limit: 0" means no allowance was ever granted for this model, not
-         * that one was spent — so the useful next step is a different model,
-         * and the key itself can say which are available.
-         */
-        /*
-         * The list is fetched for any Gemini failure, not only a zero
-         * allowance. Gating it on "limit: 0" meant the next refusal — a model
-         * withdrawn from new accounts — arrived with no list at all, which is
-         * the moment it was most needed.
-         */
-        if (name === "Gemini") {
-          probe.model = process.env.GEMINI_MODEL || "gemini-flash-latest (auto)";
-          probe.models = await listGeminiModels(key);
-        }
-        return probe;
-      }
-    }),
-  );
+  return Promise.all(configured.map(async (provider): Promise<ProviderProbe> => {
+    const isSelected = provider.id === selected;
+    if (!provider.key) {
+      return {
+        name: provider.name, envVar: provider.envVar, selected: isSelected,
+        configured: false, reachable: null, model: provider.model,
+        detail: `${provider.envVar} is not set on this deployment`, raw: null,
+      };
+    }
+    if (!isSelected) {
+      return {
+        name: provider.name, envVar: provider.envVar, selected: false,
+        configured: true, reachable: null, model: provider.model,
+        detail: "standby configured; not probed", raw: null,
+      };
+    }
+    if (provider.id === "gemini" && process.env.GEMINI_DATA_TIER?.toLowerCase() !== "paid") {
+      return {
+        name: provider.name, envVar: provider.envVar, selected: isSelected,
+        configured: true, reachable: false, model: provider.model,
+        detail: "disabled until GEMINI_DATA_TIER=paid confirms paid-service data handling",
+        raw: null,
+      };
+    }
+
+    try {
+      if (provider.id === "gemini") await callGemini(request, provider.key, provider.model);
+      else if (provider.id === "anthropic") await callAnthropic(request, provider.key, provider.model);
+      else await callOpenAI(request, provider.key, provider.model);
+      return {
+        name: provider.name, envVar: provider.envVar, selected: isSelected,
+        configured: true, reachable: true, model: provider.model, detail: "answered", raw: null,
+      };
+    } catch (caught) {
+      const message = caught instanceof Error ? caught.message : "failed";
+      const probe: ProviderProbe = {
+        name: provider.name, envVar: provider.envVar, selected: isSelected,
+        configured: true, reachable: false, model: provider.model,
+        detail: shortAiFailure(message), raw: message,
+      };
+      if (provider.id === "gemini") probe.models = await listGeminiModels(provider.key);
+      return probe;
+    }
+  }));
 }

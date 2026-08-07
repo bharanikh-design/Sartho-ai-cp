@@ -6,7 +6,13 @@
  * without an HTTP request, a session or a model behind it.
  */
 
-export const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
+import {
+  detectKind,
+  MAX_UPLOAD_BYTES,
+  type SupportedKind,
+} from "@/lib/resume/upload";
+
+export { detectKind, MAX_UPLOAD_BYTES, type SupportedKind } from "@/lib/resume/upload";
 
 /*
  * A résumé that extracts to almost nothing is nearly always a scan — a photo
@@ -16,26 +22,16 @@ export const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
  */
 export const MIN_USEFUL_CHARACTERS = 400;
 
-export type SupportedKind = "pdf" | "docx" | "text";
+/*
+ * File size is not a useful proxy for model cost: a small compressed DOCX can
+ * expand into millions of characters. A genuine résumé fits comfortably under
+ * this ceiling; rejecting larger extracted documents prevents accidental huge
+ * prompts and predictable provider context failures.
+ */
+export const MAX_RESUME_CHARACTERS = 120_000;
 
 export class ResumeExtractionError extends Error {
   readonly userFacing = true;
-}
-
-export function detectKind(fileName: string, mimeType: string | null): SupportedKind | null {
-  const name = fileName.toLowerCase();
-  const type = (mimeType ?? "").toLowerCase();
-
-  if (type === "application/pdf" || name.endsWith(".pdf")) return "pdf";
-  if (
-    type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
-    name.endsWith(".docx")
-  ) {
-    return "docx";
-  }
-  if (type.startsWith("text/") || name.endsWith(".txt") || name.endsWith(".md")) return "text";
-
-  return null;
 }
 
 /*
@@ -104,6 +100,12 @@ export async function extractResumeText(
       kind === "pdf"
         ? "That PDF has almost no readable text — it looks like a scan or an image. Please upload a text-based PDF or a Word file."
         : "There is not enough text in that file to read as a résumé.",
+    );
+  }
+
+  if (text.length > MAX_RESUME_CHARACTERS) {
+    throw new ResumeExtractionError(
+      "That document contains too much text to process safely as a résumé. Please upload a shorter résumé under 120,000 characters.",
     );
   }
 

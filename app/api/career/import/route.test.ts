@@ -5,8 +5,8 @@ import { readProgressEvents, type ImportEvent } from "@/lib/resume/progress-stre
  * The import route, run for real.
  *
  * Only the two things this sandbox genuinely cannot reach are replaced — the
- * database and the model. Everything between them is the shipping code: the
- * multipart parse, the text extraction, the normalisation, the streaming
+ * database, object storage and the model. Everything between them is the
+ * shipping code: the storage-reference validation, text extraction, normalisation, the streaming
  * response, and then the client's own parser reading that stream back. That
  * seam — server writes ndjson, client reassembles it off arbitrary chunk
  * boundaries — is the part no unit test on either side would have caught, and
@@ -17,6 +17,7 @@ const generateStructuredJson = vi.fn();
 const getAuthenticatedUser = vi.fn();
 
 vi.mock("@/lib/ai/provider", () => ({
+  createSafetyIdentifier: (userId: string) => `test-safety-${userId}`,
   generateStructuredJson: (...args: unknown[]) => generateStructuredJson(...args),
 }));
 vi.mock("@/lib/auth", () => ({
@@ -68,9 +69,22 @@ const RESUME = [
   "Held the transition gate for every release into the production estate.",
 ].join("\n");
 
-type Recorded = { rpc: Record<string, unknown> | null; updates: Array<Record<string, unknown>> };
+type Recorded = {
+  rpc: Record<string, unknown> | null;
+  updates: Array<Record<string, unknown>>;
+  downloads: string[];
+  removals: string[];
+};
 
-function fakeSupabase(recorded: Recorded, opts: { importInsertFails?: boolean } = {}) {
+function fakeSupabase(
+  recorded: Recorded,
+  opts: {
+    importInsertFails?: boolean;
+    storedText?: string;
+    downloadFails?: boolean;
+    quotaDecision?: Record<string, unknown>;
+  } = {},
+) {
   /* .eq() has to be both awaitable and chainable — the code uses one and two. */
   const terminal = (onCall: () => void): Record<string, unknown> => ({
     eq: () => terminal(onCall),
@@ -81,6 +95,23 @@ function fakeSupabase(recorded: Recorded, opts: { importInsertFails?: boolean } 
   });
 
   return {
+    storage: {
+      from: () => ({
+        download: async (path: string) => {
+          recorded.downloads.push(path);
+          return opts.downloadFails
+            ? { data: null, error: { message: "download refused" } }
+            : {
+                data: new Blob([opts.storedText ?? RESUME], { type: "text/plain" }),
+                error: null,
+              };
+        },
+        remove: async (paths: string[]) => {
+          recorded.removals.push(...paths);
+          return { data: null, error: null };
+        },
+      }),
+    },
     from(table: string) {
       return {
         insert: () => ({
@@ -98,17 +129,38 @@ function fakeSupabase(recorded: Recorded, opts: { importInsertFails?: boolean } 
           terminal(() => recorded.updates.push({ table, ...patch })),
       };
     },
-    rpc: async (_name: string, args: Record<string, unknown>) => {
+    rpc: async (name: string, args: Record<string, unknown>) => {
+      if (name === "consume_ai_quota") {
+        return {
+          data: opts.quotaDecision ?? {
+            allowed: true,
+            reason: null,
+            retryAfterSeconds: 0,
+            remainingMonthlyUnits: 97,
+          },
+          error: null,
+        };
+      }
       recorded.rpc = args;
       return { data: { rolesCreated: 1, evidenceCreated: 2, evidenceSkipped: 0 }, error: null };
     },
   };
 }
 
-function upload(text = RESUME, name = "CV.txt") {
-  const form = new FormData();
-  form.append("file", new File([text], name, { type: "text/plain" }));
-  return new Request("http://localhost/api/career/import", { method: "POST", body: form });
+const OBJECT_PATH = "user-1/00000000-0000-4000-8000-000000000001.txt";
+
+function upload(name = "CV.txt", overrides: Record<string, unknown> = {}) {
+  return new Request("http://localhost/api/career/import", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      objectPath: OBJECT_PATH,
+      fileName: name,
+      mimeType: "text/plain",
+      byteSize: new TextEncoder().encode(RESUME).byteLength,
+      ...overrides,
+    }),
+  });
 }
 
 /* Reads the response exactly as the browser client does. */
@@ -122,7 +174,7 @@ let recorded: Recorded;
 
 beforeEach(() => {
   vi.clearAllMocks();
-  recorded = { rpc: null, updates: [] };
+  recorded = { rpc: null, updates: [], downloads: [], removals: [] };
   getAuthenticatedUser.mockResolvedValue({ supabase: fakeSupabase(recorded), user: { id: "user-1" } });
   generateStructuredJson.mockResolvedValue(EXTRACTION);
 });
@@ -156,12 +208,51 @@ describe("POST /api/career/import", () => {
     expect(extracted.sample).toContain("BARCLAYS");
   });
 
+  it("deletes the temporary object immediately after extraction", async () => {
+    await drain(await POST(upload()));
+
+    expect(recorded.downloads).toEqual([OBJECT_PATH]);
+    expect(recorded.removals).toEqual([OBJECT_PATH]);
+  });
+
+  it("returns 429 without calling the model when the AI allowance is exhausted", async () => {
+    getAuthenticatedUser.mockResolvedValue({
+      supabase: fakeSupabase(recorded, {
+        quotaDecision: {
+          allowed: false,
+          reason: "rate_limit",
+          retryAfterSeconds: 45,
+          remainingMonthlyUnits: null,
+        },
+      }),
+      user: { id: "user-1" },
+    });
+
+    const response = await POST(upload());
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get("Retry-After")).toBe("45");
+    expect(generateStructuredJson).not.toHaveBeenCalled();
+    expect(recorded.removals).toEqual([OBJECT_PATH]);
+  });
+
   it("counts what the model found before it is written, not after", async () => {
     const seen = await drain(await POST(upload()));
     const saving = seen.find((e) => e.stage === "saving");
 
     if (saving?.stage !== "saving") throw new Error("expected a saving stage");
     expect(saving).toMatchObject({ roles: 1, claims: 2 });
+  });
+
+  it("uses the economical extraction route with a pseudonymous safety identifier", async () => {
+    await drain(await POST(upload()));
+
+    expect(generateStructuredJson).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workload: "fast",
+        safetyIdentifier: "test-safety-user-1",
+      }),
+    );
   });
 
   /*
@@ -217,20 +308,42 @@ describe("POST /api/career/import", () => {
     expect(await response.json()).toEqual({ error: "Unauthorized" });
   });
 
-  it("refuses a request with no file attached", async () => {
+  it("refuses a request with no storage reference", async () => {
     const response = await POST(new Request("http://localhost/api/career/import", {
       method: "POST",
-      body: new FormData(),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
     }));
 
     expect(response.status).toBe(400);
-    expect((await response.json()).error).toContain("Choose a résumé file");
+    expect((await response.json()).error).toContain("not valid");
   });
 
   it("refuses a document with too little text to be a résumé", async () => {
-    const response = await POST(upload("Bharani", "empty.txt"));
+    getAuthenticatedUser.mockResolvedValue({
+      supabase: fakeSupabase(recorded, { storedText: "Bharani" }),
+      user: { id: "user-1" },
+    });
+    const response = await POST(upload("empty.txt"));
     expect(response.status).toBe(400);
     expect(await response.json()).toHaveProperty("error");
+    expect(recorded.removals).toEqual([OBJECT_PATH]);
+  });
+
+  it("refuses another user's object path before touching storage", async () => {
+    const response = await POST(upload("CV.txt", {
+      objectPath: "user-2/00000000-0000-4000-8000-000000000001.txt",
+    }));
+
+    expect(response.status).toBe(403);
+    expect(recorded.downloads).toEqual([]);
+  });
+
+  it("refuses oversized metadata before touching storage", async () => {
+    const response = await POST(upload("CV.txt", { byteSize: 8 * 1024 * 1024 + 1 }));
+
+    expect(response.status).toBe(400);
+    expect(recorded.downloads).toEqual([]);
   });
 
   it("does not reach the model when the import row cannot be created", async () => {
@@ -262,5 +375,16 @@ describe("POST /api/career/import", () => {
     expect(columns).toContain("approval_status");
     expect(values).toContain("'pending'");
     expect(values).not.toContain("'approved'");
+  });
+
+  it("has a private bucket whose policies scope every object to its owner", async () => {
+    const { readFile } = await import("node:fs/promises");
+    const sql = await readFile("supabase/migrations/20260806_private_resume_uploads.sql", "utf8");
+
+    expect(sql).toContain("'resume-uploads'");
+    expect(sql).toContain("false");
+    expect(sql).toContain("8388608");
+    expect(sql.match(/storage\.foldername\(name\)/g)).toHaveLength(3);
+    expect(sql.match(/auth\.uid\(\)::text/g)).toHaveLength(3);
   });
 });

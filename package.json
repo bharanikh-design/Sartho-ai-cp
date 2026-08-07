@@ -15,7 +15,7 @@
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "check:ai": "NODE_USE_ENV_PROXY=1 LIVE_AI_CHECK=1 vitest run lib/ai/gemini-live.test.ts"
+    "check:ai": "NODE_USE_ENV_PROXY=1 LIVE_AI_CHECK=1 vitest run lib/ai/gemini-live.test.ts lib/ai/openai-live.test.ts"
   },
   "dependencies": {
     "@supabase/ssr": "0.12.3",

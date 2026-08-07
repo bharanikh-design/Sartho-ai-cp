@@ -39,7 +39,7 @@ export function classifyAiFailure(message: string): AiFailureKind {
 export function describeAiFailure(message: string): string {
   switch (classifyAiFailure(message)) {
     case "credit":
-      return "Sartho's AI provider has run out of credit, so it could not read the document. Nothing is wrong with your résumé. Top up the provider account — or set a second provider key — and upload it again.";
+      return "Sartho's selected AI provider has run out of credit, so it could not read the document. Nothing is wrong with your résumé. Top up the provider account and upload it again.";
     case "auth":
       return "Sartho's AI provider rejected its key, so it could not read the document. The key needs correcting in the deployment's environment variables.";
     case "rate-limit":

@@ -1,10 +1,19 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ResumeProgress, type ImportProgress } from "@/components/resume-progress";
 import { readProgressEvents } from "@/lib/resume/progress-stream";
+import {
+  detectKind,
+  makeResumeObjectPath,
+  MAX_UPLOAD_BYTES,
+  normaliseResumeMimeType,
+  RESUME_ACCEPT,
+  RESUME_UPLOAD_BUCKET,
+} from "@/lib/resume/upload";
+import { createClient } from "@/lib/supabase";
 
 /*
  * The way a career gets into Sartho.
@@ -24,8 +33,6 @@ type Result = {
   evidenceCreated: number;
   evidenceSkipped: number;
 };
-
-const ACCEPT = ".pdf,.docx,.txt,.md,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain";
 
 export function ResumeImport({
   hasEvidence,
@@ -47,6 +54,7 @@ export function ResumeImport({
   continueHref?: string;
 }) {
   const router = useRouter();
+  const supabase = useMemo(() => createClient(), []);
   const inputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -56,16 +64,51 @@ export function ResumeImport({
   const [dragging, setDragging] = useState(false);
 
   async function upload(file: File) {
+    if (file.size === 0) {
+      setError("That file is empty.");
+      return;
+    }
+    if (file.size > MAX_UPLOAD_BYTES) {
+      setError(`That file is ${(file.size / 1024 / 1024).toFixed(1)}MB. Please upload one under 8MB.`);
+      return;
+    }
+    const kind = detectKind(file.name, file.type);
+    if (!kind) {
+      setError("Sartho reads PDF, Word (.docx) and plain text résumés.");
+      return;
+    }
+    const mimeType = normaliseResumeMimeType(kind, file.type);
+
     setBusy(true);
     setError(null);
     setResult(null);
     setFileName(file.name);
     setProgress({ stage: "extracted", fileName: file.name, characters: 0, sample: "", roles: 0, claims: 0 });
 
+    let objectPath: string | null = null;
     try {
-      const body = new FormData();
-      body.append("file", file);
-      const response = await fetch("/api/career/import", { method: "POST", body });
+      const {
+        data: { user },
+        error: authError,
+      } = await supabase.auth.getUser();
+      if (authError || !user) throw new Error("Your session has expired. Please sign in again.");
+
+      objectPath = makeResumeObjectPath(user.id, file.name);
+      const { error: uploadError } = await supabase.storage
+        .from(RESUME_UPLOAD_BUCKET)
+        .upload(objectPath, file, { contentType: mimeType, upsert: false });
+      if (uploadError) throw new Error("The résumé could not be uploaded securely. Please try again.");
+
+      const response = await fetch("/api/career/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          objectPath,
+          fileName: file.name,
+          mimeType,
+          byteSize: file.size,
+        }),
+      });
 
       /*
        * Anything that could fail fast still fails as JSON with a real status.
@@ -112,6 +155,16 @@ export function ResumeImport({
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "The import failed.");
     } finally {
+      // The API removes the object after extraction. This second, idempotent
+      // cleanup covers a lost request or a browser/network failure before then.
+      if (objectPath) {
+        try {
+          await supabase.storage.from(RESUME_UPLOAD_BUCKET).remove([objectPath]);
+        } catch {
+          // The API normally removed it already. A failed best-effort retry must
+          // not leave the interface stuck in its busy state.
+        }
+      }
       setBusy(false);
       setProgress(null);
       if (inputRef.current) inputRef.current.value = "";
@@ -152,7 +205,7 @@ export function ResumeImport({
           <input
             ref={inputRef}
             type="file"
-            accept={ACCEPT}
+            accept={RESUME_ACCEPT}
             className="resume-import-input"
             disabled={busy}
             onChange={(event) => {

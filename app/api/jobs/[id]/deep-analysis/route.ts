@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { generateStructuredJson } from "@/lib/ai/provider";
+import { createSafetyIdentifier, generateStructuredJson } from "@/lib/ai/provider";
+import { aiQuotaResponse, checkAiQuota } from "@/lib/ai/quota";
 import { getAuthenticatedUser } from "@/lib/auth";
 import type { DeepAnalysisSummary, RequirementAssessment } from "@/lib/types";
 
@@ -71,10 +72,15 @@ export async function POST(
     return NextResponse.json({ error: "Approve Career Profile evidence before running deep analysis." }, { status: 400 });
   }
 
+  const quota = await checkAiQuota(supabase, "deep_analysis");
+  if (!quota.allowed) return aiQuotaResponse(quota);
+
   await supabase.from("jobs").update({ deep_analysis_status: "processing" }).eq("id", id).eq("user_id", user.id);
 
   try {
     const raw = await generateStructuredJson({
+      workload: "quality",
+      safetyIdentifier: createSafetyIdentifier(user.id),
       schemaName: "sartho_job_evidence_analysis",
       schema: jsonSchema,
       system: [

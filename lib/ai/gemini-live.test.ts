@@ -27,6 +27,7 @@ import { RESUME_EXTRACTION_SCHEMA, RESUME_EXTRACTION_SYSTEM } from "@/lib/resume
 const live = process.env.LIVE_AI_CHECK === "1";
 
 const REQUEST = {
+  workload: "fast" as const,
   schemaName: "sartho_resume_extraction",
   schema: RESUME_EXTRACTION_SCHEMA,
   system: RESUME_EXTRACTION_SYSTEM,
@@ -49,6 +50,8 @@ describe.runIf(live)("the live Gemini contract", () => {
     vi.stubEnv("OPENAI_API_KEY", "");
     vi.stubEnv("GOOGLE_API_KEY", "");
     vi.stubEnv("GEMINI_API_KEY", "not-a-real-key-on-purpose");
+    vi.stubEnv("AI_PROVIDER", "gemini");
+    vi.stubEnv("GEMINI_DATA_TIER", "paid");
     /* Pinned, so a bad key cannot turn this into a test of model discovery. */
     vi.stubEnv("GEMINI_MODEL", process.env.GEMINI_MODEL || "gemini-flash-latest");
   });
@@ -76,6 +79,10 @@ describe.runIf(live)("the live Gemini contract", () => {
 const realKey = process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY ?? "";
 
 describe.runIf(live && realKey.length > 0)("a real extraction", () => {
+  beforeEach(() => {
+    vi.stubEnv("AI_PROVIDER", "gemini");
+    vi.stubEnv("GEMINI_DATA_TIER", "paid");
+  });
   it("reads a résumé and returns the shape the route parses", async () => {
     const result = (await generateStructuredJson(REQUEST)) as {
       roles: unknown[];

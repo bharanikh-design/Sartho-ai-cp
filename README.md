@@ -36,13 +36,22 @@ Sartho is a private, evidence-led career intelligence and application workflow f
 
 ## Database setup
 
-The existing foundation schema is in `supabase/schema.sql`.
+The timestamped files in `supabase/migrations` are the reproducible schema for
+new and local projects. They must be applied in filename order; do not select a
+single migration by hand.
 
-Apply the current product migration:
+The existing live Sartho project is different: it contains user data created
+before Supabase migration tracking was enabled. **Do not run `supabase db push`
+against that project yet.** After a verified backup, use the reviewed standalone
+package below to add only the missing operational infrastructure:
 
 ```text
-supabase/migrations/20260731_work_packages_2_6.sql
+supabase/reconciliation/20260808_existing_project_reconciliation.sql
 ```
+
+That package does not register or replay the older migrations. Migration history
+must be baselined separately from a read-only pull of the live schema before the
+project begins using normal `supabase db push` releases.
 
 Private profile seed files must never be committed. `.gitignore` explicitly excludes them.
 
@@ -55,26 +64,39 @@ NEXT_PUBLIC_SUPABASE_URL
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
 ```
 
-Configure at least one server-side AI provider. Sartho tries configured
-providers in this order:
+Configure one active server-side AI provider:
 
 ```text
-GEMINI_API_KEY
-```
-
-then:
-
-```text
-ANTHROPIC_API_KEY
-```
-
-then:
-
-```text
+AI_PROVIDER=openai
 OPENAI_API_KEY
 ```
 
-Optional model overrides are documented in `.env.example`.
+Sartho uses `gpt-5.6-luna` for extraction and `gpt-5.6-terra` for analysis and
+drafting by default. A transient failure is retried once within OpenAI; a
+model-specific availability failure may use the configured OpenAI fallback.
+It never sends career data to another provider automatically.
+
+Extracted résumé text is capped at 120,000 characters before any provider call.
+This keeps compressed or malformed documents from creating unexpectedly large
+model requests while leaving ample room for a normal long-form CV.
+
+Paid Gemini can be activated deliberately for disaster recovery:
+
+```text
+AI_PROVIDER=gemini
+GEMINI_API_KEY
+GEMINI_DATA_TIER=paid
+```
+
+The paid-tier acknowledgement is mandatory because free-tier Gemini data must
+not process résumés. Anthropic is also available as an explicit operator choice.
+All model overrides are documented in `.env.example`.
+
+Provider diagnostics are operations-only. Grant access by setting the operator's
+Supabase `app_metadata.role` to `admin`, or add their Auth user UUID to the
+server-side `SARTHO_ADMIN_USER_IDS` allowlist. Health checks contact only the
+active provider and are shared for five minutes, so regular account allowance is
+not consumed and standby providers are not billed.
 
 ## Local setup
 
@@ -92,6 +114,10 @@ npm run lint
 npm test
 npm run build
 ```
+
+After configuring a paid OpenAI key, run `npm run check:ai` deliberately to
+exercise the redacted Luna extraction and Terra evidence-linking contracts.
+Ordinary test runs never contact an AI provider.
 
 ## Security boundaries
 
