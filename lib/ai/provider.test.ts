@@ -252,6 +252,18 @@ describe("controlled emergency providers", () => {
     expect(JSON.stringify(body.systemInstruction)).toContain("JSON Schema");
   });
 
+  it("gives detailed résumé extraction more output room without relaxing other cost limits", async () => {
+    vi.stubEnv("AI_PROVIDER", "gemini");
+    vi.stubEnv("GEMINI_DATA_TIER", "paid");
+    vi.stubEnv("GEMINI_API_KEY", "g-key");
+
+    await generateStructuredJson(REQUEST);
+    expect((bodyOf(calls[0]).generationConfig as Record<string, unknown>).maxOutputTokens).toBe(32_768);
+
+    await generateStructuredJson({ ...REQUEST, schemaName: "sartho_job_analysis" });
+    expect((bodyOf(calls[1]).generationConfig as Record<string, unknown>).maxOutputTokens).toBe(8_192);
+  });
+
   it("does not send Sonnet 5 a sampling parameter it rejects", async () => {
     vi.stubEnv("AI_PROVIDER", "anthropic");
     vi.stubEnv("ANTHROPIC_API_KEY", "a-key");

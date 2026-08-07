@@ -303,6 +303,17 @@ async function callAnthropic(request: StructuredRequest, apiKey: string, model: 
 }
 
 async function callGemini(request: StructuredRequest, apiKey: string, model: string) {
+  /*
+   * A detailed résumé can legitimately exceed the small default response
+   * budget once every role and evidence claim is represented as JSON. Keep
+   * the larger allowance scoped to that one workload: Gemini bills actual
+   * output, not this ceiling, while every other Sartho request retains the
+   * tighter cost guardrail.
+   */
+  const maxOutputTokens = request.schemaName === "sartho_resume_extraction"
+    ? 32_768
+    : 8_192;
+
   const { response, result: unknownResult, startedAt } = await fetchProvider(
     "gemini",
     model,
@@ -319,7 +330,7 @@ async function callGemini(request: StructuredRequest, apiKey: string, model: str
         },
         contents: [{ role: "user", parts: [{ text: request.prompt }] }],
         generationConfig: {
-          maxOutputTokens: 8_192,
+          maxOutputTokens,
           responseMimeType: "application/json",
         },
       }),
