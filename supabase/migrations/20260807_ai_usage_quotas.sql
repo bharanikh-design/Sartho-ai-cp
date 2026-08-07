@@ -127,7 +127,7 @@ begin
 end;
 $$;
 
-revoke all on function public.consume_ai_quota(text) from public;
+revoke all on function public.consume_ai_quota(text) from public, anon;
 grant execute on function public.consume_ai_quota(text) to authenticated;
 
 -- Future functions created by this deployment role must be explicitly exposed.
@@ -152,7 +152,7 @@ begin
 end;
 $$;
 
-revoke all on function public.wipe_my_data() from public;
+revoke all on function public.wipe_my_data() from public, anon;
 grant execute on function public.wipe_my_data() to authenticated;
 
 commit;

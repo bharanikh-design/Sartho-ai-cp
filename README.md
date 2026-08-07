@@ -49,6 +49,13 @@ package below to add only the missing operational infrastructure:
 supabase/reconciliation/20260808_existing_project_reconciliation.sql
 ```
 
+Run the metadata-only verification before and after that package. Every row
+must report `PASS` afterwards; it never reads career or authentication rows:
+
+```text
+supabase/reconciliation/20260808_existing_project_verification.sql
+```
+
 That package does not register or replay the older migrations. Migration history
 must be baselined separately from a read-only pull of the live schema before the
 project begins using normal `supabase db push` releases.
