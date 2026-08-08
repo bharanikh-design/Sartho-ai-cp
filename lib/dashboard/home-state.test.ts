@@ -6,7 +6,7 @@ describe("getHomeJourneyState", () => {
     const state = getHomeJourneyState({ approvedEvidence: 0, pendingEvidence: 33 });
 
     expect(state.primaryAction).toEqual({
-      href: "/career-truth",
+      href: "/journey#confirm",
       label: "Review 3 evidence records",
     });
     expect(state.readiness.label).toBe("Career evidence loaded");
@@ -32,7 +32,6 @@ describe("getHomeJourneyState", () => {
     const state = getHomeJourneyState({ approvedEvidence: 0, pendingEvidence: 0 });
 
     expect(state.readiness.title).toBe("Nothing is approved for use yet.");
-    expect(state.primaryAction.href).toBe("/career-truth");
+    expect(state.primaryAction.href).toBe("/journey");
   });
 });
-

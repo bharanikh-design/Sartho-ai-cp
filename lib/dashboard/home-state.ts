@@ -28,7 +28,7 @@ export function getHomeJourneyState({
 
     return {
       primaryAction: {
-        href: "/career-truth",
+        href: "/journey#confirm",
         label: `Review ${reviewCount} evidence record${reviewCount === 1 ? "" : "s"}`,
       },
       readiness: {
@@ -37,7 +37,7 @@ export function getHomeJourneyState({
         description: approvedEvidence
           ? `${approvedEvidence} already approved. Review the strongest remaining claims before using them for matching, résumés or interview preparation.`
           : "Approve the strongest claims first. Sartho will not use any résumé claim until you confirm it is true.",
-        href: "/career-truth",
+        href: "/journey#confirm",
         action: "Continue evidence review",
       },
       positioningFallback: "Your target role strategy is the next step after you approve the evidence that represents you best.",
@@ -65,18 +65,17 @@ export function getHomeJourneyState({
 
   return {
     primaryAction: {
-      href: "/career-truth",
+      href: "/journey",
       label: "Choose usable evidence",
     },
     readiness: {
       label: "Career evidence needs attention",
       title: "Nothing is approved for use yet.",
-      description: "Review your Career Profile or add a stronger résumé before asking Sartho to match, tailor or prepare.",
-      href: "/career-truth",
-      action: "Open Career Profile",
+      description: "Complete your User Journey or add a stronger résumé before asking Sartho to match, tailor or prepare.",
+      href: "/journey",
+      action: "Open User Journey",
     },
     positioningFallback: "Approve evidence before creating a target role strategy.",
     profileMetaFallback: "Private profile",
   };
 }
-
