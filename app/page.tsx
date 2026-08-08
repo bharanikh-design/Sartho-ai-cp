@@ -2,17 +2,22 @@ import Link from "next/link";
 import { ResumeImport } from "@/components/resume-import";
 import { requireUser } from "@/lib/auth";
 import { getCareerWorkspace } from "@/lib/data/career";
+import { getHomeJourneyState } from "@/lib/dashboard/home-state";
 import type { JobStatus } from "@/lib/types";
+import { withJwtClockSkewRetry } from "@/lib/supabase/retry";
 
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
   const { supabase, user } = await requireUser();
   const { profile, lanes, evidence } = await getCareerWorkspace(supabase, user.id);
-  const { data: jobs, error: jobsError } = await supabase
-    .from("jobs")
-    .select("id,status")
-    .eq("user_id", user.id);
+  const { data: jobs, error: jobsError } = await withJwtClockSkewRetry(() =>
+    supabase
+      .from("jobs")
+      .select("id,status")
+      .eq("user_id", user.id),
+    (result) => result.error,
+  );
 
   if (jobsError) throw jobsError;
 
@@ -21,6 +26,7 @@ export default async function HomePage() {
   const jobRows = (jobs ?? []) as Array<{ id: string; status: JobStatus }>;
   const activeApplications = jobRows.filter((job) => !["offer", "rejected", "withdrawn"].includes(job.status)).length;
   const interviewCount = jobRows.filter((job) => job.status === "interview" || job.status === "assessment").length;
+  const journeyState = getHomeJourneyState({ approvedEvidence, pendingEvidence });
 
   const actions = [
     {
@@ -126,20 +132,18 @@ export default async function HomePage() {
             shape the right résumé and walk into every opportunity ready.
           </p>
           <div className="hero-actions">
-            <Link href="/jobs" className="primary-button">Analyse a role <span aria-hidden="true">↗</span></Link>
+            <Link href={journeyState.primaryAction.href} className="primary-button">
+              {journeyState.primaryAction.label} <span aria-hidden="true">→</span>
+            </Link>
             <Link href="/?tour=1" className="secondary-button">Replay welcome</Link>
           </div>
         </div>
 
         <div className="home-hero-signal" aria-label="Career workspace readiness">
-          <span className="signal-label">Your next chapter</span>
-          <strong>One right role can change everything.</strong>
-          <p>
-            {profile
-              ? `${approvedEvidence} approved evidence records can support honest matching and preparation.`
-              : "Load your private Career Profile to begin evidence-backed matching."}
-          </p>
-          <Link href="/career-truth">{profile ? "Strengthen my Career Profile" : "Set up my Career Profile"} <span aria-hidden="true">→</span></Link>
+          <span className="signal-label">{journeyState.readiness.label}</span>
+          <strong>{journeyState.readiness.title}</strong>
+          <p>{journeyState.readiness.description}</p>
+          <Link href={journeyState.readiness.href}>{journeyState.readiness.action} <span aria-hidden="true">→</span></Link>
         </div>
       </section>
 
@@ -163,7 +167,7 @@ export default async function HomePage() {
               <h2 className="position-title">{profile?.headline ?? "Build your evidence-backed career positioning"}</h2>
             </div>
             <span className="meta-pill">
-              {profile?.total_experience_years ? `${profile.total_experience_years}+ years` : "Private profile"}
+              {profile?.total_experience_years ? `${profile.total_experience_years}+ years` : journeyState.profileMetaFallback}
               {profile?.location ? ` · ${profile.location}` : ""}
             </span>
           </div>
@@ -182,7 +186,7 @@ export default async function HomePage() {
               ))}
             </div>
           ) : (
-            <div className="empty-inline-state">Your target role lanes will appear here after the Career Profile is loaded.</div>
+            <div className="empty-inline-state">{journeyState.positioningFallback}</div>
           )}
         </article>
 

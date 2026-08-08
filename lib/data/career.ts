@@ -5,21 +5,26 @@ import type {
   ProfileRecord,
   TargetLaneRecord,
 } from "@/lib/types";
+import { withJwtClockSkewRetry } from "@/lib/supabase/retry";
 
 function stringArray(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
 }
 
 export async function getCareerWorkspace(supabase: SupabaseClient, userId: string) {
-  const [profileResult, lanesResult, rolesResult, evidenceResult] = await Promise.all([
+  const [profileResult, lanesResult, rolesResult, evidenceResult] = await withJwtClockSkewRetry(
+    () => Promise.all([
     supabase.from("profiles").select("*").eq("id", userId).maybeSingle(),
     supabase.from("target_lanes").select("*").eq("user_id", userId).eq("active", true).order("priority"),
     supabase.from("career_roles").select("*").eq("user_id", userId).order("start_date", { ascending: false }),
     supabase.from("evidence_items").select("*").eq("user_id", userId).order("updated_at", { ascending: false }),
-  ]);
+    ]),
+    ([profile, lanes, roles, evidence]) =>
+      profile.error ?? lanes.error ?? roles.error ?? evidence.error,
+  );
 
-  const firstError = profileResult.error ?? lanesResult.error ?? rolesResult.error ?? evidenceResult.error;
-  if (firstError) throw firstError;
+  const finalError = profileResult.error ?? lanesResult.error ?? rolesResult.error ?? evidenceResult.error;
+  if (finalError) throw finalError;
 
   const profileData = profileResult.data;
   const profile: ProfileRecord | null = profileData
