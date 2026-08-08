@@ -1,12 +1,19 @@
-import type { CSSProperties } from "react";
 import Link from "next/link";
-import { EvidenceReview } from "@/components/evidence-review";
-import { ResumeImport } from "@/components/resume-import";
+import type { CSSProperties } from "react";
 import { requireUser } from "@/lib/auth";
 import { getCareerWorkspace, getResumeImports } from "@/lib/data/career";
-import { getFoundationState } from "@/lib/journey/foundation";
 
 export const dynamic = "force-dynamic";
+
+type JourneyStep = {
+  label: string;
+  detail: string;
+  href: string;
+  complete: boolean;
+  title: string;
+  description: string;
+  reason: string;
+};
 
 export default async function JourneyPage() {
   const { supabase, user } = await requireUser();
@@ -16,158 +23,137 @@ export default async function JourneyPage() {
   ]);
 
   const approved = evidence.filter((item) => item.approval_status === "approved").length;
-  const rejected = evidence.filter((item) => item.approval_status === "rejected").length;
-  const pending = evidence.length - approved - rejected;
+  const pending = evidence.filter((item) => item.approval_status === "pending").length;
   const completeImports = imports.filter((item) => item.status === "complete").length;
-  const processingImports = imports.filter((item) => item.status === "processing").length;
-  const latestImport = imports[0] ?? null;
-  const signals = Array.from(new Set(evidence.flatMap((item) => item.domains))).slice(0, 8);
-  const state = getFoundationState({
-    completedImports: completeImports,
-    processingImports,
-    roles: roles.length,
-    evidence: evidence.length,
-    approvedEvidence: approved,
-    rejectedEvidence: rejected,
-  });
-  const journeySteps = [
-    { label: "Resume upload", detail: completeImports ? `${completeImports} resume received securely` : "Add your master resume", href: "#resume", complete: completeImports > 0 },
-    { label: "AI resume review", detail: evidence.length ? `${roles.length} roles and ${evidence.length} evidence records mapped` : "Waiting for resume evidence", href: "#review", complete: evidence.length > 0 },
-    { label: "Career context", detail: profile?.headline || profile?.location ? "Goals and mobility captured" : "Confirm goals, location and mobility", href: "/career-direction#context", complete: Boolean(profile?.headline && profile?.location) },
-    { label: "Career strengths", detail: profile?.strengths.length ? `${profile.strengths.length} strengths selected` : "Review evidence-backed strengths", href: "/career-direction#strengths", complete: Boolean(profile?.strengths.length) },
-    { label: "Profile priorities", detail: lanes.length ? `${lanes.length} target profiles weighted` : "Rank roles and search priorities", href: "/career-direction#priorities", complete: lanes.length > 0 && lanes.filter((lane) => lane.active).reduce((total, lane) => total + lane.weight, 0) === 100 },
-    { label: "Review & activate", detail: pending ? `${pending} evidence decisions remain` : approved ? "Foundation confirmed" : "Approve the evidence Sartho may use", href: "#confirm", complete: pending === 0 && approved > 0 },
+  const activeAllocation = lanes.filter((lane) => lane.active).reduce((total, lane) => total + lane.weight, 0);
+  const suggestedStrengths = Array.from(new Set(evidence.flatMap((item) => item.domains))).slice(0, 4);
+
+  const steps: JourneyStep[] = [
+    {
+      label: "Resume upload",
+      detail: completeImports ? "Master resume received" : "Bring in your career evidence",
+      href: "/resume-studio",
+      complete: completeImports > 0,
+      title: "Upload your master resume",
+      description: "Give Sartho the best available record of your experience, achievements and certifications.",
+      reason: "Every recommendation begins with evidence from a source you control.",
+    },
+    {
+      label: "AI resume review",
+      detail: evidence.length ? `${roles.length} roles and ${evidence.length} evidence records mapped` : "Map experience and evidence",
+      href: "/career-truth",
+      complete: evidence.length > 0,
+      title: "Review what Sartho found",
+      description: "Check the roles, outcomes, skills and certifications extracted from your resume.",
+      reason: "AI proposes evidence; you decide whether it is accurate.",
+    },
+    {
+      label: "Career context",
+      detail: profile?.headline && profile.location ? "Goals and experience confirmed" : "Goals, location and mobility",
+      href: "/career-direction#context",
+      complete: Boolean(profile?.headline && profile.location),
+      title: "Confirm your career context",
+      description: "Tell Sartho what a successful next move looks like, where you can work and what matters now.",
+      reason: "The same resume can point to very different futures. Context makes recommendations personal.",
+    },
+    {
+      label: "Career strengths",
+      detail: profile?.strengths.length ? `${profile.strengths.length} strengths selected` : "Reviewing AI suggestions",
+      href: "/career-direction#strengths",
+      complete: Boolean(profile?.strengths.length),
+      title: "Confirm your career strengths",
+      description: "Keep, edit or remove the strengths Sartho found in your resume and career evidence.",
+      reason: "These strengths become the evidence signals used to rank profiles and opportunities.",
+    },
+    {
+      label: "Profile & search priorities",
+      detail: lanes.length && activeAllocation === 100 ? `${lanes.length} target profiles weighted` : "Roles, locations and mobility",
+      href: "/career-direction#priorities",
+      complete: lanes.length > 0 && activeAllocation === 100,
+      title: "Set your profile search order",
+      description: "Add, rank and weight the roles Sartho should pursue, then confirm your locations and mobility.",
+      reason: "Your priorities determine what Sartho searches first and what it deliberately ignores.",
+    },
+    {
+      label: "Review & activate",
+      detail: pending ? `${pending} evidence decisions remain` : approved ? "Foundation confirmed" : "Confirm what Sartho knows",
+      href: "/career-truth",
+      complete: pending === 0 && approved > 0,
+      title: "Review and activate your foundation",
+      description: "Approve what is accurate, reject what is misleading and activate your evidence-led search.",
+      reason: "Nothing becomes a recommendation, resume claim or interview answer until you approve it.",
+    },
   ];
-  const completedJourneySteps = journeySteps.filter((step) => step.complete).length;
-  const journeyProgress = Math.round((completedJourneySteps / journeySteps.length) * 100);
-  const firstIncompleteStep = journeySteps.findIndex((step) => !step.complete);
-  const currentJourneyStep = firstIncompleteStep === -1 ? journeySteps.length : firstIncompleteStep + 1;
-  const progressStyle = { "--foundation-progress": `${journeyProgress}%` } as CSSProperties;
+
+  const completed = steps.filter((step) => step.complete).length;
+  const currentIndex = Math.max(0, steps.findIndex((step) => !step.complete));
+  const current = steps[currentIndex] ?? steps[steps.length - 1];
+  const journeyProgress = Math.round((completed / steps.length) * 100);
+  const knowledgeReadiness = Math.min(100, Math.round((evidence.length ? 35 : 0) + (profile ? 20 : 0) + (profile?.strengths.length ? 15 : 0) + (lanes.length ? 15 : 0) + (approved ? 15 : 0)));
 
   return (
-    <div className="foundation-page page-stack">
-      <section className="glass-card foundation-hero">
-        <div className="foundation-hero-copy">
-          <div className="page-eyebrow"><span className="live-dot" /> Your career foundation</div>
-          <h1>Your Sartho journey</h1>
-          <p>
-            Sartho first learns who you are, then asks you to confirm what it found.
-            Only approved evidence can power career direction, matching, résumés or interview preparation.
-          </p>
-          <div className="foundation-trust-row">
-            <span>Private upload</span><span>AI-assisted</span><span>Human approved</span>
+    <div className="journey-prototype-page">
+      <header className="journey-page-heading">
+        <p>Getting to know you</p>
+        <h1>Your Sartho journey</h1>
+        <span>Give Sartho enough context to make useful, evidence-based recommendations.</span>
+      </header>
+
+      <section className="panel journey-hero-exact">
+        <div className="journey-hero-copy-exact">
+          <p className="journey-micro-label">Your career foundation</p>
+          <h2>Good enough to begin. Better with every step.</h2>
+          <p>Sartho already understands enough to start helping you. Complete the remaining journey so every recommendation is grounded in your evidence, ambitions and mobility.</p>
+          <div className="readiness-notes-exact">
+            <span className={completeImports ? "is-done" : ""}>✓ Resume understood</span>
+            <span className={profile ? "is-done" : ""}>✓ Career context {profile ? "captured" : "needed"}</span>
+            <span className={lanes.length ? "is-done" : "is-missing"}>＋ Profile priorities {lanes.length ? "captured" : "need you"}</span>
           </div>
         </div>
-        <div className="foundation-readiness" style={progressStyle} aria-label={`${journeyProgress}% journey complete`}>
-          <div className="foundation-ring"><span>{journeyProgress}%</span></div>
-          <strong>{journeyProgress >= 67 ? "Good enough to begin" : state.readiness}</strong>
-          <small>Journey completion</small>
+        <div className="readiness-visual-exact">
+          <div className="readiness-ring-exact" style={{ "--readiness": `${knowledgeReadiness}%` } as CSSProperties}><span>{knowledgeReadiness}%</span></div>
+          <div><strong>Knowledge readiness</strong><span>{knowledgeReadiness >= 70 ? "Strong foundation" : "Building your foundation"}</span></div>
         </div>
       </section>
 
-      <section className="glass-card foundation-route" aria-labelledby="foundation-route-title">
-        <div className="foundation-section-heading">
-          <div><div className="page-eyebrow">Start to finish</div><h2 id="foundation-route-title">Build the evidence Sartho can trust</h2></div>
-          <span>Step {currentJourneyStep} of 6</span>
+      <section className="panel foundation-map-exact">
+        <div className="foundation-heading-exact">
+          <div><p className="journey-micro-label">Start to finish</p><h2>Your six-step foundation</h2><p>Each stage gives Sartho better evidence for the decisions that follow.</p></div>
+          <div className="journey-percent-exact"><strong>{journeyProgress}%</strong><span>Journey complete</span></div>
         </div>
-        <ol className="foundation-track foundation-track-six" style={progressStyle}>
-          <span className="foundation-track-line" aria-hidden="true"><i /></span>
-          {journeySteps.map((step, index) => {
-            const stepState = step.complete ? "complete" : index + 1 === currentJourneyStep ? "current" : "upcoming";
+        <div className="journey-track-exact" aria-label="User journey progress">
+          <div className="journey-rail-exact"><span style={{ width: `${journeyProgress}%` }} /></div>
+          {steps.map((step, index) => {
+            const state = step.complete ? "complete" : index === currentIndex ? "current" : "pending";
             return (
-            <li key={step.label} className={`foundation-node is-${stepState}`}>
-              <a href={step.href} aria-current={stepState === "current" ? "step" : undefined}>
-                <span className="foundation-node-marker">{step.complete ? "✓" : index + 1}</span>
-                <small>Step {index + 1}</small>
+              <Link className={`journey-node-exact ${state}`} href={step.href} key={step.label} aria-current={state === "current" ? "step" : undefined}>
+                <span className="node-marker-exact">{step.complete ? "✓" : index + 1}</span>
+                <span className="node-step-exact">Step {index + 1}</span>
                 <strong>{step.label}</strong>
-                <span>{step.detail}</span>
-                {stepState === "current" ? <em>Continue here</em> : null}
-              </a>
-            </li>
-          )})}
-        </ol>
-      </section>
-
-      <section id="resume" className={`glass-card foundation-stage is-${state.steps[0].state}`}>
-        <StageHeader number="01" label="Resume upload" state={state.steps[0].state}>
-          Bring in the master résumé that best represents your career today. The original file is removed after secure text extraction; the private text record remains so Sartho can explain where its claims came from.
-        </StageHeader>
-        <div className="foundation-stage-body upload-stage-body">
-          <ResumeImport hasEvidence={evidence.length > 0} showLead={false} continueHref="/journey#confirm" />
-          <aside className="foundation-stage-aside">
-            <span className="stage-aside-label">Accepted</span>
-            <strong>PDF · Word · Text</strong>
-            <p>Maximum 8MB. Nothing extracted becomes usable evidence without Step 3.</p>
-          </aside>
+                <small>{step.detail}</small>
+                {state === "current" ? <span className="current-flag-exact">✦ In progress</span> : null}
+              </Link>
+            );
+          })}
         </div>
       </section>
 
-      <section id="review" className={`glass-card foundation-stage is-${state.steps[1].state}`}>
-        <StageHeader number="02" label="AI resume review" state={state.steps[1].state}>
-          Sartho maps roles, achievements, skills, certifications and measurable outcomes. It records evidence—it does not rewrite your history or invent missing facts.
-        </StageHeader>
-        {evidence.length ? (
-          <div className="foundation-ai-summary">
-            <div className="foundation-summary-metrics">
-              <SummaryMetric value={String(roles.length)} label="Roles identified" />
-              <SummaryMetric value={String(evidence.length)} label="Evidence records" />
-              <SummaryMetric value={String(signals.length)} label="Career signals" />
-            </div>
-            <div className="foundation-positioning">
-              <span>Initial positioning</span>
-              <strong>{profile?.headline ?? "Career evidence extracted"}</strong>
-              <p>{profile?.summary ?? "Your evidence is ready for your review before Sartho uses it anywhere."}</p>
-            </div>
-            {signals.length ? <div className="foundation-signal-list">{signals.map((signal) => <span key={signal}>{signal}</span>)}</div> : null}
-            <div className="foundation-source-line">
-              <span>Latest source</span><strong>{latestImport?.file_name ?? "Resume import"}</strong><small>{latestImport?.status === "complete" ? "Read successfully" : latestImport?.status ?? "Evidence available"}</small>
-            </div>
-          </div>
-        ) : (
-          <div className="foundation-waiting-state">
-            <span className="foundation-waiting-icon">AI</span>
-            <div><strong>{processingImports ? "Sartho is reading your résumé" : "Waiting for your résumé"}</strong><p>{processingImports ? "The page will preserve your progress. When extraction finishes, the findings appear here for review." : "Complete Step 1 and Sartho will map your career evidence automatically."}</p></div>
-          </div>
-        )}
-      </section>
-
-      <section id="confirm" className={`glass-card foundation-stage is-${state.steps[2].state}`}>
-        <StageHeader number="03" label="Your confirmation" state={state.steps[2].state}>
-          Approve what is accurate, edit wording that needs context, and reject anything misleading. This is the human-control gate for the whole product.
-        </StageHeader>
-        {evidence.length ? (
-          <div className="foundation-confirmation">
-            <div className="foundation-review-summary">
-              <div><strong>{pending}</strong><span>Need your decision</span></div>
-              <div><strong>{approved}</strong><span>Approved for use</span></div>
-              <div><strong>{rejected}</strong><span>Excluded</span></div>
-              {pending === 0 && approved > 0 ? <Link href="/" className="primary-button">Open your dashboard <span aria-hidden="true">→</span></Link> : null}
-            </div>
-            <EvidenceReview initialItems={evidence} />
-          </div>
-        ) : (
-          <div className="foundation-locked-state"><span>03</span><div><strong>This step opens after AI review</strong><p>Your approval controls remain locked until Sartho has real evidence to show you.</p></div></div>
-        )}
-      </section>
-
-      <section className="foundation-next glass-card-soft">
-        <div><span>What follows</span><strong>Career Direction → Search Plan → Opportunity Dashboard</strong></div>
-        <p>We will activate these only after your foundation is confirmed. That keeps every later recommendation personal, explainable and honest.</p>
+      <section className="current-stage-card-exact">
+        <div className="stage-index-exact"><span>{String(currentIndex + 1).padStart(2, "0")}</span><small>of 06</small></div>
+        <div className="stage-workspace-exact">
+          <p className="journey-micro-label">Current step</p>
+          <h2>{current.title}</h2>
+          <p>{current.description}</p>
+          <div className="stage-progress-label-exact"><span>Journey completion</span><strong>{journeyProgress}%</strong></div>
+          <div className="stage-progress-exact"><span style={{ width: `${journeyProgress}%` }} /></div>
+          {currentIndex === 3 && suggestedStrengths.length ? <div className="strength-review-exact">{suggestedStrengths.map((strength) => <span key={strength}>✓ {strength}</span>)}</div> : null}
+        </div>
+        <aside className="stage-guidance-exact">
+          <span className="guidance-spark">✦</span>
+          <div><strong>Why this matters</strong><p>{current.reason}</p></div>
+          <Link className="journey-continue-button" href={current.href}>Continue this step <span>→</span></Link>
+        </aside>
       </section>
     </div>
   );
-}
-
-function StageHeader({ number, label, state, children }: { number: string; label: string; state: "complete" | "current" | "upcoming"; children: React.ReactNode }) {
-  return (
-    <header className="foundation-stage-header">
-      <span className="foundation-stage-number">{state === "complete" ? "✓" : number}</span>
-      <div><span className="foundation-stage-kicker">Step {Number(number)} · {state === "complete" ? "Complete" : state === "current" ? "In progress" : "Upcoming"}</span><h2>{label}</h2><p>{children}</p></div>
-      <span className={`foundation-state-chip is-${state}`}>{state === "complete" ? "Complete" : state === "current" ? "Your next action" : "Not started"}</span>
-    </header>
-  );
-}
-
-function SummaryMetric({ value, label }: { value: string; label: string }) {
-  return <div><strong>{value}</strong><span>{label}</span></div>;
 }
