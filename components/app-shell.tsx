@@ -31,13 +31,13 @@ type NavigationItem = {
 type AccountAction = "delete" | "wipe";
 
 const navigation: NavigationItem[] = [
-  { label: "Home", shortLabel: "Home", href: "/", icon: "home" },
+  { label: "Dashboard", shortLabel: "Home", href: "/", icon: "home" },
   { label: "User Journey", shortLabel: "Journey", href: "/journey", icon: "journey" },
-  { label: "Career Profile", shortLabel: "Profile", href: "/career-truth", icon: "truth" },
-  { label: "Analyse a Role", shortLabel: "Analyse", href: "/jobs", icon: "analyse" },
   { label: "Résumé Studio", shortLabel: "Résumé", href: "/resume-studio", icon: "resume" },
-  { label: "Interview Prep", shortLabel: "Prepare", href: "/interview-prep", icon: "interview" },
+  { label: "Career Direction", shortLabel: "Direction", href: "/career-direction", icon: "truth" },
+  { label: "Search Plan", shortLabel: "Search", href: "/search-plan", icon: "analyse" },
   { label: "Applications", shortLabel: "Track", href: "/applications", icon: "applications" },
+  { label: "Interview Prep", shortLabel: "Prepare", href: "/interview-prep", icon: "interview" },
 ];
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -59,7 +59,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     // The inline script in the document head already applied this before paint;
     // mirror it into React so the switch renders in the right position.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setTheme(document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark");
+    setTheme(document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light");
   }, []);
 
   function toggleTheme() {
@@ -67,7 +67,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     setTheme(next);
     document.documentElement.setAttribute("data-theme", next);
     try {
-      window.localStorage.setItem("sartho-theme", next);
+      window.localStorage.setItem("sartho-theme-v2", next);
     } catch {
       // Private browsing can refuse storage; the theme still applies this session.
     }
@@ -203,22 +203,22 @@ export function AppShell({ children }: { children: ReactNode }) {
           <span><strong>Sartho</strong><small>AI Career Copilot</small></span>
         </Link>
 
-        <div className="rail-section-label">Workspace</div>
+        <div className="rail-section-label">Your career</div>
         <nav className="rail-nav">
           {navigation.map((item) => <NavItem key={item.href} item={item} active={isActive(pathname, item.href)} />)}
         </nav>
 
-        <Link href="/jobs" className="rail-primary-action">
+        <Link href="/search-plan" className="rail-primary-action">
           <Icon name="sparkles" />
-          <span>Analyse a new role</span>
+          <span>Review search plan</span>
           <span className="rail-action-arrow" aria-hidden="true">↗</span>
         </Link>
 
         <div className="rail-spacer" />
-        <div className="privacy-card">
+        <Link href="/journey" className="privacy-card journey-summary-card">
           <span className="privacy-icon"><Icon name="shield" /></span>
-          <div><strong>Human-controlled</strong><p>Nothing is submitted without your approval.</p></div>
-        </div>
+          <div><strong>Your career foundation</strong><p>Resume, context, strengths and priorities—under your control.</p></div>
+        </Link>
         <div className="rail-footer"><span className="live-dot" /><span>Secure session</span><span>·</span><span>Evidence-led</span></div>
       </aside>
 

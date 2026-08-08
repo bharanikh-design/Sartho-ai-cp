@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 
 export default async function JourneyPage() {
   const { supabase, user } = await requireUser();
-  const [{ profile, roles, evidence }, imports] = await Promise.all([
+  const [{ profile, lanes, roles, evidence }, imports] = await Promise.all([
     getCareerWorkspace(supabase, user.id),
     getResumeImports(supabase, user.id),
   ]);
@@ -30,7 +30,19 @@ export default async function JourneyPage() {
     approvedEvidence: approved,
     rejectedEvidence: rejected,
   });
-  const progressStyle = { "--foundation-progress": `${state.progress}%` } as CSSProperties;
+  const journeySteps = [
+    { label: "Resume upload", detail: completeImports ? `${completeImports} resume received securely` : "Add your master resume", href: "#resume", complete: completeImports > 0 },
+    { label: "AI resume review", detail: evidence.length ? `${roles.length} roles and ${evidence.length} evidence records mapped` : "Waiting for resume evidence", href: "#review", complete: evidence.length > 0 },
+    { label: "Career context", detail: profile?.headline || profile?.location ? "Goals and mobility captured" : "Confirm goals, location and mobility", href: "/career-direction#context", complete: Boolean(profile?.headline && profile?.location) },
+    { label: "Career strengths", detail: profile?.strengths.length ? `${profile.strengths.length} strengths selected` : "Review evidence-backed strengths", href: "/career-direction#strengths", complete: Boolean(profile?.strengths.length) },
+    { label: "Profile priorities", detail: lanes.length ? `${lanes.length} target profiles weighted` : "Rank roles and search priorities", href: "/career-direction#priorities", complete: lanes.length > 0 && lanes.filter((lane) => lane.active).reduce((total, lane) => total + lane.weight, 0) === 100 },
+    { label: "Review & activate", detail: pending ? `${pending} evidence decisions remain` : approved ? "Foundation confirmed" : "Approve the evidence Sartho may use", href: "#confirm", complete: pending === 0 && approved > 0 },
+  ];
+  const completedJourneySteps = journeySteps.filter((step) => step.complete).length;
+  const journeyProgress = Math.round((completedJourneySteps / journeySteps.length) * 100);
+  const firstIncompleteStep = journeySteps.findIndex((step) => !step.complete);
+  const currentJourneyStep = firstIncompleteStep === -1 ? journeySteps.length : firstIncompleteStep + 1;
+  const progressStyle = { "--foundation-progress": `${journeyProgress}%` } as CSSProperties;
 
   return (
     <div className="foundation-page page-stack">
@@ -46,9 +58,9 @@ export default async function JourneyPage() {
             <span>Private upload</span><span>AI-assisted</span><span>Human approved</span>
           </div>
         </div>
-        <div className="foundation-readiness" style={progressStyle} aria-label={`${state.progress}% journey complete`}>
-          <div className="foundation-ring"><span>{state.progress}%</span></div>
-          <strong>{state.readiness}</strong>
+        <div className="foundation-readiness" style={progressStyle} aria-label={`${journeyProgress}% journey complete`}>
+          <div className="foundation-ring"><span>{journeyProgress}%</span></div>
+          <strong>{journeyProgress >= 67 ? "Good enough to begin" : state.readiness}</strong>
           <small>Journey completion</small>
         </div>
       </section>
@@ -56,21 +68,23 @@ export default async function JourneyPage() {
       <section className="glass-card foundation-route" aria-labelledby="foundation-route-title">
         <div className="foundation-section-heading">
           <div><div className="page-eyebrow">Start to finish</div><h2 id="foundation-route-title">Build the evidence Sartho can trust</h2></div>
-          <span>Step {state.currentStep} of 3</span>
+          <span>Step {currentJourneyStep} of 6</span>
         </div>
-        <ol className="foundation-track" style={progressStyle}>
+        <ol className="foundation-track foundation-track-six" style={progressStyle}>
           <span className="foundation-track-line" aria-hidden="true"><i /></span>
-          {state.steps.map((step, index) => (
-            <li key={step.id} className={`foundation-node is-${step.state}`}>
-              <a href={`#${step.id}`} aria-current={step.state === "current" ? "step" : undefined}>
-                <span className="foundation-node-marker">{step.state === "complete" ? "✓" : index + 1}</span>
+          {journeySteps.map((step, index) => {
+            const stepState = step.complete ? "complete" : index + 1 === currentJourneyStep ? "current" : "upcoming";
+            return (
+            <li key={step.label} className={`foundation-node is-${stepState}`}>
+              <a href={step.href} aria-current={stepState === "current" ? "step" : undefined}>
+                <span className="foundation-node-marker">{step.complete ? "✓" : index + 1}</span>
                 <small>Step {index + 1}</small>
                 <strong>{step.label}</strong>
                 <span>{step.detail}</span>
-                {step.state === "current" ? <em>Continue here</em> : null}
+                {stepState === "current" ? <em>Continue here</em> : null}
               </a>
             </li>
-          ))}
+          )})}
         </ol>
       </section>
 
