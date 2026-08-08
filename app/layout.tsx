@@ -13,6 +13,7 @@ import "./ai-workspace.css";
 import "./account-actions.css";
 import "./loading-and-versions.css";
 import "./journey-workspace.css";
+import "./sites-integration.css";
 import { AppShell } from "@/components/app-shell";
 
 export const metadata: Metadata = {
@@ -33,7 +34,7 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
         */}
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var t=localStorage.getItem("sartho-theme");if(!t){t=window.matchMedia("(prefers-color-scheme: light)").matches?"light":"dark";}document.documentElement.setAttribute("data-theme",t);}catch(e){document.documentElement.setAttribute("data-theme","dark");}})();`,
+            __html: `(function(){try{var t=localStorage.getItem("sartho-theme-v2")||"light";document.documentElement.setAttribute("data-theme",t);}catch(e){document.documentElement.setAttribute("data-theme","light");}})();`,
           }}
         />
         <AppShell>{children}</AppShell>
