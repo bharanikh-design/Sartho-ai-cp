@@ -4,16 +4,20 @@ import { requireUser } from "@/lib/auth";
 import { getCareerWorkspace } from "@/lib/data/career";
 import { getHomeJourneyState } from "@/lib/dashboard/home-state";
 import type { JobStatus } from "@/lib/types";
+import { withJwtClockSkewRetry } from "@/lib/supabase/retry";
 
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
   const { supabase, user } = await requireUser();
   const { profile, lanes, evidence } = await getCareerWorkspace(supabase, user.id);
-  const { data: jobs, error: jobsError } = await supabase
-    .from("jobs")
-    .select("id,status")
-    .eq("user_id", user.id);
+  const { data: jobs, error: jobsError } = await withJwtClockSkewRetry(() =>
+    supabase
+      .from("jobs")
+      .select("id,status")
+      .eq("user_id", user.id),
+    (result) => result.error,
+  );
 
   if (jobsError) throw jobsError;
 
