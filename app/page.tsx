@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { ResumeImport } from "@/components/resume-import";
 import { requireUser } from "@/lib/auth";
 import { getCareerWorkspace } from "@/lib/data/career";
@@ -11,6 +12,26 @@ export const dynamic = "force-dynamic";
 export default async function HomePage() {
   const { supabase, user } = await requireUser();
   const { profile, lanes, evidence } = await getCareerWorkspace(supabase, user.id);
+
+  /*
+   * The Dashboard is the reward after onboarding, not the onboarding itself.
+   * Until Sartho has a résumé, career context, user-selected strengths, a
+   * weighted role strategy and approved evidence, the production entry point
+   * must resume the Journey at the first unfinished step.
+   */
+  const approvedEvidence = evidence.filter((item) => item.approval_status === "approved").length;
+  const pendingEvidence = evidence.filter((item) => item.approval_status === "pending").length;
+  const activeLaneAllocation = lanes.filter((lane) => lane.active).reduce((total, lane) => total + lane.weight, 0);
+  const foundationComplete = evidence.length > 0
+    && Boolean(profile?.headline && profile.location)
+    && Boolean(profile?.strengths.length)
+    && lanes.length > 0
+    && activeLaneAllocation === 100
+    && approvedEvidence > 0
+    && pendingEvidence === 0;
+
+  if (!foundationComplete) redirect("/journey");
+
   const { data: jobs, error: jobsError } = await withJwtClockSkewRetry(() =>
     supabase
       .from("jobs")
@@ -21,8 +42,6 @@ export default async function HomePage() {
 
   if (jobsError) throw jobsError;
 
-  const approvedEvidence = evidence.filter((item) => item.approval_status === "approved").length;
-  const pendingEvidence = evidence.filter((item) => item.approval_status === "pending").length;
   const jobRows = (jobs ?? []) as Array<{ id: string; status: JobStatus }>;
   const activeApplications = jobRows.filter((job) => !["offer", "rejected", "withdrawn"].includes(job.status)).length;
   const interviewCount = jobRows.filter((job) => job.status === "interview" || job.status === "assessment").length;
