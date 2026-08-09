@@ -70,14 +70,6 @@
 }
 :root[data-theme="light"] .rail-link-icon { width: 27px; height: 27px; border-radius: 9px; }
 :root[data-theme="light"] .active-pip { display: none; }
-:root[data-theme="light"] .rail-primary-action {
-  margin-top: 16px;
-  color: white;
-  border: 0;
-  border-radius: 11px;
-  background: #174b3a;
-  box-shadow: 0 9px 20px rgba(23,75,58,.16);
-}
 :root[data-theme="light"] .privacy-card {
   border-color: #dbe8e2;
   border-radius: 13px;

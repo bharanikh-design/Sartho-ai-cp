@@ -9,36 +9,16 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase";
 import { OnboardingCarousel } from "@/components/onboarding-carousel";
-
-type IconName =
-  | "home"
-  | "journey"
-  | "truth"
-  | "analyse"
-  | "resume"
-  | "interview"
-  | "applications"
-  | "sparkles"
-  | "shield";
-
-type NavigationItem = {
-  label: string;
-  shortLabel: string;
-  href: string;
-  icon: IconName;
-};
+import {
+  getPageLabel,
+  isNavigationItemActive,
+  mobileNavigation,
+  primaryNavigation,
+  type NavigationIconName,
+  type NavigationItem,
+} from "@/lib/navigation";
 
 type AccountAction = "delete" | "wipe";
-
-const navigation: NavigationItem[] = [
-  { label: "Dashboard", shortLabel: "Home", href: "/", icon: "home" },
-  { label: "User Journey", shortLabel: "Journey", href: "/journey", icon: "journey" },
-  { label: "Résumé Studio", shortLabel: "Résumé", href: "/resume-studio", icon: "resume" },
-  { label: "Career Direction", shortLabel: "Direction", href: "/career-direction", icon: "truth" },
-  { label: "Search Plan", shortLabel: "Search", href: "/search-plan", icon: "analyse" },
-  { label: "Applications", shortLabel: "Track", href: "/applications", icon: "applications" },
-  { label: "Interview Prep", shortLabel: "Prepare", href: "/interview-prep", icon: "interview" },
-];
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -53,7 +33,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [accountBusy, setAccountBusy] = useState(false);
   const [accountError, setAccountError] = useState<string | null>(null);
   const [theme, setTheme] = useState<"dark" | "light">("dark");
-  const currentPage = navigation.find((item) => isActive(pathname, item.href))?.label ?? "Sartho";
+  const currentPage = getPageLabel(pathname);
 
   useEffect(() => {
     // The inline script in the document head already applied this before paint;
@@ -205,20 +185,16 @@ export function AppShell({ children }: { children: ReactNode }) {
 
         <div className="rail-section-label">Your career</div>
         <nav className="rail-nav">
-          {navigation.map((item) => <NavItem key={item.href} item={item} active={isActive(pathname, item.href)} />)}
+          {primaryNavigation.map((item) => (
+            <NavItem key={item.href} item={item} active={isNavigationItemActive(pathname, item.href)} />
+          ))}
         </nav>
 
-        <Link href="/search-plan" className="rail-primary-action">
-          <Icon name="sparkles" />
-          <span>Review search plan</span>
-          <span className="rail-action-arrow" aria-hidden="true">↗</span>
-        </Link>
-
         <div className="rail-spacer" />
-        <Link href="/journey" className="privacy-card journey-summary-card">
+        <div className="privacy-card journey-summary-card" aria-label="Human-controlled career workspace">
           <span className="privacy-icon"><Icon name="shield" /></span>
-          <div><strong>Your career foundation</strong><p>Resume, context, strengths and priorities—under your control.</p></div>
-        </Link>
+          <div><strong>Human-controlled</strong><p>Nothing is submitted without your approval.</p></div>
+        </div>
         <div className="rail-footer"><span className="live-dot" /><span>Secure session</span><span>·</span><span>Evidence-led</span></div>
       </aside>
 
@@ -280,8 +256,8 @@ export function AppShell({ children }: { children: ReactNode }) {
       </div>
 
       <nav className="mobile-dock glass-strong" aria-label="Mobile navigation">
-        {navigation.map((item) => {
-          const active = isActive(pathname, item.href);
+        {mobileNavigation.map((item) => {
+          const active = isNavigationItemActive(pathname, item.href);
           return (
             <Link key={item.href} href={item.href} className={`dock-item${active ? " is-active" : ""}`} aria-current={active ? "page" : undefined}>
               <span className="dock-icon"><Icon name={item.icon} /></span><span>{item.shortLabel}</span>
@@ -335,16 +311,17 @@ export function AppShell({ children }: { children: ReactNode }) {
 
 function NavItem({ item, active }: { item: NavigationItem; active: boolean }) {
   return (
-    <Link href={item.href} className={`rail-link${active ? " is-active" : ""}`} aria-current={active ? "page" : undefined}>
+    <Link
+      href={item.href}
+      className={`rail-link${active ? " is-active" : ""}`}
+      aria-current={active ? "page" : undefined}
+      title={item.purpose}
+    >
       <span className="rail-link-icon"><Icon name={item.icon} /></span>
       <span>{item.label}</span>
       {active ? <span className="active-pip" aria-hidden="true" /> : null}
     </Link>
   );
-}
-
-function isActive(pathname: string, href: string) {
-  return href === "/" ? pathname === "/" : pathname.startsWith(href);
 }
 
 function getGreeting() {
@@ -354,7 +331,7 @@ function getGreeting() {
   return "Good evening";
 }
 
-function Icon({ name }: { name: IconName }) {
+function Icon({ name }: { name: NavigationIconName }) {
   const common = { width: 20, height: 20, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round" as const, strokeLinejoin: "round" as const, "aria-hidden": true };
 
   switch (name) {
@@ -372,8 +349,6 @@ function Icon({ name }: { name: IconName }) {
       return <svg {...common}><path d="M5 5.5h14v10H9l-4 3v-13Z" /><path d="M9 9h6M9 12h4" /></svg>;
     case "applications":
       return <svg {...common}><rect x="4" y="3.5" width="16" height="17" rx="3" /><path d="M8 8h8M8 12h8M8 16h4" /></svg>;
-    case "sparkles":
-      return <svg {...common}><path d="m12 3 1.1 3.1L16 7.2l-2.9 1.1L12 11.5l-1.1-3.2L8 7.2l2.9-1.1L12 3Z" /><path d="m18 13 .8 2.2L21 16l-2.2.8L18 19l-.8-2.2L15 16l2.2-.8L18 13Z" /><path d="m6 14 .7 1.8 1.8.7-1.8.7L6 19l-.7-1.8-1.8-.7 1.8-.7L6 14Z" /></svg>;
     case "shield":
       return <svg {...common}><path d="M12 3 5 6v5c0 4.4 2.9 7.4 7 9 4.1-1.6 7-4.6 7-9V6l-7-3Z" /><path d="M9.5 12.2 11 13.7l3.7-4" /></svg>;
   }
