@@ -246,6 +246,10 @@ textarea:focus-visible,
   white-space: pre-wrap;
 }
 .page-footer-actions { display: flex; justify-content: space-between; gap: 12px; }
+.job-detail-management,
+.delete-opportunity-confirmation { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.delete-opportunity-confirmation > span:first-child { color: var(--text-secondary); font-size: 11px; }
+.delete-opportunity-confirmation .field-error { flex-basis: 100%; }
 .is-disabled { opacity: .55; pointer-events: none; }
 
 .skeleton {

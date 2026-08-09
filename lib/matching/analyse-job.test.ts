@@ -13,14 +13,14 @@ function profileOf(...skills: ReturnType<typeof skill>[]): SkillProfile {
 const longEnough = (body: string) => body.padEnd(140, " and other responsibilities ");
 
 describe("analyseJobDescription", () => {
-  it("refuses to judge a role when there is no approved evidence", () => {
+  it("refuses to judge a role before the Career Profile is confirmed", () => {
     const result = analyseJobDescription(
       longEnough("We need a Head of End User Computing to run a ServiceNow programme"),
       { skills: [], totalApproved: 0, unclassified: 0 },
     );
     expect(result.recommendation).toBe("review");
     expect(result.matchedSkills).toEqual([]);
-    expect(result.explanation).toMatch(/no approved evidence/i);
+    expect(result.explanation).toMatch(/confirmed Career Profile/i);
   });
 
   it("refuses to judge a description too short to read", () => {
@@ -65,7 +65,7 @@ describe("analyseJobDescription", () => {
     );
     expect(result.recommendation).toBe("skip");
     expect(result.matchedSkills).toEqual([]);
-    expect(result.explanation).toMatch(/cannot show that you belong/i);
+    expect(result.explanation).toMatch(/cannot yet show a strong fit/i);
   });
 
   it("names the leading skills a role ignores, so a pivot is visible", () => {

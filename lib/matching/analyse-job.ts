@@ -87,7 +87,7 @@ export function analyseJobDescription(rawText: string, profile: SkillProfile): J
      * is the exact failure this rewrite exists to remove.
      */
     return nothingToSayYet(
-      "Sartho has no approved evidence to read this role against yet. Upload a résumé and approve your claims first.",
+      "Sartho needs a confirmed Career Profile before it can judge this role. Review your profile first, then analyse the opportunity again.",
     );
   }
 
@@ -129,10 +129,10 @@ export function analyseJobDescription(rawText: string, profile: SkillProfile): J
   const confidence: Confidence = weight >= 7 ? "high" : weight >= 3 ? "medium" : "low";
 
   const explanation = !matchedSkills.length
-    ? "None of your evidenced skills appear in this role. It may still be worth reading, but Sartho cannot show that you belong in it from what you have approved."
+    ? "None of the skills in your confirmed Career Profile appear in this role. It may still be worth reading, but Sartho cannot yet show a strong fit."
     : recommendation === "apply"
-      ? `This role calls for ${leadingMatched.length} of your ${leading.length} strongest evidenced skills. Check the mandatory requirements, location and work authorisation before applying.`
-      : `This role touches ${matchedSkills.length} of your evidenced skill${matchedSkills.length === 1 ? "" : "s"} but only ${leadingMatched.length} of your strongest. Read the mandatory requirements against your approved evidence before deciding.`;
+      ? `This role calls for ${leadingMatched.length} of your ${leading.length} strongest Career Profile skills. Check the mandatory requirements, location and work authorisation before applying.`
+      : `This role touches ${matchedSkills.length} skill${matchedSkills.length === 1 ? "" : "s"} in your Career Profile but only ${leadingMatched.length} of your strongest. Review the mandatory requirements before deciding.`;
 
   return {
     recommendation,
