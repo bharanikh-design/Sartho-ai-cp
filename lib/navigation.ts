@@ -37,7 +37,7 @@ const opportunityNavigation: NavigationItem = {
   shortLabel: "Explore",
   href: "/jobs",
   icon: "analyse",
-  purpose: "Review saved opportunities or add a role for evidence-backed analysis.",
+  purpose: "Review saved opportunities or add a role for Career Profile matching.",
 };
 
 const applicationNavigation: NavigationItem = {
@@ -53,7 +53,7 @@ const profileNavigation: NavigationItem = {
   shortLabel: "Profile",
   href: "/career-truth",
   icon: "truth",
-  purpose: "Manage your master résumé, approved evidence, strengths and career direction.",
+  purpose: "Review your professional story, strengths, career history and direction.",
 };
 
 const strategyNavigation: NavigationItem = {

@@ -33,7 +33,7 @@ export function DeepAnalysisPanel({
   }
 
   const buttonLabel = running
-    ? "Analysing approved evidence…"
+    ? "Matching your Career Profile…"
     : status === "complete"
       ? "Run deep analysis again"
       : status === "failed"
@@ -50,7 +50,7 @@ export function DeepAnalysisPanel({
       >
         {buttonLabel} <span aria-hidden="true">✦</span>
       </button>
-      <span>{approvedEvidenceCount} approved evidence records available</span>
+      <span>{approvedEvidenceCount ? "Your confirmed Career Profile is ready for matching" : "Confirm your Career Profile before running this analysis"}</span>
       {error ? <div className="inline-error" role="alert">{error}</div> : null}
     </div>
   );

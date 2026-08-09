@@ -184,3 +184,29 @@
 .journey-card-progress{display:block;height:3px;margin-top:10px;border-radius:999px;background:rgba(23,75,58,.12);overflow:hidden}.journey-card-progress i{display:block;height:100%;border-radius:inherit;background:#2f8b69;transition:width .45s ease}.profile-header-actions{margin-top:22px}.opportunity-summary-grid{grid-template-columns:repeat(4,minmax(0,1fr))}.search-strategy-lanes{margin-top:18px}
 @media(max-width:900px){.opportunity-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:560px){.opportunity-summary-grid{grid-template-columns:1fr}}
+
+/* Career Profile review: intentionally higher contrast than the legacy record-by-record review. */
+:root[data-theme="light"] .profile-summary-strip { border-color:#d5dfda;background:#d5dfda }
+:root[data-theme="light"] .profile-summary-strip>div { background:#f8faf9 }
+:root[data-theme="light"] .profile-summary-strip span,
+:root[data-theme="light"] .profile-review-label { color:#53635d }
+:root[data-theme="light"] .profile-review-heading p,
+:root[data-theme="light"] .profile-review-section>p,
+:root[data-theme="light"] .attention-item p,
+:root[data-theme="light"] .profile-confirm-bar div>span,
+:root[data-theme="light"] .profile-next-action div>span { color:#4f5f59 }
+:root[data-theme="light"] .profile-review-section,
+:root[data-theme="light"] .profile-highlight-grid article { border-color:#d8e1dd;background:#fbfcfb }
+:root[data-theme="light"] .profile-strength-list span { color:#174b3a;border-color:#c7dfd4;background:#eaf5f0 }
+:root[data-theme="light"] .profile-review-status { color:#805b1e;border-color:#ead6ad;background:#fff8e9 }
+:root[data-theme="light"] .profile-review-status.is-confirmed { color:#176144;border-color:#bcdcca;background:#e9f6f0 }
+:root[data-theme="light"] .attention-item { border-color:#e1cfa8;background:#fffaf0 }
+:root[data-theme="light"] .attention-item textarea { color:#17221f;border-color:#cbd7d1;background:#fff }
+:root[data-theme="light"] .attention-actions button { color:#25342f;border-color:#cbd7d1;background:#fff }
+:root[data-theme="light"] .attention-actions button.is-primary { color:#fff;border-color:#174b3a;background:#174b3a }
+:root[data-theme="light"] .profile-highlight-grid article>span { color:#4e6159 }
+:root[data-theme="light"] .profile-highlight-grid textarea { color:#17221f;border-color:#cbd7d1;background:#fff }
+:root[data-theme="light"] .profile-highlight-grid strong,
+:root[data-theme="light"] .profile-text-action { color:#175f45 }
+:root[data-theme="light"] .profile-confirm-bar,
+:root[data-theme="light"] .profile-next-action { border-color:#c6ddd3;background:#eef8f3 }

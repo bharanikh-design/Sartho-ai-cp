@@ -104,7 +104,7 @@ export function JobAnalyser({ initialJobs, skillProfile }: { initialJobs: JobRec
             <button type="button" onClick={clear} className="secondary-button">Clear</button>
           </div>
 
-          <p className="analyser-note">The first pass is transparent and rule-based. Deep evidence matching is an explicit second action after the role is saved.</p>
+          <p className="analyser-note">The first pass is transparent and rule-based. Detailed Career Profile matching is an explicit second action after the role is saved.</p>
         </section>
 
         <section className="glass-card decision-card" aria-live="polite">
@@ -131,9 +131,9 @@ export function JobAnalyser({ initialJobs, skillProfile }: { initialJobs: JobRec
                 <span className="muted text-xs">Sartho recommendation</span>
               </div>
 
-              <Result label="Strongest match" value={analysis.primaryStrength ?? "Nothing you have evidenced"} />
-              <Result label="Backed by your evidence" value={`${analysis.evidenceBacking}/100`} />
-              <SignalList title="Your skills this role asks for" values={analysis.matchedSignals} empty="None of your evidenced skills appear in this role." />
+              <Result label="Strongest match" value={analysis.primaryStrength ?? "No clear match found"} />
+              <Result label="Profile support" value={`${analysis.evidenceBacking}/100`} />
+              <SignalList title="Your skills this role asks for" values={analysis.matchedSignals} empty="No matching skills were found in your Career Profile." />
               <SignalList title="Your strengths it does not use" values={analysis.cautionSignals} empty="This role calls on all of your strongest skills." />
               <p className="analysis-explanation">{analysis.explanation}</p>
 

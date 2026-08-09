@@ -38,10 +38,10 @@ export function CareerHistory({
     );
   }
 
-  const approvedByRole = new Map<string, number>();
+  const highlightsByRole = new Map<string, number>();
   for (const item of evidence) {
-    if (item.approval_status !== "approved" || !item.career_role_id) continue;
-    approvedByRole.set(item.career_role_id, (approvedByRole.get(item.career_role_id) ?? 0) + 1);
+    if (item.approval_status === "rejected" || !item.career_role_id) continue;
+    highlightsByRole.set(item.career_role_id, (highlightsByRole.get(item.career_role_id) ?? 0) + 1);
   }
 
   const ordered = roles.slice().sort((a, b) => {
@@ -52,7 +52,7 @@ export function CareerHistory({
   return (
     <ol className="history">
       {ordered.map((role) => {
-        const approved = approvedByRole.get(role.id) ?? 0;
+        const highlights = highlightsByRole.get(role.id) ?? 0;
         return (
           <li key={role.id} className={`history-role${role.is_current ? " is-current" : ""}`}>
             <div className="history-marker" aria-hidden="true" />
@@ -67,9 +67,9 @@ export function CareerHistory({
               </p>
               {role.summary ? <p className="history-summary">{role.summary}</p> : null}
               <span className="history-count">
-                {approved
-                  ? `${approved} approved claim${approved === 1 ? "" : "s"} from this role`
-                  : "No approved claims from this role yet"}
+                {highlights
+                  ? `${highlights} career highlight${highlights === 1 ? "" : "s"}`
+                  : "No career highlights captured from this role"}
               </span>
             </div>
           </li>
