@@ -7,13 +7,15 @@ Sartho is a private, evidence-led career intelligence and application workflow f
 ## Working product flow
 
 1. Sign in through Supabase Auth.
-2. Review the private Career Profile and approve, edit or reject evidence.
-3. Paste and analyse a job description using the transparent rule-based first pass.
-4. Save the job and preserve its analysis.
-5. Move the opportunity through the Applications pipeline.
-6. Explicitly run server-side deep analysis against approved evidence only.
-7. Review the persisted requirement-to-evidence mapping and honest gaps.
-8. Explicitly draft a separate tailored résumé with a complete change log.
+2. Complete Your Journey: résumé, extraction, evidence, context, strengths,
+   target profiles and search strategy.
+3. Review the private Career Profile and approve, edit or reject evidence.
+4. Add and analyse a role using the transparent rule-based first pass.
+5. Save the opportunity and preserve its analysis.
+6. Move it through the Applications pipeline.
+7. Explicitly run server-side deep analysis against approved evidence only.
+8. Review the persisted requirement-to-evidence mapping and honest gaps.
+9. Explicitly draft a separate tailored résumé with a complete change log.
 
 ## Product guardrails
 

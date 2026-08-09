@@ -60,6 +60,7 @@ export function EvidenceReview({ initialItems }: { initialItems: EvidenceRecord[
       const saved = await persist(item.id, { approval_status: status });
       setItems((current) => current.map((record) => record.id === item.id ? { ...optimistic, ...saved } : record));
       setUndo({ before, label: status === "approved" ? "Evidence approved" : status === "rejected" ? "Evidence rejected" : "Evidence returned to review" });
+      window.dispatchEvent(new Event("sartho:journey-changed"));
     } catch (caught) {
       setItems((current) => current.map((record) => record.id === item.id ? before : record));
       setError(caught instanceof Error ? caught.message : "Unable to save the evidence change.");
@@ -101,10 +102,10 @@ export function EvidenceReview({ initialItems }: { initialItems: EvidenceRecord[
         approval_status: before.approval_status,
         claim: before.claim,
         context: before.context,
-        safe_for_resume: before.safe_for_resume,
       });
       setItems((current) => current.map((record) => record.id === before.id ? { ...before, ...saved } : record));
       setUndo(null);
+      window.dispatchEvent(new Event("sartho:journey-changed"));
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Unable to undo the change.");
     } finally {

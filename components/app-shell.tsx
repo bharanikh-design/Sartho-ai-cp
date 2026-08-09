@@ -5,20 +5,26 @@ import Link from "next/link";
 import sarthoIcon from "@/sartho.png";
 import { usePathname, useRouter } from "next/navigation";
 import type { ReactNode } from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase";
 import { OnboardingCarousel } from "@/components/onboarding-carousel";
 import {
   getPageLabel,
+  getMobileNavigation,
+  getNavigationForPath,
   isNavigationItemActive,
-  mobileNavigation,
-  primaryNavigation,
   type NavigationIconName,
   type NavigationItem,
 } from "@/lib/navigation";
 
 type AccountAction = "delete" | "wipe";
+type JourneyStatus = {
+  activated: boolean;
+  progress: number;
+  currentHref: string;
+  currentLabel: string;
+};
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -33,7 +39,11 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [accountBusy, setAccountBusy] = useState(false);
   const [accountError, setAccountError] = useState<string | null>(null);
   const [theme, setTheme] = useState<"dark" | "light">("dark");
+  const [journeyStatus, setJourneyStatus] = useState<JourneyStatus | null>(null);
   const currentPage = getPageLabel(pathname);
+  const activated = journeyStatus?.activated ?? false;
+  const navigation = getNavigationForPath(activated, pathname);
+  const mobileNavigation = getMobileNavigation(activated);
 
   useEffect(() => {
     // The inline script in the document head already applied this before paint;
@@ -53,6 +63,16 @@ export function AppShell({ children }: { children: ReactNode }) {
     }
   }
 
+  const refreshJourneyStatus = useCallback(async () => {
+    try {
+      const response = await fetch("/api/journey/status", { cache: "no-store" });
+      if (!response.ok) return;
+      setJourneyStatus(await response.json() as JourneyStatus);
+    } catch {
+      // Navigation remains in the safe onboarding state if status cannot load.
+    }
+  }, []);
+
   useEffect(() => {
     let active = true;
 
@@ -60,18 +80,25 @@ export function AppShell({ children }: { children: ReactNode }) {
       if (!active) return;
       setSession(data.session);
       setLoading(false);
+      if (data.session) void refreshJourneyStatus();
     });
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       setSession(nextSession);
       setLoading(false);
+      if (nextSession) void refreshJourneyStatus();
     });
 
     return () => {
       active = false;
       listener.subscription.unsubscribe();
     };
-  }, [supabase]);
+  }, [refreshJourneyStatus, supabase]);
+
+  useEffect(() => {
+    window.addEventListener("sartho:journey-changed", refreshJourneyStatus);
+    return () => window.removeEventListener("sartho:journey-changed", refreshJourneyStatus);
+  }, [refreshJourneyStatus]);
 
   useEffect(() => {
     if (!loading && !session && pathname !== "/login") router.replace("/login");
@@ -178,23 +205,27 @@ export function AppShell({ children }: { children: ReactNode }) {
       <div className="ambient ambient-two" aria-hidden="true" />
 
       <aside className="desktop-rail glass-strong" aria-label="Primary navigation">
-        <Link href="/" className="brand-lockup" aria-label="Sartho home">
+        <Link href={activated ? "/" : "/journey"} className="brand-lockup" aria-label="Sartho home">
           <Image className="brand-mark" src={sarthoIcon} alt="" width={176} height={176} quality={95} priority />
           <span><strong>Sartho</strong><small>AI Career Copilot</small></span>
         </Link>
 
         <div className="rail-section-label">Your career</div>
         <nav className="rail-nav">
-          {primaryNavigation.map((item) => (
+          {navigation.map((item) => (
             <NavItem key={item.href} item={item} active={isNavigationItemActive(pathname, item.href)} />
           ))}
         </nav>
 
         <div className="rail-spacer" />
-        <div className="privacy-card journey-summary-card" aria-label="Human-controlled career workspace">
-          <span className="privacy-icon"><Icon name="shield" /></span>
-          <div><strong>Human-controlled</strong><p>Nothing is submitted without your approval.</p></div>
-        </div>
+        <Link href="/journey" className="privacy-card journey-summary-card" aria-label="Open career foundation status">
+          <span className="privacy-icon"><Icon name={activated ? "shield" : "journey"} /></span>
+          <div>
+            <strong>{activated ? "Career foundation ready" : `Career foundation · ${journeyStatus?.progress ?? "—"}%`}</strong>
+            <p>{activated ? "Review it whenever your goals change." : `Next: ${journeyStatus?.currentLabel ?? "Loading your next step"}`}</p>
+            <span className="journey-card-progress" aria-hidden="true"><i style={{ width: `${journeyStatus?.progress ?? 0}%` }} /></span>
+          </div>
+        </Link>
         <div className="rail-footer"><span className="live-dot" /><span>Secure session</span><span>·</span><span>Evidence-led</span></div>
       </aside>
 
@@ -255,7 +286,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <main className="page-content">{children}</main>
       </div>
 
-      <nav className="mobile-dock glass-strong" aria-label="Mobile navigation">
+      <nav className="mobile-dock glass-strong" aria-label="Mobile navigation" style={{ gridTemplateColumns: `repeat(${mobileNavigation.length}, minmax(0, 1fr))` }}>
         {mobileNavigation.map((item) => {
           const active = isNavigationItemActive(pathname, item.href);
           return (

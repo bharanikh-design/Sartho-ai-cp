@@ -1,29 +1,26 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { getAuthenticatedUser } from "@/lib/auth";
 import { getCareerWorkspace } from "@/lib/data/career";
 import { analyseJobDescription } from "@/lib/matching/analyse-job";
 import { buildSkillProfile } from "@/lib/matching/skill-profile";
 
+export const jobInputSchema = z.object({
+  title: z.string().trim().min(2).max(240),
+  employer: z.string().trim().max(240).optional().default(""),
+  location: z.string().trim().max(240).optional().default(""),
+  sourceUrl: z.union([z.literal(""), z.string().url().startsWith("https://").max(2000)]).optional().default(""),
+  description: z.string().trim().min(120).max(80_000),
+});
+
 export async function POST(request: Request) {
   const { supabase, user } = await getAuthenticatedUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const body = await request.json().catch(() => null) as {
-    title?: string;
-    employer?: string;
-    location?: string;
-    sourceUrl?: string;
-    description?: string;
-  } | null;
+  const parsed = jobInputSchema.safeParse(await request.json().catch(() => null));
+  if (!parsed.success) return NextResponse.json({ error: "Review the role details and use a secure HTTPS source link." }, { status: 400 });
 
-  const title = body?.title?.trim();
-  const description = body?.description?.trim();
-  if (!title || title.length < 2) {
-    return NextResponse.json({ error: "Add the job title before saving." }, { status: 400 });
-  }
-  if (!description || description.length < 120) {
-    return NextResponse.json({ error: "Paste a fuller job description before saving." }, { status: 400 });
-  }
+  const { title, employer, location, sourceUrl, description } = parsed.data;
 
   /*
    * Read against this user's own evidence. The matcher has no career of its
@@ -36,11 +33,11 @@ export async function POST(request: Request) {
     .from("jobs")
     .insert({
       user_id: user.id,
-      source: body?.sourceUrl ? "job-link" : "manual",
-      source_url: body?.sourceUrl?.trim() || null,
-      employer: body?.employer?.trim() || null,
+      source: sourceUrl ? "job-link" : "manual",
+      source_url: sourceUrl || null,
+      employer: employer || null,
       title,
-      location: body?.location?.trim() || null,
+      location: location || null,
       raw_description: description,
       status: "saved",
       technical_heaviness: analysis.evidenceBacking,
@@ -50,6 +47,9 @@ export async function POST(request: Request) {
     .select("*")
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) {
+    console.error("Unable to save opportunity", error);
+    return NextResponse.json({ error: "Sartho could not save this opportunity." }, { status: 500 });
+  }
   return NextResponse.json({ job: data }, { status: 201 });
 }

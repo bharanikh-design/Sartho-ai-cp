@@ -47,6 +47,7 @@ export function CareerDirectionEditor({
       body: JSON.stringify({ headline, summary, location, workAuthorisation, strengths, lanes }),
     });
     setStatus(response.ok ? "saved" : "error");
+    if (response.ok) window.dispatchEvent(new Event("sartho:journey-changed"));
   }
 
   return (
@@ -85,7 +86,7 @@ export function CareerDirectionEditor({
         <div className="inline-add"><input value={laneDraft} onChange={(event) => setLaneDraft(event.target.value)} onKeyDown={(event) => event.key === "Enter" && (event.preventDefault(), addLane())} placeholder="Add a target role or profile" /><button type="button" onClick={addLane}>Add profile</button></div>
       </section>
 
-      <div className="direction-save-bar"><div><strong>{allocation === 100 ? "Search priorities balanced" : "Adjust active priorities to total 100%"}</strong><span>{status === "saved" ? "Saved securely" : status === "error" ? "Could not save—please try again" : "Changes remain private to your Sartho account"}</span></div><button type="button" className="primary-button" onClick={() => void save()} disabled={status === "saving" || allocation !== 100}>{status === "saving" ? "Saving…" : "Save career direction"}</button></div>
+      <div className="direction-save-bar"><div><strong>{allocation === 100 ? "Search priorities balanced" : "Save now; activation waits for priorities to total 100%"}</strong><span>{status === "saved" ? "Progress saved securely" : status === "error" ? "Could not save—please try again" : "Changes remain private to your Sartho account"}</span></div><button type="button" className="primary-button" onClick={() => void save()} disabled={status === "saving"}>{status === "saving" ? "Saving…" : allocation === 100 ? "Save career direction" : "Save progress"}</button></div>
     </div>
   );
 }

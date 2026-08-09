@@ -1,17 +1,28 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
+import type { TargetLaneRecord } from "@/lib/types";
+import type { SearchSourcePreference } from "@/lib/data/search";
 
-export type SearchSource = { id: string; name: string; url: string; type: string; coverage: string; trust: string; active: boolean };
+export type SearchSource = SearchSourcePreference;
 
 const recommendedSources: SearchSource[] = [
   { id: "linkedin", name: "LinkedIn Jobs", url: "https://www.linkedin.com/jobs/", type: "Professional network", coverage: "Global", trust: "User-verified", active: true },
   { id: "indeed", name: "Indeed", url: "https://www.indeed.com/", type: "Job marketplace", coverage: "Global", trust: "Established source", active: true },
-  { id: "servicenow", name: "ServiceNow Careers", url: "https://careers.servicenow.com/", type: "Official employer site", coverage: "Global", trust: "Primary source", active: true },
-  { id: "deloitte", name: "Deloitte Careers", url: "https://www.deloitte.com/global/en/careers.html", type: "Official employer site", coverage: "Global", trust: "Primary source", active: true },
 ];
 
-export function SearchPlanEditor({ initialSources, initialLocations, initialRemote }: { initialSources: SearchSource[]; initialLocations: string[]; initialRemote: string }) {
+export function SearchPlanEditor({
+  initialSources,
+  initialLocations,
+  initialRemote,
+  targetLanes,
+}: {
+  initialSources: SearchSource[];
+  initialLocations: string[];
+  initialRemote: string;
+  targetLanes: TargetLaneRecord[];
+}) {
   const [sources, setSources] = useState<SearchSource[]>(initialSources.length ? initialSources : recommendedSources);
   const [locations, setLocations] = useState(initialLocations);
   const [remote, setRemote] = useState(initialRemote);
@@ -39,15 +50,36 @@ export function SearchPlanEditor({ initialSources, initialLocations, initialRemo
     setStatus("saving");
     const response = await fetch("/api/search-plan", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ sources, targetLocations: locations, remotePreference: remote }) });
     setStatus(response.ok ? "saved" : "error");
+    if (response.ok) window.dispatchEvent(new Event("sartho:journey-changed"));
   }
 
   return (
     <div className="search-plan-workspace">
       <section className="glass-card search-plan-summary">
+        <div><span>Target profiles</span><strong>{targetLanes.length || "Not set"}</strong></div>
         <div><span>Target locations</span><strong>{locations.length || "Not set"}</strong></div>
         <div><span>Active sources</span><strong>{sources.filter((source) => source.active).length}</strong></div>
         <div><span>Work model</span><strong>{remote || "Flexible"}</strong></div>
-        <div><span>Control</span><strong>You approve every application</strong></div>
+      </section>
+
+      <section className="glass-card direction-panel" id="profiles">
+        <div className="direction-heading">
+          <div><span>Role search order</span><h2>What should Sartho prioritise?</h2><p>Your role weights guide which opportunities deserve attention first. They remain editable and are never hard-coded.</p></div>
+          <Link href="/career-direction#priorities" className="secondary-button">Edit target profiles</Link>
+        </div>
+        {targetLanes.length ? (
+          <div className="strategy-grid search-strategy-lanes">
+            {targetLanes.map((lane, index) => (
+              <article key={lane.id} className="strategy-card">
+                <span className="strategy-number">{String(index + 1).padStart(2, "0")}</span>
+                <h3>{lane.name}</h3>
+                <footer><span>Search priority</span><strong>{lane.weight}%</strong></footer>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <div className="empty-inline-state">Add and weight at least one target profile before activating your search.</div>
+        )}
       </section>
 
       <section className="glass-card direction-panel">

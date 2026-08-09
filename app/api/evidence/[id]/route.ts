@@ -1,15 +1,12 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { getAuthenticatedUser } from "@/lib/auth";
-import type { ApprovalStatus } from "@/lib/types";
 
-const allowedStatuses = new Set<ApprovalStatus>(["pending", "approved", "rejected"]);
-
-type EvidencePatch = {
-  approval_status?: ApprovalStatus;
-  claim?: string;
-  context?: string | null;
-  safe_for_resume?: boolean;
-};
+const evidencePatchSchema = z.object({
+  approval_status: z.enum(["pending", "approved", "rejected"]).optional(),
+  claim: z.string().trim().min(10).max(4000).optional(),
+  context: z.string().trim().max(8000).nullable().optional(),
+}).strict().refine((value) => Object.keys(value).length > 0, "No supported changes supplied");
 
 export async function PATCH(
   request: Request,
@@ -19,33 +16,15 @@ export async function PATCH(
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { id } = await context.params;
-  const body = (await request.json().catch(() => null)) as EvidencePatch | null;
-  if (!body) return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+  if (!z.string().uuid().safeParse(id).success) return NextResponse.json({ error: "Evidence record not found." }, { status: 404 });
+  const parsed = evidencePatchSchema.safeParse(await request.json().catch(() => null));
+  if (!parsed.success) return NextResponse.json({ error: "Review the evidence change." }, { status: 400 });
 
-  const update: EvidencePatch = {};
-
-  if (body.approval_status !== undefined) {
-    if (!allowedStatuses.has(body.approval_status)) {
-      return NextResponse.json({ error: "Invalid approval status" }, { status: 400 });
-    }
-    update.approval_status = body.approval_status;
-    update.safe_for_resume = body.approval_status === "approved";
+  const update: Record<string, unknown> = { ...parsed.data };
+  if (parsed.data.approval_status !== undefined) {
+    update.safe_for_resume = parsed.data.approval_status === "approved";
   }
-
-  if (body.claim !== undefined) {
-    const claim = body.claim.trim();
-    if (claim.length < 10) {
-      return NextResponse.json({ error: "The evidence claim is too short." }, { status: 400 });
-    }
-    update.claim = claim;
-  }
-
-  if (body.context !== undefined) update.context = body.context?.trim() || null;
-  if (body.safe_for_resume !== undefined) update.safe_for_resume = body.safe_for_resume;
-
-  if (!Object.keys(update).length) {
-    return NextResponse.json({ error: "No supported changes supplied" }, { status: 400 });
-  }
+  if (parsed.data.context !== undefined) update.context = parsed.data.context || null;
 
   const { data, error } = await supabase
     .from("evidence_items")
@@ -55,6 +34,9 @@ export async function PATCH(
     .select("*")
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) {
+    console.error("Unable to update evidence", error);
+    return NextResponse.json({ error: "Sartho could not save this evidence change." }, { status: 500 });
+  }
   return NextResponse.json({ evidence: data });
 }

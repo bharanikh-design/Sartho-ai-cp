@@ -49,7 +49,7 @@ export function getHomeJourneyState({
     return {
       primaryAction: {
         href: "/jobs",
-        label: "Analyse a role",
+        label: "Open opportunities",
       },
       readiness: {
         label: "Career workspace ready",
@@ -71,9 +71,9 @@ export function getHomeJourneyState({
     readiness: {
       label: "Career evidence needs attention",
       title: "Nothing is approved for use yet.",
-      description: "Complete your User Journey or add a stronger résumé before asking Sartho to match, tailor or prepare.",
+      description: "Complete Your Journey or add a stronger résumé before asking Sartho to match, tailor or prepare.",
       href: "/journey",
-      action: "Open User Journey",
+      action: "Open Your Journey",
     },
     positioningFallback: "Approve evidence before creating a target role strategy.",
     profileMetaFallback: "Private profile",

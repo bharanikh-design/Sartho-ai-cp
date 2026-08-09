@@ -17,7 +17,7 @@ describe("getHomeJourneyState", () => {
   it("moves an approved workspace on to role analysis", () => {
     const state = getHomeJourneyState({ approvedEvidence: 12, pendingEvidence: 0 });
 
-    expect(state.primaryAction).toEqual({ href: "/jobs", label: "Analyse a role" });
+    expect(state.primaryAction).toEqual({ href: "/jobs", label: "Open opportunities" });
     expect(state.readiness.title).toBe("Your evidence base is ready.");
   });
 

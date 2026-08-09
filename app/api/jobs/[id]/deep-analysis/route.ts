@@ -55,6 +55,7 @@ export async function POST(
   const { supabase, user } = await getAuthenticatedUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await context.params;
+  if (!z.string().uuid().safeParse(id).success) return NextResponse.json({ error: "Opportunity not found." }, { status: 404 });
 
   const [jobResult, evidenceResult] = await Promise.all([
     supabase.from("jobs").select("*").eq("id", id).eq("user_id", user.id).maybeSingle(),
@@ -65,8 +66,10 @@ export async function POST(
       .eq("approval_status", "approved"),
   ]);
 
-  if (jobResult.error) return NextResponse.json({ error: jobResult.error.message }, { status: 400 });
-  if (evidenceResult.error) return NextResponse.json({ error: evidenceResult.error.message }, { status: 400 });
+  if (jobResult.error || evidenceResult.error) {
+    console.error("Unable to prepare deep analysis", jobResult.error ?? evidenceResult.error);
+    return NextResponse.json({ error: "Sartho could not prepare this opportunity for analysis." }, { status: 500 });
+  }
   if (!jobResult.data) return NextResponse.json({ error: "Job not found" }, { status: 404 });
   if (!evidenceResult.data?.length) {
     return NextResponse.json({ error: "Approve Career Profile evidence before running deep analysis." }, { status: 400 });
@@ -145,7 +148,10 @@ export async function POST(
     return NextResponse.json({ requirements, summary });
   } catch (caught) {
     await supabase.from("jobs").update({ deep_analysis_status: "failed" }).eq("id", id).eq("user_id", user.id);
-    const message = caught instanceof Error ? caught.message : "Deep analysis failed.";
+    console.error("Deep analysis failed", caught);
+    const message = caught instanceof Error && caught.message.startsWith("Sartho")
+      ? caught.message
+      : "Sartho could not complete the deep analysis. The saved opportunity and your career evidence are unchanged.";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
