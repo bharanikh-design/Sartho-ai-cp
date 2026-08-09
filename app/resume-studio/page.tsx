@@ -126,7 +126,7 @@ export default async function ResumeStudioPage() {
           </div>
           <span className="meta-pill">{imports.length} document{imports.length === 1 ? "" : "s"}</span>
         </div>
-        <ResumeImport hasEvidence={approvedCount > 0} showLead={false} continueHref="/career-truth#profile-review" />
+        <ResumeImport hasEvidence={imports.length > 0} showLead={false} continueHref="/career-truth#profile-review" />
         <div className="source-resume-library">
           <ResumeLibrary imports={imports} />
         </div>
