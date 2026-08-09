@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { DeleteOpportunityButton } from "@/components/delete-opportunity-button";
 import { DeepAnalysisPanel } from "@/components/deep-analysis-panel";
 import { JobStatusSelect } from "@/components/job-status-select";
 import { ResumeDraftPanel } from "@/components/resume-draft-panel";
@@ -65,10 +66,10 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
         </article>
 
         <article className="glass-card content-card next-card action-next-card">
-          <div className="page-eyebrow">Evidence-led analysis</div>
-          <h3>{job.deep_analysis_status === "complete" ? "Requirement mapping complete" : "Map the role to Career Profile evidence"}</h3>
-          <p>Only approved evidence is sent to the AI provider. Every claimed match must resolve to a real approved evidence record.</p>
-          <div className="impact-row"><span>Approved evidence</span><strong>{approvedEvidence?.length ?? 0} records</strong></div>
+          <div className="page-eyebrow">Career Profile match</div>
+          <h3>{job.deep_analysis_status === "complete" ? "Requirement mapping complete" : "Map the role to your Career Profile"}</h3>
+          <p>Sartho uses only the Career Profile information you have confirmed. Every suggested match remains traceable to your résumé.</p>
+          <div className="impact-row"><span>Confirmed profile details</span><strong>{approvedEvidence?.length ?? 0} records</strong></div>
           <div className="impact-row"><span>Status</span><strong>{job.deep_analysis_status.replaceAll("_", " ")}</strong></div>
           <DeepAnalysisPanel jobId={job.id} status={job.deep_analysis_status} approvedEvidenceCount={approvedEvidence?.length ?? 0} />
         </article>
@@ -78,9 +79,9 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
         <section className="glass-card content-card requirements-section">
           <div className="card-header">
             <div>
-              <div className="page-eyebrow">Requirements versus evidence</div>
+              <div className="page-eyebrow">Requirements versus Career Profile</div>
               <h2 className="section-heading">Meets {summary?.mandatoryMet ?? 0} of {summary?.mandatoryTotal ?? 0} mandatory requirements</h2>
-              <p className="section-subtitle">Every verdict remains attached to the exact evidence used to support it.</p>
+              <p className="section-subtitle">Every verdict shows which Career Profile information supports it.</p>
             </div>
             <span className="meta-pill">{requirements.length} requirements</span>
           </div>
@@ -116,7 +117,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
           <div className="empty-ledger-inner">
             <div className="empty-ledger-icon" aria-hidden="true">✦</div>
             <h3>Deep analysis has not been run yet</h3>
-            <p>Run the explicit evidence analysis above to extract requirements and map them to approved Career Profile evidence.</p>
+            <p>Run the Career Profile match above to extract the requirements and show where your background supports them.</p>
           </div>
         </section>
       )}
@@ -135,7 +136,10 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
       </section>
 
       <div className="page-footer-actions">
-        <Link href="/jobs" className="secondary-button">← Back to jobs</Link>
+        <div className="job-detail-management">
+          <Link href="/jobs" className="secondary-button">← Back to jobs</Link>
+          <DeleteOpportunityButton jobId={job.id} />
+        </div>
         <Link href="/applications" className="primary-button">Open Applications <span aria-hidden="true">→</span></Link>
       </div>
     </div>
@@ -153,10 +157,10 @@ function RequirementCard({ requirement, evidenceMap }: { requirement: JobRequire
       <p>{requirement.rationale ?? "No rationale stored."}</p>
       {citedEvidence.length ? (
         <details className="evidence-citations">
-          <summary>{citedEvidence.length} cited evidence record{citedEvidence.length === 1 ? "" : "s"}</summary>
+          <summary>{citedEvidence.length} supporting Career Profile record{citedEvidence.length === 1 ? "" : "s"}</summary>
           <div>{citedEvidence.map((evidence) => <article key={evidence.id}><p>{evidence.claim}</p><small>{evidence.source_name ?? "Source not recorded"}{evidence.source_locator ? ` · ${evidence.source_locator}` : ""}</small></article>)}</div>
         </details>
-      ) : <div className="requirement-gap">No approved evidence supports this requirement.</div>}
+      ) : <div className="requirement-gap">Your Career Profile does not currently support this requirement.</div>}
     </article>
   );
 }

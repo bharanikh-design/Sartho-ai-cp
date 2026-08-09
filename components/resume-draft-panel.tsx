@@ -48,13 +48,13 @@ export function ResumeDraftPanel({
           <div>
             <div className="page-eyebrow">Résumé Studio</div>
             <h2 className="section-heading">Draft a tailored résumé</h2>
-            <p className="section-subtitle">Create a separate review-only draft using approved evidence and the persisted requirement mapping.</p>
+            <p className="section-subtitle">Create a separate review-only draft using your confirmed Career Profile and the saved requirement mapping.</p>
           </div>
           <span className="meta-pill">Human review required</span>
         </div>
         <div className="resume-guardrail-note">The master résumé is never overwritten. Nothing is exported, sent or submitted from this action.</div>
         <button type="button" className="primary-button" disabled={!deepAnalysisComplete || running} onClick={() => void generateDraft()}>
-          {running ? "Drafting from approved evidence…" : "Draft tailored résumé"} <span aria-hidden="true">→</span>
+          {running ? "Drafting from your Career Profile…" : "Draft tailored résumé"} <span aria-hidden="true">→</span>
         </button>
         {!deepAnalysisComplete ? <p className="field-hint">Complete deep analysis first.</p> : null}
         {error ? <div className="inline-error" role="alert">{error}</div> : null}
@@ -68,7 +68,7 @@ export function ResumeDraftPanel({
         <div>
           <div className="page-eyebrow">Résumé Studio</div>
           <h2 className="section-heading">{application.resume_version ?? "Tailored résumé draft"}</h2>
-          <p className="section-subtitle">Draft — review before use. Generated only from approved résumé-safe evidence.</p>
+          <p className="section-subtitle">Draft — review before use. Generated only from confirmed, résumé-safe Career Profile information.</p>
         </div>
         <div className="resume-output-actions">
           <button type="button" className="secondary-button" onClick={() => void copyDraft()}>{copied ? "Copied" : "Copy draft"}</button>
