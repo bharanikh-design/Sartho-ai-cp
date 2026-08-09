@@ -1,213 +1,121 @@
 import Link from "next/link";
-import { EvidenceReview } from "@/components/evidence-review";
+import { CareerProfileReview } from "@/components/career-profile-review";
 import { ResumeImport } from "@/components/resume-import";
 import { CareerHistory } from "@/components/career-history";
-import { ResumeLibrary } from "@/components/resume-library";
-import { ResumeStrengthPanel } from "@/components/resume-strength";
-import { SkillSet } from "@/components/skill-set";
 import { requireUser } from "@/lib/auth";
-import { getCareerWorkspace, getResumeImports } from "@/lib/data/career";
-import { buildSkillProfile } from "@/lib/matching/skill-profile";
-import { assessResume } from "@/lib/resume/strength";
+import { getCareerWorkspace } from "@/lib/data/career";
 
 export const dynamic = "force-dynamic";
 
 export default async function CareerTruthPage() {
   const { supabase, user } = await requireUser();
-  const [{ profile, lanes, roles, evidence }, imports] = await Promise.all([
-    getCareerWorkspace(supabase, user.id),
-    getResumeImports(supabase, user.id),
-  ]);
-
-  const approved = evidence.filter((item) => item.approval_status === "approved").length;
-  const rejected = evidence.filter((item) => item.approval_status === "rejected").length;
-  const pending = evidence.length - approved - rejected;
-
-  /*
-   * Order follows the journey, not the data model.
-   *
-   * With nothing in the evidence base, every section on this page is empty and
-   * the one action that matters — putting a career in — was sitting fourth,
-   * underneath things that cannot be done yet. When there is nothing to review,
-   * the import comes first and the rest waits its turn.
-   */
+  const { profile, lanes, roles, evidence } = await getCareerWorkspace(supabase, user.id);
   const isEmpty = evidence.length === 0;
-  const skillProfile = buildSkillProfile(evidence, roles);
-  const strength = assessResume(evidence, roles, skillProfile);
+  const pending = evidence.filter((item) => item.approval_status === "pending").length;
+  const strengths = new Set(evidence
+    .filter((item) => item.approval_status !== "rejected")
+    .flatMap((item) => item.domains));
 
-  const importCard = (
-    <section className="glass-card content-card" id="resume">
-      <div className="card-header">
-        <div>
-          <h2 className="section-heading">{isEmpty ? "Start here — bring your career in" : "Add another résumé"}</h2>
-          <p className="section-subtitle">Sartho reads your résumé and records what it says — it never writes anything you did not.</p>
-        </div>
-        {isEmpty ? <span className="status-chip status-pending">Step 1</span> : null}
+  if (isEmpty) {
+    return (
+      <div className="page-stack">
+        <section className="glass-card page-header-card profile-entry-header">
+          <div className="page-eyebrow"><span className="live-dot" /> Start your career foundation</div>
+          <h1 className="page-title">Bring in your résumé</h1>
+          <p className="page-description">Upload your strongest résumé. Sartho will turn it into a concise Career Profile you can review in one sitting.</p>
+        </section>
+        <section className="glass-card content-card" id="resume">
+          <div className="card-header">
+            <div>
+              <h2 className="section-heading">Upload your master résumé</h2>
+              <p className="section-subtitle">PDF, Word or plain text. The document remains your source; Sartho organises what it contains.</p>
+            </div>
+            <span className="status-chip status-pending">Step 1</span>
+          </div>
+          <ResumeImport hasEvidence={false} />
+        </section>
       </div>
-
-      <ResumeImport hasEvidence={!isEmpty} />
-    </section>
-  );
-
-  const reviewCard = (
-    <section className="glass-card content-card" id="evidence-review">
-      <div className="card-header">
-        <div>
-          <h2 className="section-heading">Career evidence review</h2>
-          <p className="section-subtitle">Approve, edit or reject every claim before Sartho can use it. Focus a card and press A to approve or R to reject.</p>
-        </div>
-        <span className={`status-chip ${pending ? "status-pending" : "status-approved"}`}>
-          {pending ? `${pending} pending` : "Review complete"}
-        </span>
-      </div>
-
-      <EvidenceReview initialItems={evidence} />
-    </section>
-  );
+    );
+  }
 
   return (
-    <div className="page-stack">
-      <section className="glass-card page-header-card">
-        <div className="page-eyebrow"><span className="live-dot" /> Career foundation</div>
+    <div className="page-stack career-profile-page">
+      <section className="glass-card page-header-card profile-entry-header">
+        <div className="page-eyebrow"><span className="live-dot" /> Your professional foundation</div>
         <h1 className="page-title">Career Profile</h1>
-        <p className="page-description">
-          The factual source behind every match, résumé and interview answer. Sartho uses only evidence you approve and never invents a skill, metric, employer, certification or responsibility.
-        </p>
+        <p className="page-description">A clear, editable picture of your career—not a list of database records. Confirm it once, then use it to guide opportunities, résumés and interviews.</p>
 
         <div className="hero-actions profile-header-actions">
-          <Link href="/career-direction" className="primary-button">Edit direction and strengths <span aria-hidden="true">→</span></Link>
-          <Link href="/resume-studio" className="secondary-button">Open tailored résumés</Link>
+          <Link href="/career-direction" className="secondary-button">Edit career direction</Link>
+          <Link href="/resume-studio#source-resumes" className="secondary-button">Manage source résumés</Link>
         </div>
 
-        <div className="summary-grid">
-          <Summary label="Evidence records" value={String(evidence.length)} />
-          <Summary label="Approved for use" value={String(approved)} />
-          <Summary label="Awaiting review" value={String(pending)} />
+        <div className="profile-summary-strip" aria-label="Career profile summary">
+          <div><span>Experience</span><strong>{profile?.total_experience_years ? `${profile.total_experience_years}+ years` : `${roles.length} roles`}</strong></div>
+          <div><span>Career history</span><strong>{roles.length} role{roles.length === 1 ? "" : "s"}</strong></div>
+          <div><span>Strength signals</span><strong>{strengths.size}</strong></div>
+          <div><span>Profile status</span><strong>{pending ? "Ready to confirm" : "Confirmed"}</strong></div>
         </div>
       </section>
-
-      {isEmpty ? importCard : null}
 
       {profile ? (
         <section className="glass-card content-card profile-overview-card">
           <div className="card-header">
             <div>
-              <div className="page-eyebrow">Current positioning</div>
+              <div className="page-eyebrow">Professional snapshot</div>
               <h2 className="position-title">{profile.headline ?? "Career positioning"}</h2>
               {profile.summary ? <p className="section-subtitle profile-summary">{profile.summary}</p> : null}
             </div>
-            <span className="meta-pill">
-              {profile.total_experience_years ? `${profile.total_experience_years}+ years` : "Experience profile"}
-              {profile.location ? ` · ${profile.location}` : ""}
-            </span>
+            <Link href="/career-direction#context" className="profile-text-action">Edit snapshot <span>→</span></Link>
           </div>
 
           <div className="profile-facts-grid">
-            <div><span>Work authorisation</span><strong>{profile.work_authorisation ?? "Not recorded"}</strong></div>
-            <div><span>Approved evidence</span><strong>{approved} records</strong></div>
-            <div><span>Honest exclusions</span><strong>{profile.exclusions.length} guardrails</strong></div>
+            <div><span>Current location</span><strong>{profile.location ?? "Not recorded"}</strong></div>
+            <div><span>Work authorisation and mobility</span><strong>{profile.work_authorisation ?? "Not recorded"}</strong></div>
+            <div><span>Search guardrails</span><strong>{profile.exclusions.length ? `${profile.exclusions.length} preferences recorded` : "No exclusions recorded"}</strong></div>
           </div>
         </section>
       ) : null}
 
-      {isEmpty ? null : reviewCard}
+      <CareerProfileReview initialItems={evidence} />
 
-      {isEmpty ? null : (
-        <section className="glass-card content-card" id="career-history">
-          <div className="card-header">
-            <div>
-              <h2 className="section-heading">Your skill set</h2>
-              <p className="section-subtitle">
-                Built from the evidence you approved, not from what anyone claims about themselves. Each skill shows what backs it.
-              </p>
-            </div>
-            <span className="meta-pill">
-              {skillProfile.skills.length} skill{skillProfile.skills.length === 1 ? "" : "s"} from {skillProfile.totalApproved} approved claim{skillProfile.totalApproved === 1 ? "" : "s"}
-            </span>
+      <section className="glass-card content-card" id="career-history">
+        <div className="card-header">
+          <div>
+            <h2 className="section-heading">Career history</h2>
+            <p className="section-subtitle">Your professional timeline, organised from the résumé you supplied.</p>
           </div>
+          <span className="meta-pill">{roles.length} role{roles.length === 1 ? "" : "s"}</span>
+        </div>
+        <CareerHistory roles={roles} evidence={evidence} />
+      </section>
 
-          <SkillSet profile={skillProfile} />
-        </section>
-      )}
-
-      {isEmpty ? null : (
-        <section className="glass-card content-card">
-          <div className="card-header">
-            <div>
-              <h2 className="section-heading">What would make this stronger</h2>
-              <p className="section-subtitle">
-                Checks an interviewer applies without announcing them: can you say what changed, by how much, and prove it happened.
-              </p>
-            </div>
+      <section className="glass-card content-card">
+        <div className="card-header">
+          <div>
+            <h2 className="section-heading">Target profile strategy</h2>
+            <p className="section-subtitle">The role families Sartho will prioritise after your profile is confirmed.</p>
           </div>
+          <Link href="/career-direction#priorities" className="profile-text-action">Edit priorities <span>→</span></Link>
+        </div>
 
-          <ResumeStrengthPanel strength={strength} />
-        </section>
-      )}
-
-      {isEmpty ? null : (
-        <section className="glass-card content-card">
-          <div className="card-header">
-            <div>
-              <h2 className="section-heading">Career history</h2>
-              <p className="section-subtitle">Where you have worked, for how long, and how much approved evidence each role carries.</p>
-            </div>
-            <span className="meta-pill">{roles.length} role{roles.length === 1 ? "" : "s"}</span>
+        {lanes.length ? (
+          <div className="strategy-grid">
+            {lanes.map((lane, index) => (
+              <article key={lane.id} className="strategy-card">
+                <span className="strategy-number">{String(index + 1).padStart(2, "0")}</span>
+                <h3>{lane.name}</h3>
+                <footer><span>Search priority</span><strong>{lane.weight}%</strong></footer>
+              </article>
+            ))}
           </div>
-
-          <CareerHistory roles={roles} evidence={evidence} />
-        </section>
-      )}
-
-      {/*
-        * Target lanes describe how to weight a search. That is a question worth
-        * asking once there is something to search with, and noise before it.
-        */}
-      {isEmpty ? null : (
-        <section className="glass-card content-card">
-          <div className="card-header">
-            <div>
-              <h2 className="section-heading">Target role strategy</h2>
-              <p className="section-subtitle">Leadership first. Platforms support your value; they do not define your entire identity.</p>
-            </div>
-            <span className="meta-pill">{lanes.reduce((total, lane) => total + lane.weight, 0)}% search allocation</span>
+        ) : (
+          <div className="profile-next-action">
+            <div><strong>No target profiles chosen yet</strong><span>After confirming this profile, choose and rank the roles you want Sartho to pursue.</span></div>
+            <Link href="/career-direction#priorities" className="primary-button">Choose target profiles <span>→</span></Link>
           </div>
-
-          {lanes.length ? (
-            <div className="strategy-grid">
-              {lanes.map((lane, index) => (
-                <article key={lane.id} className="strategy-card">
-                  <span className="strategy-number">{String(index + 1).padStart(2, "0")}</span>
-                  <h3>{lane.name}</h3>
-                  <footer><span>Priority lane</span><strong>{lane.weight}%</strong></footer>
-                </article>
-              ))}
-            </div>
-          ) : (
-            <div className="empty-inline-state">No target role lanes are configured yet.</div>
-          )}
-        </section>
-      )}
-
-      {isEmpty ? null : importCard}
-
-      {imports.length ? (
-        <section className="glass-card content-card">
-          <div className="card-header">
-            <div>
-              <h2 className="section-heading">Your résumés</h2>
-              <p className="section-subtitle">Every document you have handed over is kept, so a claim can always point at where it came from.</p>
-            </div>
-            <span className="meta-pill">{imports.length} document{imports.length === 1 ? "" : "s"}</span>
-          </div>
-
-          <ResumeLibrary imports={imports} />
-        </section>
-      ) : null}
+        )}
+      </section>
     </div>
   );
-}
-
-function Summary({ label, value }: { label: string; value: string }) {
-  return <div className="summary-tile"><span>{label}</span><strong>{value}</strong></div>;
 }

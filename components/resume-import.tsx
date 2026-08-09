@@ -230,13 +230,13 @@ export function ResumeImport({
         <div className="resume-import-result" role="status">
           <strong>
             {result.evidenceCreated
-              ? `${result.evidenceCreated} claim${result.evidenceCreated === 1 ? "" : "s"} ready for your review`
+              ? "Your Career Profile is ready to review"
               : "Nothing new in that one"}
           </strong>
           <span>
             {result.rolesCreated ? `${result.rolesCreated} role${result.rolesCreated === 1 ? "" : "s"} added. ` : ""}
             {result.evidenceSkipped
-              ? `${result.evidenceSkipped} already in your profile, left untouched.`
+              ? "Existing Career Profile details were kept and new information was reconciled."
               : continueHref
                 ? "Nothing is used anywhere until you approve it."
                 : "Approve or reject each one below."}
@@ -249,7 +249,7 @@ export function ResumeImport({
           {continueHref ? (
             <Link href={continueHref} className="resume-import-continue">
               {result.evidenceCreated
-                ? `Review ${result.evidenceCreated} claim${result.evidenceCreated === 1 ? "" : "s"}`
+                ? "Review my Career Profile"
                 : "Open your Career Profile"}
               <span aria-hidden="true">→</span>
             </Link>

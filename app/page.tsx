@@ -16,7 +16,7 @@ export default async function HomePage() {
   /*
    * The Dashboard is the reward after onboarding, not the onboarding itself.
    * Until Sartho has a résumé, career context, user-selected strengths, a
-   * weighted role strategy and approved evidence, the production entry point
+   * weighted role strategy and a confirmed Career Profile, the production entry point
    * must resume the Journey at the first unfinished step.
    */
   const approvedEvidence = evidence.filter((item) => item.approval_status === "approved").length;
@@ -43,9 +43,9 @@ export default async function HomePage() {
     {
       href: "/career-truth",
       symbol: "✓",
-      label: "Evidence to review",
-      value: String(pendingEvidence),
-      note: pendingEvidence ? "Confirm what Sartho may use" : "Your approved evidence base is ready",
+      label: "Career Profile",
+      value: pendingEvidence ? "Review" : "Ready",
+      note: pendingEvidence ? "Confirm the profile Sartho understood" : "Your Career Profile is confirmed",
       action: pendingEvidence ? "Review Career Profile" : "Open Career Profile",
     },
     {
@@ -61,7 +61,7 @@ export default async function HomePage() {
       symbol: "R",
       label: "Résumé Studio",
       value: approvedEvidence ? "Ready" : "Setup",
-      note: approvedEvidence ? `${approvedEvidence} approved evidence records available` : "Approve evidence before tailoring",
+      note: approvedEvidence ? "Career Profile ready for tailoring" : "Confirm your Career Profile before tailoring",
       action: "Open Résumé Studio",
     },
     {
@@ -89,7 +89,7 @@ export default async function HomePage() {
           <div className="page-eyebrow"><span className="live-dot" /> Sartho AI · Your career, intelligently guided.</div>
           <h1>See the opportunity.<br />Make the right move.</h1>
           <p>
-            Sartho connects your search strategy, approved evidence and opportunity decisions—then helps you prepare an honest application and walk in ready.
+            Sartho connects your Career Profile, search strategy and opportunity decisions—then helps you prepare an honest application and walk in ready.
           </p>
           <div className="hero-actions">
             <Link href={journeyState.primaryAction.href} className="primary-button">
@@ -124,7 +124,7 @@ export default async function HomePage() {
           <div className="card-header">
             <div>
               <div className="page-eyebrow">Current positioning</div>
-              <h2 className="position-title">{profile?.headline ?? "Build your evidence-backed career positioning"}</h2>
+              <h2 className="position-title">{profile?.headline ?? "Build your career positioning"}</h2>
             </div>
             <span className="meta-pill">
               {profile?.total_experience_years ? `${profile.total_experience_years}+ years` : journeyState.profileMetaFallback}
@@ -152,21 +152,21 @@ export default async function HomePage() {
 
         <article className="glass-card content-card next-card action-next-card">
           <div className="page-eyebrow">Next best action</div>
-          <h3>{pendingEvidence ? `Verify ${Math.min(pendingEvidence, 3)} career evidence records` : "Analyse the next promising role"}</h3>
+          <h3>{pendingEvidence ? "Confirm your Career Profile" : "Analyse the next promising role"}</h3>
           <p>
             {pendingEvidence
-              ? "Approved evidence is the foundation for accurate job matching, truthful résumé tailoring and confident interview answers."
+              ? "Review one concise career summary so Sartho can match roles and tailor applications accurately."
               : "Paste a complete job description, understand the opportunity and preserve the analysis in your private workspace."}
           </p>
-          <div className="impact-row"><span>Impact</span><strong>{pendingEvidence ? "Unlocks evidence-led AI" : "Creates a complete opportunity journey"}</strong></div>
-          <div className="impact-row"><span>Estimated effort</span><strong>{pendingEvidence ? "3–5 minutes" : "2 minutes"}</strong></div>
+          <div className="impact-row"><span>Impact</span><strong>{pendingEvidence ? "Activates profile-based recommendations" : "Creates a complete opportunity journey"}</strong></div>
+          <div className="impact-row"><span>Estimated effort</span><strong>{pendingEvidence ? "One concise review" : "2 minutes"}</strong></div>
           <div className="next-action-buttons">
             <Link href={pendingEvidence ? "/career-truth" : "/jobs"} className="primary-button">
-              {pendingEvidence ? "Review evidence" : "Start analysis"} <span aria-hidden="true">→</span>
+              {pendingEvidence ? "Review Career Profile" : "Start analysis"} <span aria-hidden="true">→</span>
             </Link>
             <details className="why-details">
               <summary>Why this?</summary>
-              <p>Sartho can only make strong recommendations and drafts when its evidence base is both relevant and explicitly approved by you.</p>
+              <p>Sartho can only make strong recommendations when its understanding of your career has been confirmed by you.</p>
             </details>
           </div>
         </article>

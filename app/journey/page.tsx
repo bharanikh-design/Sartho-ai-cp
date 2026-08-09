@@ -15,17 +15,17 @@ export default async function JourneyPage() {
       <header className="journey-page-heading">
         <p>Getting to know you</p>
         <h1>Your Sartho journey</h1>
-        <span>One clear path from career evidence to an activated opportunity search.</span>
+        <span>One clear path from your résumé to an activated opportunity search.</span>
       </header>
 
       <section className="panel journey-hero-exact">
         <div className="journey-hero-copy-exact">
           <p className="journey-micro-label">Your career foundation</p>
           <h2>{activated ? "Your search foundation is ready." : "Complete the foundation once. Improve it whenever life changes."}</h2>
-          <p>{activated ? "Sartho has the evidence, direction and search coverage needed to support opportunity decisions." : "Finish the current step so recommendations are grounded in your evidence, ambitions, mobility and chosen sources."}</p>
+          <p>{activated ? "Sartho has the Career Profile, direction and search coverage needed to support opportunity decisions." : "Finish the current step so recommendations reflect your career, ambitions, mobility and chosen sources."}</p>
           <div className="readiness-notes-exact">
             <span className={steps[0].complete ? "is-done" : "is-missing"}>{steps[0].complete ? "✓" : "＋"} Résumé source {steps[0].complete ? "received" : "needed"}</span>
-            <span className={steps[2].complete ? "is-done" : "is-missing"}>{steps[2].complete ? "✓" : "＋"} Evidence {steps[2].complete ? "confirmed" : "needs review"}</span>
+            <span className={steps[2].complete ? "is-done" : "is-missing"}>{steps[2].complete ? "✓" : "＋"} Career Profile {steps[2].complete ? "confirmed" : "needs review"}</span>
             <span className={steps[6].complete ? "is-done" : "is-missing"}>{steps[6].complete ? "✓" : "＋"} Search coverage {steps[6].complete ? "confirmed" : "needs you"}</span>
           </div>
         </div>
@@ -37,7 +37,7 @@ export default async function JourneyPage() {
 
       <section className="panel foundation-map-exact">
         <div className="foundation-heading-exact">
-          <div><p className="journey-micro-label">Start to finish</p><h2>Your seven-step foundation</h2><p>Each stage gives Sartho better evidence for the decisions that follow.</p></div>
+          <div><p className="journey-micro-label">Start to finish</p><h2>Your seven-step foundation</h2><p>Each stage makes Sartho&apos;s recommendations more relevant to you.</p></div>
           <div className="journey-percent-exact"><strong>{progress}%</strong><span>Journey complete</span></div>
         </div>
         <div className="journey-track-exact" aria-label="User journey progress">

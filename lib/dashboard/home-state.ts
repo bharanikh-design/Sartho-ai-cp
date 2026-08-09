@@ -24,24 +24,20 @@ export function getHomeJourneyState({
   pendingEvidence,
 }: HomeJourneyInput): HomeJourneyState {
   if (pendingEvidence > 0) {
-    const reviewCount = Math.min(pendingEvidence, 3);
-
     return {
       primaryAction: {
-        href: "/journey#confirm",
-        label: `Review ${reviewCount} evidence record${reviewCount === 1 ? "" : "s"}`,
+        href: "/career-truth#profile-review",
+        label: "Review my Career Profile",
       },
       readiness: {
-        label: "Career evidence loaded",
-        title: `${pendingEvidence} claim${pendingEvidence === 1 ? " is" : "s are"} ready for your review.`,
-        description: approvedEvidence
-          ? `${approvedEvidence} already approved. Review the strongest remaining claims before using them for matching, résumés or interview preparation.`
-          : "Approve the strongest claims first. Sartho will not use any résumé claim until you confirm it is true.",
-        href: "/journey#confirm",
-        action: "Continue evidence review",
+        label: "Career Profile ready",
+        title: "Review the career story Sartho understood.",
+        description: "Check one concise profile summary, correct anything unclear and confirm it in one action.",
+        href: "/career-truth#profile-review",
+        action: "Review my Career Profile",
       },
-      positioningFallback: "Your target role strategy is the next step after you approve the evidence that represents you best.",
-      profileMetaFallback: "Evidence imported",
+      positioningFallback: "Your target role strategy is the next step after you confirm your Career Profile.",
+      profileMetaFallback: "Profile ready to review",
     };
   }
 
@@ -53,29 +49,29 @@ export function getHomeJourneyState({
       },
       readiness: {
         label: "Career workspace ready",
-        title: "Your evidence base is ready.",
-        description: `${approvedEvidence} approved evidence record${approvedEvidence === 1 ? " can" : "s can"} now support honest matching, résumé tailoring and interview preparation.`,
+        title: "Your Career Profile is ready.",
+        description: "Your confirmed profile can now support opportunity matching, résumé tailoring and interview preparation.",
         href: "/career-truth",
         action: "Strengthen my Career Profile",
       },
-      positioningFallback: "Add target role lanes to turn your approved evidence into a focused search strategy.",
-      profileMetaFallback: "Evidence ready",
+      positioningFallback: "Add target profiles to turn your Career Profile into a focused search strategy.",
+      profileMetaFallback: "Profile confirmed",
     };
   }
 
   return {
     primaryAction: {
       href: "/journey",
-      label: "Choose usable evidence",
+      label: "Build my Career Profile",
     },
     readiness: {
-      label: "Career evidence needs attention",
-      title: "Nothing is approved for use yet.",
+      label: "Career Profile needed",
+      title: "Sartho does not know enough about your career yet.",
       description: "Complete Your Journey or add a stronger résumé before asking Sartho to match, tailor or prepare.",
       href: "/journey",
       action: "Open Your Journey",
     },
-    positioningFallback: "Approve evidence before creating a target role strategy.",
+    positioningFallback: "Build your Career Profile before creating a target role strategy.",
     profileMetaFallback: "Private profile",
   };
 }

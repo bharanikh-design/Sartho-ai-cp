@@ -1,5 +1,8 @@
 import Link from "next/link";
+import { ResumeImport } from "@/components/resume-import";
+import { ResumeLibrary } from "@/components/resume-library";
 import { requireUser } from "@/lib/auth";
+import { getResumeImports } from "@/lib/data/career";
 import { getJobs } from "@/lib/data/jobs";
 import type { ApplicationRecord } from "@/lib/types";
 
@@ -7,10 +10,11 @@ export const dynamic = "force-dynamic";
 
 export default async function ResumeStudioPage() {
   const { supabase, user } = await requireUser();
-  const [jobs, applicationsResult, approvedResult] = await Promise.all([
+  const [jobs, applicationsResult, approvedResult, imports] = await Promise.all([
     getJobs(supabase, user.id),
     supabase.from("applications").select("*").eq("user_id", user.id).not("resume_draft", "is", null).order("updated_at", { ascending: false }),
     supabase.from("evidence_items").select("id", { count: "exact", head: true }).eq("user_id", user.id).eq("approval_status", "approved").eq("safe_for_resume", true),
+    getResumeImports(supabase, user.id),
   ]);
 
   if (applicationsResult.error) throw applicationsResult.error;
@@ -27,7 +31,7 @@ export default async function ResumeStudioPage() {
         <div className="hero-copy">
           <div className="page-eyebrow"><span className="live-dot" /> Résumé Studio</div>
           <h1>Shape the résumé<br />the role deserves.</h1>
-          <p>Keep one protected evidence base and produce separate job-specific drafts that highlight the right proof without rewriting history.</p>
+          <p>Keep one confirmed Career Profile and produce separate job-specific drafts that highlight the right achievements without rewriting history.</p>
           <div className="hero-actions">
             <Link href="/jobs" className="primary-button">Analyse a role <span aria-hidden="true">↗</span></Link>
             <Link href="/career-truth" className="secondary-button">Strengthen Career Profile</Link>
@@ -37,16 +41,16 @@ export default async function ResumeStudioPage() {
         <div className="home-hero-signal" aria-label="Résumé Studio readiness">
           <span className="signal-label">Résumé principle</span>
           <strong>Tailor the story. Never invent it.</strong>
-          <p>{approvedCount} approved résumé-safe evidence records are available for drafting.</p>
+          <p>{approvedCount ? "Your confirmed Career Profile is available for truthful drafting." : "Confirm your Career Profile before creating job-specific drafts."}</p>
         </div>
       </section>
 
       <section className="metric-grid action-metric-grid" aria-label="Résumé workspace status">
         <article className="glass-card-soft metric-card action-metric">
           <span className="metric-icon" aria-hidden="true">01</span>
-          <div className="metric-label">Protected evidence base</div>
-          <div className="metric-value">{approvedCount}</div>
-          <div className="metric-note">Approved records available for truthful drafting</div>
+          <div className="metric-label">Career Profile</div>
+          <div className="metric-value">{approvedCount ? "Ready" : "Review"}</div>
+          <div className="metric-note">One confirmed source for truthful drafting</div>
           <Link href="/career-truth" className="metric-action">Review Career Profile<span aria-hidden="true">→</span></Link>
         </article>
         <article className="glass-card-soft metric-card action-metric">
@@ -68,7 +72,7 @@ export default async function ResumeStudioPage() {
       {readyJobs.length ? (
         <section className="glass-card content-card">
           <div className="card-header">
-            <div><h2 className="section-heading">Ready for a tailored draft</h2><p className="section-subtitle">These roles already have evidence-led requirement mappings.</p></div>
+            <div><h2 className="section-heading">Ready for a tailored draft</h2><p className="section-subtitle">These roles have already been matched to your Career Profile.</p></div>
             <span className="meta-pill">{readyJobs.length} ready</span>
           </div>
           <div className="saved-job-list">
@@ -108,10 +112,24 @@ export default async function ResumeStudioPage() {
           <div className="empty-ledger-inner">
             <div className="empty-ledger-icon" aria-hidden="true">R</div>
             <h3>No tailored drafts yet</h3>
-            <p>Save a role, complete deep analysis and create the first evidence-backed résumé draft from its job page.</p>
+            <p>Save a role, complete the role analysis and create the first profile-backed résumé draft from its job page.</p>
             <Link href="/jobs" className="primary-button">Analyse a role <span aria-hidden="true">→</span></Link>
           </div>
         )}
+      </section>
+
+      <section className="glass-card content-card source-resume-section" id="source-resumes">
+        <div className="card-header">
+          <div>
+            <h2 className="section-heading">Source résumés</h2>
+            <p className="section-subtitle">Manage the documents Sartho uses to keep your Career Profile current. Additional uploads are reconciled with what is already known.</p>
+          </div>
+          <span className="meta-pill">{imports.length} document{imports.length === 1 ? "" : "s"}</span>
+        </div>
+        <ResumeImport hasEvidence={approvedCount > 0} showLead={false} continueHref="/career-truth#profile-review" />
+        <div className="source-resume-library">
+          <ResumeLibrary imports={imports} />
+        </div>
       </section>
     </div>
   );

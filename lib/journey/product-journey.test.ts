@@ -38,7 +38,7 @@ describe("product journey", () => {
     expect(state.steps).toHaveLength(7);
   });
 
-  it("does not confuse extraction with user confirmation", () => {
+  it("does not confuse résumé understanding with profile confirmation", () => {
     const state = buildProductJourney({ ...ready, approvedEvidence: 0, pendingEvidence: 20 });
     expect(state.steps.find((step) => step.id === "extract")?.complete).toBe(true);
     expect(state.steps.find((step) => step.id === "confirm")?.complete).toBe(false);
