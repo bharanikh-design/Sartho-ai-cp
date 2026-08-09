@@ -1,4 +1,5 @@
 import type { ResumeImportRecord } from "@/lib/data/career";
+import { describeAiFailure } from "@/lib/ai/failure";
 
 /*
  * Every résumé this account has handed over, kept.
@@ -48,7 +49,9 @@ export function ResumeLibrary({ imports }: { imports: ResumeImportRecord[] }) {
               {item.evidence_skipped ? ` · ${item.evidence_skipped} already held` : ""}
             </span>
           ) : item.status === "failed" ? (
-            <span className="library-result is-failed">{item.error ?? "Could not be read"}</span>
+            <span className="library-result is-failed">
+              {item.error ? describeAiFailure(item.error) : "Sartho could not read this résumé. Try uploading it again."}
+            </span>
           ) : (
             <span className="library-result">Reading…</span>
           )}

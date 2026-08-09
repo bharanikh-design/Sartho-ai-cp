@@ -283,12 +283,18 @@ describe("POST /api/career/import", () => {
   });
 
   it("marks the import row failed when the provider fails", async () => {
-    generateStructuredJson.mockRejectedValue(new Error("boom"));
+    generateStructuredJson.mockRejectedValue(new Error("boom request abc-123 at https://provider.example/internal"));
     await drain(await POST(upload()));
 
     expect(recorded.updates).toContainEqual(
-      expect.objectContaining({ table: "resume_imports", status: "failed", error: "boom" }),
+      expect.objectContaining({
+        table: "resume_imports",
+        status: "failed",
+        error: expect.stringContaining("could not read the document"),
+      }),
     );
+    expect(recorded.updates[0]?.error).not.toContain("abc-123");
+    expect(recorded.updates[0]?.error).not.toContain("provider.example");
   });
 
   it("says so plainly when the document holds no career evidence", async () => {
