@@ -23,7 +23,7 @@ export function classifyAiFailure(message: string): AiFailureKind {
    * A near miss reads as an unrecognised failure and gets passed through raw,
    * which is the behaviour this whole file exists to prevent.
    */
-  if (/insufficient_quota|no credits|credit balance|purchase credits|exceeded your current quota|billing|payment|check your plan/.test(text)) {
+  if (/insufficient_quota|no credits|no credit left|run out of credit|credit balance|purchase credits|top up|exceeded your current quota|billing|payment|check your plan/.test(text)) {
     return "credit";
   }
   if (/rate.?limit|too many requests|429|overloaded|capacity|exhausted/.test(text)) return "rate-limit";
@@ -47,7 +47,7 @@ export function describeAiFailure(message: string): string {
     case "timeout":
       return "Reading the document took longer than Sartho waits. Try it again, and if it keeps happening the document may be unusually long.";
     default:
-      return message;
+      return "Sartho's AI provider could not read the document. Nothing is wrong with your résumé. Try again, and if it continues ask the Sartho administrator to check the provider.";
   }
 }
 
@@ -67,7 +67,7 @@ export function shortAiFailure(message: string): string {
     case "auth": return "key rejected";
     case "rate-limit": return "rate limited";
     case "timeout": return "timed out";
-    default: return message.length > 140 ? `${message.slice(0, 137)}…` : message;
+    default: return "provider error";
   }
 }
 

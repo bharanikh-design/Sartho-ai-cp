@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createSafetyIdentifier, generateStructuredJson } from "@/lib/ai/provider";
+import { describeAiFailure } from "@/lib/ai/failure";
 import { aiQuotaResponse, checkAiQuota } from "@/lib/ai/quota";
 import { getAuthenticatedUser } from "@/lib/auth";
 import { extractResumeText, ResumeExtractionError } from "@/lib/resume/extract-text";
@@ -247,7 +248,11 @@ export async function POST(request: Request) {
       try {
         await run(send);
       } catch (caught) {
-        const message = caught instanceof Error ? caught.message : "The import failed.";
+        const rawMessage = caught instanceof Error ? caught.message : "The import failed.";
+        const message = rawMessage === "Sartho did not find any career evidence in that document."
+          ? rawMessage
+          : describeAiFailure(rawMessage);
+        console.error("Résumé import failed", caught);
         await supabase
           .from("resume_imports")
           .update({ status: "failed", error: message.slice(0, 500), completed_at: new Date().toISOString() })

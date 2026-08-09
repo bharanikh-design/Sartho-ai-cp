@@ -53,8 +53,11 @@ describe("describeAiFailure", () => {
     expect(describeAiFailure("Incorrect API key provided")).toContain("environment variables");
   });
 
-  it("passes an unrecognised message through rather than inventing a cause", () => {
-    const odd = "Sartho did not find any career evidence in that document.";
-    expect(describeAiFailure(odd)).toBe(odd);
+  it("never passes an unrecognised provider message through to the user", () => {
+    const odd = "upstream exploded with request abc-123 at https://provider.example/internal";
+    const spoken = describeAiFailure(odd);
+    expect(spoken).toContain("could not read the document");
+    expect(spoken).not.toContain("abc-123");
+    expect(spoken).not.toContain("provider.example");
   });
 });
