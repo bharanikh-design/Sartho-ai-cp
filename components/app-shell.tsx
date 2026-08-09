@@ -226,7 +226,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <span className="journey-card-progress" aria-hidden="true"><i style={{ width: `${journeyStatus?.progress ?? 0}%` }} /></span>
           </div>
         </Link>
-        <div className="rail-footer"><span className="live-dot" /><span>Secure session</span><span>·</span><span>Evidence-led</span></div>
+        <div className="rail-footer"><span className="live-dot" /><span>Secure session</span><span>·</span><span>Profile-grounded</span></div>
       </aside>
 
       <div className="app-stage">

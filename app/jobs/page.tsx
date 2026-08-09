@@ -27,7 +27,7 @@ export default async function JobsPage() {
         <div className="page-eyebrow"><span className="live-dot" /> Opportunity workspace</div>
         <h1 className="page-title">Opportunities</h1>
         <p className="page-description">
-          Bring in a role, understand why it fits, save the worthwhile ones and carry each decision forward without losing the evidence behind it.
+          Bring in a role, understand why it fits your Career Profile, save the worthwhile ones and carry each decision forward.
         </p>
         <div className="hero-actions profile-header-actions">
           <Link href="#analyse" className="primary-button">Add and analyse a role <span aria-hidden="true">↓</span></Link>
