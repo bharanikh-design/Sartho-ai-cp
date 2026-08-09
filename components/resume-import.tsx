@@ -149,6 +149,7 @@ export function ResumeImport({
       if (!finished) throw new Error("The import ended before it finished.");
 
       setResult(finished);
+      window.dispatchEvent(new Event("sartho:journey-changed"));
       // Brings the newly extracted claims into the review list below. Where the
       // review is on another page, the result and its link have to survive.
       if (!continueHref) router.refresh();

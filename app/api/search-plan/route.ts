@@ -14,6 +14,9 @@ export async function PUT(request: Request) {
   const parsed = schema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Review the search plan fields." }, { status: 400 });
   const { error } = await supabase.from("search_preferences").upsert({ user_id: user.id, target_locations: parsed.data.targetLocations, remote_preference: parsed.data.remotePreference, sources: parsed.data.sources, updated_at: new Date().toISOString() });
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) {
+    console.error("Unable to save search strategy", error);
+    return NextResponse.json({ error: "Sartho could not save your search strategy." }, { status: 500 });
+  }
   return NextResponse.json({ ok: true });
 }

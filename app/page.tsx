@@ -1,9 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ResumeImport } from "@/components/resume-import";
 import { requireUser } from "@/lib/auth";
-import { getCareerWorkspace } from "@/lib/data/career";
 import { getHomeJourneyState } from "@/lib/dashboard/home-state";
+import { loadProductJourney } from "@/lib/journey/load-product-journey";
 import type { JobStatus } from "@/lib/types";
 import { withJwtClockSkewRetry } from "@/lib/supabase/retry";
 
@@ -11,7 +10,8 @@ export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
   const { supabase, user } = await requireUser();
-  const { profile, lanes, evidence } = await getCareerWorkspace(supabase, user.id);
+  const { journey, workspace } = await loadProductJourney(supabase, user.id);
+  const { profile, lanes, evidence } = workspace;
 
   /*
    * The Dashboard is the reward after onboarding, not the onboarding itself.
@@ -21,16 +21,8 @@ export default async function HomePage() {
    */
   const approvedEvidence = evidence.filter((item) => item.approval_status === "approved").length;
   const pendingEvidence = evidence.filter((item) => item.approval_status === "pending").length;
-  const activeLaneAllocation = lanes.filter((lane) => lane.active).reduce((total, lane) => total + lane.weight, 0);
-  const foundationComplete = evidence.length > 0
-    && Boolean(profile?.headline && profile.location)
-    && Boolean(profile?.strengths.length)
-    && lanes.length > 0
-    && activeLaneAllocation === 100
-    && approvedEvidence > 0
-    && pendingEvidence === 0;
 
-  if (!foundationComplete) redirect("/journey");
+  if (!journey.activated) redirect("/journey");
 
   const { data: jobs, error: jobsError } = await withJwtClockSkewRetry(() =>
     supabase
@@ -62,7 +54,7 @@ export default async function HomePage() {
       label: "Saved opportunities",
       value: String(jobRows.length),
       note: "Analyse, save and revisit roles",
-      action: "Open role workspace",
+      action: "Open opportunities",
     },
     {
       href: "/resume-studio",
@@ -90,65 +82,14 @@ export default async function HomePage() {
     },
   ];
 
-  /*
-   * A brand-new account has no evidence, and every tile below reads zero. The
-   * dashboard is meaningless until a career is in, so the first screen after
-   * signing in should point at the one thing that matters rather than at five
-   * empty counters.
-   *
-   * And it points at it by doing it. This spot previously held a button reading
-   * "Upload your résumé" that only navigated to a page carrying an identical
-   * button — the second of which was the real one. A control that names an
-   * action has to perform it, so the uploader itself stands here now.
-   */
-  if (!evidence.length) {
-    return (
-      <div className="page-stack">
-        <section className="hero-panel home-hero glass-card">
-          <div className="hero-copy">
-            <div className="page-eyebrow"><span className="live-dot" /> First step</div>
-            <h1>Start with<br />your résumé.</h1>
-            <p>
-              Sartho reads it and records every role and achievement it finds — as claims for
-              you to approve, never as facts it decided on your behalf. Nothing reaches a
-              match, a résumé or an interview answer until you have said yes to it.
-            </p>
-            <div className="hero-upload">
-              <ResumeImport hasEvidence={false} showLead={false} continueHref="/career-truth" />
-            </div>
-
-            {/*
-              * The welcome tour is dismissible and stays dismissed, and this
-              * screen — the one a brand-new account actually lands on — had no
-              * way back to it. The dashboard below carries the same link.
-              */}
-            <p className="hero-replay">
-              <Link href="/?tour=1">Replay the welcome tour <span aria-hidden="true">→</span></Link>
-            </p>
-          </div>
-
-          <div className="home-hero-signal" aria-label="Why this comes first">
-            <span className="signal-label">Why this first</span>
-            <strong>A headhunter who knows you has to know you.</strong>
-            <p>
-              Matching, résumé tailoring and interview preparation all read from your approved
-              evidence. Until it exists, there is nothing honest to match against.
-            </p>
-          </div>
-        </section>
-      </div>
-    );
-  }
-
   return (
     <div className="page-stack">
       <section className="hero-panel home-hero glass-card">
         <div className="hero-copy">
           <div className="page-eyebrow"><span className="live-dot" /> Sartho AI · Your career, intelligently guided.</div>
-          <h1>Find it. Prepare for it.<br />Land it.</h1>
+          <h1>See the opportunity.<br />Make the right move.</h1>
           <p>
-            Sartho helps you discover work worthy of your experience, prove why you belong,
-            shape the right résumé and walk into every opportunity ready.
+            Sartho connects your search strategy, approved evidence and opportunity decisions—then helps you prepare an honest application and walk in ready.
           </p>
           <div className="hero-actions">
             <Link href={journeyState.primaryAction.href} className="primary-button">

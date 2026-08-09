@@ -2,13 +2,18 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getAuthenticatedUser } from "@/lib/auth";
 
-const directionSchema = z.object({
+export const directionSchema = z.object({
   headline: z.string().trim().max(240),
   summary: z.string().trim().max(4000),
   location: z.string().trim().max(160),
   workAuthorisation: z.string().trim().max(1000),
   strengths: z.array(z.string().trim().min(1).max(120)).max(30),
   lanes: z.array(z.object({ id: z.string(), name: z.string().trim().min(1).max(180), weight: z.number().int().min(0).max(100), active: z.boolean() })).max(20),
+}).superRefine((value, context) => {
+  const names = value.lanes.map((lane) => lane.name.toLocaleLowerCase());
+  if (new Set(names).size !== names.length) {
+    context.addIssue({ code: "custom", path: ["lanes"], message: "Target profile names must be unique." });
+  }
 });
 
 export async function PUT(request: Request) {
@@ -17,9 +22,6 @@ export async function PUT(request: Request) {
 
   const parsed = directionSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Review the career direction fields." }, { status: 400 });
-
-  const activeTotal = parsed.data.lanes.filter((lane) => lane.active).reduce((sum, lane) => sum + lane.weight, 0);
-  if (activeTotal !== 100) return NextResponse.json({ error: "Active profile priorities must total 100%." }, { status: 400 });
 
   const { error: profileError } = await supabase.from("profiles").upsert({
     id: user.id,
@@ -30,14 +32,62 @@ export async function PUT(request: Request) {
     work_authorisation: parsed.data.workAuthorisation || null,
     strengths: parsed.data.strengths,
   });
-  if (profileError) return NextResponse.json({ error: profileError.message }, { status: 500 });
+  if (profileError) {
+    console.error("Unable to save career profile", profileError);
+    return NextResponse.json({ error: "Sartho could not save your career profile." }, { status: 500 });
+  }
 
-  const { error: deleteError } = await supabase.from("target_lanes").delete().eq("user_id", user.id);
-  if (deleteError) return NextResponse.json({ error: deleteError.message }, { status: 500 });
+  /*
+   * Never delete the working strategy before the replacement is safely stored.
+   * New and retained lanes are upserted first. Removed lanes are then disabled
+   * before best-effort cleanup, so a cleanup failure cannot corrupt allocation.
+   */
+  const { data: existing, error: existingError } = await supabase
+    .from("target_lanes")
+    .select("id,name")
+    .eq("user_id", user.id);
+  if (existingError) {
+    console.error("Unable to read target profiles", existingError);
+    return NextResponse.json({ error: "Sartho could not update your target profiles." }, { status: 500 });
+  }
 
-  if (parsed.data.lanes.length) {
-    const { error: lanesError } = await supabase.from("target_lanes").insert(parsed.data.lanes.map((lane, index) => ({ user_id: user.id, name: lane.name, weight: lane.weight, priority: index + 1, active: lane.active })));
-    if (lanesError) return NextResponse.json({ error: lanesError.message }, { status: 500 });
+  const laneRows = parsed.data.lanes.map((lane, index) => ({
+    user_id: user.id,
+    name: lane.name,
+    weight: lane.weight,
+    priority: index + 1,
+    active: lane.active,
+  }));
+
+  if (laneRows.length) {
+    const { error: lanesError } = await supabase
+      .from("target_lanes")
+      .upsert(laneRows, { onConflict: "user_id,name" });
+    if (lanesError) {
+      console.error("Unable to save target profiles", lanesError);
+      return NextResponse.json({ error: "Sartho could not save your target profiles." }, { status: 500 });
+    }
+  }
+
+  const retainedNames = new Set(laneRows.map((lane) => lane.name));
+  const staleIds = (existing ?? []).filter((lane) => !retainedNames.has(lane.name)).map((lane) => lane.id);
+  if (staleIds.length) {
+    const { error: disableError } = await supabase
+      .from("target_lanes")
+      .update({ active: false, weight: 0 })
+      .eq("user_id", user.id)
+      .in("id", staleIds);
+    if (disableError) {
+      console.error("Unable to disable removed target profiles", disableError);
+      return NextResponse.json({ error: "Sartho preserved your previous strategy because the update could not finish." }, { status: 500 });
+    }
+
+    const { error: cleanupError } = await supabase
+      .from("target_lanes")
+      .delete()
+      .eq("user_id", user.id)
+      .in("id", staleIds);
+    if (cleanupError) console.warn("Removed target profiles remain disabled", cleanupError);
   }
 
   return NextResponse.json({ ok: true });

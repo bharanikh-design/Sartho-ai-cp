@@ -1,17 +1,26 @@
-import { SearchPlanEditor, type SearchSource } from "@/components/search-plan-editor";
+import { SearchPlanEditor } from "@/components/search-plan-editor";
 import { requireUser } from "@/lib/auth";
+import { getTargetLanes } from "@/lib/data/career";
+import { getSearchPreferences } from "@/lib/data/search";
 
 export const dynamic = "force-dynamic";
 
 export default async function SearchPlanPage() {
   const { supabase, user } = await requireUser();
-  const { data, error } = await supabase.from("search_preferences").select("target_locations,remote_preference,sources").eq("user_id", user.id).maybeSingle();
-  if (error && error.code !== "PGRST116") throw error;
+  const [lanes, preferences] = await Promise.all([
+    getTargetLanes(supabase, user.id),
+    getSearchPreferences(supabase, user.id),
+  ]);
 
   return (
     <div className="page-stack product-page">
-      <header className="product-page-heading"><div><span>Where Sartho looks</span><h1>Search Plan</h1><p>Control target locations and trusted opportunity sources before Sartho begins discovery.</p></div><aside><strong>Private</strong><span>your preferences</span></aside></header>
-      <SearchPlanEditor initialSources={Array.isArray(data?.sources) ? data.sources as SearchSource[] : []} initialLocations={data?.target_locations ?? []} initialRemote={data?.remote_preference ?? "Flexible"} />
+      <header className="product-page-heading"><div><span>Your opportunity coverage</span><h1>Search Strategy</h1><p>Control the profiles, locations, work model and trusted sources that define a worthwhile opportunity.</p></div><aside><strong>{lanes.length || "—"}</strong><span>target profiles</span></aside></header>
+      <SearchPlanEditor
+        initialSources={preferences.sources}
+        initialLocations={preferences.targetLocations}
+        initialRemote={preferences.remotePreference ?? "Flexible"}
+        targetLanes={lanes}
+      />
     </div>
   );
 }

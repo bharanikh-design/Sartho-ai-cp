@@ -57,6 +57,22 @@ export async function getCareerWorkspace(supabase: SupabaseClient, userId: strin
   return { profile, lanes, roles, evidence };
 }
 
+export async function getTargetLanes(supabase: SupabaseClient, userId: string) {
+  const { data, error } = await supabase
+    .from("target_lanes")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("active", true)
+    .order("priority");
+
+  if (error) throw error;
+  return (data ?? []).map((lane) => ({
+    ...lane,
+    weight: Number(lane.weight),
+    priority: Number(lane.priority),
+  })) as TargetLaneRecord[];
+}
+
 export type ResumeImportRecord = {
   id: string;
   file_name: string;

@@ -16,86 +16,111 @@ export type NavigationItem = {
   purpose: string;
 };
 
+const journeyNavigation: NavigationItem = {
+  label: "Your Journey",
+  shortLabel: "Journey",
+  href: "/journey",
+  icon: "journey",
+  purpose: "Complete the career foundation Sartho needs before searching.",
+};
+
+const dashboardNavigation: NavigationItem = {
+  label: "Home",
+  shortLabel: "Home",
+  href: "/",
+  icon: "home",
+  purpose: "See opportunity activity, applications and the next best action.",
+};
+
+const opportunityNavigation: NavigationItem = {
+  label: "Opportunities",
+  shortLabel: "Explore",
+  href: "/jobs",
+  icon: "analyse",
+  purpose: "Review saved opportunities or add a role for evidence-backed analysis.",
+};
+
+const applicationNavigation: NavigationItem = {
+  label: "Applications",
+  shortLabel: "Track",
+  href: "/applications",
+  icon: "applications",
+  purpose: "Track every application stage, preparation task and outcome.",
+};
+
+const profileNavigation: NavigationItem = {
+  label: "Career Profile",
+  shortLabel: "Profile",
+  href: "/career-truth",
+  icon: "truth",
+  purpose: "Manage your master résumé, approved evidence, strengths and career direction.",
+};
+
+const strategyNavigation: NavigationItem = {
+  label: "Search Strategy",
+  shortLabel: "Strategy",
+  href: "/search-plan",
+  icon: "resume",
+  purpose: "Control target profiles, locations, work model and trusted opportunity sources.",
+};
+
 /**
- * The primary navigation follows the product journey: understand the overall
- * picture, build the career foundation, find and assess opportunities, then
- * manage each application through preparation and outcome.
+ * Before activation the Journey is the product. Afterwards the navigation
+ * shifts to the recurring outcome loop and Journey becomes a readiness card.
  */
-export const primaryNavigation: NavigationItem[] = [
-  {
-    label: "Dashboard",
-    shortLabel: "Home",
-    href: "/",
-    icon: "home",
-    purpose: "See opportunity activity, applications and the next best action.",
-  },
-  {
-    label: "User Journey",
-    shortLabel: "Journey",
-    href: "/journey",
-    icon: "journey",
-    purpose: "Complete the career foundation Sartho needs before searching.",
-  },
-  {
-    label: "Résumé Studio",
-    shortLabel: "Résumé",
-    href: "/resume-studio",
-    icon: "resume",
-    purpose: "Manage evidence-backed résumé versions for specific roles.",
-  },
-  {
-    label: "Career Direction",
-    shortLabel: "Direction",
-    href: "/career-direction",
-    icon: "truth",
-    purpose: "Refine strengths, target profiles and career priorities.",
-  },
-  {
-    label: "Search Plan",
-    shortLabel: "Search",
-    href: "/search-plan",
-    icon: "analyse",
-    purpose: "Choose target locations and trusted opportunity sources.",
-  },
-  {
-    label: "Analyse a Role",
-    shortLabel: "Analyse",
-    href: "/jobs",
-    icon: "analyse",
-    purpose: "Screen a real opportunity against the approved career profile.",
-  },
-  {
-    label: "Applications",
-    shortLabel: "Track",
-    href: "/applications",
-    icon: "applications",
-    purpose: "Track every saved opportunity, application stage and outcome.",
-  },
-  {
-    label: "Interview Prep",
-    shortLabel: "Prepare",
-    href: "/interview-prep",
-    icon: "interview",
-    purpose: "Prepare role-specific questions and evidence-backed stories.",
-  },
+export function getPrimaryNavigation(activated: boolean): NavigationItem[] {
+  if (!activated) return [journeyNavigation, profileNavigation, strategyNavigation];
+
+  return [
+    dashboardNavigation,
+    opportunityNavigation,
+    applicationNavigation,
+    profileNavigation,
+    strategyNavigation,
+  ];
+}
+
+export const allNavigation: NavigationItem[] = [
+  journeyNavigation,
+  dashboardNavigation,
+  opportunityNavigation,
+  applicationNavigation,
+  profileNavigation,
+  strategyNavigation,
 ];
 
+export function getMobileNavigation(activated: boolean) {
+  return getPrimaryNavigation(activated).slice(0, 4);
+}
+
+export function getNavigationForPath(activated: boolean, pathname: string) {
+  const navigation = getPrimaryNavigation(activated);
+  const current = allNavigation.find((item) => isNavigationItemActive(pathname, item.href));
+  if (!current || navigation.some((item) => item.href === current.href)) return navigation;
+  return [...navigation, current];
+}
+
+/* Legacy and contextual workspaces remain addressable from their parent flow. */
 const supportingPageLabels: Array<[prefix: string, label: string]> = [
-  ["/career-truth", "Career Profile"],
+  ["/resume-studio", "Résumé Studio"],
+  ["/career-direction", "Career Direction"],
+  ["/interview-prep", "Interview Preparation"],
   ["/diagnostics", "Diagnostics"],
 ];
-
-const mobileHrefs = new Set(["/", "/journey", "/jobs", "/applications"]);
-
-export const mobileNavigation = primaryNavigation.filter((item) => mobileHrefs.has(item.href));
 
 export function isNavigationItemActive(pathname: string, href: string) {
   return href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`);
 }
 
 export function getPageLabel(pathname: string) {
-  const primary = primaryNavigation.find((item) => isNavigationItemActive(pathname, item.href));
+  const primary = allNavigation.find((item) => isNavigationItemActive(pathname, item.href));
   if (primary) return primary.label;
 
   return supportingPageLabels.find(([prefix]) => pathname === prefix || pathname.startsWith(`${prefix}/`))?.[1] ?? "Sartho";
 }
+
+/*
+ * Kept as a named export for tests and non-shell consumers that need the full
+ * product map rather than the lifecycle-specific menu.
+ */
+export const primaryNavigation = allNavigation;

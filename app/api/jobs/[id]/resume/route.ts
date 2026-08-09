@@ -80,6 +80,7 @@ export async function POST(
   const { supabase, user } = await getAuthenticatedUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await context.params;
+  if (!z.string().uuid().safeParse(id).success) return NextResponse.json({ error: "Opportunity not found." }, { status: 404 });
 
   const [jobResult, requirementsResult, evidenceResult] = await Promise.all([
     supabase.from("jobs").select("*").eq("id", id).eq("user_id", user.id).maybeSingle(),
@@ -93,7 +94,10 @@ export async function POST(
   ]);
 
   const error = jobResult.error ?? requirementsResult.error ?? evidenceResult.error;
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) {
+    console.error("Unable to prepare résumé inputs", error);
+    return NextResponse.json({ error: "Sartho could not prepare the approved résumé evidence." }, { status: 500 });
+  }
   if (!jobResult.data) return NextResponse.json({ error: "Job not found" }, { status: 404 });
   if (!requirementsResult.data?.length || jobResult.data.deep_analysis_status !== "complete") {
     return NextResponse.json({ error: "Complete deep analysis before drafting a tailored résumé." }, { status: 400 });
@@ -184,7 +188,10 @@ export async function POST(
       evidenceIds,
     });
   } catch (caught) {
-    const message = caught instanceof Error ? caught.message : "Résumé drafting failed.";
+    console.error("Résumé drafting failed", caught);
+    const message = caught instanceof Error && caught.message.startsWith("Sartho")
+      ? caught.message
+      : "Sartho could not create this résumé draft. Your existing evidence and application data are unchanged.";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
