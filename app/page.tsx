@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { getHomeJourneyState } from "@/lib/dashboard/home-state";
 import { loadProductJourney } from "@/lib/journey/load-product-journey";
@@ -13,16 +12,8 @@ export default async function HomePage() {
   const { journey, workspace } = await loadProductJourney(supabase, user.id);
   const { profile, lanes, evidence } = workspace;
 
-  /*
-   * The Dashboard is the reward after onboarding, not the onboarding itself.
-   * Until Sartho has a résumé, career context, user-selected strengths, a
-   * weighted role strategy and a confirmed Career Profile, the production entry point
-   * must resume the Journey at the first unfinished step.
-   */
   const approvedEvidence = evidence.filter((item) => item.approval_status === "approved").length;
   const pendingEvidence = evidence.filter((item) => item.approval_status === "pending").length;
-
-  if (!journey.activated) redirect("/journey");
 
   const { data: jobs, error: jobsError } = await withJwtClockSkewRetry(() =>
     supabase
@@ -106,6 +97,42 @@ export default async function HomePage() {
           <Link href={journeyState.readiness.href}>{journeyState.readiness.action} <span aria-hidden="true">→</span></Link>
         </div>
       </section>
+
+      {!journey.activated ? (
+        <section className="glass-card content-card home-setup" aria-labelledby="home-setup-title">
+          <div className="home-setup-heading">
+            <div>
+              <div className="page-eyebrow">Your setup</div>
+              <h2 id="home-setup-title">Activate personalized opportunity matching</h2>
+              <p>Complete one step at a time. Your Dashboard remains available while Sartho learns enough to rank opportunities for you.</p>
+            </div>
+            <div className="home-setup-progress" aria-label={`${journey.completedSteps} of ${journey.steps.length} setup tasks complete`}>
+              <strong>{journey.completedSteps} of {journey.steps.length}</strong>
+              <span>tasks complete</span>
+              <i aria-hidden="true"><b style={{ width: `${journey.progress}%` }} /></i>
+            </div>
+          </div>
+
+          <div className="home-workflow">
+            {journey.steps.map((step, index) => {
+              const state = step.complete ? "complete" : index === journey.currentIndex ? "current" : "pending";
+              return (
+                <Link className={`home-workflow-step is-${state}`} href={step.href} key={step.id} aria-current={state === "current" ? "step" : undefined}>
+                  <span className="home-workflow-marker" aria-hidden="true">{step.complete ? "✓" : index + 1}</span>
+                  <span><strong>{step.label}</strong><small>{step.detail}</small></span>
+                  <em>{step.complete ? "Completed" : state === "current" ? "In progress" : "Not started"}</em>
+                </Link>
+              );
+            })}
+          </div>
+
+          <div className="home-setup-action">
+            <span>Next step</span>
+            <strong>{journey.current.title}</strong>
+            <Link href={journey.current.href} className="primary-button">Continue setup <span aria-hidden="true">→</span></Link>
+          </div>
+        </section>
+      ) : null}
 
       <section className="metric-grid action-metric-grid" aria-label="Your Sartho journey">
         {actions.map((action) => (

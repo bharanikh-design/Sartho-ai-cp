@@ -205,7 +205,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <div className="ambient ambient-two" aria-hidden="true" />
 
       <aside className="desktop-rail glass-strong" aria-label="Primary navigation">
-        <Link href={activated ? "/" : "/journey"} className="brand-lockup" aria-label="Sartho home">
+        <Link href="/" className="brand-lockup" aria-label="Sartho home">
           <Image className="brand-mark" src={sarthoIcon} alt="" width={176} height={176} quality={95} priority />
           <span><strong>Sartho</strong><small>AI Career Copilot</small></span>
         </Link>

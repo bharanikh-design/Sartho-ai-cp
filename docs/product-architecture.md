@@ -24,8 +24,9 @@ four user-owned domains:
 
 ## Lifecycle
 
-Before activation, Your Journey is the home experience. It has one canonical
-completion model shared by the Journey, shell and Dashboard gate:
+The Dashboard is available from the first authenticated visit. Before activation,
+it presents Your Journey as a progressive setup workflow using one canonical
+completion model shared by the Dashboard, Journey and shell:
 
 1. master résumé;
 2. AI extraction;
@@ -59,7 +60,8 @@ than permanent top-level destinations.
 - Removed search priorities are disabled before best-effort cleanup.
 - Provider failure is classified into actionable user states without leaking
   credentials, billing details or raw provider output.
-- The Dashboard is accessible only after the complete search foundation exists.
+- The Dashboard remains accessible throughout setup; personalized opportunity
+  matching activates only after the complete search foundation exists.
 
 ## Scalability direction
 
