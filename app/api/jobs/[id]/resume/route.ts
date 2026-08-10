@@ -1,8 +1,15 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { approvedEvidenceIds, keepGroundedIds } from "@/lib/ai/grounding";
 import { createSafetyIdentifier, generateStructuredJson } from "@/lib/ai/provider";
 import { aiQuotaResponse, checkAiQuota } from "@/lib/ai/quota";
 import { getAuthenticatedUser } from "@/lib/auth";
+
+// Same reasoning as the deep-analysis route: the declared budget has to cover
+// the 90s the provider adapter is allowed to wait, or the host kills the
+// handler before its own timeout and error handling can run.
+export const runtime = "nodejs";
+export const maxDuration = 120;
 
 const bulletSchema = z.object({
   text: z.string().min(5),
@@ -135,15 +142,21 @@ export async function POST(
     });
 
     const parsed = outputSchema.parse(raw);
-    const approvedIds = new Set(evidenceResult.data.map((item) => item.id));
+    const approvedIds = approvedEvidenceIds(evidenceResult.data);
 
+    /*
+     * A bullet whose every citation was discarded is dropped outright rather
+     * than downgraded. Unlike a requirement assessment, a résumé line has no
+     * honest weaker form — it either has a receipt or it does not belong on
+     * the page.
+     */
     const sections = parsed.sections
       .map((section) => ({
         heading: section.heading.trim(),
         bullets: section.bullets
           .map((bullet) => ({
             text: bullet.text.trim(),
-            evidenceIds: [...new Set(bullet.evidenceIds.filter((evidenceId) => approvedIds.has(evidenceId)))],
+            evidenceIds: keepGroundedIds(bullet.evidenceIds, approvedIds),
           }))
           .filter((bullet) => bullet.text && bullet.evidenceIds.length),
       }))
@@ -154,7 +167,7 @@ export async function POST(
     const changeLog = parsed.changeLog.map((change) => ({
       type: change.type,
       description: change.description.trim(),
-      evidenceIds: [...new Set(change.evidenceIds.filter((evidenceId) => approvedIds.has(evidenceId)))],
+      evidenceIds: keepGroundedIds(change.evidenceIds, approvedIds),
     }));
 
     const evidenceIds = [...new Set(sections.flatMap((section) => section.bullets.flatMap((bullet) => bullet.evidenceIds)))];

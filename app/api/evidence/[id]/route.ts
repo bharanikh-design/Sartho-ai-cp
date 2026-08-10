@@ -32,11 +32,14 @@ export async function PATCH(
     .eq("id", id)
     .eq("user_id", user.id)
     .select("*")
-    .single();
+    .maybeSingle();
 
   if (error) {
     console.error("Unable to update evidence", error);
     return NextResponse.json({ error: "Sartho could not save this evidence change." }, { status: 500 });
   }
+  // Missing or owned by someone else — indistinguishable under RLS, and a 404
+  // either way rather than the 500 that `.single()` produced on an empty result.
+  if (!data) return NextResponse.json({ error: "Evidence record not found." }, { status: 404 });
   return NextResponse.json({ evidence: data });
 }

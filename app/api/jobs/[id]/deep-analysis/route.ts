@@ -1,9 +1,26 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import {
+  approvedEvidenceIds,
+  groundAssessment,
+  groundConfidence,
+  keepGroundedIds,
+} from "@/lib/ai/grounding";
 import { createSafetyIdentifier, generateStructuredJson } from "@/lib/ai/provider";
 import { aiQuotaResponse, checkAiQuota } from "@/lib/ai/quota";
 import { getAuthenticatedUser } from "@/lib/auth";
 import type { DeepAnalysisSummary, RequirementAssessment } from "@/lib/types";
+
+/*
+ * Quality-workload analysis waits up to 90s on the provider (see the
+ * AbortSignal in lib/ai/provider.ts). Without a declared budget this handler
+ * inherits the platform default, which is shorter than the wait the code
+ * itself permits — so a slow but succeeding analysis is killed by the host
+ * before its own timeout can fire, and the catch that records "failed" never
+ * runs. Declaring the budget makes the two agree.
+ */
+export const runtime = "nodejs";
+export const maxDuration = 120;
 
 const requirementSchema = z.object({
   requirementText: z.string().min(3),
@@ -106,20 +123,18 @@ export async function POST(
     });
 
     const parsed = outputSchema.parse(raw);
-    const approvedIds = new Set(evidenceResult.data.map((item) => item.id));
+    const approvedIds = approvedEvidenceIds(evidenceResult.data);
 
     const requirements = parsed.requirements.map((item) => {
-      const matchedEvidenceIds = [...new Set(item.matchedEvidenceIds.filter((evidenceId) => approvedIds.has(evidenceId)))];
-      let assessment: RequirementAssessment = item.assessment;
-      if ((assessment === "met" || assessment === "partially_met") && !matchedEvidenceIds.length) assessment = "unknown";
+      const matchedEvidenceIds = keepGroundedIds(item.matchedEvidenceIds, approvedIds);
 
       return {
         requirement_text: item.requirementText.trim(),
         requirement_type: item.requirementType,
         category: item.category.trim(),
         matched_evidence_ids: matchedEvidenceIds,
-        assessment,
-        confidence: matchedEvidenceIds.length ? item.confidence : "low",
+        assessment: groundAssessment(item.assessment, matchedEvidenceIds),
+        confidence: groundConfidence(item.confidence, matchedEvidenceIds),
         rationale: item.rationale.trim(),
       };
     });

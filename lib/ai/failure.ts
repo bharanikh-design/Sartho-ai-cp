@@ -51,16 +51,6 @@ export function describeAiFailure(message: string): string {
   }
 }
 
-/*
- * When every provider fails, name every provider.
- *
- * Reporting only the last failure was a real defect: the providers are tried
- * in order, so a first provider that fails for one reason and a second that
- * fails for another produced a message describing only the second. Someone
- * reading "run out of credit" had no way to tell whether the free provider
- * ahead of it was even reached, let alone why it did not answer — and the
- * thing they needed to fix was the one the message did not mention.
- */
 export function shortAiFailure(message: string): string {
   switch (classifyAiFailure(message)) {
     case "credit": return "no credit left";
@@ -71,15 +61,3 @@ export function shortAiFailure(message: string): string {
   }
 }
 
-export function describeProviderFailures(
-  failures: Array<{ provider: string; message: string }>,
-): string {
-  if (!failures.length) return "Sartho could not reach an AI provider.";
-  if (failures.length === 1) return describeAiFailure(failures[0].message);
-
-  const named = failures
-    .map((failure) => `${failure.provider}: ${shortAiFailure(failure.message)}`)
-    .join(". ");
-
-  return `Sartho tried ${failures.length} AI providers and none could read the document. ${named}. Nothing is wrong with your résumé — fix whichever provider you meant to use and upload it again.`;
-}
