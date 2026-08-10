@@ -19,7 +19,7 @@
   color: white;
   background: rgba(5, 8, 13, .55);
   outline: none;
-  font-size: 12px;
+  font-size: var(--text-xs);
   letter-spacing: .08em;
 }
 
@@ -39,7 +39,7 @@
   color: #ffe4e9;
   background: rgba(201, 55, 82, .2);
   cursor: pointer;
-  font-size: 10px;
+  font-size: var(--text-2xs);
   font-weight: 750;
 }
 

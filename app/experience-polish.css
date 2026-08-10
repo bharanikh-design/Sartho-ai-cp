@@ -41,26 +41,26 @@ button, a { touch-action: manipulation; }
 }
 .page-description, .product-page-heading p { max-width: 68ch; font-size: clamp(14px, 1.15vw, 16px); line-height: 1.7; }
 .section-heading { font-size: clamp(19px, 1.55vw, 23px); }
-.section-subtitle { max-width: 68ch; font-size: 13px; line-height: 1.65; }
+.section-subtitle { max-width: 68ch; font-size: var(--text-sm); line-height: 1.65; }
 
 .primary-button, .secondary-button, .danger-button {
   min-height: 44px;
   border-radius: var(--radius-control);
   padding-inline: 18px;
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
-input, textarea, select { min-height: 44px; font-size: 16px; }
+input, textarea, select { min-height: 44px; font-size: var(--text-base); }
 
 .metric-grid { gap: var(--space-4); }
 .metric-card { min-height: 150px; padding: var(--space-5); }
-.metric-label, .metric-note, .metric-action { font-size: 11px; }
+.metric-label, .metric-note, .metric-action { font-size: var(--text-2xs); }
 .metric-value { margin-top: var(--space-3); font-size: clamp(26px, 2.5vw, 34px); }
 .dashboard-grid, .analyser-layout { gap: var(--space-5); }
 
 .top-bar { min-height: 72px; padding-inline: clamp(18px, 2.4vw, 34px); }
 .desktop-context { gap: 2px; }
-.context-kicker { font-size: 10px; }
-.desktop-context strong { font-size: 15px; }
+.context-kicker { font-size: var(--text-2xs); }
+.desktop-context strong { font-size: var(--text-base); }
 .sync-status { min-height: 38px; padding-inline: 13px; }
 .avatar-button { width: 42px; height: 42px; border-radius: 50%; }
 
@@ -89,23 +89,23 @@ input, textarea, select { min-height: 44px; font-size: 16px; }
   align-items: center;
   padding: 10px;
 }
-.profile-menu-identity .profile-menu-avatar { width: 42px; height: 42px; display: grid; place-items: center; margin: 0; overflow: visible; border-radius: 50%; color: #dce8e2; background: #234a3c; font-size: 12px; font-weight: 750; white-space: normal; }
+.profile-menu-identity .profile-menu-avatar { width: 42px; height: 42px; display: grid; place-items: center; margin: 0; overflow: visible; border-radius: 50%; color: #dce8e2; background: #234a3c; font-size: var(--text-xs); font-weight: 750; white-space: normal; }
 .profile-menu-identity .profile-menu-person { display: block; min-width: 0; margin: 0; overflow: visible; color: inherit; font-size: inherit; white-space: normal; }
-.profile-menu-person strong { overflow: hidden; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
-.profile-menu-person small { display: block; margin-top: 3px; overflow: hidden; color: var(--text-tertiary); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.profile-menu-person strong { overflow: hidden; font-size: var(--text-base); text-overflow: ellipsis; white-space: nowrap; }
+.profile-menu-person small { display: block; margin-top: 3px; overflow: hidden; color: var(--text-tertiary); font-size: var(--text-2xs); text-overflow: ellipsis; white-space: nowrap; }
 .profile-menu-divider { margin: 6px 4px; }
 .theme-row { min-height: 56px; padding: 8px 10px; }
 .theme-row > span { display: grid; gap: 2px; }
-.theme-row > span strong { color: var(--text); font-size: 13px; }
-.theme-row > span small { color: var(--text-tertiary); font-size: 11px; }
+.theme-row > span strong { color: var(--text); font-size: var(--text-sm); }
+.theme-row > span small { color: var(--text-tertiary); font-size: var(--text-2xs); }
 .theme-switch { width: 48px; height: 28px; }
 .theme-switch::after { width: 22px; height: 22px; }
 .theme-switch[data-on="true"]::after { transform: translateX(20px); }
 .profile-menu-link, .profile-menu-action { min-height: 58px; padding: 9px 10px; border-radius: 12px; }
 .profile-menu-link > span, .profile-menu-action > span { display: grid; min-width: 0; gap: 2px; }
-.profile-menu-link strong, .profile-menu-action strong { color: var(--text); font-size: 13px; }
-.profile-menu-link small, .profile-menu-action small { max-width: none; color: var(--text-tertiary); font-size: 10px; line-height: 1.4; text-align: left; }
-.profile-menu-link > b, .profile-menu-action > b { color: var(--text-tertiary); font-size: 15px; font-weight: 500; }
+.profile-menu-link strong, .profile-menu-action strong { color: var(--text); font-size: var(--text-sm); }
+.profile-menu-link small, .profile-menu-action small { max-width: none; color: var(--text-tertiary); font-size: var(--text-2xs); line-height: 1.4; text-align: left; }
+.profile-menu-link > b, .profile-menu-action > b { color: var(--text-tertiary); font-size: var(--text-base); font-weight: 500; }
 .profile-menu-signout { margin-top: 3px; }
 
 .profile-protection-layer { padding: clamp(12px, 3vw, 28px); }
@@ -117,9 +117,9 @@ input, textarea, select { min-height: 44px; font-size: 16px; }
 .account-privacy-options button { min-height: 82px; display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 15px 16px; border: 1px solid var(--line); border-radius: 14px; color: inherit; background: color-mix(in srgb, var(--glass) 60%, transparent); cursor: pointer; text-align: left; }
 .account-privacy-options button:hover { border-color: var(--line-bright); background: color-mix(in srgb, var(--glass) 88%, transparent); }
 .account-privacy-options button span { display: grid; gap: 4px; }
-.account-privacy-options button strong { font-size: 14px; }
-.account-privacy-options button small { color: var(--text-secondary); font-size: 12px; line-height: 1.5; }
-.account-privacy-options button b { flex: 0 0 auto; color: var(--text-tertiary); font-size: 11px; }
+.account-privacy-options button strong { font-size: var(--text-base); }
+.account-privacy-options button small { color: var(--text-secondary); font-size: var(--text-xs); line-height: 1.5; }
+.account-privacy-options button b { flex: 0 0 auto; color: var(--text-tertiary); font-size: var(--text-2xs); }
 .account-privacy-options button.is-danger { border-color: color-mix(in srgb, var(--rose) 28%, var(--line)); }
 .account-privacy-options button.is-danger strong, .account-privacy-options button.is-danger b { color: var(--rose); }
 .account-dialog-done { width: 100%; margin-top: 20px; }

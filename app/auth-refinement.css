@@ -14,7 +14,7 @@
 
 .auth-story-copy p {
   max-width: 730px;
-  font-size: 18px;
+  font-size: var(--text-md);
   line-height: 1.68;
 }
 
@@ -31,13 +31,13 @@
 }
 
 .auth-promise strong {
-  font-size: 15px;
+  font-size: var(--text-base);
   letter-spacing: -.015em;
 }
 
 .auth-promise span {
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: var(--text-sm);
   line-height: 1.5;
 }
 
@@ -48,7 +48,7 @@
 .route-node {
   min-height: 44px;
   padding: 0 17px;
-  font-size: 13px;
+  font-size: var(--text-sm);
   letter-spacing: -.01em;
 }
 
@@ -65,24 +65,24 @@
 
 .auth-card-heading p {
   margin-top: 13px;
-  font-size: 16px;
+  font-size: var(--text-base);
   line-height: 1.55;
 }
 
 .auth-kicker {
-  font-size: 11px;
+  font-size: var(--text-2xs);
 }
 
 .oauth-button {
   min-height: 58px;
   margin-top: 31px;
   border-radius: 17px;
-  font-size: 16px;
+  font-size: var(--text-base);
 }
 
 .auth-divider {
   margin: 25px 0;
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 
 .auth-form {
@@ -95,7 +95,7 @@
 }
 
 .auth-form label > span {
-  font-size: 14px;
+  font-size: var(--text-base);
   font-weight: 650;
 }
 
@@ -103,19 +103,19 @@
   min-height: 58px;
   border-radius: 16px;
   padding: 0 18px;
-  font-size: 17px;
+  font-size: var(--text-md);
 }
 
 .auth-submit {
   min-height: 58px;
   margin-top: 7px;
   border-radius: 17px;
-  font-size: 16px;
+  font-size: var(--text-base);
 }
 
 .auth-switch {
   margin-top: 21px;
-  font-size: 14px;
+  font-size: var(--text-base);
 }
 
 .auth-access-note {
@@ -125,7 +125,7 @@
   border-radius: 14px;
   color: var(--text-secondary);
   background: rgba(119, 158, 255, .055);
-  font-size: 13px;
+  font-size: var(--text-sm);
   line-height: 1.55;
   text-align: center;
 }
@@ -133,19 +133,19 @@
 .auth-footnote {
   margin-top: 25px;
   padding-top: 21px;
-  font-size: 12px;
+  font-size: var(--text-xs);
   line-height: 1.6;
 }
 
 .auth-message {
   padding: 14px 16px;
   border-radius: 14px;
-  font-size: 13px;
+  font-size: var(--text-sm);
   line-height: 1.55;
 }
 
 .journey-strip strong {
-  font-size: 11px;
+  font-size: var(--text-2xs);
 }
 
 .journey-strip span {
@@ -160,7 +160,7 @@
   }
 
   .auth-story-copy p {
-    font-size: 16px;
+    font-size: var(--text-base);
   }
 }
 
@@ -170,7 +170,7 @@
   }
 
   .auth-story-copy p {
-    font-size: 15px;
+    font-size: var(--text-base);
   }
 
   .auth-promise {
@@ -186,7 +186,7 @@
   }
 
   .auth-card-heading p {
-    font-size: 15px;
+    font-size: var(--text-base);
   }
 
   .auth-form input,
