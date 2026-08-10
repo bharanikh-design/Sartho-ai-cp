@@ -37,7 +37,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
         eyebrow="Opportunity decision"
         title={job.title}
         description={`${job.employer ?? "Employer not recorded"}${job.location ? ` · ${job.location}` : ""}. Review the signal, evidence mapping and preparation outputs in that order.`}
-        metric={{ value: <JobStatusSelect jobId={job.id} initialStatus={job.status} />, label: "current stage" }}
+        metric={{ value: <JobStatusSelect jobId={job.id} initialStatus={job.status} initialOutcome={application ? { stage: application.outcome_stage, reason: application.outcome_reason, note: application.outcome_note, recordedAt: application.outcome_recorded_at } : null} />, label: "current stage" }}
       />
 
       <section className="dashboard-grid job-summary-grid">
