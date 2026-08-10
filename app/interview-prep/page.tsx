@@ -27,8 +27,8 @@ export default async function InterviewPrepPage() {
       />
 
       <div className="capability-note">
-        <strong>Available now · evidence-led preparation workspace</strong>
-        <span>The role page already provides requirement mapping, evidence citations and labelled recruiter inferences. Model-generated questions and answer coaching are the next AI capability; this page does not pretend they exist yet.</span>
+        <strong>Available now · grounded AI interview coaching</strong>
+        <span>Open an analysed role to generate role-specific questions, a natural answer plan, approved evidence to use and warnings about where you could overclaim.</span>
       </div>
 
       <section className="glass-card content-card">
@@ -44,7 +44,7 @@ export default async function InterviewPrepPage() {
             {orderedJobs.map((job) => {
               const needsAttention = job.status === "interview" || job.status === "assessment";
               return (
-                <Link href={`/jobs/${job.id}`} className="saved-job-row" key={job.id}>
+                <Link href={`/jobs/${job.id}#interview-coach`} className="saved-job-row" key={job.id}>
                   <div>
                     <span className="saved-job-employer">{needsAttention ? "Needs preparation" : job.employer ?? "Employer not recorded"}</span>
                     <strong>{job.title}</strong>

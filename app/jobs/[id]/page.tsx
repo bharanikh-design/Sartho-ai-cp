@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { DeleteOpportunityButton } from "@/components/delete-opportunity-button";
 import { DeepAnalysisPanel } from "@/components/deep-analysis-panel";
+import { InterviewCoachPanel } from "@/components/interview-coach-panel";
 import { JobStatusSelect } from "@/components/job-status-select";
 import { ProductPageHeader } from "@/components/product-page-header";
 import { ResumeDraftPanel } from "@/components/resume-draft-panel";
@@ -120,6 +121,12 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
           </div>
         </section>
       )}
+
+      <InterviewCoachPanel
+        jobId={job.id}
+        analysisComplete={job.deep_analysis_status === "complete"}
+        requirementCount={requirements.length}
+      />
 
       <ResumeDraftPanel jobId={job.id} deepAnalysisComplete={job.deep_analysis_status === "complete"} application={application} />
 

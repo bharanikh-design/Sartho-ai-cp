@@ -34,6 +34,14 @@ export function SearchPlanEditor({
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const filtered = useMemo(() => sources.filter((source) => source.name.toLowerCase().includes(query.toLowerCase())), [query, sources]);
+  const activeSourceCount = sources.filter((source) => source.active).length;
+  const incompleteReasons = [
+    !targetLanes.length ? "choose at least one target role in Career Direction" : null,
+    !locations.length ? "add at least one search location" : null,
+    !remote ? "choose a preferred work model" : null,
+    !activeSourceCount ? "turn on at least one trusted source" : null,
+  ].filter((reason): reason is string => Boolean(reason));
+  const canSave = incompleteReasons.length === 0;
 
   function addLocation() {
     const value = locationDraft.trim();
@@ -49,6 +57,10 @@ export function SearchPlanEditor({
   }
 
   async function save() {
+    if (!canSave) {
+      setStatus("error");
+      return;
+    }
     setStatus("saving");
     const response = await fetch("/api/search-plan", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ sources, targetLocations: locations, remotePreference: remote }) });
     setStatus(response.ok ? "saved" : "error");
@@ -79,7 +91,7 @@ export function SearchPlanEditor({
       </section>
 
       <section className="glass-card direction-panel">
-        <div className="direction-heading"><div><span>Trusted sources</span><h2>Record the sources you want to use</h2><p>Official employer sites are primary sources; marketplaces can broaden your manual discovery. Automatic source connections are a future capability.</p></div><strong>{sources.filter((source) => source.active).length}/{sources.length}</strong></div>
+        <div className="direction-heading"><div><span>Trusted sources</span><h2>Record the sources you want to use</h2><p>Official employer sites are primary sources; marketplaces can broaden your manual discovery. Automatic source connections are a future capability.</p></div><strong>{activeSourceCount}/{sources.length}</strong></div>
         <div className="source-toolbar"><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Find a source" /></div>
         <div className="production-source-list">
           {filtered.map((source) => (
@@ -96,7 +108,7 @@ export function SearchPlanEditor({
         <div className="custom-source-add"><input value={customName} onChange={(event) => setCustomName(event.target.value)} placeholder="Employer or job source" /><input value={customUrl} onChange={(event) => setCustomUrl(event.target.value)} placeholder="https://…" /><button type="button" onClick={addSource}>Add custom source</button></div>
       </section>
 
-      <div className="direction-save-bar"><div><strong>Search brief ready for your approval</strong><span>{status === "saved" ? "Saved securely" : status === "error" ? "Could not save—please try again" : "This saves evaluation criteria; it does not fetch or submit applications"}</span></div><button type="button" className="primary-button" onClick={() => void save()} disabled={status === "saving"}>{status === "saving" ? "Saving…" : "Save and open opportunities"}</button></div>
+      <div className="direction-save-bar"><div><strong>{canSave ? "Search brief ready for your approval" : "Complete your search brief before continuing"}</strong><span>{status === "saved" ? "Saved securely" : status === "error" && canSave ? "Could not save—please try again" : incompleteReasons.length ? `Next: ${incompleteReasons[0]}.` : "This saves evaluation criteria; it does not fetch or submit applications"}</span></div><button type="button" className="primary-button" onClick={() => void save()} disabled={status === "saving" || !canSave}>{status === "saving" ? "Saving…" : "Save and open opportunities"}</button></div>
     </div>
   );
 }

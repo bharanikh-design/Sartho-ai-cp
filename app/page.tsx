@@ -1,16 +1,12 @@
 import Link from "next/link";
 import { ProductPageHeader } from "@/components/product-page-header";
 import { requireUser } from "@/lib/auth";
+import { summarizeDashboardJobs } from "@/lib/dashboard/job-metrics";
 import { loadProductJourney } from "@/lib/journey/load-product-journey";
 import type { JobRecommendation, JobStatus } from "@/lib/types";
 import { withJwtClockSkewRetry } from "@/lib/supabase/retry";
 
 export const dynamic = "force-dynamic";
-
-const activeApplicationStatuses = new Set<JobStatus>([
-  "approved", "applied", "acknowledged", "assessment", "interview",
-]);
-const outcomeStatuses = new Set<JobStatus>(["offer", "rejected", "withdrawn"]);
 
 export default async function DashboardPage() {
   const { supabase, user } = await requireUser();
@@ -28,10 +24,7 @@ export default async function DashboardPage() {
   if (jobsError) throw jobsError;
 
   const jobRows = (jobs ?? []) as Array<{ id: string; status: JobStatus; recommendation: JobRecommendation | null }>;
-  const activeApplications = jobRows.filter((job) => activeApplicationStatuses.has(job.status)).length;
-  const interviewCount = jobRows.filter((job) => job.status === "interview" || job.status === "assessment").length;
-  const outcomeCount = jobRows.filter((job) => outcomeStatuses.has(job.status)).length;
-  const strongMatches = jobRows.filter((job) => job.recommendation === "apply").length;
+  const { activeApplications, interviewCount, outcomeCount, strongMatches } = summarizeDashboardJobs(jobRows);
   const firstName = ((user.user_metadata?.full_name as string | undefined) ?? user.email?.split("@")[0] ?? "there").split(" ")[0];
 
   const nextAction = !journey.activated
@@ -95,7 +88,7 @@ export default async function DashboardPage() {
     <div className="page-stack dashboard-page">
       <ProductPageHeader
         eyebrow="Dashboard"
-        title={`Good morning, ${firstName}.`}
+        title={`Welcome back, ${firstName}.`}
         description="See where you are, what needs attention and the one action that moves your career workflow forward."
         metric={{ value: `${journey.progress}%`, label: "foundation complete" }}
       />
