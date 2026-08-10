@@ -1,11 +1,20 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { GroundedDirectionSuggestion } from "@/lib/career/direction-suggestions";
+import type { GroundedRoleRanking, MatchLevel } from "@/lib/career/direction-ranking";
 import type { ProfileRecord, TargetLaneRecord } from "@/lib/types";
 
 type LaneDraft = Pick<TargetLaneRecord, "id" | "name" | "weight" | "priority" | "active">;
+
+const MATCH_LABEL: Record<MatchLevel, string> = {
+  strong: "Strong match",
+  moderate: "Partial match",
+  stretch: "Stretch",
+  unclear: "Unclear",
+};
+const MATCH_RANK: Record<MatchLevel, number> = { strong: 0, moderate: 1, stretch: 2, unclear: 3 };
 
 function balanceByPriority(items: LaneDraft[]) {
   if (!items.length) return [];
@@ -49,9 +58,28 @@ export function CareerDirectionEditor({
   const [dismissed, setDismissed] = useState<string[]>([]);
   const [aiStatus, setAiStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [aiError, setAiError] = useState<string | null>(null);
+  const [rankings, setRankings] = useState<GroundedRoleRanking[]>([]);
+  const [rankStatus, setRankStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [rankError, setRankError] = useState<string | null>(null);
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [guidanceError, setGuidanceError] = useState<string | null>(null);
+
+  const guidanceRef = useRef<HTMLDetailsElement>(null);
+  const headlineRef = useRef<HTMLInputElement>(null);
+  const locationRef = useRef<HTMLInputElement>(null);
+  const workRef = useRef<HTMLInputElement>(null);
+
   const allocation = useMemo(() => lanes.reduce((sum, lane) => sum + lane.weight, 0), [lanes]);
   const visibleSuggestions = suggestions.filter((item) => !dismissed.includes(item.name));
+  const rankingByName = useMemo(
+    () => new Map(rankings.map((item) => [item.name.toLocaleLowerCase(), item])),
+    [rankings],
+  );
+  const strongest = useMemo(
+    () => (rankings.length ? [...rankings].sort((a, b) => MATCH_RANK[a.match] - MATCH_RANK[b.match])[0] : null),
+    [rankings],
+  );
+  const missingGuidance = !headline.trim() || !location.trim() || !workAuthorisation.trim();
 
   function addLaneName(value: string) {
     const name = value.trim();
@@ -72,6 +100,19 @@ export function CareerDirectionEditor({
     setLanes((items) => {
       const reordered = [...items];
       [reordered[index], reordered[nextIndex]] = [reordered[nextIndex], reordered[index]];
+      return balanceByPriority(reordered);
+    });
+  }
+
+  /* Reorder the priorities to lead with the roles the evidence backs most. */
+  function applyRankedOrder() {
+    if (!rankings.length) return;
+    setLanes((items) => {
+      const reordered = [...items].sort((a, b) => {
+        const ra = rankingByName.get(a.name.toLocaleLowerCase());
+        const rb = rankingByName.get(b.name.toLocaleLowerCase());
+        return (ra ? MATCH_RANK[ra.match] : 99) - (rb ? MATCH_RANK[rb.match] : 99);
+      });
       return balanceByPriority(reordered);
     });
   }
@@ -104,7 +145,45 @@ export function CareerDirectionEditor({
     }
   }
 
+  async function rankRoles() {
+    if (rankStatus === "loading" || !lanes.length) return;
+    setRankStatus("loading");
+    setRankError(null);
+    try {
+      const response = await fetch("/api/career/direction/rank", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ lanes: lanes.map((lane) => lane.name), explorationPrompt: aiPrompt }),
+      });
+      const result = await response.json() as { rankings?: GroundedRoleRanking[]; error?: string };
+      if (!response.ok || !result.rankings) throw new Error(result.error ?? "AI could not rank your roles.");
+      setRankings(result.rankings);
+      setRankStatus("ready");
+    } catch (caught) {
+      setRankError(caught instanceof Error ? caught.message : "AI could not rank your roles.");
+      setRankStatus("error");
+    }
+  }
+
   async function save() {
+    /*
+     * The three guidance fields are required. Rather than silently disabling
+     * the button (which reads as "nothing happens"), the save is attempted and,
+     * if guidance is missing, the section is opened, scrolled to and focused so
+     * the reason is impossible to miss.
+     */
+    if (missingGuidance) {
+      setGuidanceError("Add your role, location and work rights below before saving.");
+      if (guidanceRef.current) {
+        guidanceRef.current.open = true;
+        guidanceRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+      const firstMissing = !headline.trim() ? headlineRef : !location.trim() ? locationRef : workRef;
+      window.setTimeout(() => firstMissing.current?.focus(), 320);
+      return;
+    }
+
+    setGuidanceError(null);
     setStatus("saving");
     const strengths = initialProfile?.strengths?.length ? initialProfile.strengths : suggestedStrengths.slice(0, 12);
     const response = await fetch("/api/career/direction", {
@@ -199,23 +278,52 @@ export function CareerDirectionEditor({
 
       <section className="glass-card direction-priority-panel" id="priorities">
         <div className="direction-priority-heading">
-          <div><span>Your decision</span><h2>Roles Sartho should prioritise</h2><p>Order them from most to least important. Sartho balances the search weighting automatically.</p></div>
+          <div><span>Your decision</span><h2>Roles Sartho should prioritise</h2><p>Order them from most to least important, or let AI rank them against your résumé. Sartho balances the search weighting automatically.</p></div>
           <strong>{lanes.length}</strong>
         </div>
 
         {lanes.length ? (
+          <div className="direction-rank-bar">
+            <button type="button" className="direction-rank-button" onClick={() => void rankRoles()} disabled={rankStatus === "loading" || evidenceCount === 0}>
+              <span aria-hidden="true">✦</span>
+              {rankStatus === "loading" ? "Matching against your résumé…" : rankStatus === "ready" ? "Re-rank against my résumé" : "Rank these against my résumé"}
+            </button>
+            {strongest && strongest.match !== "unclear" ? (
+              <p className="direction-rank-summary">
+                Strongest match: <strong>{strongest.name}</strong> — {strongest.reason}
+                <button type="button" className="direction-rank-apply" onClick={applyRankedOrder}>Use this order</button>
+              </p>
+            ) : null}
+            {evidenceCount === 0 ? <p className="direction-rank-note">Confirm your Career Profile first so the ranking has evidence behind it.</p> : null}
+            {rankError ? <p className="direction-rank-note is-error" role="alert">{rankError}</p> : null}
+          </div>
+        ) : null}
+
+        {lanes.length ? (
           <div className="direction-priority-list">
-            {lanes.map((lane, index) => (
-              <article key={lane.id}>
-                <span className="priority-rank">{index + 1}</span>
-                <div><input aria-label={`Priority ${index + 1}`} value={lane.name} onChange={(event) => setLanes((items) => items.map((item) => item.id === lane.id ? { ...item, name: event.target.value } : item))} /><small>{index === 0 ? "Highest priority" : `${lane.weight}% search emphasis`}</small></div>
-                <div className="priority-order-actions">
-                  <button type="button" disabled={index === 0} onClick={() => moveLane(index, -1)} aria-label={`Move ${lane.name} up`}>↑</button>
-                  <button type="button" disabled={index === lanes.length - 1} onClick={() => moveLane(index, 1)} aria-label={`Move ${lane.name} down`}>↓</button>
-                  <button type="button" onClick={() => setLanes((items) => balanceByPriority(items.filter((item) => item.id !== lane.id)))} aria-label={`Remove ${lane.name}`}>×</button>
-                </div>
-              </article>
-            ))}
+            {lanes.map((lane, index) => {
+              const ranking = rankingByName.get(lane.name.toLocaleLowerCase());
+              return (
+                <article key={lane.id}>
+                  <span className="priority-rank">{index + 1}</span>
+                  <div>
+                    <input aria-label={`Priority ${index + 1}`} value={lane.name} onChange={(event) => setLanes((items) => items.map((item) => item.id === lane.id ? { ...item, name: event.target.value } : item))} />
+                    <small>{index === 0 ? "Highest priority" : `${lane.weight}% search emphasis`}</small>
+                    {ranking ? (
+                      <div className="priority-match">
+                        <span className={`rank-badge rank-${ranking.match}`}>{MATCH_LABEL[ranking.match]}</span>
+                        <p>{ranking.reason}</p>
+                      </div>
+                    ) : null}
+                  </div>
+                  <div className="priority-order-actions">
+                    <button type="button" disabled={index === 0} onClick={() => moveLane(index, -1)} aria-label={`Move ${lane.name} up`}>↑</button>
+                    <button type="button" disabled={index === lanes.length - 1} onClick={() => moveLane(index, 1)} aria-label={`Move ${lane.name} down`}>↓</button>
+                    <button type="button" onClick={() => setLanes((items) => balanceByPriority(items.filter((item) => item.id !== lane.id)))} aria-label={`Remove ${lane.name}`}>×</button>
+                  </div>
+                </article>
+              );
+            })}
           </div>
         ) : (
           <div className="direction-priority-empty"><strong>No priorities selected yet</strong><span>Choose an AI suggestion above or add the first role yourself.</span></div>
@@ -223,16 +331,17 @@ export function CareerDirectionEditor({
 
       </section>
 
-      <details className="glass-card direction-preferences" id="context" open>
+      <details className="glass-card direction-preferences" id="context" ref={guidanceRef} open>
         <summary><span><strong>Complete your guidance</strong><small>Required context for relevant opportunity decisions</small></span><span>Review</span></summary>
         <div className="direction-fields">
-          <label><span>Role or level already in mind · Required</span><input value={headline} onChange={(event) => setHeadline(event.target.value)} placeholder="e.g. Regional Transformation Director" /></label>
-          <label><span>Current location · Required</span><input value={location} onChange={(event) => setLocation(event.target.value)} placeholder="Singapore" /></label>
-          <label className="field-wide"><span>Work rights and mobility · Required</span><input value={workAuthorisation} onChange={(event) => setWorkAuthorisation(event.target.value)} placeholder="Countries, visa status, relocation or remote preference" /></label>
+          <label><span>Role or level already in mind · Required</span><input ref={headlineRef} value={headline} onChange={(event) => setHeadline(event.target.value)} placeholder="e.g. Regional Transformation Director" /></label>
+          <label><span>Current location · Required</span><input ref={locationRef} value={location} onChange={(event) => setLocation(event.target.value)} placeholder="Singapore" /></label>
+          <label className="field-wide"><span>Work rights and mobility · Required</span><input ref={workRef} value={workAuthorisation} onChange={(event) => setWorkAuthorisation(event.target.value)} placeholder="Countries, visa status, relocation or remote preference" /></label>
         </div>
+        {guidanceError ? <div className="direction-ai-message is-error" role="alert">{guidanceError}</div> : null}
       </details>
 
-      <div className="direction-save-bar"><div><strong>{lanes.length ? `${lanes.length} priorit${lanes.length === 1 ? "y" : "ies"} ready to guide Sartho` : "Choose at least one direction when you are ready"}</strong><span>{status === "saved" ? "Career direction saved" : status === "error" ? "Could not save—please try again" : !headline.trim() || !location.trim() || !workAuthorisation.trim() ? "Complete the three required guidance fields before saving" : allocation === 100 && lanes.length ? "Search weighting is balanced automatically" : "Your current Career Profile remains unchanged until you save"}</span></div><button type="button" className="primary-button" onClick={() => void save()} disabled={status === "saving" || !lanes.length || !headline.trim() || !location.trim() || !workAuthorisation.trim()}>{status === "saving" ? "Saving…" : "Save and continue"}</button></div>
+      <div className="direction-save-bar"><div><strong>{lanes.length ? `${lanes.length} priorit${lanes.length === 1 ? "y" : "ies"} ready to guide Sartho` : "Choose at least one direction when you are ready"}</strong><span>{status === "saved" ? "Career direction saved" : status === "error" ? "Could not save—please try again" : missingGuidance ? "Complete the three required guidance fields before saving" : allocation === 100 && lanes.length ? "Search weighting is balanced automatically" : "Your current Career Profile remains unchanged until you save"}</span></div><button type="button" className="primary-button" onClick={() => void save()} disabled={status === "saving" || !lanes.length}>{status === "saving" ? "Saving…" : "Save and continue"}</button></div>
     </div>
   );
 }
