@@ -30,9 +30,9 @@
   transition: transform .18s ease, border-color .18s ease, background .18s ease;
 }
 .resume-version-row:hover { transform: translateY(-1px); border-color: rgba(140,175,255,.18); background: rgba(255,255,255,.04); }
-.resume-version-row > div > span { color: #ffc9a7; font-size: 7px; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; }
+.resume-version-row > div > span { color: #ffc9a7; font-size: var(--text-2xs); font-weight: 750; letter-spacing: .08em; text-transform: uppercase; }
 .resume-version-row strong { display: block; margin-top: 6px; font-size: 12px; }
-.resume-version-row small { display: block; margin-top: 5px; color: var(--text-tertiary); font-size: 8px; }
+.resume-version-row small { display: block; margin-top: 5px; color: var(--text-tertiary); font-size: var(--text-2xs); }
 
 @media (max-width: 620px) {
   .skeleton-row { grid-template-columns: 1fr; }

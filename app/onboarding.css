@@ -101,7 +101,7 @@
   display: block;
   margin-top: 2px;
   color: var(--text-tertiary);
-  font-size: 9px;
+  font-size: var(--text-2xs);
 }
 
 .onboarding-close {
