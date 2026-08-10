@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { CareerProfileReview } from "@/components/career-profile-review";
+import { ProductPageHeader } from "@/components/product-page-header";
 import { ResumeImport } from "@/components/resume-import";
 import { CareerHistory } from "@/components/career-history";
 import { requireUser } from "@/lib/auth";
@@ -19,11 +20,11 @@ export default async function CareerTruthPage() {
   if (isEmpty) {
     return (
       <div className="page-stack">
-        <section className="glass-card page-header-card profile-entry-header">
-          <div className="page-eyebrow"><span className="live-dot" /> Start your career foundation</div>
-          <h1 className="page-title">Bring in your résumé</h1>
-          <p className="page-description">Upload your strongest résumé. Sartho will turn it into a concise Career Profile you can review in one sitting.</p>
-        </section>
+        <ProductPageHeader
+          eyebrow="Step 1 of 4 · Add your résumé"
+          title="Bring in your career story."
+          description="Upload your strongest résumé. Generative AI organises the roles, strengths and achievements into a Career Profile; nothing is accepted until you review it."
+        />
         <section className="glass-card content-card" id="resume">
           <div className="card-header">
             <div>
@@ -40,22 +41,22 @@ export default async function CareerTruthPage() {
 
   return (
     <div className="page-stack career-profile-page">
-      <section className="glass-card page-header-card profile-entry-header">
-        <div className="page-eyebrow"><span className="live-dot" /> Your professional foundation</div>
-        <h1 className="page-title">Career Profile</h1>
-        <p className="page-description">A clear, editable picture of your career—not a list of database records. Confirm it once, then use it to guide opportunities, résumés and interviews.</p>
+      <ProductPageHeader
+        eyebrow="Step 2 of 4 · Confirm your profile"
+        title="Career Profile"
+        description="Review the professional story AI organised from your source résumé. Confirm what is true, reject what is not, and keep this as the evidence base for every later recommendation."
+        metric={{ value: pending ? pending : "✓", label: pending ? "items need review" : "Profile confirmed" }}
+        actions={[
+          { href: "/career-direction", label: "Edit career direction" },
+          { href: "/resume-studio#source-resumes", label: "Manage source résumés" },
+        ]}
+      />
 
-        <div className="hero-actions profile-header-actions">
-          <Link href="/career-direction" className="secondary-button">Edit career direction</Link>
-          <Link href="/resume-studio#source-resumes" className="secondary-button">Manage source résumés</Link>
-        </div>
-
-        <div className="profile-summary-strip" aria-label="Career profile summary">
-          <div><span>Experience</span><strong>{profile?.total_experience_years ? `${profile.total_experience_years}+ years` : `${roles.length} roles`}</strong></div>
-          <div><span>Career history</span><strong>{roles.length} role{roles.length === 1 ? "" : "s"}</strong></div>
-          <div><span>Strength signals</span><strong>{strengths.size}</strong></div>
-          <div><span>Profile status</span><strong>{pending ? "Ready to confirm" : "Confirmed"}</strong></div>
-        </div>
+      <section className="profile-summary-strip" aria-label="Career profile summary">
+        <div><span>Experience</span><strong>{profile?.total_experience_years ? `${profile.total_experience_years}+ years` : `${roles.length} roles`}</strong></div>
+        <div><span>Career history</span><strong>{roles.length} role{roles.length === 1 ? "" : "s"}</strong></div>
+        <div><span>Strength signals</span><strong>{strengths.size}</strong></div>
+        <div><span>Profile status</span><strong>{pending ? "Ready to confirm" : "Confirmed"}</strong></div>
       </section>
 
       {profile ? (

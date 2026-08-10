@@ -36,14 +36,14 @@ describe("primary navigation", () => {
       "Home",
       "Your Journey",
       "Career Profile",
-      "Search Strategy",
+      "Search Brief",
     ]);
     expect(getPrimaryNavigation(true).map((item) => item.label)).toEqual([
       "Home",
       "Opportunities",
       "Applications",
       "Career Profile",
-      "Search Strategy",
+      "Search Brief",
     ]);
     expect(getMobileNavigation(true)).toHaveLength(4);
   });
@@ -53,7 +53,7 @@ describe("primary navigation", () => {
       "Home",
       "Your Journey",
       "Career Profile",
-      "Search Strategy",
+      "Search Brief",
       "Opportunities",
     ]);
   });

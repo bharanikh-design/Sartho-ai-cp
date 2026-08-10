@@ -1,0 +1,470 @@
+:root {
+  --product-text: var(--text);
+  --product-muted: var(--text-secondary);
+  --product-line: rgba(255, 255, 255, 0.12);
+  --product-surface: rgba(19, 23, 30, 0.88);
+  --product-soft: rgba(255, 255, 255, 0.045);
+  --product-accent: #8ad9ba;
+  --product-accent-soft: rgba(114, 230, 189, 0.1);
+  --product-radius: 18px;
+  --product-shadow: 0 18px 50px rgba(22, 48, 38, 0.07);
+}
+
+:root[data-theme="light"] {
+  --product-text: #16231e;
+  --product-muted: #64736d;
+  --product-line: #dbe5e0;
+  --product-surface: #ffffff;
+  --product-soft: #f3f7f5;
+  --product-accent: #155c46;
+  --product-accent-soft: #e8f3ee;
+}
+
+.product-system-header {
+  align-items: flex-end;
+  display: flex;
+  gap: 48px;
+  justify-content: space-between;
+  padding: 18px 4px 28px;
+}
+
+.product-system-header__copy {
+  max-width: 820px;
+}
+
+.product-system-eyebrow {
+  color: var(--product-accent);
+  font-size: 12px;
+  font-weight: 750;
+  letter-spacing: 0.12em;
+  line-height: 1.4;
+  margin: 0 0 10px;
+  text-transform: uppercase;
+}
+
+.product-system-header h1 {
+  color: var(--product-text);
+  font-family: var(--font-sans, inherit);
+  font-size: clamp(32px, 4vw, 44px);
+  font-weight: 720;
+  letter-spacing: -0.04em;
+  line-height: 1.06;
+  margin: 0;
+  max-width: 780px;
+}
+
+.product-system-header__description {
+  color: var(--product-muted);
+  font-size: 16px;
+  line-height: 1.65;
+  margin: 16px 0 0;
+  max-width: 760px;
+}
+
+.product-system-header__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+.product-system-header__metric {
+  border-left: 1px solid var(--product-line);
+  display: grid;
+  flex: 0 0 154px;
+  gap: 4px;
+  padding: 10px 0 10px 30px;
+}
+
+.product-system-header__metric strong {
+  color: var(--product-text);
+  font-size: 30px;
+  line-height: 1;
+}
+
+.product-system-header__metric span {
+  color: var(--product-muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.product-system-section-header {
+  align-items: flex-start;
+  display: flex;
+  gap: 24px;
+  justify-content: space-between;
+}
+
+.product-system-section-header h2 {
+  color: var(--product-text);
+  font-family: var(--font-sans, inherit);
+  font-size: clamp(24px, 2.6vw, 30px);
+  letter-spacing: -0.025em;
+  line-height: 1.15;
+  margin: 0;
+}
+
+.product-system-section-header > div > p:last-child:not(.product-system-eyebrow) {
+  color: var(--product-muted);
+  font-size: 15px;
+  line-height: 1.6;
+  margin: 9px 0 0;
+  max-width: 720px;
+}
+
+.product-system-section-header__aside {
+  color: var(--product-muted);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.workflow-handoff {
+  align-items: center;
+  background: var(--product-soft);
+  border: 1px solid var(--product-line);
+  border-radius: var(--product-radius);
+  display: grid;
+  gap: 36px;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 0.42fr);
+  padding: 28px 30px;
+}
+
+.workflow-handoff h2 {
+  color: var(--product-text);
+  font-family: var(--font-sans, inherit);
+  font-size: 25px;
+  letter-spacing: -0.025em;
+  line-height: 1.2;
+  margin: 0;
+}
+
+.workflow-handoff__copy > p:last-child {
+  color: var(--product-muted);
+  font-size: 15px;
+  line-height: 1.6;
+  margin: 9px 0 0;
+  max-width: 680px;
+}
+
+.workflow-handoff__action {
+  align-items: flex-start;
+  border-left: 1px solid var(--product-line);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-left: 28px;
+}
+
+.workflow-handoff__action p {
+  color: var(--product-muted);
+  display: grid;
+  font-size: 13px;
+  gap: 3px;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.workflow-handoff__action p strong {
+  color: var(--product-text);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* Product-wide readability and control rhythm. These rules intentionally sit
+   last so older screen-specific styles cannot shrink core UI text below a
+   comfortable reading size. */
+.app-stage .page-eyebrow,
+.app-stage .journey-micro-label,
+.app-stage .home-step-label,
+.app-stage .metric-label,
+.app-stage .resume-section-heading span,
+.app-stage .career-direction-header > div > span,
+.app-stage .product-page-heading > div > span {
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.app-stage .section-heading,
+.app-stage .position-title,
+.app-stage .direction-ai-intro h2,
+.app-stage .direction-suggestion-card h3,
+.app-stage .direction-priority-heading h2,
+.app-stage .direction-heading h2,
+.app-stage .resume-workflow-heading h2,
+.app-stage .resume-section-heading h2,
+.app-stage .resume-source-upload h2,
+.app-stage .resume-source-drawer > summary > span:first-child strong {
+  font-family: var(--font-sans, inherit);
+  letter-spacing: -0.025em;
+}
+
+.app-stage .page-description,
+.app-stage .section-subtitle,
+.app-stage .metric-note,
+.app-stage .analysis-explanation,
+.app-stage .empty-ledger-inner p,
+.app-stage .empty-inline-state {
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.app-stage .summary-tile span,
+.app-stage .result-tile span,
+.app-stage .profile-summary-strip span,
+.app-stage .search-plan-summary span,
+.app-stage .direction-heading > div > span,
+.app-stage .direction-fields label span,
+.app-stage .resume-action-title > div > span,
+.app-stage .resume-ready-list article > div > span,
+.app-stage .resume-version-row > div > span {
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.app-stage .analyser-note,
+.app-stage .signal-section p,
+.app-stage .signal-chip,
+.app-stage .empty-decision p,
+.app-stage .direction-heading p,
+.app-stage .direction-priority-list small,
+.app-stage .direction-preferences > summary small,
+.app-stage .direction-save-bar span,
+.app-stage .search-plan-summary strong,
+.app-stage .resume-workflow-steps small,
+.app-stage .resume-action-title > small,
+.app-stage .resume-ready-list article small,
+.app-stage .resume-source-drawer > summary > span:first-child small,
+.app-stage .resume-source-status,
+.app-stage .resume-version-row small {
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.app-stage .direction-save-bar strong,
+.app-stage .resume-workflow-steps strong {
+  font-size: 14px;
+}
+
+.app-stage .resume-draft-reader pre {
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.app-stage .resume-draft-label,
+.app-stage .resume-change-log li span,
+.app-stage .resume-change-log li small,
+.app-stage .resume-change-log li strong,
+.app-stage .resume-guardrail-note {
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.app-stage .primary-button,
+.app-stage .secondary-button {
+  align-items: center;
+  display: inline-flex;
+  font-size: 14px;
+  font-weight: 700;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 18px;
+}
+
+.app-stage .glass-card,
+.app-stage .glass-card-soft,
+.app-stage .panel {
+  border-radius: var(--product-radius);
+}
+
+.journey-system-progress {
+  background: var(--product-surface);
+  border: 1px solid var(--product-line);
+  border-radius: var(--product-radius);
+  box-shadow: var(--product-shadow);
+  padding: 28px 30px;
+}
+
+:root:not([data-theme="light"]) .journey-system-progress,
+:root:not([data-theme="light"]) .workflow-handoff {
+  background: var(--product-surface);
+}
+
+.journey-system-summary {
+  align-items: center;
+  display: flex;
+  gap: 28px;
+  justify-content: space-between;
+  margin-top: 24px;
+}
+
+.journey-system-summary strong {
+  color: var(--product-text);
+  font-size: 15px;
+}
+
+.journey-system-summary span {
+  color: var(--product-muted);
+  font-size: 14px;
+}
+
+.journey-system-rail {
+  background: #e7eeea;
+  border-radius: 99px;
+  height: 8px;
+  margin-top: 14px;
+  overflow: hidden;
+}
+
+.journey-system-rail span {
+  background: var(--product-accent);
+  border-radius: inherit;
+  display: block;
+  height: 100%;
+}
+
+.journey-system-list {
+  display: grid;
+  gap: 0;
+  list-style: none;
+  margin: 24px 0 0;
+  padding: 0;
+}
+
+.journey-system-step a {
+  align-items: center;
+  border-top: 1px solid var(--product-line);
+  color: inherit;
+  display: grid;
+  gap: 18px;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  min-height: 92px;
+  padding: 18px 4px;
+  text-decoration: none;
+}
+
+.journey-system-step:first-child a {
+  border-top: 0;
+}
+
+.journey-system-step__marker {
+  align-items: center;
+  background: var(--product-soft);
+  border: 1px solid var(--product-line);
+  border-radius: 50%;
+  color: var(--product-muted);
+  display: flex;
+  font-size: 14px;
+  font-weight: 750;
+  height: 38px;
+  justify-content: center;
+  width: 38px;
+}
+
+.journey-system-step.is-complete .journey-system-step__marker {
+  background: var(--product-accent-soft);
+  border-color: #bbd8ca;
+  color: var(--product-accent);
+}
+
+.journey-system-step.is-current a {
+  background: linear-gradient(90deg, var(--product-accent-soft), transparent 72%);
+  border-radius: 12px;
+  padding-left: 14px;
+  padding-right: 14px;
+}
+
+.journey-system-step__copy {
+  display: grid;
+  gap: 4px;
+}
+
+.journey-system-step__copy strong {
+  color: var(--product-text);
+  font-size: 17px;
+}
+
+.journey-system-step__copy small {
+  color: var(--product-muted);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.journey-system-step__state {
+  color: var(--product-muted);
+  font-size: 13px;
+  font-style: normal;
+  font-weight: 700;
+}
+
+.journey-system-step.is-current .journey-system-step__state {
+  color: var(--product-accent);
+}
+
+.capability-note {
+  align-items: flex-start;
+  background: var(--product-soft);
+  border: 1px solid var(--product-line);
+  border-radius: 14px;
+  display: grid;
+  gap: 5px;
+  padding: 16px 18px;
+}
+
+.capability-note strong {
+  color: var(--product-text);
+  font-size: 13px;
+}
+
+.capability-note span {
+  color: var(--product-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+@media (max-width: 760px) {
+  .product-system-header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 20px;
+    padding-bottom: 20px;
+  }
+
+  .product-system-header__metric {
+    border-left: 0;
+    border-top: 1px solid var(--product-line);
+    grid-template-columns: auto 1fr;
+    padding: 16px 0 0;
+    width: 100%;
+  }
+
+  .workflow-handoff {
+    gap: 24px;
+    grid-template-columns: 1fr;
+    padding: 24px 20px;
+  }
+
+  .workflow-handoff__action {
+    border-left: 0;
+    border-top: 1px solid var(--product-line);
+    padding: 20px 0 0;
+  }
+
+  .journey-system-progress {
+    padding: 22px 18px;
+  }
+
+  .journey-system-summary {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .journey-system-step a {
+    grid-template-columns: 38px minmax(0, 1fr);
+  }
+
+  .journey-system-step__state {
+    grid-column: 2;
+  }
+}

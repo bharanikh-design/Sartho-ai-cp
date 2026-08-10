@@ -1,4 +1,5 @@
 import { ApplicationLedger } from "@/components/application-ledger";
+import { ProductPageHeader } from "@/components/product-page-header";
 import { requireUser } from "@/lib/auth";
 import { getJobs } from "@/lib/data/jobs";
 
@@ -10,13 +11,12 @@ export default async function ApplicationsPage() {
 
   return (
     <div className="page-stack">
-      <section className="glass-card page-header-card">
-        <div className="page-eyebrow"><span className="live-dot" /> Outcome ledger</div>
-        <h1 className="page-title">Applications</h1>
-        <p className="page-description">
-          One factual timeline for every opportunity, résumé version, acknowledgement, assessment, interview and outcome. Nothing is submitted without your approval.
-        </p>
-      </section>
+      <ProductPageHeader
+        eyebrow="Recurring workflow · Track and learn"
+        title="Applications"
+        description="Keep one factual timeline for each opportunity—from decision and résumé version through acknowledgement, interview and outcome. Nothing is submitted without your approval."
+        metric={{ value: jobs.length, label: "tracked opportunities" }}
+      />
 
       <ApplicationLedger initialJobs={jobs} />
     </div>

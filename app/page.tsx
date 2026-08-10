@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ProductPageHeader } from "@/components/product-page-header";
 import { requireUser } from "@/lib/auth";
 import { loadProductJourney } from "@/lib/journey/load-product-journey";
 import type { JobStatus } from "@/lib/types";
@@ -94,14 +95,12 @@ export default async function HomePage() {
 
   return (
     <div className="page-stack home-dashboard">
-      <header className="home-welcome">
-        <div>
-          <div className="page-eyebrow"><span className="live-dot" /> Your career workspace</div>
-          <h1>Welcome back, {firstName}.</h1>
-          <p>One clear path from Career Profile to opportunity, application and outcome.</p>
-        </div>
-        <Link href="/?tour=1" className="home-text-link">Replay introduction</Link>
-      </header>
+      <ProductPageHeader
+        eyebrow="Your career workspace"
+        title={`Welcome back, ${firstName}.`}
+        description="Pick up exactly where you left off. Your next action, opportunity decisions and application outcomes stay connected here."
+        actions={[{ href: "/?tour=1", label: "Replay introduction" }]}
+      />
 
       <section className="glass-card home-primary-action" aria-labelledby="next-action-title">
         <div className="home-primary-copy">

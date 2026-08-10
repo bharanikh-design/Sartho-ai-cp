@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import type { TargetLaneRecord } from "@/lib/types";
 import type { SearchSourcePreference } from "@/lib/data/search";
 
@@ -23,6 +24,7 @@ export function SearchPlanEditor({
   initialRemote: string;
   targetLanes: TargetLaneRecord[];
 }) {
+  const router = useRouter();
   const [sources, setSources] = useState<SearchSource[]>(initialSources.length ? initialSources : recommendedSources);
   const [locations, setLocations] = useState(initialLocations);
   const [remote, setRemote] = useState(initialRemote);
@@ -50,7 +52,11 @@ export function SearchPlanEditor({
     setStatus("saving");
     const response = await fetch("/api/search-plan", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ sources, targetLocations: locations, remotePreference: remote }) });
     setStatus(response.ok ? "saved" : "error");
-    if (response.ok) window.dispatchEvent(new Event("sartho:journey-changed"));
+    if (response.ok) {
+      window.dispatchEvent(new Event("sartho:journey-changed"));
+      router.push("/jobs");
+      router.refresh();
+    }
   }
 
   return (
@@ -61,6 +67,11 @@ export function SearchPlanEditor({
         <div><span>Active sources</span><strong>{sources.filter((source) => source.active).length}</strong></div>
         <div><span>Work model</span><strong>{remote || "Flexible"}</strong></div>
       </section>
+
+      <div className="capability-note">
+        <strong>Saved search brief · no automatic discovery yet</strong>
+        <span>Sartho stores these choices and uses them as context when you evaluate a role. Selecting a source does not connect to it or fetch jobs from it.</span>
+      </div>
 
       <section className="glass-card direction-panel" id="profiles">
         <div className="direction-heading">
@@ -90,7 +101,7 @@ export function SearchPlanEditor({
       </section>
 
       <section className="glass-card direction-panel">
-        <div className="direction-heading"><div><span>Trusted sources</span><h2>Choose where opportunities come from</h2><p>Official employer sites are primary sources. Marketplaces broaden discovery. Sartho will never submit an application without your approval.</p></div><strong>{sources.filter((source) => source.active).length}/{sources.length}</strong></div>
+        <div className="direction-heading"><div><span>Trusted sources</span><h2>Record the sources you want to use</h2><p>Official employer sites are primary sources; marketplaces can broaden your manual discovery. Automatic source connections are a future capability.</p></div><strong>{sources.filter((source) => source.active).length}/{sources.length}</strong></div>
         <div className="source-toolbar"><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Find a source" /></div>
         <div className="production-source-list">
           {filtered.map((source) => (
@@ -107,7 +118,7 @@ export function SearchPlanEditor({
         <div className="custom-source-add"><input value={customName} onChange={(event) => setCustomName(event.target.value)} placeholder="Employer or job source" /><input value={customUrl} onChange={(event) => setCustomUrl(event.target.value)} placeholder="https://…" /><button type="button" onClick={addSource}>Add custom source</button></div>
       </section>
 
-      <div className="direction-save-bar"><div><strong>Search plan ready for your approval</strong><span>{status === "saved" ? "Saved securely" : status === "error" ? "Could not save—please try again" : "This controls discovery only, never automatic applications"}</span></div><button type="button" className="primary-button" onClick={() => void save()} disabled={status === "saving"}>{status === "saving" ? "Saving…" : "Save search plan"}</button></div>
+      <div className="direction-save-bar"><div><strong>Search brief ready for your approval</strong><span>{status === "saved" ? "Saved securely" : status === "error" ? "Could not save—please try again" : "This saves evaluation criteria; it does not fetch or submit applications"}</span></div><button type="button" className="primary-button" onClick={() => void save()} disabled={status === "saving"}>{status === "saving" ? "Saving…" : "Save and open opportunities"}</button></div>
     </div>
   );
 }

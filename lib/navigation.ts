@@ -57,11 +57,11 @@ const profileNavigation: NavigationItem = {
 };
 
 const strategyNavigation: NavigationItem = {
-  label: "Search Strategy",
-  shortLabel: "Strategy",
+  label: "Search Brief",
+  shortLabel: "Brief",
   href: "/search-plan",
   icon: "resume",
-  purpose: "Control target profiles, locations, work model and trusted opportunity sources.",
+  purpose: "Save the locations, work model and sources that define a worthwhile opportunity.",
 };
 
 /**

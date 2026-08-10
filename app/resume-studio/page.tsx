@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ProductPageHeader } from "@/components/product-page-header";
 import { ResumeImport } from "@/components/resume-import";
 import { ResumeLibrary } from "@/components/resume-library";
 import { ResumeStudioWorkspace } from "@/components/resume-studio-workspace";
@@ -32,10 +33,13 @@ export default async function ResumeStudioPage() {
 
   return (
     <div className="page-stack resume-studio-page">
-      <header className="resume-studio-header">
-        <div><span>Résumé Studio</span><h1>Turn an analysed role into a résumé you can review.</h1><p>No blank canvas and no invented experience. Choose the role; AI builds a separate draft from the career facts you approved.</p></div>
-        <Link href="/jobs" className="secondary-button">Open opportunities</Link>
-      </header>
+      <ProductPageHeader
+        eyebrow="Prepare · Résumé"
+        title="Turn one analysed role into one truthful résumé draft."
+        description="Choose the role first. Generative AI then builds a separate draft using only the career facts you approved and shows every material change for review."
+        metric={{ value: applications.length, label: "tailored drafts" }}
+        actions={[{ href: "/jobs", label: "Open opportunities" }]}
+      />
 
       <ResumeStudioWorkspace
         profileReady={approvedCount > 0}

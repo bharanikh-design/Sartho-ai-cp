@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ProductPageHeader } from "@/components/product-page-header";
 
 /*
  * A job that is gone is a real answer, not a wrong turn.
@@ -10,29 +11,15 @@ import Link from "next/link";
  */
 export default function JobNotFound() {
   return (
-    <section className="glass-panel" style={{ maxWidth: "46ch", margin: "10vh auto", padding: "34px", textAlign: "center" }}>
-      <h1 style={{ margin: 0, fontSize: "22px", fontWeight: 640, letterSpacing: "-0.026em" }}>
-        That role is no longer here
-      </h1>
-      <p style={{ margin: "10px 0 0", color: "var(--text-secondary)", fontSize: "14px", lineHeight: 1.6 }}>
-        It may have been removed, or the link may be out of date. Everything else you are tracking is still where you left it.
-      </p>
-      <Link
-        href="/jobs"
-        style={{
-          display: "inline-block",
-          marginTop: "22px",
-          padding: "12px 22px",
-          borderRadius: "13px",
-          color: "#fff",
-          background: "linear-gradient(135deg, #7c5cf0, #5b7ff0)",
-          fontSize: "14px",
-          fontWeight: 620,
-          textDecoration: "none",
-        }}
-      >
-        Back to your roles
-      </Link>
-    </section>
+    <div className="page-stack">
+      <ProductPageHeader
+        eyebrow="Opportunity unavailable"
+        title="That role is no longer here."
+        description="It may have been removed, or the link may be out of date. Everything else you are tracking is still where you left it."
+      />
+      <section className="glass-card content-card empty-state-card">
+        <Link href="/jobs" className="primary-button">Back to opportunities <span aria-hidden="true">→</span></Link>
+      </section>
+    </div>
   );
 }
