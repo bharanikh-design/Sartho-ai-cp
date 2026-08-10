@@ -36,12 +36,24 @@ export async function PATCH(
     .eq("id", id)
     .eq("user_id", user.id)
     .select("*")
-    .single();
+    .maybeSingle();
 
   if (jobError) {
     console.error("Unable to update opportunity", jobError);
     return NextResponse.json({ error: "Sartho could not update this opportunity." }, { status: 500 });
   }
+
+  /*
+   * No row matched: the opportunity does not exist, or it belongs to someone
+   * else. Row Level Security makes those two indistinguishable from here,
+   * which is deliberate — telling them apart would confirm the existence of
+   * another user's record. Either way it is a 404.
+   *
+   * `.single()` used to sit here and raised PGRST116 on an empty result, so
+   * every miss surfaced as "Sartho could not update this opportunity" on a
+   * 500 — a server fault reported for a client mistake.
+   */
+  if (!job) return NextResponse.json({ error: "Opportunity not found." }, { status: 404 });
 
   if (body.status !== "saved") {
     const { error: applicationError } = await supabase
