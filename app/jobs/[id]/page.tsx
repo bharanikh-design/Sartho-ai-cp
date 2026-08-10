@@ -8,6 +8,7 @@ import { ProductPageHeader } from "@/components/product-page-header";
 import { ResumeDraftPanel } from "@/components/resume-draft-panel";
 import { requireUser } from "@/lib/auth";
 import { getJobWorkspace } from "@/lib/data/jobs";
+import { presentRuleAnalysis } from "@/lib/matching/present-rule-analysis";
 import type { EvidenceRecord, JobRequirementRecord, RequirementType } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -27,6 +28,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
 
   const evidenceMap = new Map((approvedEvidence ?? []).map((item) => [item.id, item as Pick<EvidenceRecord, "id" | "claim" | "source_name" | "source_locator">]));
   const analysis = job.rule_analysis;
+  const analysisPresentation = analysis ? presentRuleAnalysis(analysis, job.technical_heaviness) : null;
   const summary = job.deep_analysis_summary;
 
   return (
@@ -50,8 +52,8 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
 
           {analysis ? (
             <div className="decision-result persisted-analysis">
-              <div className="result-tile"><span>Best-fit lane</span><strong>{analysis.primaryLane}</strong></div>
-              <div className="result-tile"><span>Technical heaviness</span><strong>{analysis.technicalHeaviness}/100</strong></div>
+              <div className="result-tile"><span>Strongest match</span><strong>{analysisPresentation?.strongestMatch}</strong></div>
+              <div className="result-tile"><span>Profile support</span><strong>{analysisPresentation?.profileSupport}/100</strong></div>
               <div className="signal-section">
                 <h4>Relevant signals</h4>
                 <div className="chip-row">{analysis.matchedSignals.map((value) => <span key={value} className="signal-chip">{value}</span>)}</div>
