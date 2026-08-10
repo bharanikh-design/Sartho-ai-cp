@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
+import localFont from "next/font/local";
 import "./globals.css";
 import "./auth.css";
 import "./auth-refinement.css";
@@ -16,6 +17,19 @@ import "./journey-workspace.css";
 import "./sites-integration.css";
 import { AppShell } from "@/components/app-shell";
 
+/*
+ * One typeface, self-hosted. The body font was declared as "Inter" for months
+ * but never actually loaded, so every screen silently rendered in the system
+ * font. Shipping the variable woff2 in-repo makes the intended type real and
+ * keeps the build reproducible — no font is fetched at build time.
+ */
+const inter = localFont({
+  src: "./fonts/inter-latin.woff2",
+  variable: "--font-inter",
+  display: "swap",
+  weight: "100 900",
+});
+
 export const metadata: Metadata = {
   title: {
     default: "Sartho",
@@ -26,7 +40,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" className={inter.variable} suppressHydrationWarning>
       <body>
         {/*
           Applied before the app paints so a light-mode user never sees a dark
