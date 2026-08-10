@@ -1,7 +1,7 @@
 export function WorkspaceSkeleton({ rows = 3 }: { rows?: number }) {
   return (
     <div className="page-stack" aria-label="Loading workspace" aria-busy="true">
-      <section className="glass-card page-header-card skeleton-card">
+      <section className="product-system-header skeleton-card">
         <div className="skeleton skeleton-kicker" />
         <div className="skeleton skeleton-title" />
         <div className="skeleton skeleton-copy" />

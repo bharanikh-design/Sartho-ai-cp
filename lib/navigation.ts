@@ -25,8 +25,8 @@ const journeyNavigation: NavigationItem = {
 };
 
 const dashboardNavigation: NavigationItem = {
-  label: "Home",
-  shortLabel: "Home",
+  label: "Dashboard",
+  shortLabel: "Dashboard",
   href: "/",
   icon: "home",
   purpose: "See opportunity activity, applications and the next best action.",
@@ -57,15 +57,15 @@ const profileNavigation: NavigationItem = {
 };
 
 const strategyNavigation: NavigationItem = {
-  label: "Search Strategy",
-  shortLabel: "Strategy",
+  label: "Search Brief",
+  shortLabel: "Brief",
   href: "/search-plan",
   icon: "resume",
-  purpose: "Control target profiles, locations, work model and trusted opportunity sources.",
+  purpose: "Save the locations, work model and sources that define a worthwhile opportunity.",
 };
 
 /**
- * Home remains the orientation point throughout setup. After activation the
+ * Dashboard remains the orientation point throughout setup. After activation the
  * navigation expands into the recurring opportunity and application loop.
  */
 export function getPrimaryNavigation(activated: boolean): NavigationItem[] {

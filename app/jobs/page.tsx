@@ -1,5 +1,5 @@
-import Link from "next/link";
 import { JobAnalyser } from "@/components/job-analyser";
+import { ProductPageHeader } from "@/components/product-page-header";
 import { requireUser } from "@/lib/auth";
 import { getCareerWorkspace } from "@/lib/data/career";
 import { getJobs } from "@/lib/data/jobs";
@@ -23,22 +23,21 @@ export default async function JobsPage() {
 
   return (
     <div className="page-stack">
-      <section className="glass-card page-header-card">
-        <div className="page-eyebrow"><span className="live-dot" /> Opportunity workspace</div>
-        <h1 className="page-title">Opportunities</h1>
-        <p className="page-description">
-          Bring in a role, understand why it fits your Career Profile, save the worthwhile ones and carry each decision forward.
-        </p>
-        <div className="hero-actions profile-header-actions">
-          <Link href="#analyse" className="primary-button">Add and analyse a role <span aria-hidden="true">↓</span></Link>
-          <Link href="/search-plan" className="secondary-button">Review search strategy</Link>
-        </div>
-        <div className="summary-grid opportunity-summary-grid">
-          <Summary label="Saved opportunities" value={String(jobs.length)} />
-          <Summary label="Strong signals" value={String(strongMatches)} />
-          <Summary label="Active sources" value={String(activeSources)} />
-          <Summary label="Target locations" value={String(searchPreferences.targetLocations.length)} />
-        </div>
+      <ProductPageHeader
+        eyebrow="Recurring workflow · Find and decide"
+        title="Opportunities"
+        description="Add a role you have found, understand why it fits your Career Profile, and carry the decision forward into résumé preparation and application tracking."
+        metric={{ value: jobs.length, label: "saved opportunities" }}
+        actions={[
+          { href: "#analyse", label: "Add and analyse a role", primary: true },
+          { href: "/search-plan", label: "Review search brief" },
+        ]}
+      />
+      <section className="summary-grid opportunity-summary-grid" aria-label="Opportunity summary">
+        <Summary label="Saved opportunities" value={String(jobs.length)} />
+        <Summary label="Strong rule-based signals" value={String(strongMatches)} />
+        <Summary label="Sources selected" value={String(activeSources)} />
+        <Summary label="Target locations" value={String(searchPreferences.targetLocations.length)} />
       </section>
       <div id="analyse"><JobAnalyser initialJobs={jobs} skillProfile={skillProfile} /></div>
     </div>

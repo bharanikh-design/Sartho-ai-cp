@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import type { GroundedDirectionSuggestion } from "@/lib/career/direction-suggestions";
 import type { ProfileRecord, TargetLaneRecord } from "@/lib/types";
 
@@ -36,10 +37,12 @@ export function CareerDirectionEditor({
   evidenceCount: number;
   roleCount: number;
 }) {
+  const router = useRouter();
   const [headline, setHeadline] = useState(initialProfile?.headline ?? "");
-  const [summary, setSummary] = useState(initialProfile?.summary ?? "");
+  const [summary] = useState(initialProfile?.summary ?? "");
   const [location, setLocation] = useState(initialProfile?.location ?? "");
   const [workAuthorisation, setWorkAuthorisation] = useState(initialProfile?.work_authorisation ?? "");
+  const [aiPrompt, setAiPrompt] = useState("");
   const [lanes, setLanes] = useState<LaneDraft[]>(() => balanceByPriority(initialLanes));
   const [laneDraft, setLaneDraft] = useState("");
   const [suggestions, setSuggestions] = useState<GroundedDirectionSuggestion[]>([]);
@@ -85,6 +88,7 @@ export function CareerDirectionEditor({
         body: JSON.stringify({
           headline,
           summary,
+          explorationPrompt: aiPrompt,
           location,
           workAuthorisation,
           existingLanes: lanes.map((lane) => lane.name),
@@ -109,7 +113,11 @@ export function CareerDirectionEditor({
       body: JSON.stringify({ headline, summary, location, workAuthorisation, strengths, lanes }),
     });
     setStatus(response.ok ? "saved" : "error");
-    if (response.ok) window.dispatchEvent(new Event("sartho:journey-changed"));
+    if (response.ok) {
+      window.dispatchEvent(new Event("sartho:journey-changed"));
+      router.push("/search-plan");
+      router.refresh();
+    }
   }
 
   return (
@@ -127,13 +135,33 @@ export function CareerDirectionEditor({
             <span><strong>{roleCount}</strong> roles understood</span>
             <span><strong>You decide</strong> what gets added</span>
           </div>
-          <div className="direction-ai-prompt">
-            <label htmlFor="direction-goal">Anything you want AI to optimise for? <span>Optional</span></label>
-            <textarea id="direction-goal" value={summary} onChange={(event) => setSummary(event.target.value)} rows={2} placeholder="For example: regional leadership, less travel, more transformation ownership…" />
-            <button type="button" onClick={() => void generateSuggestions()} disabled={aiStatus === "loading" || evidenceCount === 0}>
-              <span aria-hidden="true">✦</span>
-              {aiStatus === "loading" ? "Analysing your Career Profile…" : aiStatus === "ready" ? "Refresh AI suggestions" : "Generate AI suggestions"}
-            </button>
+          <div className="capability-note">
+            <strong>Generative AI · grounded suggestion</strong>
+            <span>This creates new career-path ideas from your approved profile. It is not a prediction, and nothing is saved until you add it.</span>
+          </div>
+          <div className="direction-choice-grid">
+            <section>
+              <span className="direction-choice-label">I know the role I want</span>
+              <strong>Add it directly</strong>
+              <p>The role enters your priorities immediately. AI does not need to reinterpret it.</p>
+              <div className="direction-manual-add">
+                <input value={laneDraft} onChange={(event) => setLaneDraft(event.target.value)} onKeyDown={(event) => event.key === "Enter" && (event.preventDefault(), addManualLane())} placeholder="e.g. ServiceNow Senior Engagement Manager" />
+                <button type="button" onClick={addManualLane}>Add target role</button>
+              </div>
+            </section>
+            <section>
+              <span className="direction-choice-label">Help me explore</span>
+              <strong>Ask AI for possibilities</strong>
+              <p>Describe what should change or matter next. AI will update the suggestions; it will not add anything automatically.</p>
+              <div className="direction-ai-prompt">
+                <label htmlFor="direction-goal">Exploration request <span>Optional</span></label>
+                <textarea id="direction-goal" value={aiPrompt} onChange={(event) => setAiPrompt(event.target.value)} rows={2} placeholder="For example: regional leadership, less travel, more transformation ownership…" />
+                <button type="button" onClick={() => void generateSuggestions()} disabled={aiStatus === "loading" || evidenceCount === 0}>
+                  <span aria-hidden="true">✦</span>
+                  {aiStatus === "loading" ? "Analysing your Career Profile…" : aiStatus === "ready" ? "Update AI suggestions" : "Generate AI suggestions"}
+                </button>
+              </div>
+            </section>
           </div>
           {evidenceCount === 0 ? <div className="direction-ai-message">Confirm your Career Profile first so every suggestion has evidence behind it.</div> : null}
           {aiError ? <div className="direction-ai-message is-error" role="alert">{aiError}</div> : null}
@@ -193,22 +221,18 @@ export function CareerDirectionEditor({
           <div className="direction-priority-empty"><strong>No priorities selected yet</strong><span>Choose an AI suggestion above or add the first role yourself.</span></div>
         )}
 
-        <div className="direction-manual-add">
-          <input value={laneDraft} onChange={(event) => setLaneDraft(event.target.value)} onKeyDown={(event) => event.key === "Enter" && (event.preventDefault(), addManualLane())} placeholder="Or add a role manually" />
-          <button type="button" onClick={addManualLane}>Add role</button>
-        </div>
       </section>
 
-      <details className="glass-card direction-preferences" id="context">
-        <summary><span><strong>Refine the guidance</strong><small>Optional location, mobility and target-role context</small></span><span>Open</span></summary>
+      <details className="glass-card direction-preferences" id="context" open>
+        <summary><span><strong>Complete your guidance</strong><small>Required context for relevant opportunity decisions</small></span><span>Review</span></summary>
         <div className="direction-fields">
-          <label><span>Role or level already in mind</span><input value={headline} onChange={(event) => setHeadline(event.target.value)} placeholder="e.g. Regional Transformation Director" /></label>
-          <label><span>Current location</span><input value={location} onChange={(event) => setLocation(event.target.value)} placeholder="Singapore" /></label>
-          <label className="field-wide"><span>Work rights, relocation or remote preferences</span><input value={workAuthorisation} onChange={(event) => setWorkAuthorisation(event.target.value)} placeholder="Countries, visa status, relocation or remote preference" /></label>
+          <label><span>Role or level already in mind · Required</span><input value={headline} onChange={(event) => setHeadline(event.target.value)} placeholder="e.g. Regional Transformation Director" /></label>
+          <label><span>Current location · Required</span><input value={location} onChange={(event) => setLocation(event.target.value)} placeholder="Singapore" /></label>
+          <label className="field-wide"><span>Work rights and mobility · Required</span><input value={workAuthorisation} onChange={(event) => setWorkAuthorisation(event.target.value)} placeholder="Countries, visa status, relocation or remote preference" /></label>
         </div>
       </details>
 
-      <div className="direction-save-bar"><div><strong>{lanes.length ? `${lanes.length} priorit${lanes.length === 1 ? "y" : "ies"} ready to guide Sartho` : "Choose at least one direction when you are ready"}</strong><span>{status === "saved" ? "Career direction saved" : status === "error" ? "Could not save—please try again" : allocation === 100 && lanes.length ? "Search weighting is balanced automatically" : "Your current Career Profile remains unchanged until you save"}</span></div><button type="button" className="primary-button" onClick={() => void save()} disabled={status === "saving"}>{status === "saving" ? "Saving…" : "Save my career direction"}</button></div>
+      <div className="direction-save-bar"><div><strong>{lanes.length ? `${lanes.length} priorit${lanes.length === 1 ? "y" : "ies"} ready to guide Sartho` : "Choose at least one direction when you are ready"}</strong><span>{status === "saved" ? "Career direction saved" : status === "error" ? "Could not save—please try again" : !headline.trim() || !location.trim() || !workAuthorisation.trim() ? "Complete the three required guidance fields before saving" : allocation === 100 && lanes.length ? "Search weighting is balanced automatically" : "Your current Career Profile remains unchanged until you save"}</span></div><button type="button" className="primary-button" onClick={() => void save()} disabled={status === "saving" || !lanes.length || !headline.trim() || !location.trim() || !workAuthorisation.trim()}>{status === "saving" ? "Saving…" : "Save and continue"}</button></div>
     </div>
   );
 }

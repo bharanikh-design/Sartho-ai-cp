@@ -31,29 +31,29 @@ describe("primary navigation", () => {
     expect(primaryNavigation.some((item) => item.href === "/resume-studio")).toBe(false);
   });
 
-  it("keeps Home visible while setup is incomplete and expands the outcome loop afterwards", () => {
+  it("keeps Dashboard visible while setup is incomplete and expands the outcome loop afterwards", () => {
     expect(getPrimaryNavigation(false).map((item) => item.label)).toEqual([
-      "Home",
+      "Dashboard",
       "Your Journey",
       "Career Profile",
-      "Search Strategy",
+      "Search Brief",
     ]);
     expect(getPrimaryNavigation(true).map((item) => item.label)).toEqual([
-      "Home",
+      "Dashboard",
       "Opportunities",
       "Applications",
       "Career Profile",
-      "Search Strategy",
+      "Search Brief",
     ]);
     expect(getMobileNavigation(true)).toHaveLength(4);
   });
 
   it("keeps a directly opened contextual destination visible and active", () => {
     expect(getNavigationForPath(false, "/jobs").map((item) => item.label)).toEqual([
-      "Home",
+      "Dashboard",
       "Your Journey",
       "Career Profile",
-      "Search Strategy",
+      "Search Brief",
       "Opportunities",
     ]);
   });

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { EvidenceRecord } from "@/lib/types";
 
@@ -12,6 +13,7 @@ function roleLabel(item: EvidenceRecord) {
 }
 
 export function CareerProfileReview({ initialItems }: { initialItems: EvidenceRecord[] }) {
+  const router = useRouter();
   const [items, setItems] = useState(initialItems);
   const [busy, setBusy] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -77,11 +79,49 @@ export function CareerProfileReview({ initialItems }: { initialItems: EvidenceRe
         ? { ...item, approval_status: "approved", safe_for_resume: true }
         : item));
       window.dispatchEvent(new Event("sartho:journey-changed"));
+      router.push("/career-direction");
+      router.refresh();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Sartho could not confirm your profile.");
     } finally {
       setBusy(false);
     }
+  }
+
+  if (confirmed) {
+    return (
+      <details className="glass-card profile-evidence-disclosure">
+        <summary>
+          <span><strong>Review or correct extracted evidence</strong><small>Open only when something in your confirmed Career Profile needs changing.</small></span>
+          <span>{usable.length} approved items <b aria-hidden="true">⌄</b></span>
+        </summary>
+        <div className="profile-evidence-disclosure__content">
+          <div className="profile-highlight-grid">
+            {highlights.map((item) => (
+              <article key={item.id}>
+                <span>{roleLabel(item)}</span>
+                {editingId === item.id ? (
+                  <>
+                    <textarea value={draft} onChange={(event) => setDraft(event.target.value)} rows={4} aria-label="Correct career highlight" />
+                    <div className="attention-actions">
+                      <button type="button" onClick={() => setEditingId(null)} disabled={busy}>Cancel</button>
+                      <button type="button" className="is-primary" onClick={() => void updateItem(item, { claim: draft })} disabled={busy || draft.trim().length < 10}>Save correction</button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <p>{item.claim}</p>
+                    {item.metrics.length ? <strong>{item.metrics.join(" · ")}</strong> : null}
+                    <button type="button" className="highlight-edit" onClick={() => { setEditingId(item.id); setDraft(item.claim); }}>Correct this</button>
+                  </>
+                )}
+              </article>
+            ))}
+          </div>
+          {error ? <div className="inline-error" role="alert">{error}</div> : null}
+        </div>
+      </details>
+    );
   }
 
   return (

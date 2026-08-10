@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { isOperationsAdmin, requireUser } from "@/lib/auth";
 import { getCachedProviderHealth } from "@/lib/ai/diagnostics";
+import { ProductPageHeader } from "@/components/product-page-header";
 
 /*
  * Is this deployment actually able to read a résumé?
@@ -27,15 +28,12 @@ export default async function DiagnosticsPage() {
 
   return (
     <div className="page-stack">
-      <section className="glass-card page-header-card">
-        <div className="page-eyebrow"><span className="live-dot" /> Deployment check</div>
-        <h1 className="page-title">Can Sartho read a résumé?</h1>
-        <p className="page-description">
-          Active-provider health is checked directly and cached for five minutes. Standbys are
-          never contacted until an operator activates them.
-        </p>
-        <p className="diagnostic-note">Last provider check: {new Date(checkedAt).toLocaleString("en-GB")}</p>
-      </section>
+      <ProductPageHeader
+        eyebrow="Operations · AI provider health"
+        title="Can Sartho read a résumé?"
+        description={<>The active provider is checked directly and the result is cached for five minutes. Standbys never receive career data until an operator activates them. Last checked {new Date(checkedAt).toLocaleString("en-GB")}.</>}
+        metric={{ value: usable ? "Ready" : "Paused", label: "AI processing" }}
+      />
 
       <section className={`glass-card content-card diagnostic-verdict ${usable ? "is-good" : "is-bad"}`}>
         <strong>

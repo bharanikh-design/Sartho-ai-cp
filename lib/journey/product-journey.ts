@@ -3,11 +3,8 @@ import type { SearchPreferences } from "@/lib/data/search";
 
 export type ProductJourneyStepId =
   | "resume"
-  | "extract"
   | "confirm"
-  | "context"
-  | "strengths"
-  | "profiles"
+  | "direction"
   | "search";
 
 export type ProductJourneyStep = {
@@ -59,6 +56,7 @@ export function buildProductJourney(input: ProductJourneyInput): ProductJourneyS
   );
   const strengthsComplete = Boolean(input.profile?.strengths.length);
   const profilesComplete = input.activeLanes > 0 && input.activeLaneAllocation === 100;
+  const directionComplete = contextComplete && strengthsComplete && profilesComplete;
   const activeSources = input.searchPreferences.sources.filter((source) => source.active).length;
   const searchComplete = input.searchPreferences.targetLocations.length > 0
     && activeSources > 0
@@ -76,19 +74,13 @@ export function buildProductJourney(input: ProductJourneyInput): ProductJourneyS
       reason: "Every recommendation must begin with a source you control.",
     },
     {
-      id: "extract",
-      label: "Résumé understood",
-      detail: extractionComplete ? `${input.roles} roles and key career highlights found` : "Organise roles, strengths and achievements",
-      href: "/career-truth#career-history",
-      complete: extractionComplete,
-      title: "Let Sartho organise your career story",
-      description: "Sartho identifies your professional history, strengths and standout achievements from the résumé you supplied.",
-      reason: "A structured career profile makes recommendations more useful than keyword matching.",
-    },
-    {
       id: "confirm",
       label: "Profile review",
-      detail: evidenceConfirmed ? "Career Profile confirmed" : "Review one concise career summary",
+      detail: evidenceConfirmed
+        ? `Career Profile confirmed from ${input.roles} role${input.roles === 1 ? "" : "s"}`
+        : extractionComplete
+          ? "AI has organised your résumé; review what it found"
+          : "Sartho will organise the résumé before your review",
       href: "/career-truth#profile-review",
       complete: evidenceConfirmed,
       title: "Confirm that the profile represents you",
@@ -96,46 +88,28 @@ export function buildProductJourney(input: ProductJourneyInput): ProductJourneyS
       reason: "Sartho organises the résumé; you confirm the overall career story.",
     },
     {
-      id: "context",
-      label: "Career context",
-      detail: contextComplete ? "Goal, location and mobility confirmed" : "Goal, location and work rights",
-      href: "/career-direction#context",
-      complete: contextComplete,
-      title: "Define what a successful next move means",
-      description: "Confirm the work you want, where you are based and where you can realistically work.",
-      reason: "The same experience can support very different futures; context makes the search personal.",
-    },
-    {
-      id: "strengths",
-      label: "Career strengths",
-      detail: strengthsComplete ? `${input.profile?.strengths.length ?? 0} strengths selected` : "Choose the signals you want to lead with",
-      href: "/career-direction#strengths",
-      complete: strengthsComplete,
-      title: "Choose the strengths that should lead",
-      description: "Keep, edit or remove the evidence-backed strengths that should shape role recommendations.",
-      reason: "Your strongest signals should influence ranking without hard-coding your future.",
-    },
-    {
-      id: "profiles",
-      label: "Target profiles",
-      detail: profilesComplete ? `${input.activeLanes} profiles weighted to 100%` : "Rank the roles Sartho should pursue",
-      href: "/career-direction#priorities",
-      complete: profilesComplete,
-      title: "Set your role search order",
-      description: "Add, rank and weight the profiles Sartho should prioritise, including pivots and adjacent possibilities.",
-      reason: "Priority weights turn broad career possibilities into an intentional search strategy.",
+      id: "direction",
+      label: "Career direction",
+      detail: directionComplete
+        ? `${input.activeLanes} priorities, strengths and mobility confirmed`
+        : "Review AI suggestions, then set priorities and mobility",
+      href: "/career-direction",
+      complete: directionComplete,
+      title: "Choose the direction that feels right",
+      description: "Review AI-suggested paths grounded in your Career Profile, then choose your strengths, role priorities and mobility constraints.",
+      reason: "AI can broaden the possibilities; only you can decide which paths should shape the search.",
     },
     {
       id: "search",
-      label: "Search strategy",
+      label: "Search brief",
       detail: searchComplete
         ? `${input.searchPreferences.targetLocations.length} locations · ${activeSources} active sources`
         : "Choose locations, work model and trusted sources",
       href: "/search-plan",
       complete: searchComplete,
-      title: "Choose where opportunities should come from",
-      description: "Confirm target locations, working model and the trusted sources that should define your opportunity coverage.",
-      reason: "A search is only useful when its geography, sources and constraints are explicit.",
+      title: "Set the brief for worthwhile opportunities",
+      description: "Confirm target locations, working model and trusted sources. This saves your search criteria; it does not yet fetch roles automatically.",
+      reason: "A clear brief makes every opportunity decision consistent and prepares Sartho for future source integrations.",
     },
   ];
 

@@ -1,4 +1,5 @@
 import { CareerDirectionEditor } from "@/components/career-direction-editor";
+import { ProductPageHeader } from "@/components/product-page-header";
 import { requireUser } from "@/lib/auth";
 import { getCareerWorkspace } from "@/lib/data/career";
 
@@ -12,7 +13,12 @@ export default async function CareerDirectionPage() {
 
   return (
     <div className="page-stack product-page career-direction-page">
-      <header className="career-direction-header"><div><span>Career direction</span><h1>Choose where Sartho should take you next.</h1><p>Start with evidence-grounded AI suggestions, then keep only the paths that feel right to you.</p></div><aside><strong>{lanes.length}</strong><span>selected priorities</span></aside></header>
+      <ProductPageHeader
+        eyebrow="Step 3 of 4 · Choose your direction"
+        title="Let AI open the possibilities. You choose the path."
+        description="Sartho reads your confirmed career evidence, suggests plausible next moves and explains why. Accept, edit or dismiss every suggestion, then rank the paths you want to pursue."
+        metric={{ value: lanes.length || "—", label: "selected priorities" }}
+      />
       <CareerDirectionEditor
         initialProfile={profile}
         initialLanes={lanes}

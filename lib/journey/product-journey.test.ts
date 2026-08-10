@@ -31,16 +31,16 @@ const ready: ProductJourneyInput = {
 };
 
 describe("product journey", () => {
-  it("uses one seven-step definition for full activation", () => {
+  it("uses one four-step definition for full activation", () => {
     const state = buildProductJourney(ready);
     expect(state.activated).toBe(true);
     expect(state.progress).toBe(100);
-    expect(state.steps).toHaveLength(7);
+    expect(state.steps).toHaveLength(4);
   });
 
   it("does not confuse résumé understanding with profile confirmation", () => {
     const state = buildProductJourney({ ...ready, approvedEvidence: 0, pendingEvidence: 20 });
-    expect(state.steps.find((step) => step.id === "extract")?.complete).toBe(true);
+    expect(state.steps.find((step) => step.id === "resume")?.complete).toBe(true);
     expect(state.steps.find((step) => step.id === "confirm")?.complete).toBe(false);
     expect(state.current.id).toBe("confirm");
   });
@@ -52,7 +52,7 @@ describe("product journey", () => {
     });
     expect(state.activated).toBe(false);
     expect(state.current.id).toBe("search");
-    expect(state.progress).toBe(86);
+    expect(state.progress).toBe(75);
   });
 
   it("accepts existing evidence as proof that a résumé was received", () => {

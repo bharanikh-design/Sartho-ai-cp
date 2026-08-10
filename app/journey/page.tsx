@@ -1,5 +1,6 @@
 import Link from "next/link";
-import type { CSSProperties } from "react";
+import { ProductPageHeader } from "@/components/product-page-header";
+import { WorkflowHandoff } from "@/components/workflow-handoff";
 import { requireUser } from "@/lib/auth";
 import { loadProductJourneyStatus } from "@/lib/journey/load-product-journey";
 
@@ -11,67 +12,53 @@ export default async function JourneyPage() {
   const { steps, current, currentIndex, progress, activated } = journey;
 
   return (
-    <div className="journey-prototype-page">
-      <header className="journey-page-heading">
-        <p>Getting to know you</p>
-        <h1>Your Sartho journey</h1>
-        <span>One clear path from your résumé to an activated opportunity search.</span>
-      </header>
+    <div className="page-stack">
+      <ProductPageHeader
+        eyebrow="Your foundation"
+        title="Four steps from résumé to a focused search."
+        description="Complete this once, then return only when your experience, direction or search constraints change. AI organises and suggests; you confirm every decision."
+        metric={{ value: `${progress}%`, label: activated ? "Foundation ready" : "Foundation complete" }}
+      />
 
-      <section className="panel journey-hero-exact">
-        <div className="journey-hero-copy-exact">
-          <p className="journey-micro-label">Your career foundation</p>
-          <h2>{activated ? "Your search foundation is ready." : "Complete the foundation once. Improve it whenever life changes."}</h2>
-          <p>{activated ? "Sartho has the Career Profile, direction and search coverage needed to support opportunity decisions." : "Finish the current step so recommendations reflect your career, ambitions, mobility and chosen sources."}</p>
-          <div className="readiness-notes-exact">
-            <span className={steps[0].complete ? "is-done" : "is-missing"}>{steps[0].complete ? "✓" : "＋"} Résumé source {steps[0].complete ? "received" : "needed"}</span>
-            <span className={steps[2].complete ? "is-done" : "is-missing"}>{steps[2].complete ? "✓" : "＋"} Career Profile {steps[2].complete ? "confirmed" : "needs review"}</span>
-            <span className={steps[6].complete ? "is-done" : "is-missing"}>{steps[6].complete ? "✓" : "＋"} Search coverage {steps[6].complete ? "confirmed" : "needs you"}</span>
+      <section className="journey-system-progress" aria-labelledby="journey-path-title">
+        <div className="product-system-section-header">
+          <div>
+            <p className="product-system-eyebrow">Setup path</p>
+            <h2 id="journey-path-title">Know me, guide me, then search.</h2>
+            <p>Each step produces something the next step uses. No disconnected forms and no hidden completion rules.</p>
           </div>
         </div>
-        <div className="readiness-visual-exact">
-          <div className="readiness-ring-exact" style={{ "--readiness": `${progress}%` } as CSSProperties}><span>{progress}%</span></div>
-          <div><strong>Journey completion</strong><span>{activated ? "Search activated" : `${journey.completedSteps} of ${steps.length} steps complete`}</span></div>
-        </div>
-      </section>
 
-      <section className="panel foundation-map-exact">
-        <div className="foundation-heading-exact">
-          <div><p className="journey-micro-label">Start to finish</p><h2>Your seven-step foundation</h2><p>Each stage makes Sartho&apos;s recommendations more relevant to you.</p></div>
-          <div className="journey-percent-exact"><strong>{progress}%</strong><span>Journey complete</span></div>
+        <div className="journey-system-summary">
+          <strong>{activated ? "All four foundation steps are complete." : `Step ${currentIndex + 1} is next: ${current.label}`}</strong>
+          <span>{journey.completedSteps} of {steps.length} complete</span>
         </div>
-        <div className="journey-track-exact" aria-label="User journey progress">
-          <div className="journey-rail-exact"><span style={{ width: `${progress}%` }} /></div>
+        <div className="journey-system-rail" aria-label={`${progress}% complete`}><span style={{ width: `${progress}%` }} /></div>
+
+        <ol className="journey-system-list">
           {steps.map((step, index) => {
             const state = step.complete ? "complete" : index === currentIndex ? "current" : "pending";
             return (
-              <Link className={`journey-node-exact ${state}`} href={step.href} key={step.label} aria-current={state === "current" ? "step" : undefined}>
-                <span className="node-marker-exact">{step.complete ? "✓" : index + 1}</span>
-                <span className="node-step-exact">Step {index + 1}</span>
-                <strong>{step.label}</strong>
-                <small>{step.detail}</small>
-                {state === "current" ? <span className="current-flag-exact">✦ In progress</span> : null}
-              </Link>
+              <li className={`journey-system-step is-${state}`} key={step.id}>
+                <Link href={step.href} aria-current={state === "current" ? "step" : undefined}>
+                  <span className="journey-system-step__marker" aria-hidden="true">{step.complete ? "✓" : index + 1}</span>
+                  <span className="journey-system-step__copy"><strong>{step.label}</strong><small>{step.detail}</small></span>
+                  <em className="journey-system-step__state">{step.complete ? "Complete" : state === "current" ? "Continue" : "Follows next"}</em>
+                </Link>
+              </li>
             );
           })}
-        </div>
+        </ol>
       </section>
 
-      <section className="current-stage-card-exact">
-        <div className="stage-index-exact"><span>{String(currentIndex + 1).padStart(2, "0")}</span><small>of 07</small></div>
-        <div className="stage-workspace-exact">
-          <p className="journey-micro-label">Current step</p>
-          <h2>{activated ? "Your foundation is active" : current.title}</h2>
-          <p>{activated ? "Open Home to review opportunity activity, applications and the next best action." : current.description}</p>
-          <div className="stage-progress-label-exact"><span>Journey completion</span><strong>{progress}%</strong></div>
-          <div className="stage-progress-exact"><span style={{ width: `${progress}%` }} /></div>
-        </div>
-        <aside className="stage-guidance-exact">
-          <span className="guidance-spark">✦</span>
-          <div><strong>{activated ? "Keep it current" : "Why this matters"}</strong><p>{activated ? "Return whenever your goals, mobility, résumé or preferred sources change." : current.reason}</p></div>
-          <Link className="journey-continue-button" href={activated ? "/" : current.href}>{activated ? "Open Home" : "Continue this step"} <span>→</span></Link>
-        </aside>
-      </section>
+      <WorkflowHandoff
+        eyebrow={activated ? "Recurring workflow" : `Current step · ${currentIndex + 1} of ${steps.length}`}
+        title={activated ? "Your foundation is ready. Start with the next opportunity." : current.title}
+        description={activated ? "Sartho can now compare roles with your confirmed Career Profile and keep each decision connected to preparation and outcomes." : current.description}
+        reason={activated ? "The setup exists to support opportunity decisions—not to become a permanent checklist." : current.reason}
+        href={activated ? "/jobs" : current.href}
+        label={activated ? "Open opportunities" : "Continue this step"}
+      />
     </div>
   );
 }

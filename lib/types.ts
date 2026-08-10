@@ -69,11 +69,21 @@ export type EvidenceRecord = {
 export type RuleAnalysis = {
   recommendation: JobRecommendation;
   confidence: string;
-  primaryLane: string;
-  technicalHeaviness: number;
+  primaryStrength?: string | null;
+  coverage?: number;
+  evidenceBacking?: number;
   matchedSignals: string[];
   cautionSignals: string[];
+  matchedSkills?: Array<{
+    name: string;
+    strength: "core" | "strong" | "supporting" | "emerging";
+    evidenceCount: number;
+  }>;
+  unusedStrengths?: string[];
   explanation: string;
+  /** Legacy fields retained only so previously saved analyses still render. */
+  primaryLane?: string;
+  technicalHeaviness?: number;
 };
 
 export type JobRecord = {

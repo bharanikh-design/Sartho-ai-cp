@@ -2,10 +2,13 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { DeleteOpportunityButton } from "@/components/delete-opportunity-button";
 import { DeepAnalysisPanel } from "@/components/deep-analysis-panel";
+import { InterviewCoachPanel } from "@/components/interview-coach-panel";
 import { JobStatusSelect } from "@/components/job-status-select";
+import { ProductPageHeader } from "@/components/product-page-header";
 import { ResumeDraftPanel } from "@/components/resume-draft-panel";
 import { requireUser } from "@/lib/auth";
 import { getJobWorkspace } from "@/lib/data/jobs";
+import { presentRuleAnalysis } from "@/lib/matching/present-rule-analysis";
 import type { EvidenceRecord, JobRequirementRecord, RequirementType } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -25,18 +28,17 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
 
   const evidenceMap = new Map((approvedEvidence ?? []).map((item) => [item.id, item as Pick<EvidenceRecord, "id" | "claim" | "source_name" | "source_locator">]));
   const analysis = job.rule_analysis;
+  const analysisPresentation = analysis ? presentRuleAnalysis(analysis, job.technical_heaviness) : null;
   const summary = job.deep_analysis_summary;
 
   return (
     <div className="page-stack">
-      <section className="glass-card page-header-card job-detail-header">
-        <div>
-          <div className="page-eyebrow"><span className="live-dot" /> Saved opportunity</div>
-          <h1 className="page-title">{job.title}</h1>
-          <p className="page-description">{job.employer ?? "Employer not recorded"}{job.location ? ` · ${job.location}` : ""}</p>
-        </div>
-        <JobStatusSelect jobId={job.id} initialStatus={job.status} />
-      </section>
+      <ProductPageHeader
+        eyebrow="Opportunity decision"
+        title={job.title}
+        description={`${job.employer ?? "Employer not recorded"}${job.location ? ` · ${job.location}` : ""}. Review the signal, evidence mapping and preparation outputs in that order.`}
+        metric={{ value: <JobStatusSelect jobId={job.id} initialStatus={job.status} />, label: "current stage" }}
+      />
 
       <section className="dashboard-grid job-summary-grid">
         <article className="glass-card content-card">
@@ -50,8 +52,8 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
 
           {analysis ? (
             <div className="decision-result persisted-analysis">
-              <div className="result-tile"><span>Best-fit lane</span><strong>{analysis.primaryLane}</strong></div>
-              <div className="result-tile"><span>Technical heaviness</span><strong>{analysis.technicalHeaviness}/100</strong></div>
+              <div className="result-tile"><span>Strongest match</span><strong>{analysisPresentation?.strongestMatch}</strong></div>
+              <div className="result-tile"><span>Profile support</span><strong>{analysisPresentation?.profileSupport}/100</strong></div>
               <div className="signal-section">
                 <h4>Relevant signals</h4>
                 <div className="chip-row">{analysis.matchedSignals.map((value) => <span key={value} className="signal-chip">{value}</span>)}</div>
@@ -121,6 +123,12 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
           </div>
         </section>
       )}
+
+      <InterviewCoachPanel
+        jobId={job.id}
+        analysisComplete={job.deep_analysis_status === "complete"}
+        requirementCount={requirements.length}
+      />
 
       <ResumeDraftPanel jobId={job.id} deepAnalysisComplete={job.deep_analysis_status === "complete"} application={application} />
 
