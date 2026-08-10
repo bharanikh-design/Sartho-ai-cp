@@ -34,6 +34,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [accountPanelOpen, setAccountPanelOpen] = useState(false);
   const [accountAction, setAccountAction] = useState<AccountAction | null>(null);
   const [confirmation, setConfirmation] = useState("");
   const [accountBusy, setAccountBusy] = useState(false);
@@ -154,6 +155,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   function openAccountAction(action: AccountAction) {
     setProfileOpen(false);
+    setAccountPanelOpen(false);
     setAccountAction(action);
     setConfirmation("");
     setAccountError(null);
@@ -164,6 +166,11 @@ export function AppShell({ children }: { children: ReactNode }) {
     setAccountAction(null);
     setConfirmation("");
     setAccountError(null);
+  }
+
+  function openAccountPanel() {
+    setProfileOpen(false);
+    setAccountPanelOpen(true);
   }
 
   async function confirmAccountAction() {
@@ -257,10 +264,13 @@ export function AppShell({ children }: { children: ReactNode }) {
 
               {profileOpen ? (
                 <div id="profile-menu" className="profile-menu" role="menu" aria-label="Profile and account">
-                  <div className="profile-menu-identity"><strong>{fullName}</strong><span>{session.user.email}</span></div>
+                  <div className="profile-menu-identity">
+                    <span className="profile-menu-avatar" aria-hidden="true">{initials}</span>
+                    <span className="profile-menu-person"><strong>{fullName}</strong><small>{session.user.email}</small></span>
+                  </div>
                   <div className="profile-menu-divider" />
                   <div className="theme-row">
-                    <span>{theme === "dark" ? "Dark" : "Light"} theme</span>
+                    <span><strong>Appearance</strong><small>{theme === "dark" ? "Dark theme" : "Light theme"}</small></span>
                     <button
                       type="button"
                       className="theme-switch"
@@ -272,11 +282,9 @@ export function AppShell({ children }: { children: ReactNode }) {
                     />
                   </div>
                   <div className="profile-menu-divider" />
-                  <Link href="/career-truth" className="profile-menu-link" role="menuitem"><span>Career Profile</span><small aria-hidden="true">→</small></Link>
-                  <button type="button" className="profile-menu-action" role="menuitem" onClick={() => void signOut()}><span>Log out</span><small>End this secure session</small></button>
-                  <div className="profile-menu-divider" />
-                  <button type="button" className="profile-menu-action danger" role="menuitem" onClick={() => openAccountAction("delete")}><span>Delete Profile</span><small>Delete account and all private data</small></button>
-                  <button type="button" className="profile-menu-action danger" role="menuitem" onClick={() => openAccountAction("wipe")}><span>Wipe Data</span><small>Keep login, erase workspace data</small></button>
+                  <Link href="/career-truth" className="profile-menu-link" role="menuitem"><span><strong>Career Profile</strong><small>Review your evidence and positioning</small></span><b aria-hidden="true">→</b></Link>
+                  <button type="button" className="profile-menu-action" role="menuitem" onClick={openAccountPanel}><span><strong>Data & privacy</strong><small>Manage or remove your information</small></span><b aria-hidden="true">→</b></button>
+                  <button type="button" className="profile-menu-action profile-menu-signout" role="menuitem" onClick={() => void signOut()}><span><strong>Log out</strong><small>End this secure session</small></span></button>
                 </div>
               ) : null}
             </div>
@@ -298,6 +306,28 @@ export function AppShell({ children }: { children: ReactNode }) {
       </nav>
 
       <OnboardingCarousel user={session.user} />
+
+      {accountPanelOpen ? (
+        <div className="profile-protection-layer" role="dialog" aria-modal="true" aria-labelledby="account-panel-title">
+          <button type="button" className="profile-protection-backdrop" onClick={() => setAccountPanelOpen(false)} aria-label="Close data and privacy settings" />
+          <section className="profile-protection-dialog account-privacy-dialog">
+            <div className="account-dialog-heading">
+              <div><span className="profile-protection-kicker">Account settings</span><h2 id="account-panel-title">Data & privacy</h2></div>
+              <button type="button" className="account-dialog-close" onClick={() => setAccountPanelOpen(false)} aria-label="Close data and privacy settings">×</button>
+            </div>
+            <p>Your career information stays private to your account. Choose what you want to keep or remove.</p>
+            <div className="account-privacy-options">
+              <button type="button" onClick={() => openAccountAction("wipe")}>
+                <span><strong>Clear workspace data</strong><small>Remove your Career Profile, jobs and applications while keeping your login.</small></span><b>Review →</b>
+              </button>
+              <button type="button" className="is-danger" onClick={() => openAccountAction("delete")}>
+                <span><strong>Delete account</strong><small>Permanently remove your login and all information associated with it.</small></span><b>Review →</b>
+              </button>
+            </div>
+            <button type="button" className="secondary-button account-dialog-done" onClick={() => setAccountPanelOpen(false)}>Done</button>
+          </section>
+        </div>
+      ) : null}
 
       {accountAction ? (
         <div className="profile-protection-layer" role="dialog" aria-modal="true" aria-labelledby="account-action-title">
