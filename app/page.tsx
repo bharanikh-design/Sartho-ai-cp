@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { DailyDigestSettings } from "@/components/daily-digest-settings";
 import { ProductPageHeader } from "@/components/product-page-header";
 import { requireUser } from "@/lib/auth";
 import { summarizeDashboardJobs } from "@/lib/dashboard/job-metrics";
@@ -13,6 +14,13 @@ export default async function DashboardPage() {
   const { journey, workspace } = await loadProductJourney(supabase, user.id);
   const approvedEvidence = workspace.evidence.filter((item) => item.approval_status === "approved").length;
   const pendingEvidence = workspace.evidence.filter((item) => item.approval_status === "pending").length;
+
+  const { data: notificationPreference, error: notificationError } = await supabase
+    .from("notification_preferences")
+    .select("email,daily_digest_enabled")
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (notificationError) throw notificationError;
 
   const { data: jobs, error: jobsError } = await withJwtClockSkewRetry(() =>
     supabase
@@ -119,6 +127,12 @@ export default async function DashboardPage() {
         </div>
         <Link href={nextAction.href} className="primary-button">{nextAction.label} <span aria-hidden="true">→</span></Link>
       </section>
+
+      <DailyDigestSettings
+        initialEmail={notificationPreference?.email ?? user.email ?? ""}
+        initialEnabled={notificationPreference?.daily_digest_enabled ?? false}
+        deliveryReady={Boolean(process.env.RESEND_API_KEY && process.env.SARTHO_EMAIL_FROM)}
+      />
     </div>
   );
 }
