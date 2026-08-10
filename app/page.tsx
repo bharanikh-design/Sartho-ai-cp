@@ -2,135 +2,168 @@ import Link from "next/link";
 import { DailyDigestSettings } from "@/components/daily-digest-settings";
 import { ProductPageHeader } from "@/components/product-page-header";
 import { requireUser } from "@/lib/auth";
-import { summarizeDashboardJobs } from "@/lib/dashboard/job-metrics";
+import {
+  buildCareerCommandCentre,
+  type CommandCentreApplication,
+  type CommandCentreJob,
+} from "@/lib/dashboard/command-centre";
 import { loadProductJourney } from "@/lib/journey/load-product-journey";
-import type { JobRecommendation, JobStatus } from "@/lib/types";
 import { withJwtClockSkewRetry } from "@/lib/supabase/retry";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
   const { supabase, user } = await requireUser();
-  const { journey, workspace } = await loadProductJourney(supabase, user.id);
+
+  const [journeyResult, notificationResult, jobsResult, applicationsResult] = await Promise.all([
+    loadProductJourney(supabase, user.id),
+    supabase
+      .from("notification_preferences")
+      .select("email,daily_digest_enabled")
+      .eq("user_id", user.id)
+      .maybeSingle(),
+    withJwtClockSkewRetry(
+      () => supabase
+        .from("jobs")
+        .select("id,title,employer,status,recommendation,overall_match,rule_analysis,deep_analysis_status,deep_analysis_summary,updated_at")
+        .eq("user_id", user.id),
+      (result) => result.error,
+    ),
+    supabase
+      .from("applications")
+      .select("job_id,resume_draft,next_action,next_action_date")
+      .eq("user_id", user.id),
+  ]);
+
+  if (notificationResult.error) throw notificationResult.error;
+  if (jobsResult.error) throw jobsResult.error;
+  if (applicationsResult.error) throw applicationsResult.error;
+
+  const { journey, workspace } = journeyResult;
   const approvedEvidence = workspace.evidence.filter((item) => item.approval_status === "approved").length;
   const pendingEvidence = workspace.evidence.filter((item) => item.approval_status === "pending").length;
-
-  const { data: notificationPreference, error: notificationError } = await supabase
-    .from("notification_preferences")
-    .select("email,daily_digest_enabled")
-    .eq("user_id", user.id)
-    .maybeSingle();
-  if (notificationError) throw notificationError;
-
-  const { data: jobs, error: jobsError } = await withJwtClockSkewRetry(() =>
-    supabase
-      .from("jobs")
-      .select("id,status,recommendation")
-      .eq("user_id", user.id),
-    (result) => result.error,
-  );
-  if (jobsError) throw jobsError;
-
-  const jobRows = (jobs ?? []) as Array<{ id: string; status: JobStatus; recommendation: JobRecommendation | null }>;
-  const { activeApplications, interviewCount, outcomeCount, strongMatches } = summarizeDashboardJobs(jobRows);
+  const commandCentre = buildCareerCommandCentre({
+    journey,
+    jobs: (jobsResult.data ?? []) as CommandCentreJob[],
+    applications: (applicationsResult.data ?? []) as CommandCentreApplication[],
+    approvedEvidence,
+    pendingEvidence,
+  });
   const firstName = ((user.user_metadata?.full_name as string | undefined) ?? user.email?.split("@")[0] ?? "there").split(" ")[0];
 
-  const nextAction = !journey.activated
-    ? {
-        eyebrow: `Foundation · Step ${journey.currentIndex + 1} of ${journey.steps.length}`,
-        title: journey.current.title,
-        description: journey.current.description,
-        href: journey.current.href,
-        label: "Continue foundation",
-      }
-    : interviewCount > 0
-      ? {
-          eyebrow: "Needs attention",
-          title: `Prepare for ${interviewCount === 1 ? "your active interview" : `${interviewCount} active interviews`}`,
-          description: "Review the role requirements and the approved career evidence that should shape your answers.",
-          href: "/interview-prep",
-          label: "Open interview preparation",
-        }
-      : {
-          eyebrow: "Next best action",
-          title: jobRows.length ? "Review your saved opportunities" : "Analyse your first promising role",
-          description: jobRows.length
-            ? "Compare the saved roles and decide which one deserves attention next."
-            : "Add a real job description and compare it with your confirmed Career Profile.",
-          href: "/jobs",
-          label: jobRows.length ? "Review opportunities" : "Analyse a role",
-        };
-
-  const workflow = [
-    {
-      label: "Career foundation",
-      value: journey.activated ? "Complete" : `${journey.progress}%`,
-      detail: journey.activated ? `${approvedEvidence} approved career facts` : `Next: ${journey.current.label}`,
-      href: journey.activated ? "/career-truth" : journey.current.href,
-      state: journey.activated ? "complete" : "current",
-    },
-    {
-      label: "Opportunities",
-      value: String(jobRows.length),
-      detail: jobRows.length ? `${strongMatches} strong match${strongMatches === 1 ? "" : "es"}` : "No roles analysed yet",
-      href: "/jobs",
-      state: jobRows.length ? "active" : "pending",
-    },
-    {
-      label: "Applications",
-      value: String(activeApplications),
-      detail: interviewCount ? `${interviewCount} at assessment or interview` : "No interview action due",
-      href: "/applications",
-      state: activeApplications ? "active" : "pending",
-    },
-    {
-      label: "Outcomes",
-      value: String(outcomeCount),
-      detail: outcomeCount ? "Offers, rejections or withdrawals recorded" : "No outcomes recorded yet",
-      href: "/applications",
-      state: outcomeCount ? "complete" : "pending",
-    },
-  ];
-
   return (
-    <div className="page-stack dashboard-page">
+    <div className="page-stack dashboard-page command-centre-page">
       <ProductPageHeader
-        eyebrow="Dashboard"
+        eyebrow="Career Command Centre"
         title={`Welcome back, ${firstName}.`}
-        description="See where you are, what needs attention and the one action that moves your career workflow forward."
-        metric={{ value: `${journey.progress}%`, label: "foundation complete" }}
+        description="One connected view from Career Profile to outcome. Sartho uses your live workspace to explain what matters now and where to go next."
+        metric={{ value: "1", label: "clear next action" }}
       />
 
-      <section className="dashboard-workflow" aria-labelledby="dashboard-workflow-title">
+      <section className="dashboard-workflow command-centre-journey" aria-labelledby="career-journey-title">
         <div className="dashboard-section-heading">
-          <div><p className="product-system-eyebrow">Your workflow</p><h2 id="dashboard-workflow-title">From profile to outcome</h2></div>
-          {pendingEvidence ? <span>{pendingEvidence} profile item{pendingEvidence === 1 ? "" : "s"} need review</span> : null}
+          <div>
+            <p className="product-system-eyebrow">Your career journey</p>
+            <h2 id="career-journey-title">Every step connects to the next</h2>
+          </div>
+          <span>Live status from your private workspace</span>
         </div>
-        <div className="dashboard-stage-grid">
-          {workflow.map((stage, index) => (
-            <Link className={`dashboard-stage is-${stage.state}`} href={stage.href} key={stage.label}>
-              <span className="dashboard-stage-number">{index + 1}</span>
-              <small>{stage.label}</small>
-              <strong>{stage.value}</strong>
-              <p>{stage.detail}</p>
+
+        <div className="command-centre-stage-track">
+          <div className="command-centre-stage-line" aria-hidden="true" />
+          {commandCentre.stages.map((stage, index) => (
+            <Link
+              className={`command-centre-stage is-${stage.state}`}
+              href={stage.href}
+              key={stage.id}
+              aria-current={stage.state === "current" ? "step" : undefined}
+            >
+              <span className="command-centre-stage-marker" aria-hidden="true">
+                {stage.state === "complete" ? "✓" : index + 1}
+              </span>
+              <span className="command-centre-stage-copy">
+                <small>{stage.label}</small>
+                <strong>{stage.value}</strong>
+                <span>{stage.detail}</span>
+              </span>
               <b aria-hidden="true">→</b>
             </Link>
           ))}
         </div>
       </section>
 
-      <section className="dashboard-next-action" aria-labelledby="dashboard-next-title">
-        <div>
-          <p className="product-system-eyebrow">{nextAction.eyebrow}</p>
-          <h2 id="dashboard-next-title">{nextAction.title}</h2>
-          <p>{nextAction.description}</p>
+      <section className="command-centre-focus" aria-label="Sartho priority guidance">
+        <article className="command-centre-next-action">
+          <div className="command-centre-action-copy">
+            <p className="command-centre-kicker">{commandCentre.nextAction.eyebrow}</p>
+            <h2>{commandCentre.nextAction.title}</h2>
+            <p>{commandCentre.nextAction.description}</p>
+          </div>
+          <div className="command-centre-action-footer">
+            <details>
+              <summary>Why this now?</summary>
+              <p>{commandCentre.nextAction.reason}</p>
+            </details>
+            <Link href={commandCentre.nextAction.href} className="command-centre-primary-action">
+              {commandCentre.nextAction.label} <span aria-hidden="true">→</span>
+            </Link>
+          </div>
+        </article>
+
+        <aside className="command-centre-ai-brief" aria-labelledby="ai-brief-title">
+          <div className="command-centre-ai-heading">
+            <span className="command-centre-ai-symbol" aria-hidden="true">✦</span>
+            <div>
+              <p className="product-system-eyebrow">AI career briefing</p>
+              <small>Grounded in your approved data</small>
+            </div>
+          </div>
+          {commandCentre.aiBrief ? (
+            <>
+              <div className="command-centre-ai-role">
+                <span>{commandCentre.aiBrief.employer}</span>
+                <h3 id="ai-brief-title">{commandCentre.aiBrief.title}</h3>
+              </div>
+              <p>{commandCentre.aiBrief.summary}</p>
+              <div className="command-centre-ai-signals" aria-label="Opportunity signals">
+                <span><strong>{commandCentre.aiBrief.match ?? "—"}</strong> profile support</span>
+                <span><strong>{commandCentre.aiBrief.recommendation ?? "Pending"}</strong> recommendation</span>
+                <span><strong>{commandCentre.aiBrief.analysisComplete ? "Complete" : "Next"}</strong> evidence mapping</span>
+              </div>
+              <Link href={commandCentre.aiBrief.href}>Review the evidence <span aria-hidden="true">→</span></Link>
+            </>
+          ) : (
+            <div className="command-centre-ai-empty">
+              <h3 id="ai-brief-title">Ready when your next role is.</h3>
+              <p>Add a real job description and Sartho will explain the fit, gaps and best next action using your confirmed Career Profile.</p>
+              <Link href="/jobs#analyse">Analyse a role <span aria-hidden="true">→</span></Link>
+            </div>
+          )}
+        </aside>
+      </section>
+
+      <section className="command-centre-review" aria-labelledby="review-queue-title">
+        <div className="command-centre-review-heading">
+          <div>
+            <p className="product-system-eyebrow">Your review queue</p>
+            <h2 id="review-queue-title">Decisions that need you</h2>
+          </div>
+          <span>Sartho recommends; you approve</span>
         </div>
-        <Link href={nextAction.href} className="primary-button">{nextAction.label} <span aria-hidden="true">→</span></Link>
+        <div className="command-centre-review-list">
+          {commandCentre.reviewItems.map((item) => (
+            <Link href={item.href} className={`command-centre-review-item is-${item.tone}`} key={item.label}>
+              <span className="command-centre-review-status" aria-hidden="true" />
+              <span><strong>{item.label}</strong><small>{item.detail}</small></span>
+              <b aria-hidden="true">→</b>
+            </Link>
+          ))}
+        </div>
       </section>
 
       <DailyDigestSettings
-        initialEmail={notificationPreference?.email ?? user.email ?? ""}
-        initialEnabled={notificationPreference?.daily_digest_enabled ?? false}
+        initialEmail={notificationResult.data?.email ?? user.email ?? ""}
+        initialEnabled={notificationResult.data?.daily_digest_enabled ?? false}
         deliveryReady={Boolean(process.env.RESEND_API_KEY && process.env.SARTHO_EMAIL_FROM)}
       />
     </div>
