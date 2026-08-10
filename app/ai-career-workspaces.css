@@ -26,7 +26,7 @@
 .resume-studio-header h1 {
   max-width: 840px;
   margin: 10px 0 0;
-  font-family: Georgia, serif;
+  font-family: var(--font-sans);
   font-size: clamp(36px, 4.4vw, 56px);
   font-weight: 600;
   letter-spacing: -.045em;
@@ -48,7 +48,7 @@
 }
 .career-direction-header aside strong,
 .career-direction-header aside span { display: block; }
-.career-direction-header aside strong { color: var(--blue); font-family: Georgia, serif; font-size: 30px; }
+.career-direction-header aside strong { color: var(--blue); font-family: var(--font-sans); font-size: 30px; }
 .career-direction-header aside span { margin-top: 4px; color: var(--text-tertiary); font-size: 10px; text-transform: uppercase; letter-spacing: .08em; }
 
 .direction-ai-workspace { gap: 18px; }
@@ -66,7 +66,7 @@
 .direction-ai-intro > div:first-child { display: flex; align-items: center; gap: 9px; }
 .ai-orbit { display: grid; width: 28px; height: 28px; place-items: center; border: 1px solid rgba(196, 238, 219, .35); border-radius: 50%; color: #bde6d2; background: rgba(255,255,255,.07); }
 .direction-ai-label { color: #b9d9ca; font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
-.direction-ai-intro h2 { max-width: 740px; margin: 18px 0 0; font-family: Georgia, serif; font-size: clamp(29px, 3.2vw, 42px); font-weight: 500; line-height: 1.08; letter-spacing: -.025em; }
+.direction-ai-intro h2 { max-width: 740px; margin: 18px 0 0; font-family: var(--font-sans); font-size: clamp(29px, 3.2vw, 42px); font-weight: 500; line-height: 1.08; letter-spacing: -.025em; }
 .direction-ai-intro > p { max-width: 830px; margin: 13px 0 0; color: #c7dbd1; font-size: 14px; line-height: 1.7; }
 .direction-ai-grounding { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 21px; }
 .direction-ai-grounding span { padding: 8px 11px; border: 1px solid rgba(207, 239, 225, .18); border-radius: 999px; color: #b8d3c7; background: rgba(255,255,255,.055); font-size: 11px; }
@@ -89,7 +89,7 @@
 .direction-suggestion-card.is-adjacent .suggestion-card-top > span { color: #685118; background: #faf1d7; }
 .direction-suggestion-card.is-stretch .suggestion-card-top > span { color: #5a4d88; background: #efecfb; }
 .suggestion-card-top > button { width: 28px; height: 28px; border: 0; color: var(--text-tertiary); background: transparent; font-size: 20px; cursor: pointer; }
-.direction-suggestion-card h3 { margin: 20px 0 0; font-family: Georgia, serif; font-size: 23px; font-weight: 600; line-height: 1.2; }
+.direction-suggestion-card h3 { margin: 20px 0 0; font-family: var(--font-sans); font-size: 23px; font-weight: 600; line-height: 1.2; }
 .direction-suggestion-card > p { margin: 10px 0 0; color: var(--text-secondary); font-size: 13px; line-height: 1.62; }
 .direction-suggestion-card details { margin: 16px 0; }
 .direction-suggestion-card details summary { color: #315f4c; font-size: 11px; font-weight: 750; cursor: pointer; }
@@ -106,13 +106,13 @@
 .direction-priority-heading h2,
 .resume-section-heading h2,
 .resume-workflow-heading h2,
-.resume-source-upload h2 { margin: 7px 0 0; font-family: Georgia, serif; font-size: 28px; font-weight: 600; }
+.resume-source-upload h2 { margin: 7px 0 0; font-family: var(--font-sans); font-size: 28px; font-weight: 600; }
 .direction-priority-heading p,
 .resume-section-heading p,
 .resume-workflow-heading p,
 .resume-source-upload p { margin: 7px 0 0; color: var(--text-secondary); font-size: 13px; line-height: 1.6; }
 .direction-priority-heading > strong,
-.resume-section-heading > strong { color: var(--blue); font-family: Georgia, serif; font-size: 30px; }
+.resume-section-heading > strong { color: var(--blue); font-family: var(--font-sans); font-size: 30px; }
 .direction-priority-list { display: grid; gap: 8px; margin-top: 22px; }
 .direction-priority-list article { display: grid; grid-template-columns: 38px minmax(0, 1fr) auto; gap: 13px; align-items: center; padding: 12px 13px; border: 1px solid var(--line); border-radius: 12px; background: #fbfcfb; }
 .priority-rank { display: grid; width: 34px; height: 34px; place-items: center; border-radius: 10px; color: #fff; background: #174b3a; font-size: 12px; font-weight: 800; }
@@ -159,7 +159,7 @@
 .resume-workflow-empty > div > span,
 .resume-action-title > div > span { color: #527565; font-size: 10px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
 .resume-workflow-empty strong,
-.resume-action-title strong { display: block; margin-top: 5px; font-family: Georgia, serif; font-size: 21px; }
+.resume-action-title strong { display: block; margin-top: 5px; font-family: var(--font-sans); font-size: 21px; }
 .resume-workflow-empty p { margin: 6px 0 0; color: var(--text-secondary); font-size: 12px; }
 .resume-action-title { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: 14px; }
 .resume-action-title > small { max-width: 360px; color: var(--text-secondary); font-size: 11px; text-align: right; }
@@ -185,7 +185,7 @@
 .resume-source-drawer > summary::-webkit-details-marker { display: none; }
 .resume-source-drawer > summary > span:first-child strong,
 .resume-source-drawer > summary > span:first-child small { display: block; }
-.resume-source-drawer > summary > span:first-child strong { font-family: Georgia, serif; font-size: 20px; }
+.resume-source-drawer > summary > span:first-child strong { font-family: var(--font-sans); font-size: 20px; }
 .resume-source-drawer > summary > span:first-child small { margin-top: 4px; color: var(--text-secondary); font-size: 11px; }
 .resume-source-status { color: var(--text-secondary); font-size: 11px; }
 .resume-source-content { display: grid; gap: 20px; padding: 24px 25px 27px; border-top: 1px solid var(--line); }

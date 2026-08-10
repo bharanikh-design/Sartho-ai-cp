@@ -45,7 +45,7 @@
   margin-top: 4px;
   overflow: hidden;
   color: var(--text-tertiary);
-  font-size: 9px;
+  font-size: var(--text-2xs);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -90,7 +90,7 @@
 .profile-menu-action small {
   max-width: 120px;
   color: var(--text-tertiary);
-  font-size: 7px;
+  font-size: var(--text-2xs);
   line-height: 1.35;
   text-align: right;
 }
@@ -136,7 +136,7 @@
 
 .profile-protection-kicker {
   color: #ffb6c3;
-  font-size: 8px;
+  font-size: var(--text-2xs);
   font-weight: 750;
   letter-spacing: .14em;
   text-transform: uppercase;
@@ -162,7 +162,7 @@
   border-radius: 14px;
   color: #ffe1a3;
   background: rgba(255,211,122,.055);
-  font-size: 9px;
+  font-size: var(--text-2xs);
   line-height: 1.55;
 }
 

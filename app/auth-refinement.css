@@ -151,7 +151,7 @@
 .journey-strip span {
   width: 29px;
   height: 29px;
-  font-size: 9px;
+  font-size: var(--text-2xs);
 }
 
 @media (max-width: 900px) {
