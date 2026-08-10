@@ -8,7 +8,13 @@ export const directionSchema = z.object({
   location: z.string().trim().max(160),
   workAuthorisation: z.string().trim().max(1000),
   strengths: z.array(z.string().trim().min(1).max(120)).max(30),
-  lanes: z.array(z.object({ id: z.string(), name: z.string().trim().min(1).max(180), weight: z.number().int().min(0).max(100), active: z.boolean() })).max(20),
+  lanes: z.array(z.object({
+    id: z.string(),
+    name: z.string().trim().min(1).max(180),
+    weight: z.number().int().min(0).max(100),
+    active: z.boolean(),
+    sourceUrl: z.union([z.literal(""), z.string().url().startsWith("https://").max(2000)]).optional().default(""),
+  })).max(20),
 }).superRefine((value, context) => {
   const names = value.lanes.map((lane) => lane.name.toLocaleLowerCase());
   if (new Set(names).size !== names.length) {
@@ -57,6 +63,7 @@ export async function PUT(request: Request) {
     weight: lane.weight,
     priority: index + 1,
     active: lane.active,
+    source_url: lane.sourceUrl || null,
   }));
 
   if (laneRows.length) {

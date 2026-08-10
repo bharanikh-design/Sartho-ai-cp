@@ -5,7 +5,8 @@ import { z } from "zod";
 export type AiOperation =
   | "resume_import"
   | "deep_analysis"
-  | "resume_draft";
+  | "resume_draft"
+  | "career_suggestions";
 
 const decisionSchema = z.object({
   allowed: z.boolean(),

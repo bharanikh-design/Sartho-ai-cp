@@ -32,6 +32,7 @@ export type TargetLaneRecord = {
   weight: number;
   priority: number;
   active: boolean;
+  source_url: string | null;
 };
 
 export type CareerRoleRecord = {
