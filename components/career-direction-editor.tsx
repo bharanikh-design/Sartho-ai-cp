@@ -341,7 +341,7 @@ export function CareerDirectionEditor({
         {guidanceError ? <div className="direction-ai-message is-error" role="alert">{guidanceError}</div> : null}
       </details>
 
-      <div className="direction-save-bar"><div><strong>{lanes.length ? `${lanes.length} priorit${lanes.length === 1 ? "y" : "ies"} ready to guide Sartho` : "Choose at least one direction when you are ready"}</strong><span>{status === "saved" ? "Career direction saved" : status === "error" ? "Could not save—please try again" : missingGuidance ? "Complete the three required guidance fields before saving" : allocation === 100 && lanes.length ? "Search weighting is balanced automatically" : "Your current Career Profile remains unchanged until you save"}</span></div><button type="button" className="primary-button" onClick={() => void save()} disabled={status === "saving" || !lanes.length}>{status === "saving" ? "Saving…" : "Save and continue"}</button></div>
+      <div className="direction-save-bar"><div><strong>{lanes.length ? `${lanes.length} priorit${lanes.length === 1 ? "y" : "ies"} ready to guide Sartho` : "Choose at least one direction when you are ready"}</strong><span>{status === "saved" ? "Career direction saved" : status === "error" ? "Could not save—please try again" : "Search weighting is balanced automatically"}</span></div><button type="button" className="primary-button" onClick={() => void save()} disabled={status === "saving" || !lanes.length}>{status === "saving" ? "Saving…" : "Save and continue"}</button></div>
     </div>
   );
 }
