@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createServerSupabaseClient } from "@/lib/supabase-server";
+import { createClient } from "@/lib/supabase/server";
 
 function safeMessage(value: string | null, fallback: string) {
   return (value || fallback).replace(/[\r\n]+/g, " ").slice(0, 500);
@@ -32,7 +32,7 @@ export async function GET(request: Request) {
     return NextResponse.redirect(errorUrl);
   }
 
-  const supabase = await createServerSupabaseClient();
+  const supabase = await createClient();
   const { error } = await supabase.auth.exchangeCodeForSession(code);
 
   if (!error) {
