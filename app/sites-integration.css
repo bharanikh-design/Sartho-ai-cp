@@ -276,3 +276,38 @@
   .lane-add { grid-template-columns: 1fr; }
   .lane-add button { min-height: 44px; }
 }
+
+/* ------------------------------------------------------------------ *
+ * Journey screen — legibility pass onto the shared type scale.
+ * The seven-step foundation carried 7–9px labels; raised to readable
+ * tokens. Appended so these win over the dense definitions above.
+ * ------------------------------------------------------------------ */
+.journey-page-heading > p, .journey-micro-label { font-size: var(--text-2xs); letter-spacing: 0.1em; }
+.journey-page-heading h1 { font-size: var(--text-3xl); font-weight: var(--weight-bold); letter-spacing: var(--tracking-tight); }
+.journey-page-heading > span { font-size: var(--text-sm); }
+.journey-hero-copy-exact h2 { font-size: var(--text-xl); font-weight: var(--weight-bold); letter-spacing: var(--tracking-tight); }
+.journey-hero-copy-exact > p:not(.journey-micro-label) { font-size: var(--text-sm); line-height: var(--leading-normal); }
+.readiness-notes-exact span { font-size: var(--text-xs); }
+.readiness-visual-exact strong { font-size: var(--text-xs); }
+.readiness-visual-exact > div:last-child span { font-size: var(--text-2xs); }
+.readiness-ring-exact span { font-size: var(--text-2xl); font-weight: var(--weight-bold); }
+
+.foundation-heading-exact h2 { font-size: var(--text-xl); font-weight: var(--weight-bold); letter-spacing: var(--tracking-tight); }
+.foundation-heading-exact > div:first-child > p:last-child { font-size: var(--text-sm); }
+.journey-percent-exact strong { font-size: var(--text-2xl); font-weight: var(--weight-bold); }
+.journey-percent-exact span { font-size: var(--text-2xs); }
+
+.node-marker-exact { font-size: var(--text-sm); font-weight: var(--weight-bold); }
+.journey-node-exact strong { font-size: var(--text-sm); font-weight: var(--weight-semibold); line-height: var(--leading-snug); }
+.journey-node-exact small { max-width: 140px; font-size: var(--text-2xs); line-height: var(--leading-snug); }
+.node-step-exact { font-size: var(--text-2xs); letter-spacing: 0.1em; }
+.current-flag-exact { font-size: var(--text-2xs); font-weight: var(--weight-semibold); }
+
+.stage-index-exact span { font-size: var(--text-3xl); font-weight: var(--weight-bold); }
+.stage-index-exact small { font-size: var(--text-2xs); letter-spacing: 0.1em; }
+.stage-workspace-exact h2 { font-size: var(--text-xl); font-weight: var(--weight-semibold); }
+.stage-workspace-exact > p:not(.journey-micro-label) { font-size: var(--text-sm); line-height: var(--leading-normal); }
+.stage-progress-label-exact { font-size: var(--text-2xs); }
+.stage-guidance-exact strong { font-size: var(--text-xs); }
+.stage-guidance-exact p { font-size: var(--text-2xs); line-height: var(--leading-snug); }
+.journey-continue-button { font-size: var(--text-sm); font-weight: var(--weight-semibold); }
