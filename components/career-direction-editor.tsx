@@ -237,7 +237,7 @@ export function CareerDirectionEditor({
                 <textarea id="direction-goal" value={aiPrompt} onChange={(event) => setAiPrompt(event.target.value)} rows={2} placeholder="For example: regional leadership, less travel, more transformation ownership…" />
                 <button type="button" onClick={() => void generateSuggestions()} disabled={aiStatus === "loading" || evidenceCount === 0}>
                   <span aria-hidden="true">✦</span>
-                  {aiStatus === "loading" ? "Analysing your Career Profile…" : aiStatus === "ready" ? "Update AI suggestions" : "Generate AI suggestions"}
+                  {aiStatus === "loading" ? "Analysing…" : aiStatus === "ready" ? "Update suggestions" : "Generate suggestions"}
                 </button>
               </div>
             </section>
