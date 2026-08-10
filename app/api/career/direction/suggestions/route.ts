@@ -15,6 +15,7 @@ export const maxDuration = 120;
 const inputSchema = z.object({
   headline: z.string().trim().max(240).optional().default(""),
   summary: z.string().trim().max(4000).optional().default(""),
+  explorationPrompt: z.string().trim().max(1200).optional().default(""),
   location: z.string().trim().max(160).optional().default(""),
   workAuthorisation: z.string().trim().max(1000).optional().default(""),
   existingLanes: z.array(z.string().trim().min(1).max(180)).max(20).optional().default([]),
@@ -67,6 +68,7 @@ export async function POST(request: Request) {
         currentGuidance: {
           headline: input.data.headline,
           summary: input.data.summary,
+          explorationPrompt: input.data.explorationPrompt,
           location: input.data.location,
           workAuthorisation: input.data.workAuthorisation,
         },

@@ -88,6 +88,42 @@ export function CareerProfileReview({ initialItems }: { initialItems: EvidenceRe
     }
   }
 
+  if (confirmed) {
+    return (
+      <details className="glass-card profile-evidence-disclosure">
+        <summary>
+          <span><strong>Review or correct extracted evidence</strong><small>Open only when something in your confirmed Career Profile needs changing.</small></span>
+          <span>{usable.length} approved items <b aria-hidden="true">⌄</b></span>
+        </summary>
+        <div className="profile-evidence-disclosure__content">
+          <div className="profile-highlight-grid">
+            {highlights.map((item) => (
+              <article key={item.id}>
+                <span>{roleLabel(item)}</span>
+                {editingId === item.id ? (
+                  <>
+                    <textarea value={draft} onChange={(event) => setDraft(event.target.value)} rows={4} aria-label="Correct career highlight" />
+                    <div className="attention-actions">
+                      <button type="button" onClick={() => setEditingId(null)} disabled={busy}>Cancel</button>
+                      <button type="button" className="is-primary" onClick={() => void updateItem(item, { claim: draft })} disabled={busy || draft.trim().length < 10}>Save correction</button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <p>{item.claim}</p>
+                    {item.metrics.length ? <strong>{item.metrics.join(" · ")}</strong> : null}
+                    <button type="button" className="highlight-edit" onClick={() => { setEditingId(item.id); setDraft(item.claim); }}>Correct this</button>
+                  </>
+                )}
+              </article>
+            ))}
+          </div>
+          {error ? <div className="inline-error" role="alert">{error}</div> : null}
+        </div>
+      </details>
+    );
+  }
+
   return (
     <section className="glass-card content-card profile-review" id="profile-review">
       <div className="profile-review-heading">

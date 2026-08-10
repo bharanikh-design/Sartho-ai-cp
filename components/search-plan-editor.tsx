@@ -61,37 +61,15 @@ export function SearchPlanEditor({
 
   return (
     <div className="search-plan-workspace">
-      <section className="glass-card search-plan-summary">
-        <div><span>Target profiles</span><strong>{targetLanes.length || "Not set"}</strong></div>
-        <div><span>Target locations</span><strong>{locations.length || "Not set"}</strong></div>
-        <div><span>Active sources</span><strong>{sources.filter((source) => source.active).length}</strong></div>
-        <div><span>Work model</span><strong>{remote || "Flexible"}</strong></div>
+      <section className="search-direction-context" id="profiles">
+        <div><span>Career Direction</span><strong>{targetLanes.length ? targetLanes.map((lane) => lane.name).join(" · ") : "No target roles selected"}</strong></div>
+        <Link href="/career-direction#priorities">Edit in Career Direction →</Link>
       </section>
 
       <div className="capability-note">
         <strong>Saved search brief · no automatic discovery yet</strong>
         <span>Sartho stores these choices and uses them as context when you evaluate a role. Selecting a source does not connect to it or fetch jobs from it.</span>
       </div>
-
-      <section className="glass-card direction-panel" id="profiles">
-        <div className="direction-heading">
-          <div><span>Role search order</span><h2>What should Sartho prioritise?</h2><p>Your role weights guide which opportunities deserve attention first. They remain editable and are never hard-coded.</p></div>
-          <Link href="/career-direction#priorities" className="secondary-button">Edit target profiles</Link>
-        </div>
-        {targetLanes.length ? (
-          <div className="strategy-grid search-strategy-lanes">
-            {targetLanes.map((lane, index) => (
-              <article key={lane.id} className="strategy-card">
-                <span className="strategy-number">{String(index + 1).padStart(2, "0")}</span>
-                <h3>{lane.name}</h3>
-                <footer><span>Search priority</span><strong>{lane.weight}%</strong></footer>
-              </article>
-            ))}
-          </div>
-        ) : (
-          <div className="empty-inline-state">Add and weight at least one target profile before activating your search.</div>
-        )}
-      </section>
 
       <section className="glass-card direction-panel">
         <div className="direction-heading"><div><span>Search geography</span><h2>Where should Sartho look?</h2><p>Your current location does not limit your search. Add every country or city where an opportunity is genuinely possible.</p></div></div>

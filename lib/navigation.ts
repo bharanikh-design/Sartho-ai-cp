@@ -25,8 +25,8 @@ const journeyNavigation: NavigationItem = {
 };
 
 const dashboardNavigation: NavigationItem = {
-  label: "Home",
-  shortLabel: "Home",
+  label: "Dashboard",
+  shortLabel: "Dashboard",
   href: "/",
   icon: "home",
   purpose: "See opportunity activity, applications and the next best action.",
@@ -65,7 +65,7 @@ const strategyNavigation: NavigationItem = {
 };
 
 /**
- * Home remains the orientation point throughout setup. After activation the
+ * Dashboard remains the orientation point throughout setup. After activation the
  * navigation expands into the recurring opportunity and application loop.
  */
 export function getPrimaryNavigation(activated: boolean): NavigationItem[] {
