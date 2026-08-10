@@ -15,6 +15,7 @@ import "./loading-and-versions.css";
 import "./journey-workspace.css";
 import "./sites-integration.css";
 import "./experience-polish.css";
+import "./ai-career-workspaces.css";
 import { AppShell } from "@/components/app-shell";
 
 export const metadata: Metadata = {
