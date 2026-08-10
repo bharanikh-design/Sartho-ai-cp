@@ -29,9 +29,30 @@ export function ResumeLibrary({ imports }: { imports: ResumeImportRecord[] }) {
     return <div className="empty-inline-state">No résumés yet. The first one you upload is kept here.</div>;
   }
 
+  const usable = imports.filter((item) => item.status !== "failed");
+  const failures = imports.filter((item) => item.status === "failed");
+  const uniqueFailures = failures.filter((item, index) =>
+    failures.findIndex((candidate) => candidate.file_name.toLocaleLowerCase() === item.file_name.toLocaleLowerCase()) === index
+  );
+
   return (
-    <ul className="library">
-      {imports.map((item) => (
+    <div className="resume-library-grouped">
+      {failures.length ? (
+        <details className="resume-import-issues">
+          <summary><span><strong>{failures.length} import attempt{failures.length === 1 ? "" : "s"} need attention</strong><small>Collapsed so failed attempts do not overwhelm your usable résumés.</small></span><span>Review issue{uniqueFailures.length === 1 ? "" : "s"}</span></summary>
+          <div className="resume-import-issue-list">
+            {uniqueFailures.map((item) => (
+              <article key={item.id}>
+                <div><strong>{item.label ?? item.file_name}</strong><small>{when(item.created_at)}{size(item.byte_size) ? ` · ${size(item.byte_size)}` : ""}</small></div>
+                <p>{item.error ? describeAiFailure(item.error) : "Sartho could not read this résumé. Try uploading it again."}</p>
+              </article>
+            ))}
+          </div>
+        </details>
+      ) : null}
+
+      {usable.length ? <ul className="library">
+        {usable.map((item) => (
         <li key={item.id} className={`library-row is-${item.status}`}>
           <div className="library-main">
             <strong className="library-name">{item.label ?? item.file_name}</strong>
@@ -48,15 +69,12 @@ export function ResumeLibrary({ imports }: { imports: ResumeImportRecord[] }) {
               {item.roles_created ? `, ${item.roles_created} role${item.roles_created === 1 ? "" : "s"}` : ""}
               {item.evidence_skipped ? ` · ${item.evidence_skipped} already held` : ""}
             </span>
-          ) : item.status === "failed" ? (
-            <span className="library-result is-failed">
-              {item.error ? describeAiFailure(item.error) : "Sartho could not read this résumé. Try uploading it again."}
-            </span>
           ) : (
             <span className="library-result">Reading…</span>
           )}
         </li>
-      ))}
-    </ul>
+        ))}
+      </ul> : null}
+    </div>
   );
 }
