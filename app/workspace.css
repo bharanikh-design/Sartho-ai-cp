@@ -231,6 +231,20 @@ textarea:focus-visible,
 
 .job-detail-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; }
 .job-status-block { min-width: 210px; }
+.outcome-capture {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 14px;
+  border: 1px solid rgba(255,255,255,.09);
+  border-radius: 14px;
+  background: rgba(3,6,10,.35);
+}
+.outcome-capture-lead { font-size: 11px; color: var(--text-secondary); line-height: 1.5; }
+.outcome-capture-lead span { display: block; margin-top: 2px; color: var(--text-tertiary); font-size: 10px; }
+.outcome-capture input { min-height: 38px; padding: 0 10px; font-size: 10px; }
+.outcome-capture-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 2px; }
+.outcome-recorded-meta { margin-top: 8px; color: var(--text-tertiary); font-size: 10px; }
 .job-summary-grid { align-items: stretch; }
 .persisted-analysis { margin-top: 18px; }
 .job-description-reader {

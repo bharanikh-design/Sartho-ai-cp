@@ -35,7 +35,16 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
           <h1 className="page-title">{job.title}</h1>
           <p className="page-description">{job.employer ?? "Employer not recorded"}{job.location ? ` · ${job.location}` : ""}</p>
         </div>
-        <JobStatusSelect jobId={job.id} initialStatus={job.status} />
+        <JobStatusSelect
+          jobId={job.id}
+          initialStatus={job.status}
+          initialOutcome={application ? {
+            stage: application.outcome_stage,
+            reason: application.outcome_reason,
+            note: application.outcome_note,
+            recordedAt: application.outcome_recorded_at,
+          } : null}
+        />
       </section>
 
       <section className="dashboard-grid job-summary-grid">

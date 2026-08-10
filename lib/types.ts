@@ -139,6 +139,10 @@ export type ApplicationRecord = {
   resume_change_log: ResumeChange[];
   resume_evidence_ids: string[];
   resume_generated_at: string | null;
+  outcome_stage: string | null;
+  outcome_reason: string | null;
+  outcome_note: string | null;
+  outcome_recorded_at: string | null;
   cover_note: string | null;
   submitted_at: string | null;
   confirmation_reference: string | null;
