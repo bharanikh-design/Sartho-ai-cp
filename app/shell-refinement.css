@@ -113,7 +113,7 @@
   display: block;
   margin-top: 3px;
   color: var(--text-tertiary);
-  font-size: 8px;
+  font-size: var(--text-2xs);
   line-height: 1.4;
 }
 
@@ -123,7 +123,7 @@
   border-radius: 999px;
   color: #dff9ef;
   background: rgba(114,230,189,.1);
-  font-size: 8px;
+  font-size: var(--text-2xs);
   font-weight: 750;
   text-align: center;
 }
@@ -156,7 +156,7 @@
 
 .preview-bars label {
   color: var(--text-tertiary);
-  font-size: 8px;
+  font-size: var(--text-2xs);
 }
 
 .preview-bars i {
@@ -200,12 +200,12 @@
 
 .preview-change del {
   color: rgba(255,142,163,.68);
-  font-size: 8px;
+  font-size: var(--text-2xs);
 }
 
 .preview-change ins {
   color: #dce8ff;
-  font-size: 9px;
+  font-size: var(--text-2xs);
   line-height: 1.4;
   text-decoration: none;
 }
@@ -234,7 +234,7 @@
   border-radius: 999px;
   color: var(--text-secondary);
   background: rgba(255,255,255,.03);
-  font-size: 7px;
+  font-size: var(--text-2xs);
 }
 
 .preview-pipeline {
@@ -260,13 +260,13 @@
 }
 
 .preview-pipeline strong {
-  font-size: 8px;
+  font-size: var(--text-2xs);
 }
 
 .preview-pipeline small {
   margin-top: 3px;
   color: var(--text-tertiary);
-  font-size: 7px;
+  font-size: var(--text-2xs);
 }
 
 @media (max-width: 780px) {
