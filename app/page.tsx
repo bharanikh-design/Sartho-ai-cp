@@ -1,11 +1,18 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
-import { getHomeJourneyState } from "@/lib/dashboard/home-state";
 import { loadProductJourney } from "@/lib/journey/load-product-journey";
 import type { JobStatus } from "@/lib/types";
 import { withJwtClockSkewRetry } from "@/lib/supabase/retry";
 
 export const dynamic = "force-dynamic";
+
+const activeApplicationStatuses = new Set<JobStatus>([
+  "approved",
+  "applied",
+  "acknowledged",
+  "assessment",
+  "interview",
+]);
 
 export default async function HomePage() {
   const { supabase, user } = await requireUser();
@@ -26,177 +33,190 @@ export default async function HomePage() {
   if (jobsError) throw jobsError;
 
   const jobRows = (jobs ?? []) as Array<{ id: string; status: JobStatus }>;
-  const activeApplications = jobRows.filter((job) => !["offer", "rejected", "withdrawn"].includes(job.status)).length;
+  const activeApplications = jobRows.filter((job) => activeApplicationStatuses.has(job.status)).length;
   const interviewCount = jobRows.filter((job) => job.status === "interview" || job.status === "assessment").length;
-  const journeyState = getHomeJourneyState({ approvedEvidence, pendingEvidence });
+  const firstName = ((user.user_metadata?.full_name as string | undefined) ?? user.email?.split("@")[0] ?? "there").split(" ")[0];
+  const hasPositioning = Boolean(profile?.headline?.trim() || lanes.length);
 
-  const actions = [
+  const nextAction = !journey.activated
+    ? {
+        eyebrow: `Setup · Step ${journey.currentIndex + 1} of ${journey.steps.length}`,
+        title: journey.current.title,
+        description: journey.current.description,
+        reason: journey.current.reason,
+        href: journey.current.href,
+        label: "Continue setup",
+      }
+    : interviewCount > 0
+      ? {
+          eyebrow: "Applications · Needs attention",
+          title: `Prepare for ${interviewCount === 1 ? "your active interview" : `${interviewCount} active interviews`}`,
+          description: "Turn the role requirements and your approved evidence into focused preparation before the next conversation.",
+          reason: "Preparation is most useful while the opportunity and your evidence are fresh.",
+          href: "/interview-prep",
+          label: "Open interview preparation",
+        }
+      : {
+          eyebrow: "Opportunities · Next move",
+          title: jobRows.length ? "Review your opportunities" : "Analyse your first promising role",
+          description: jobRows.length
+            ? "Return to saved roles, compare their fit and decide which opportunity deserves your attention next."
+            : "Paste a complete job description and Sartho will compare it with the career evidence you have approved.",
+          reason: "Every opportunity decision stays connected to your Career Profile and application history.",
+          href: "/jobs",
+          label: jobRows.length ? "Review opportunities" : "Analyse a role",
+        };
+
+  const summary = [
     {
       href: "/career-truth",
-      symbol: "✓",
       label: "Career Profile",
-      value: pendingEvidence ? "Review" : "Ready",
-      note: pendingEvidence ? "Confirm the profile Sartho understood" : "Your Career Profile is confirmed",
-      action: pendingEvidence ? "Review Career Profile" : "Open Career Profile",
+      value: pendingEvidence ? "Review needed" : approvedEvidence ? "Confirmed" : "Not ready",
+      detail: pendingEvidence
+        ? `${pendingEvidence} item${pendingEvidence === 1 ? "" : "s"} still need your review`
+        : approvedEvidence
+          ? `${approvedEvidence} approved evidence item${approvedEvidence === 1 ? "" : "s"}`
+          : "Add a résumé to build your evidence base",
     },
     {
       href: "/jobs",
-      symbol: "✦",
-      label: "Saved opportunities",
+      label: "Opportunities",
       value: String(jobRows.length),
-      note: "Analyse, save and revisit roles",
-      action: "Open opportunities",
-    },
-    {
-      href: "/resume-studio",
-      symbol: "R",
-      label: "Résumé Studio",
-      value: approvedEvidence ? "Ready" : "Setup",
-      note: approvedEvidence ? "Career Profile ready for tailoring" : "Confirm your Career Profile before tailoring",
-      action: "Open Résumé Studio",
-    },
-    {
-      href: "/interview-prep",
-      symbol: "Q",
-      label: "Interview Prep",
-      value: String(interviewCount),
-      note: interviewCount ? "Opportunities need preparation" : "Prepare from a saved role",
-      action: "Start preparation",
+      detail: jobRows.length ? "Saved roles in your workspace" : "No roles analysed yet",
     },
     {
       href: "/applications",
-      symbol: "↗",
-      label: "Active journey",
+      label: "Active applications",
       value: String(activeApplications),
-      note: "Track applications, interviews and outcomes",
-      action: "Open applications",
+      detail: interviewCount ? `${interviewCount} at assessment or interview stage` : "Track progress and outcomes here",
     },
   ];
 
   return (
-    <div className="page-stack">
-      <section className="hero-panel home-hero glass-card">
-        <div className="hero-copy">
-          <div className="page-eyebrow"><span className="live-dot" /> Sartho AI · Your career, intelligently guided.</div>
-          <h1>See the opportunity.<br />Make the right move.</h1>
-          <p>
-            Sartho connects your Career Profile, search strategy and opportunity decisions—then helps you prepare an honest application and walk in ready.
-          </p>
-          <div className="hero-actions">
-            <Link href={journeyState.primaryAction.href} className="primary-button">
-              {journeyState.primaryAction.label} <span aria-hidden="true">→</span>
-            </Link>
-            <Link href="/?tour=1" className="secondary-button">Replay welcome</Link>
-          </div>
+    <div className="page-stack home-dashboard">
+      <header className="home-welcome">
+        <div>
+          <div className="page-eyebrow"><span className="live-dot" /> Your career workspace</div>
+          <h1>Welcome back, {firstName}.</h1>
+          <p>One clear path from Career Profile to opportunity, application and outcome.</p>
         </div>
+        <Link href="/?tour=1" className="home-text-link">Replay introduction</Link>
+      </header>
 
-        <div className="home-hero-signal" aria-label="Career workspace readiness">
-          <span className="signal-label">{journeyState.readiness.label}</span>
-          <strong>{journeyState.readiness.title}</strong>
-          <p>{journeyState.readiness.description}</p>
-          <Link href={journeyState.readiness.href}>{journeyState.readiness.action} <span aria-hidden="true">→</span></Link>
+      <section className="glass-card home-primary-action" aria-labelledby="next-action-title">
+        <div className="home-primary-copy">
+          <span className="home-step-label">{nextAction.eyebrow}</span>
+          <h2 id="next-action-title">{nextAction.title}</h2>
+          <p>{nextAction.description}</p>
+          <Link href={nextAction.href} className="primary-button">
+            {nextAction.label} <span aria-hidden="true">→</span>
+          </Link>
         </div>
+        <aside className="home-action-context">
+          <span>{journey.activated ? "Why this is next" : "Your progress"}</span>
+          {!journey.activated ? (
+            <>
+              <strong>{journey.completedSteps} of {journey.steps.length} complete</strong>
+              <i aria-hidden="true"><b style={{ width: `${journey.progress}%` }} /></i>
+            </>
+          ) : null}
+          <p>{nextAction.reason}</p>
+        </aside>
       </section>
 
       {!journey.activated ? (
-        <section className="glass-card content-card home-setup" aria-labelledby="home-setup-title">
-          <div className="home-setup-heading">
-            <div>
-              <div className="page-eyebrow">Your setup</div>
-              <h2 id="home-setup-title">Activate personalized opportunity matching</h2>
-              <p>Complete one step at a time. Your Dashboard remains available while Sartho learns enough to rank opportunities for you.</p>
-            </div>
-            <div className="home-setup-progress" aria-label={`${journey.completedSteps} of ${journey.steps.length} setup tasks complete`}>
-              <strong>{journey.completedSteps} of {journey.steps.length}</strong>
-              <span>tasks complete</span>
-              <i aria-hidden="true"><b style={{ width: `${journey.progress}%` }} /></i>
-            </div>
+        <section className="home-journey" aria-labelledby="journey-title">
+          <div className="home-section-heading">
+            <div><span>Foundation</span><h2 id="journey-title">Your setup path</h2></div>
+            <Link href="/journey">See full journey →</Link>
           </div>
-
-          <div className="home-workflow">
+          <ol className="home-journey-list">
             {journey.steps.map((step, index) => {
               const state = step.complete ? "complete" : index === journey.currentIndex ? "current" : "pending";
               return (
-                <Link className={`home-workflow-step is-${state}`} href={step.href} key={step.id} aria-current={state === "current" ? "step" : undefined}>
-                  <span className="home-workflow-marker" aria-hidden="true">{step.complete ? "✓" : index + 1}</span>
-                  <span><strong>{step.label}</strong><small>{step.detail}</small></span>
-                  <em>{step.complete ? "Completed" : state === "current" ? "In progress" : "Not started"}</em>
-                </Link>
+                <li className={`is-${state}`} key={step.id}>
+                  <Link href={step.href} aria-current={state === "current" ? "step" : undefined}>
+                    <span className="home-journey-marker" aria-hidden="true">{step.complete ? "✓" : index + 1}</span>
+                    <span><strong>{step.label}</strong><small>{step.detail}</small></span>
+                    <em>{step.complete ? "Done" : state === "current" ? "Next" : "Later"}</em>
+                  </Link>
+                </li>
               );
             })}
-          </div>
-
-          <div className="home-setup-action">
-            <span>Next step</span>
-            <strong>{journey.current.title}</strong>
-            <Link href={journey.current.href} className="primary-button">Continue setup <span aria-hidden="true">→</span></Link>
-          </div>
+          </ol>
         </section>
       ) : null}
 
-      <section className="metric-grid action-metric-grid" aria-label="Your Sartho journey">
-        {actions.map((action) => (
-          <Link key={action.href} href={action.href} className="glass-card-soft metric-card action-metric">
-            <span className="metric-icon" aria-hidden="true">{action.symbol}</span>
-            <div className="metric-label">{action.label}</div>
-            <div className="metric-value">{action.value}</div>
-            <div className="metric-note">{action.note}</div>
-            <span className="metric-action">{action.action}<span aria-hidden="true">→</span></span>
+      <section className="home-summary" aria-label="Workspace summary">
+        {summary.map((item) => (
+          <Link href={item.href} key={item.label}>
+            <span>{item.label}</span>
+            <strong>{item.value}</strong>
+            <small>{item.detail}</small>
+            <b aria-hidden="true">→</b>
           </Link>
         ))}
       </section>
 
-      <section className="dashboard-grid">
-        <article className="glass-card content-card">
-          <div className="card-header">
-            <div>
-              <div className="page-eyebrow">Current positioning</div>
-              <h2 className="position-title">{profile?.headline ?? "Build your career positioning"}</h2>
-            </div>
-            <span className="meta-pill">
-              {profile?.total_experience_years ? `${profile.total_experience_years}+ years` : journeyState.profileMetaFallback}
-              {profile?.location ? ` · ${profile.location}` : ""}
-            </span>
-          </div>
+      <section className="glass-card home-positioning" aria-labelledby="positioning-title">
+        <div className="home-section-heading">
+          <div><span>Career direction</span><h2 id="positioning-title">Your positioning</h2></div>
+          <Link href="/career-direction">{hasPositioning ? "Edit direction" : "Set direction"} →</Link>
+        </div>
 
-          {lanes.length ? (
-            <div className="lane-list">
-              {lanes.map((lane, index) => (
-                <div key={lane.id} className="lane-row">
-                  <div className="lane-top">
-                    <span className="lane-index">{String(index + 1).padStart(2, "0")}</span>
-                    <span className="lane-name">{lane.name}</span>
-                    <span className="lane-weight">{lane.weight}%</span>
+        {hasPositioning ? (
+          <div className="home-positioning-content">
+            <div className="home-positioning-copy">
+              <strong>{profile?.headline || "Choose the roles you want Sartho to prioritise"}</strong>
+              <p>
+                {[profile?.location, profile?.total_experience_years ? `${profile.total_experience_years}+ years experience` : null]
+                  .filter(Boolean)
+                  .join(" · ") || "Your direction guides opportunity ranking and application preparation."}
+              </p>
+            </div>
+            {lanes.length ? (
+              <div className="home-lanes">
+                {lanes.map((lane, index) => (
+                  <div key={lane.id}>
+                    <span>{index + 1}</span><strong>{lane.name}</strong><b>{lane.weight}%</b>
+                    <i aria-hidden="true"><em style={{ width: `${lane.weight}%` }} /></i>
                   </div>
-                  <div className="progress-track"><div className="progress-fill" style={{ width: `${lane.weight}%` }} /></div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="empty-inline-state">{journeyState.positioningFallback}</div>
-          )}
-        </article>
-
-        <article className="glass-card content-card next-card action-next-card">
-          <div className="page-eyebrow">Next best action</div>
-          <h3>{pendingEvidence ? "Confirm your Career Profile" : "Analyse the next promising role"}</h3>
-          <p>
-            {pendingEvidence
-              ? "Review one concise career summary so Sartho can match roles and tailor applications accurately."
-              : "Paste a complete job description, understand the opportunity and preserve the analysis in your private workspace."}
-          </p>
-          <div className="impact-row"><span>Impact</span><strong>{pendingEvidence ? "Activates profile-based recommendations" : "Creates a complete opportunity journey"}</strong></div>
-          <div className="impact-row"><span>Estimated effort</span><strong>{pendingEvidence ? "One concise review" : "2 minutes"}</strong></div>
-          <div className="next-action-buttons">
-            <Link href={pendingEvidence ? "/career-truth" : "/jobs"} className="primary-button">
-              {pendingEvidence ? "Review Career Profile" : "Start analysis"} <span aria-hidden="true">→</span>
-            </Link>
-            <details className="why-details">
-              <summary>Why this?</summary>
-              <p>Sartho can only make strong recommendations when its understanding of your career has been confirmed by you.</p>
-            </details>
+                ))}
+              </div>
+            ) : (
+              <div className="home-positioning-prompt">
+                <p>Add target profiles so Sartho knows which career directions matter most to you.</p>
+                <Link href="/career-direction" className="secondary-button">Add target profiles</Link>
+              </div>
+            )}
           </div>
-        </article>
+        ) : (
+          <div className="home-empty-action">
+            <div>
+              <strong>Tell Sartho where you want to go next.</strong>
+              <p>Add your headline, location and target profiles. This turns a general Career Profile into a focused search direction.</p>
+            </div>
+            <Link href="/career-direction" className="secondary-button">Build my positioning <span aria-hidden="true">→</span></Link>
+          </div>
+        )}
+      </section>
+
+      <section className="home-tools" aria-labelledby="tools-title">
+        <div className="home-section-heading">
+          <div><span>Supporting tools</span><h2 id="tools-title">Use these when the journey calls for them</h2></div>
+        </div>
+        <div>
+          <Link href="/resume-studio">
+            <span className="home-tool-icon" aria-hidden="true">R</span>
+            <span><strong>Résumé Studio</strong><small>Create a tailored version after analysing an opportunity.</small></span>
+            <b aria-hidden="true">→</b>
+          </Link>
+          <Link href="/interview-prep">
+            <span className="home-tool-icon" aria-hidden="true">Q</span>
+            <span><strong>Interview preparation</strong><small>Prepare from the requirements and evidence attached to a saved role.</small></span>
+            <b aria-hidden="true">→</b>
+          </Link>
+        </div>
       </section>
     </div>
   );
