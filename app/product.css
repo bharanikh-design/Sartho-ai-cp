@@ -8,6 +8,31 @@
 
 .action-metric { display: block; cursor: pointer; transition: transform .22s ease, border-color .22s ease, background .22s ease, box-shadow .22s ease; }
 .action-metric:hover { transform: translateY(-4px); border-color: rgba(151,181,255,.22); background: linear-gradient(145deg, rgba(123,157,255,.08), rgba(255,255,255,.018)); box-shadow: inset 0 1px 0 rgba(255,255,255,.05), 0 20px 44px rgba(0,0,0,.26); }
+.home-setup { display: grid; gap: 22px; }
+.home-setup-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 28px; }
+.home-setup-heading h2 { margin: 7px 0 0; font-size: 23px; letter-spacing: -.035em; }
+.home-setup-heading p { max-width: 650px; margin: 8px 0 0; color: var(--text-secondary); font-size: 11px; line-height: 1.65; }
+.home-setup-progress { min-width: 150px; text-align: right; }
+.home-setup-progress strong, .home-setup-progress span { display: block; }
+.home-setup-progress strong { font-size: 18px; }
+.home-setup-progress span { margin-top: 3px; color: var(--text-tertiary); font-size: 9px; }
+.home-setup-progress i { display: block; width: 150px; height: 5px; margin-top: 10px; overflow: hidden; border-radius: 99px; background: rgba(127,146,138,.16); }
+.home-setup-progress b { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #174b3a, #72ac91); }
+.home-workflow { display: grid; grid-template-columns: repeat(7, minmax(0,1fr)); gap: 8px; }
+.home-workflow-step { display: grid; align-content: start; min-height: 132px; padding: 14px; border: 1px solid var(--line); border-radius: 13px; color: inherit; background: rgba(255,255,255,.018); transition: transform .18s ease, border-color .18s ease; }
+.home-workflow-step:hover { transform: translateY(-2px); border-color: var(--line-bright); }
+.home-workflow-marker { width: 27px; height: 27px; display: grid; place-items: center; border: 1px solid var(--line-bright); border-radius: 50%; color: var(--text-tertiary); font-size: 9px; font-weight: 800; }
+.home-workflow-step > span:nth-child(2) { display: grid; gap: 5px; margin-top: 12px; }
+.home-workflow-step strong { font-size: 10px; line-height: 1.35; }
+.home-workflow-step small { color: var(--text-tertiary); font-size: 8px; line-height: 1.45; }
+.home-workflow-step em { align-self: end; margin-top: 10px; color: var(--text-tertiary); font-size: 7px; font-style: normal; font-weight: 750; letter-spacing: .06em; text-transform: uppercase; }
+.home-workflow-step.is-complete .home-workflow-marker { color: white; border-color: #397a61; background: #397a61; }
+.home-workflow-step.is-complete em, .home-workflow-step.is-current em { color: #397a61; }
+.home-workflow-step.is-current { border-color: rgba(82,148,116,.48); background: rgba(82,148,116,.09); box-shadow: inset 0 0 0 1px rgba(82,148,116,.08); }
+.home-workflow-step.is-current .home-workflow-marker { color: #174b3a; border-color: #397a61; background: rgba(82,148,116,.12); }
+.home-setup-action { display: flex; align-items: center; gap: 12px; padding-top: 3px; }
+.home-setup-action > span { color: var(--text-tertiary); font-size: 9px; text-transform: uppercase; letter-spacing: .08em; }
+.home-setup-action > strong { margin-right: auto; font-size: 11px; }
 .metric-action { position: relative; z-index: 1; display: inline-flex; align-items: center; gap: 8px; margin-top: 18px; color: #c0d2ff; font-size: 9px; font-weight: 680; }
 .action-next-card { gap: 0; }
 .action-next-card h3 { margin: 15px 0 0; font-size: 25px; line-height: 1.08; letter-spacing: -.04em; }
@@ -25,10 +50,21 @@
 @media (max-width: 900px) {
   .home-hero { grid-template-columns: 1fr; }
   .home-hero-signal { min-height: 180px; }
+  .home-workflow { grid-template-columns: repeat(2, minmax(0,1fr)); }
 }
 
 @media (max-width: 620px) {
   .home-hero { min-height: 0; }
   .home-hero-signal { min-height: 160px; }
+  .home-setup-heading { display: grid; }
+  .home-setup-progress { text-align: left; }
+  .home-setup-progress i { width: 100%; }
+  .home-workflow { grid-template-columns: 1fr; }
+  .home-workflow-step { min-height: 0; grid-template-columns: 30px minmax(0,1fr) auto; gap: 10px; align-items: center; }
+  .home-workflow-step > span:nth-child(2), .home-workflow-step em { margin-top: 0; }
+  .home-workflow-step em { align-self: center; }
+  .home-setup-action { align-items: flex-start; flex-wrap: wrap; }
+  .home-setup-action > strong { width: calc(100% - 80px); margin-right: 0; }
+  .home-setup-action .primary-button { width: 100%; justify-content: center; }
   .next-action-buttons { flex-wrap: wrap; }
 }

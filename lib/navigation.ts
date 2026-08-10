@@ -65,11 +65,11 @@ const strategyNavigation: NavigationItem = {
 };
 
 /**
- * Before activation the Journey is the product. Afterwards the navigation
- * shifts to the recurring outcome loop and Journey becomes a readiness card.
+ * Home remains the orientation point throughout setup. After activation the
+ * navigation expands into the recurring opportunity and application loop.
  */
 export function getPrimaryNavigation(activated: boolean): NavigationItem[] {
-  if (!activated) return [journeyNavigation, profileNavigation, strategyNavigation];
+  if (!activated) return [dashboardNavigation, journeyNavigation, profileNavigation, strategyNavigation];
 
   return [
     dashboardNavigation,

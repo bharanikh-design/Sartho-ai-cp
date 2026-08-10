@@ -31,8 +31,9 @@ describe("primary navigation", () => {
     expect(primaryNavigation.some((item) => item.href === "/resume-studio")).toBe(false);
   });
 
-  it("puts Journey first before activation and the outcome loop first afterwards", () => {
+  it("keeps Home visible while setup is incomplete and expands the outcome loop afterwards", () => {
     expect(getPrimaryNavigation(false).map((item) => item.label)).toEqual([
+      "Home",
       "Your Journey",
       "Career Profile",
       "Search Strategy",
@@ -49,6 +50,7 @@ describe("primary navigation", () => {
 
   it("keeps a directly opened contextual destination visible and active", () => {
     expect(getNavigationForPath(false, "/jobs").map((item) => item.label)).toEqual([
+      "Home",
       "Your Journey",
       "Career Profile",
       "Search Strategy",
