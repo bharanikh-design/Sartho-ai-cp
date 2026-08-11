@@ -57,12 +57,13 @@ export function SearchPlanEditor({
   }
 
   async function save() {
-    if (!canSave) {
-      setStatus("error");
-      return;
-    }
+    // The brief refines search but never blocks the loop: reaching opportunities
+    // is the point of this screen, so we fill sensible defaults and always save.
     setStatus("saving");
-    const response = await fetch("/api/search-plan", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ sources, targetLocations: locations, remotePreference: remote }) });
+    const finalLocations = locations.length ? locations : ["Remote"];
+    const finalRemote = remote || "Flexible";
+    const finalSources = sources.some((source) => source.active) ? sources : recommendedSources;
+    const response = await fetch("/api/search-plan", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ sources: finalSources, targetLocations: finalLocations, remotePreference: finalRemote }) });
     setStatus(response.ok ? "saved" : "error");
     if (response.ok) {
       window.dispatchEvent(new Event("sartho:journey-changed"));
@@ -108,7 +109,7 @@ export function SearchPlanEditor({
         <div className="custom-source-add"><input value={customName} onChange={(event) => setCustomName(event.target.value)} placeholder="Employer or job source" /><input value={customUrl} onChange={(event) => setCustomUrl(event.target.value)} placeholder="https://…" /><button type="button" onClick={addSource}>Add custom source</button></div>
       </section>
 
-      <div className="direction-save-bar"><div><strong>{canSave ? "Search brief ready for your approval" : "Complete your search brief before continuing"}</strong><span>{status === "saved" ? "Saved securely" : status === "error" && canSave ? "Could not save—please try again" : incompleteReasons.length ? `Next: ${incompleteReasons[0]}.` : "This saves evaluation criteria; it does not fetch or submit applications"}</span></div><button type="button" className="primary-button" onClick={() => void save()} disabled={status === "saving" || !canSave}>{status === "saving" ? "Saving…" : "Save and open opportunities"}</button></div>
+      <div className="direction-save-bar"><div><strong>{canSave ? "Search brief ready" : "You can refine this later"}</strong><span>{status === "saved" ? "Saved securely" : status === "error" ? "Could not save—please try again" : incompleteReasons.length ? `Optional: ${incompleteReasons[0]}.` : "This saves evaluation criteria; it does not fetch or submit applications"}</span></div><button type="button" className="primary-button" onClick={() => void save()} disabled={status === "saving"}>{status === "saving" ? "Saving…" : "Save and open opportunities"}</button></div>
     </div>
   );
 }
