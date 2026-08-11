@@ -19,8 +19,8 @@
 .requirement-card.assessment-unknown { border-color: rgba(255,142,163,.13); }
 .requirement-heading { display: flex; justify-content: space-between; gap: 18px; align-items: flex-start; }
 .requirement-heading > div:first-child > span { color: #b9caff; font-size: var(--text-2xs); font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
-.requirement-heading h4 { margin: 6px 0 0; max-width: 760px; font-size: 12px; line-height: 1.5; }
-.requirement-card > p { margin: 12px 0 0; color: var(--text-secondary); font-size: 10px; line-height: 1.65; }
+.requirement-heading h4 { margin: 6px 0 0; max-width: 760px; font-size: var(--text-xs); line-height: 1.5; }
+.requirement-card > p { margin: 12px 0 0; color: var(--text-secondary); font-size: var(--text-2xs); line-height: 1.65; }
 .requirement-verdict { min-width: 125px; padding: 9px 10px; border: 1px solid rgba(255,255,255,.07); border-radius: 12px; text-align: right; background: rgba(0,0,0,.14); }
 .requirement-verdict strong { display: block; font-size: var(--text-2xs); text-transform: capitalize; }
 .requirement-verdict small { display: block; margin-top: 4px; color: var(--text-tertiary); font-size: var(--text-2xs); }
@@ -39,9 +39,9 @@
 .resume-review-grid { display: grid; grid-template-columns: minmax(0,1.2fr) minmax(300px,.8fr); gap: 16px; margin-top: 22px; align-items: start; }
 .resume-draft-reader { min-width: 0; padding: 22px; border: 1px solid rgba(255,255,255,.08); border-radius: 18px; background: #f4f2ed; color: #171a20; box-shadow: 0 25px 60px rgba(0,0,0,.28); }
 .resume-draft-label { display: inline-flex; padding: 6px 8px; border-radius: 999px; color: #6b3e45; background: #f4d9de; font-size: var(--text-2xs); font-weight: 800; letter-spacing: .08em; }
-.resume-draft-reader pre { margin: 18px 0 0; overflow: auto; white-space: pre-wrap; font-family: inherit; font-size: 11px; line-height: 1.75; }
+.resume-draft-reader pre { margin: 18px 0 0; overflow: auto; white-space: pre-wrap; font-family: inherit; font-size: var(--text-2xs); line-height: 1.75; }
 .resume-change-log { padding: 18px; border: 1px solid rgba(255,255,255,.08); border-radius: 18px; background: rgba(255,255,255,.025); }
-.resume-change-log h3 { margin: 0; font-size: 15px; }
+.resume-change-log h3 { margin: 0; font-size: var(--text-base); }
 .resume-change-log > p { margin: 8px 0 0; color: var(--text-tertiary); font-size: var(--text-2xs); line-height: 1.55; }
 .resume-change-log ol { display: grid; gap: 9px; margin: 16px 0 0; padding: 0; list-style: none; }
 .resume-change-log li { padding: 12px; border: 1px solid rgba(255,255,255,.065); border-radius: 13px; background: rgba(0,0,0,.12); }
@@ -51,15 +51,15 @@
 
 .interview-coach-start { display: flex; justify-content: space-between; gap: 24px; align-items: center; margin-top: 24px; padding: 18px; border: 1px solid rgba(114,230,189,.14); border-radius: 18px; background: rgba(114,230,189,.035); }
 .interview-coach-start > div { display: grid; gap: 6px; }
-.interview-coach-start strong { font-size: 12px; }
+.interview-coach-start strong { font-size: var(--text-xs); }
 .interview-coach-start span { color: var(--text-secondary); font-size: var(--text-2xs); line-height: 1.55; }
 .interview-coach-results { display: grid; gap: 18px; margin-top: 24px; }
 .interview-opening-advice { padding: 16px; border-left: 3px solid var(--accent); border-radius: 0 14px 14px 0; background: rgba(114,230,189,.04); }
 .interview-opening-advice strong { font-size: var(--text-2xs); text-transform: uppercase; letter-spacing: .07em; }
-.interview-opening-advice p { margin: 7px 0 0; color: var(--text-secondary); font-size: 10px; line-height: 1.65; }
+.interview-opening-advice p { margin: 7px 0 0; color: var(--text-secondary); font-size: var(--text-2xs); line-height: 1.65; }
 .interview-question-list { display: grid; gap: 12px; }
 .interview-question-list > article { display: grid; grid-template-columns: auto minmax(0,1fr); gap: 16px; padding: 18px; border: 1px solid rgba(255,255,255,.075); border-radius: 18px; background: rgba(255,255,255,.022); }
-.interview-question-list h3 { margin: 0; font-size: 14px; line-height: 1.4; }
+.interview-question-list h3 { margin: 0; font-size: var(--text-base); line-height: 1.4; }
 .interview-question-list p,
 .interview-question-list li { color: var(--text-secondary); font-size: var(--text-2xs); line-height: 1.65; }
 .interview-question-list ol { display: grid; gap: 5px; margin: 12px 0; padding-left: 18px; }

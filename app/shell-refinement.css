@@ -34,7 +34,7 @@
   align-items: center;
   gap: 9px;
   color: var(--text-secondary);
-  font-size: 11px;
+  font-size: var(--text-2xs);
   line-height: 1.35;
   cursor: pointer;
   user-select: none;
@@ -102,7 +102,7 @@
 .preview-resume-card strong,
 .preview-fit-card strong {
   display: block;
-  font-size: 10px;
+  font-size: var(--text-2xs);
   line-height: 1.35;
 }
 
@@ -217,7 +217,7 @@
 .preview-question-card p {
   margin: 9px 0 0;
   color: #e8eeff;
-  font-size: 10px;
+  font-size: var(--text-2xs);
   line-height: 1.45;
 }
 
