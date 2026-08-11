@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { GroundedDirectionSuggestion } from "@/lib/career/direction-suggestions";
 import type { GroundedRoleRanking, MatchLevel } from "@/lib/career/direction-ranking";
@@ -62,14 +62,7 @@ export function CareerDirectionEditor({
   const [rankStatus, setRankStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [rankError, setRankError] = useState<string | null>(null);
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
-  const [guidanceError, setGuidanceError] = useState<string | null>(null);
 
-  const guidanceRef = useRef<HTMLDetailsElement>(null);
-  const headlineRef = useRef<HTMLInputElement>(null);
-  const locationRef = useRef<HTMLInputElement>(null);
-  const workRef = useRef<HTMLInputElement>(null);
-
-  const allocation = useMemo(() => lanes.reduce((sum, lane) => sum + lane.weight, 0), [lanes]);
   const visibleSuggestions = suggestions.filter((item) => !dismissed.includes(item.name));
   const rankingByName = useMemo(
     () => new Map(rankings.map((item) => [item.name.toLocaleLowerCase(), item])),
@@ -79,7 +72,6 @@ export function CareerDirectionEditor({
     () => (rankings.length ? [...rankings].sort((a, b) => MATCH_RANK[a.match] - MATCH_RANK[b.match])[0] : null),
     [rankings],
   );
-  const missingGuidance = !headline.trim() || !location.trim() || !workAuthorisation.trim();
 
   function addLaneName(value: string) {
     const name = value.trim();
@@ -166,24 +158,8 @@ export function CareerDirectionEditor({
   }
 
   async function save() {
-    /*
-     * The three guidance fields are required. Rather than silently disabling
-     * the button (which reads as "nothing happens"), the save is attempted and,
-     * if guidance is missing, the section is opened, scrolled to and focused so
-     * the reason is impossible to miss.
-     */
-    if (missingGuidance) {
-      setGuidanceError("Add your role, location and work rights below before saving.");
-      if (guidanceRef.current) {
-        guidanceRef.current.open = true;
-        guidanceRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
-      }
-      const firstMissing = !headline.trim() ? headlineRef : !location.trim() ? locationRef : workRef;
-      window.setTimeout(() => firstMissing.current?.focus(), 320);
-      return;
-    }
-
-    setGuidanceError(null);
+    // Guidance sharpens matching but never blocks: the priorities are the
+    // point of this screen, so saving them always goes through.
     setStatus("saving");
     const strengths = initialProfile?.strengths?.length ? initialProfile.strengths : suggestedStrengths.slice(0, 12);
     const response = await fetch("/api/career/direction", {
@@ -331,14 +307,13 @@ export function CareerDirectionEditor({
 
       </section>
 
-      <details className="glass-card direction-preferences" id="context" ref={guidanceRef} open>
-        <summary><span><strong>Complete your guidance</strong><small>Required context for relevant opportunity decisions</small></span><span>Review</span></summary>
+      <details className="glass-card direction-preferences" id="context">
+        <summary><span><strong>Add context (optional)</strong><small>Location and work rights sharpen matching — you can add them later</small></span><span>Review</span></summary>
         <div className="direction-fields">
-          <label><span>Role or level already in mind · Required</span><input ref={headlineRef} value={headline} onChange={(event) => setHeadline(event.target.value)} placeholder="e.g. Regional Transformation Director" /></label>
-          <label><span>Current location · Required</span><input ref={locationRef} value={location} onChange={(event) => setLocation(event.target.value)} placeholder="Singapore" /></label>
-          <label className="field-wide"><span>Work rights and mobility · Required</span><input ref={workRef} value={workAuthorisation} onChange={(event) => setWorkAuthorisation(event.target.value)} placeholder="Countries, visa status, relocation or remote preference" /></label>
+          <label><span>Role or level already in mind</span><input value={headline} onChange={(event) => setHeadline(event.target.value)} placeholder="e.g. Regional Transformation Director" /></label>
+          <label><span>Current location</span><input value={location} onChange={(event) => setLocation(event.target.value)} placeholder="Singapore" /></label>
+          <label className="field-wide"><span>Work rights and mobility</span><input value={workAuthorisation} onChange={(event) => setWorkAuthorisation(event.target.value)} placeholder="Countries, visa status, relocation or remote preference" /></label>
         </div>
-        {guidanceError ? <div className="direction-ai-message is-error" role="alert">{guidanceError}</div> : null}
       </details>
 
       <div className="direction-save-bar"><div><strong>{lanes.length ? `${lanes.length} priorit${lanes.length === 1 ? "y" : "ies"} ready to guide Sartho` : "Choose at least one direction when you are ready"}</strong><span>{status === "saved" ? "Career direction saved" : status === "error" ? "Could not save—please try again" : "Search weighting is balanced automatically"}</span></div><button type="button" className="primary-button" onClick={() => void save()} disabled={status === "saving" || !lanes.length}>{status === "saving" ? "Saving…" : "Save and continue"}</button></div>
