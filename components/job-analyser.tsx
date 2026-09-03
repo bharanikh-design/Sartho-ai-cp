@@ -25,6 +25,7 @@ export function JobAnalyser({ initialJobs, skillProfile }: { initialJobs: JobRec
   const [saving, setSaving] = useState(false);
   const [savedJobId, setSavedJobId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [extensionIntel, setExtensionIntel] = useState<{ applicants?: string; postedDate?: string; hiringManager?: string } | null>(null);
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
@@ -34,6 +35,15 @@ export function JobAnalyser({ initialJobs, skillProfile }: { initialJobs: JobRec
         setEmployer(payload.company || "");
         setSourceUrl(payload.url || "");
         setDescription(payload.description || "");
+        
+        // Save Extension Intel
+        if (payload.applicants || payload.postedDate || payload.hiringManager) {
+          setExtensionIntel({
+            applicants: payload.applicants,
+            postedDate: payload.postedDate,
+            hiringManager: payload.hiringManager
+          });
+        }
         
         // Auto trigger analyze if there is a description
         if (payload.description) {
@@ -138,7 +148,24 @@ export function JobAnalyser({ initialJobs, skillProfile }: { initialJobs: JobRec
             <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem", fontSize: "0.875rem" }}>Link to Job (Optional)<input className="sartho-input" style={{ padding: "0.8rem", background: "rgba(0,0,0,0.2)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "6px", color: "white" }} value={sourceUrl} onChange={(event) => setSourceUrl(event.target.value)} placeholder="https://..." inputMode="url" /></label>
           </div>
 
-          <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem", fontSize: "0.875rem", marginBottom: "1.5rem" }}>
+          
+  {extensionIntel && (
+    <div style={{ marginBottom: "1.5rem", padding: "12px 16px", background: "rgba(107, 207, 147, 0.05)", border: "1px solid rgba(107, 207, 147, 0.2)", borderRadius: "8px" }}>
+      <h4 style={{ margin: "0 0 8px 0", fontSize: "0.75rem", color: "#6bcf93", textTransform: "uppercase", letterSpacing: "0.05em" }}>Sartho Role Intelligence</h4>
+      <div style={{ display: "flex", gap: "16px", flexWrap: "wrap" }}>
+        {extensionIntel.applicants && extensionIntel.applicants !== "hidden" && (
+          <span style={{ fontSize: "0.8125rem", color: "#ccc" }}>👥 {extensionIntel.applicants}</span>
+        )}
+        {extensionIntel.postedDate && (
+          <span style={{ fontSize: "0.8125rem", color: "#ccc" }}>🗓 {extensionIntel.postedDate}</span>
+        )}
+        {extensionIntel.hiringManager && (
+          <span style={{ fontSize: "0.8125rem", color: "#ccc" }}>👤 <strong>Hiring Manager:</strong> {extensionIntel.hiringManager}</span>
+        )}
+      </div>
+    </div>
+  )}
+  <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem", fontSize: "0.875rem", marginBottom: "1.5rem" }}>
             Full Job Description
             <textarea
               value={description}

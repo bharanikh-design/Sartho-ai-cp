@@ -40,8 +40,10 @@ document.getElementById('analyzeBtn').addEventListener('click', async () => {
         <span style="color: #aaa; font-size: 12px">${data.company}</span>
       </div>
       <p style="color: #6bcf93; margin-bottom: 8px;">✓ Job successfully parsed (${data.description.length} chars)</p>
-      ${data.applicants && !data.applicants.includes('hidden') ? `<div class="stat"><strong>Market Intel:</strong> ${data.applicants}</div>` : ''}
-      <button id="sendToSartho" style="background: #111; border: 1px solid #333; margin-top: 12px">Send to Sartho Dashboard ↗</button>
+      ${data.applicants && !data.applicants.includes('hidden') ? `<div class="stat" style="font-size: 11px; margin-bottom: 4px;"><strong>👥 Applicants:</strong> ${data.applicants}</div>` : ''}
+      ${data.postedDate ? `<div class="stat" style="font-size: 11px; margin-bottom: 4px;"><strong>🗓 Posted:</strong> ${data.postedDate}</div>` : ''}
+      ${data.hiringManager ? `<div class="stat" style="font-size: 11px; margin-bottom: 4px;"><strong>👤 Hiring Manager:</strong> ${data.hiringManager}</div>` : ''}
+      <button id="sendToSartho" style="background: #111; border: 1px solid #333; margin-top: 12px; color: #6bcf93;">Send to Sartho Dashboard ↗</button>
     `;
 
     document.getElementById('sendToSartho').addEventListener('click', () => {
@@ -52,7 +54,10 @@ document.getElementById('analyzeBtn').addEventListener('click', async () => {
           title: parsedData.title,
           company: parsedData.company,
           description: parsedData.description,
-          url: sourceUrl
+          url: sourceUrl,
+          applicants: parsedData.applicants,
+          postedDate: parsedData.postedDate,
+          hiringManager: parsedData.hiringManager
         }
       }, () => {
         window.close();
@@ -73,6 +78,8 @@ function scrapeJobData() {
   let company = '';
   let description = '';
   let applicants = '';
+  let postedDate = '';
+  let hiringManager = '';
 
   try {
     if (url.includes('linkedin.com')) {
@@ -96,21 +103,33 @@ function scrapeJobData() {
       if (descEl) {
         description = descEl.innerText.trim();
       } else {
-        // Ultimate fallback: Look for any div containing "About the job"
-        const allNodes = Array.from(document.querySelectorAll('div, section, main'));
-        const aboutNode = allNodes.find(el => el.innerText && el.innerText.includes('About the job') && el.innerText.length > 500);
-        if (aboutNode) {
-          description = aboutNode.innerText.trim();
-        } else {
-          // If we are in the split view, grabbing the whole body might grab the list of jobs.
-          // Grab the main content area.
-          const mainNode = document.querySelector('main') || document.body;
-          description = mainNode.innerText.trim();
-        }
+        // Ultimate fallback
+        const mainNode = document.querySelector('main') || document.body;
+        description = mainNode.innerText.trim();
       }
       
+      // Applicants
       const applicantEl = Array.from(document.querySelectorAll('span, li')).find(el => el.innerText.toLowerCase().includes('applicant'));
-      applicants = applicantEl ? applicantEl.innerText.trim() : 'hidden';
+      if (applicantEl) applicants = applicantEl.innerText.trim();
+      
+      // Posted Date
+      const postedEl = Array.from(document.querySelectorAll('span, li')).find(el => {
+        const text = el.innerText.toLowerCase();
+        return text.includes('ago') || text.includes('posted');
+      });
+      if (postedEl) postedDate = postedEl.innerText.trim();
+      
+      // Hiring Manager
+      const hmEl = document.querySelector('.hirer-card__hirer-information span:first-child')
+                || document.querySelector('.jobs-poster__name')
+                || document.querySelector('.job-details-jobs-unified-top-card__hirer-name');
+      if (hmEl) hiringManager = hmEl.innerText.trim();
+      else {
+        // Look for the "Meet the hiring team" block
+        const profileLink = document.querySelector('a[href*="/in/"] h3') || document.querySelector('.app-aware-link:has(strong)');
+        if (profileLink) hiringManager = profileLink.innerText.trim();
+      }
+      
     } else if (url.includes('indeed.com')) {
       const titleEl = document.querySelector('h1');
       title = titleEl ? titleEl.innerText.trim() : document.title.split(' - ')[0];
@@ -118,12 +137,14 @@ function scrapeJobData() {
       company = companyEl ? companyEl.innerText.trim() : 'Unknown Company';
       const descEl = document.getElementById('jobDescriptionText') || document.body;
       description = descEl.innerText.trim();
+      // Indeed meta
+      const postedEl = document.querySelector('[data-testid="jobSearch-jobMetadata-posted"]');
+      if (postedEl) postedDate = postedEl.innerText.trim();
     } else {
       title = document.title;
       description = document.body.innerText;
     }
   } catch (e) {
-    // Failsafe
     title = document.title;
     description = document.body.innerText;
   }
@@ -131,7 +152,9 @@ function scrapeJobData() {
   return { 
     title: title || 'Unknown Title', 
     company, 
-    description: description.slice(0, 15000), // Cap at 15k chars to prevent postMessage overload
-    applicants 
+    description: description.slice(0, 15000), 
+    applicants,
+    postedDate,
+    hiringManager
   };
 }
