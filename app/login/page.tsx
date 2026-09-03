@@ -25,11 +25,6 @@ const entryArt =
  * switch along with the rest of the product.
  */
 
-/*
- * Supabase names the LinkedIn provider "linkedin_oidc"; the bare "linkedin"
- * id is the retired OAuth 2.0 one and is rejected.
- */
-type Provider = "google" | "apple" | "linkedin_oidc";
 type Mode = "signin" | "reset";
 
 const styles = `
@@ -694,22 +689,6 @@ export default function LoginPage() {
     window.setTimeout(() => setSplash("done"), 980);
   }
 
-  async function signInWithProvider(provider: Provider) {
-    setBusy(provider);
-    setError(null);
-    setNotice(null);
-
-    const { error: failure } = await supabase.auth.signInWithOAuth({
-      provider,
-      options: { redirectTo: `${window.location.origin}/auth/callback?next=/` },
-    });
-
-    if (failure) {
-      setBusy(null);
-      setError(friendlyAuthMessage(failure.message));
-    }
-  }
-
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
@@ -802,26 +781,8 @@ export default function LoginPage() {
           <p className="si-sub">
             {mode === "reset"
               ? "We'll email you a link to set a new one."
-              : "Choose how you'd like to sign in."}
+              : "Enter your email and password to sign in."}
           </p>
-
-          {mode === "signin" ? (
-            <>
-              <div className="si-providers">
-                <button type="button" className="si-provider" onClick={() => signInWithProvider("google")} disabled={busy !== null}>
-                  <GoogleIcon /><span>{busy === "google" ? "Opening…" : "Continue with Google"}</span>
-                </button>
-                <button type="button" className="si-provider" onClick={() => signInWithProvider("apple")} disabled={busy !== null}>
-                  <AppleIcon /><span>{busy === "apple" ? "Opening…" : "Continue with Apple"}</span>
-                </button>
-                <button type="button" className="si-provider" onClick={() => signInWithProvider("linkedin_oidc")} disabled={busy !== null}>
-                  <LinkedInIcon /><span>{busy === "linkedin_oidc" ? "Opening…" : "Continue with LinkedIn"}</span>
-                </button>
-              </div>
-
-              <div className="si-or">or</div>
-            </>
-          ) : null}
 
           <form className="si-form" onSubmit={submit}>
             <label>
@@ -885,29 +846,3 @@ export default function LoginPage() {
   );
 }
 
-function GoogleIcon() {
-  return (
-    <svg width="17" height="17" viewBox="0 0 24 24" aria-hidden="true">
-      <path fill="#4285F4" d="M21.6 12.23c0-.71-.06-1.4-.18-2.07H12v3.92h5.38a4.6 4.6 0 0 1-2 3.02v2.54h3.24c1.9-1.75 2.98-4.33 2.98-7.41Z" />
-      <path fill="#34A853" d="M12 22c2.7 0 4.97-.9 6.62-2.36l-3.24-2.54c-.9.6-2.05.96-3.38.96-2.6 0-4.8-1.76-5.59-4.12H3.06v2.62A10 10 0 0 0 12 22Z" />
-      <path fill="#FBBC05" d="M6.41 13.94A6.02 6.02 0 0 1 6.1 12c0-.67.12-1.33.31-1.94V7.44H3.06A10 10 0 0 0 2 12c0 1.61.38 3.14 1.06 4.56l3.35-2.62Z" />
-      <path fill="#EA4335" d="M12 5.94c1.47 0 2.79.5 3.83 1.5l2.87-2.88A9.62 9.62 0 0 0 12 2a10 10 0 0 0-8.94 5.44l3.35 2.62C7.2 7.7 9.4 5.94 12 5.94Z" />
-    </svg>
-  );
-}
-
-function AppleIcon() {
-  return (
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <path d="M16.36 12.72c.02 2.6 2.28 3.47 2.3 3.48-.02.06-.36 1.24-1.19 2.45-.72 1.05-1.47 2.1-2.65 2.12-1.16.02-1.53-.69-2.86-.69-1.32 0-1.74.67-2.83.71-1.14.04-2.01-1.13-2.73-2.18-1.48-2.15-2.61-6.07-1.09-8.72.75-1.31 2.1-2.15 3.57-2.17 1.11-.02 2.17.75 2.85.75.68 0 1.96-.93 3.3-.79.56.02 2.14.23 3.15 1.71-.08.05-1.88 1.1-1.86 3.33M14.2 4.9c.6-.73 1.01-1.75.9-2.76-.87.04-1.92.58-2.55 1.31-.56.65-1.05 1.68-.92 2.68.97.07 1.96-.49 2.57-1.23" />
-    </svg>
-  );
-}
-
-function LinkedInIcon() {
-  return (
-    <svg width="17" height="17" viewBox="0 0 24 24" aria-hidden="true">
-      <path fill="#0A66C2" d="M20.45 20.45h-3.56v-5.57c0-1.33-.02-3.04-1.85-3.04-1.85 0-2.14 1.45-2.14 2.94v5.67H9.35V9h3.41v1.56h.05a3.74 3.74 0 0 1 3.37-1.85c3.6 0 4.27 2.37 4.27 5.46zM5.34 7.43a2.06 2.06 0 1 1 0-4.13 2.06 2.06 0 0 1 0 4.13M7.12 20.45H3.55V9h3.57zM22.22 0H1.77C.79 0 0 .77 0 1.73v20.54C0 23.23.79 24 1.77 24h20.45c.98 0 1.78-.77 1.78-1.73V1.73C24 .77 23.2 0 22.22 0" />
-    </svg>
-  );
-}
