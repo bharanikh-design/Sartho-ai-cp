@@ -19,6 +19,7 @@ import "./experience-polish.css";
 import "./ai-career-workspaces.css";
 import "./product-system.css";
 import { AppShell } from "@/components/app-shell";
+import { siteMetadata } from "@/lib/site-metadata";
 
 /*
  * One typeface, self-hosted. The body font was declared as "Inter" but never
@@ -33,13 +34,7 @@ const inter = localFont({
   weight: "100 900",
 });
 
-export const metadata: Metadata = {
-  title: {
-    default: "Sartho",
-    template: "%s · Sartho",
-  },
-  description: "Sartho is an evidence-led AI career copilot for role matching, résumé tailoring, interview preparation and application tracking.",
-};
+export const metadata: Metadata = siteMetadata;
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
