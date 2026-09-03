@@ -11,8 +11,8 @@
   "host_permissions": [
     "*://*.linkedin.com/*",
     "*://*.indeed.com/*",
-    "*://localhost:3000/*",
-    "*://www.sartho.tech/*"
+    "http://localhost:3000/*",
+    "https://www.sartho.tech/*"
   ],
   "action": {
     "default_popup": "popup.html",
