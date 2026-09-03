@@ -8,6 +8,8 @@ import {
 import { createSafetyIdentifier, generateStructuredJson } from "@/lib/ai/provider";
 import { aiQuotaResponse, checkAiQuota } from "@/lib/ai/quota";
 import { getAuthenticatedUser } from "@/lib/auth";
+import { logError } from "@/lib/logger";
+
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -35,7 +37,7 @@ export async function POST(request: Request) {
   ]);
   const dataError = profileResult.error ?? rolesResult.error ?? evidenceResult.error;
   if (dataError) {
-    console.error("Unable to prepare career direction suggestions", dataError);
+    logError(supabase, "direction_suggestions_prepare", dataError);
     return NextResponse.json({ error: "Sartho could not prepare your Career Profile for suggestions." }, { status: 500 });
   }
   if (!evidenceResult.data?.length) {
@@ -92,7 +94,7 @@ export async function POST(request: Request) {
       roleCount: rolesResult.data?.length ?? 0,
     });
   } catch (caught) {
-    console.error("Career direction suggestions failed", caught);
+    logError(supabase, "direction_suggestions_fail", caught);
     return NextResponse.json({
       error: "AI could not create grounded suggestions right now. Your Career Profile and selected priorities are unchanged.",
     }, { status: 500 });

@@ -9,6 +9,7 @@ import {
 import { createSafetyIdentifier, generateStructuredJson } from "@/lib/ai/provider";
 import { aiQuotaResponse, checkAiQuota } from "@/lib/ai/quota";
 import { getAuthenticatedUser } from "@/lib/auth";
+import { logError } from "@/lib/logger";
 import type { DeepAnalysisSummary, RequirementAssessment } from "@/lib/types";
 
 /*
@@ -84,7 +85,7 @@ export async function POST(
   ]);
 
   if (jobResult.error || evidenceResult.error) {
-    console.error("Unable to prepare deep analysis", jobResult.error ?? evidenceResult.error);
+    logError(supabase, "deep_analysis_prepare", jobResult.error ?? evidenceResult.error);
     return NextResponse.json({ error: "Sartho could not prepare this opportunity for analysis." }, { status: 500 });
   }
   if (!jobResult.data) return NextResponse.json({ error: "Job not found" }, { status: 404 });
@@ -163,7 +164,7 @@ export async function POST(
     return NextResponse.json({ requirements, summary });
   } catch (caught) {
     await supabase.from("jobs").update({ deep_analysis_status: "failed" }).eq("id", id).eq("user_id", user.id);
-    console.error("Deep analysis failed", caught);
+    logError(supabase, "deep_analysis_fail", caught);
     const message = caught instanceof Error && caught.message.startsWith("Sartho")
       ? caught.message
       : "Sartho could not complete the deep analysis. The saved opportunity and your career evidence are unchanged.";

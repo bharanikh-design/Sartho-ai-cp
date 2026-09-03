@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getAuthenticatedUser } from "@/lib/auth";
+import { logError } from "@/lib/logger";
+
 
 export const directionSchema = z.object({
   headline: z.string().trim().max(240),
@@ -33,7 +35,7 @@ export async function PUT(request: Request) {
     strengths: parsed.data.strengths,
   });
   if (profileError) {
-    console.error("Unable to save career profile", profileError);
+    logError(supabase, "direction_save_profile", profileError);
     return NextResponse.json({ error: "Sartho could not save your career profile." }, { status: 500 });
   }
 
@@ -47,7 +49,7 @@ export async function PUT(request: Request) {
     .select("id,name")
     .eq("user_id", user.id);
   if (existingError) {
-    console.error("Unable to read target profiles", existingError);
+    logError(supabase, "direction_read_targets", existingError);
     return NextResponse.json({ error: "Sartho could not update your target profiles." }, { status: 500 });
   }
 
@@ -64,7 +66,7 @@ export async function PUT(request: Request) {
       .from("target_lanes")
       .upsert(laneRows, { onConflict: "user_id,name" });
     if (lanesError) {
-      console.error("Unable to save target profiles", lanesError);
+      logError(supabase, "direction_save_targets", lanesError);
       return NextResponse.json({ error: "Sartho could not save your target profiles." }, { status: 500 });
     }
   }
@@ -78,7 +80,7 @@ export async function PUT(request: Request) {
       .eq("user_id", user.id)
       .in("id", staleIds);
     if (disableError) {
-      console.error("Unable to disable removed target profiles", disableError);
+      logError(supabase, "direction_disable_targets", disableError);
       return NextResponse.json({ error: "Sartho preserved your previous strategy because the update could not finish." }, { status: 500 });
     }
 
