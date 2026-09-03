@@ -1,4 +1,5 @@
 import { JobAnalyser } from "@/components/job-analyser";
+import { ProductPageHeader } from "@/components/product-page-header";
 import { requireUser } from "@/lib/auth";
 import { getCareerWorkspace } from "@/lib/data/career";
 import { getJobs } from "@/lib/data/jobs";
@@ -16,19 +17,33 @@ export default async function JobsPage() {
   ]);
 
   const skillProfile = buildSkillProfile(workspace.evidence, workspace.roles);
-  
-  return (
-    <div className="page-stack" style={{ maxWidth: "1200px", margin: "0 auto", padding: "2rem" }}>
-      {/* Hyper-clear Header */}
-      <div style={{ marginBottom: "2rem", borderBottom: "1px solid rgba(255,255,255,0.1)", paddingBottom: "2rem" }}>
-        <h1 style={{ fontSize: "2.5rem", margin: "0 0 1rem", letterSpacing: "-0.02em" }}>Job Analyzer</h1>
-        <p style={{ fontSize: "1.1rem", color: "#aaa", maxWidth: "800px", lineHeight: 1.6 }}>
-          Sartho acts as your personal recruiter. Whenever you find a job you like on LinkedIn, Indeed, or a company website, <strong>paste the Job Description below</strong>. 
-          Sartho will instantly cross-reference it with your resume, tell you if you're a strong match, and help you tailor your application.
-        </p>
-      </div>
+  const activeSources = searchPreferences.sources.filter((source) => source.active).length;
+  const strongMatches = jobs.filter((job) => job.recommendation === "apply").length;
 
-      <JobAnalyser initialJobs={jobs} skillProfile={skillProfile} />
+  return (
+    <div className="page-stack">
+      <ProductPageHeader
+        eyebrow="Recurring workflow · Assess fit"
+        title="Job Analyzer"
+        description="Sartho acts as your personal recruiter. Paste a job description below to instantly cross-reference it with your Master Resume. Understand your fit, spot missing skills, and save the role for tailoring."
+        metric={{ value: jobs.length, label: "saved opportunities" }}
+        actions={[
+          { href: "/search-plan", label: "Review search brief" },
+        ]}
+      />
+      
+      <section className="summary-grid opportunity-summary-grid" aria-label="Opportunity summary">
+        <Summary label="Saved opportunities" value={String(jobs.length)} />
+        <Summary label="Strong rule-based signals" value={String(strongMatches)} />
+        <Summary label="Sources selected" value={String(activeSources)} />
+        <Summary label="Target locations" value={String(searchPreferences.targetLocations.length)} />
+      </section>
+      
+      <div id="analyse"><JobAnalyser initialJobs={jobs} skillProfile={skillProfile} /></div>
     </div>
   );
+}
+
+function Summary({ label, value }: { label: string; value: string }) {
+  return <div className="summary-tile"><span>{label}</span><strong>{value}</strong></div>;
 }
