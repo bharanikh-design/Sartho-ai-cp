@@ -718,7 +718,7 @@ export default function LoginPage() {
     if (mode === "reset") {
       setBusy("reset");
       const { error: failure } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth/callback?next=/`,
+        redirectTo: `${window.location.origin}/auth/callback?next=/update-password`,
       });
       setBusy(null);
       if (failure) setError(friendlyAuthMessage(failure.message));
