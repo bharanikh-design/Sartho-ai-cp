@@ -36,7 +36,22 @@ export function SearchPlanEditor({
     !remote ? "choose a preferred work model" : null,
     !activeSourceCount ? "turn on at least one trusted source" : null,
   ].filter((reason): reason is string => Boolean(reason));
+  
   const canSave = incompleteReasons.length === 0;
+
+  const hasChanges = useMemo(() => {
+    if (remote !== initialRemote) return true;
+    if (dailyDigest !== false) return true;
+    if (locations.length !== initialLocations.length) return true;
+    if (locations.some(loc => !initialLocations.includes(loc))) return true;
+    
+    const initialSourcesList = initialSources.length ? initialSources : DEFAULT_JOB_SOURCES;
+    if (sources.length !== initialSourcesList.length) return true;
+    for (let i = 0; i < sources.length; i++) {
+      if (sources[i].active !== initialSourcesList[i].active) return true;
+    }
+    return false;
+  }, [remote, dailyDigest, locations, sources, initialRemote, initialLocations, initialSources]);
 
   function addLocation() {
     const value = locationDraft.trim();
@@ -49,12 +64,17 @@ export function SearchPlanEditor({
       setStatus("error");
       return;
     }
+    
+    // If no changes, just skip the network call and go straight to dashboard
+    if (!hasChanges) {
+      router.push("/");
+      return;
+    }
+
     setStatus("saving");
     
-    // Save search plan
     const response = await fetch("/api/search-plan", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ sources, targetLocations: locations, remotePreference: remote }) });
     
-    // Save digest preference if toggled
     if (dailyDigest) {
       await fetch("/api/notifications/preferences", {
         method: "PUT",
@@ -115,11 +135,16 @@ export function SearchPlanEditor({
 
       <div className="direction-save-bar">
         <div>
-          <strong>{canSave ? "Search brief ready for your approval" : "Complete your search brief before continuing"}</strong>
-          <span>{status === "saved" ? "Saved securely" : status === "error" && canSave ? "Could not save—please try again" : incompleteReasons.length ? `Next: ${incompleteReasons[0]}.` : "One click to finish setup and open your Dashboard"}</span>
+          <strong>{canSave ? (hasChanges ? "Search brief ready for your approval" : "Search brief is up to date") : "Complete your search brief before continuing"}</strong>
+          <span>{status === "saved" ? "Saved securely" : status === "error" && canSave ? "Could not save—please try again" : incompleteReasons.length ? `Next: ${incompleteReasons[0]}.` : (hasChanges ? "One click to save changes and open your Dashboard" : "No changes made.")}</span>
         </div>
-        <button type="button" className="primary-button" onClick={() => void save()} disabled={status === "saving" || !canSave}>
-          {status === "saving" ? "Saving…" : "Save and go to Dashboard"}
+        <button 
+          type="button" 
+          className={hasChanges ? "primary-button" : "secondary-button"} 
+          onClick={() => void save()} 
+          disabled={status === "saving" || !canSave}
+        >
+          {status === "saving" ? "Saving…" : (hasChanges ? "Save and go to Dashboard" : "Return to Dashboard")}
         </button>
       </div>
     </div>
