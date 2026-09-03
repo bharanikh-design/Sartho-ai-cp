@@ -6,7 +6,8 @@
   "permissions": [
     "activeTab",
     "scripting",
-    "storage"
+    "storage",
+    "tabs"
   ],
   "host_permissions": [
     "*://*.linkedin.com/*",
@@ -20,5 +21,11 @@
   },
   "background": {
     "service_worker": "background.js"
-  }
+  },
+  "content_scripts": [
+    {
+      "matches": ["http://localhost:3000/*", "https://www.sartho.tech/*"],
+      "js": ["sartho-connector.js"]
+    }
+  ]
 }

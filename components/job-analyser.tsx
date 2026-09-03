@@ -26,6 +26,29 @@ export function JobAnalyser({ initialJobs, skillProfile }: { initialJobs: JobRec
   const [savedJobId, setSavedJobId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data?.source === "sartho-extension" && event.data?.type === "IMPORT_JOB") {
+        const payload = event.data.payload;
+        setTitle(payload.title || "");
+        setEmployer(payload.company || "");
+        setSourceUrl(payload.url || "");
+        setDescription(payload.description || "");
+        
+        // Auto trigger analyze if there is a description
+        if (payload.description) {
+          setTimeout(() => {
+            const analyzeBtn = document.getElementById("analyze-fit-btn");
+            if (analyzeBtn) analyzeBtn.click();
+          }, 500);
+        }
+      }
+    };
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, []);
+
+
   // Parallel Processing States
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [marketIntel, setMarketIntel] = useState<{ news: string; culture: string } | null>(null);
@@ -128,7 +151,7 @@ export function JobAnalyser({ initialJobs, skillProfile }: { initialJobs: JobRec
           <div style={{ display: "flex", gap: "1rem" }}>
             <button 
               type="button" 
-              onClick={analyse} 
+              id="analyze-fit-btn" onClick={analyse} 
               className="primary-button"
               style={{ flex: 1, padding: "1rem", fontSize: "1rem" }} 
               disabled={isAnalyzing || description.trim().length < 40}

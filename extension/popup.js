@@ -1,3 +1,6 @@
+let parsedData = null;
+let sourceUrl = '';
+
 document.getElementById('analyzeBtn').addEventListener('click', async () => {
   const resultDiv = document.getElementById('result');
   const btn = document.getElementById('analyzeBtn');
@@ -8,6 +11,7 @@ document.getElementById('analyzeBtn').addEventListener('click', async () => {
 
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    sourceUrl = tab.url;
     
     // Inject the content script to scrape the page
     const results = await chrome.scripting.executeScript({
@@ -16,6 +20,7 @@ document.getElementById('analyzeBtn').addEventListener('click', async () => {
     });
 
     const data = results[0].result;
+    parsedData = data;
     
     if (!data.title) {
       resultDiv.innerHTML = "<p style='color: #ff6b6b'>Could not find a job description on this page. Make sure you are on a LinkedIn or Indeed job posting.</p>";
@@ -34,9 +39,19 @@ document.getElementById('analyzeBtn').addEventListener('click', async () => {
       <button id="sendToSartho" style="background: #111; border: 1px solid #333; margin-top: 12px">Send to Sartho Dashboard ↗</button>
     `;
 
-    document.getElementById('sendToSartho')?.addEventListener('click', () => {
-      // Open Sartho Jobs page (ideally passing data via query params or postMessage, but simple link for prototype)
-      chrome.tabs.create({ url: 'http://localhost:3000/jobs' });
+    document.getElementById('sendToSartho').addEventListener('click', () => {
+      document.getElementById('sendToSartho').innerText = "Sending...";
+      chrome.runtime.sendMessage({
+        type: "SEND_TO_SARTHO",
+        payload: {
+          title: parsedData.title,
+          company: parsedData.company,
+          description: parsedData.description,
+          url: sourceUrl
+        }
+      }, () => {
+        window.close(); // Close popup once sent
+      });
     });
 
   } catch (err) {
@@ -47,7 +62,6 @@ document.getElementById('analyzeBtn').addEventListener('click', async () => {
   }
 });
 
-// This function runs IN the context of the web page (LinkedIn/Indeed)
 function scrapeJobData() {
   const url = window.location.href;
   let title = '';
@@ -59,7 +73,6 @@ function scrapeJobData() {
     const titleEl = document.querySelector('h1');
     title = titleEl ? titleEl.innerText : '';
     
-    // LinkedIn specific classes change often, grabbing generic structural hints
     const companyEl = document.querySelector('.job-details-jobs-unified-top-card__company-name') || document.querySelector('a[href*="/company/"]');
     company = companyEl ? companyEl.innerText : '';
     
@@ -69,7 +82,6 @@ function scrapeJobData() {
     const applicantEl = Array.from(document.querySelectorAll('span')).find(el => el.innerText.includes('applicant'));
     applicants = applicantEl ? applicantEl.innerText.trim() : 'Applicant data hidden by LinkedIn';
   } else {
-    // Fallback naive extraction
     title = document.title;
     description = document.body.innerText.slice(0, 5000);
   }
