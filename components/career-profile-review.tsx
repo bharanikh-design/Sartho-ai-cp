@@ -54,9 +54,6 @@ export function CareerProfileReview({ initialItems, roles, profile }: { initialI
             <h2 style={{ fontSize: "1.25rem", color: "#0d402b", margin: "0 0 0.25rem" }}>Profile Confirmed</h2>
             <p style={{ color: "#555", fontSize: "0.875rem", margin: 0 }}>Your master resume has been securely stored and parsed.</p>
           </div>
-          <Link href="/career-direction" className="primary-button" style={{ background: "#0d402b", color: "white", padding: "10px 20px", borderRadius: "8px", textDecoration: "none", fontWeight: "bold" }}>
-            Continue to Career Direction <span aria-hidden="true">→</span>
-          </Link>
         </div>
       </section>
     );

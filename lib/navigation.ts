@@ -72,16 +72,25 @@ const directionNavigation: NavigationItem = {
   purpose: "Select target roles and set your career positioning.",
 };
 
+const resumeNavigation: NavigationItem = {
+  label: "Resume Studio",
+  shortLabel: "Resumes",
+  href: "/resume-studio",
+  icon: "resume",
+  purpose: "Manage your source resumes and create tailored drafts.",
+};
+
 /**
  * Dashboard remains the orientation point throughout setup. After activation the
  * navigation expands into the recurring opportunity and application loop.
  */
 export function getPrimaryNavigation(activated: boolean): NavigationItem[] {
-  if (!activated) return [dashboardNavigation, profileNavigation, directionNavigation, strategyNavigation, opportunityNavigation];
+  if (!activated) return [dashboardNavigation, profileNavigation, directionNavigation, strategyNavigation, opportunityNavigation, resumeNavigation];
 
   return [
     dashboardNavigation,
     opportunityNavigation,
+    resumeNavigation,
     applicationNavigation,
     profileNavigation,
     directionNavigation,
@@ -93,6 +102,7 @@ export const allNavigation: NavigationItem[] = [
   journeyNavigation,
   dashboardNavigation,
   opportunityNavigation,
+  resumeNavigation,
   applicationNavigation,
   profileNavigation,
   directionNavigation,
@@ -112,8 +122,6 @@ export function getNavigationForPath(activated: boolean, pathname: string) {
 
 /* Legacy and contextual workspaces remain addressable from their parent flow. */
 const supportingPageLabels: Array<[prefix: string, label: string]> = [
-  ["/resume-studio", "Résumé Studio"],
-  ["/career-direction", "Career Direction"],
   ["/interview-prep", "Interview Preparation"],
   ["/diagnostics", "Diagnostics"],
 ];
