@@ -24,7 +24,6 @@ export function JobAnalyser({ initialJobs, skillProfile }: { initialJobs: JobRec
   const [saving, setSaving] = useState(false);
   const [savedJobId, setSavedJobId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [isTyping, setIsTyping] = useState(false);
 
   const analysis = useMemo(
     () => (submittedText ? analyseJobDescription(submittedText, skillProfile) : null),
@@ -68,132 +67,122 @@ export function JobAnalyser({ initialJobs, skillProfile }: { initialJobs: JobRec
     setSubmittedText("");
     setSavedJobId(null);
     setError(null);
-    setIsTyping(false);
   }
 
-  const showEmptyState = initialJobs.length === 0 && !isTyping && !description.trim();
-
   return (
-    <div className="job-workspace-stack" style={{ maxWidth: "1200px", margin: "0 auto" }}>
+    <div className="job-workspace-stack">
       
-      {showEmptyState ? (
-        <div style={{ padding: "4rem 2rem", textAlign: "center", background: "linear-gradient(180deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0) 100%)", border: "2px dashed rgba(255,255,255,0.1)", borderRadius: "16px", marginBottom: "2rem" }}>
-          <div style={{ width: "64px", height: "64px", background: "rgba(13,64,43,0.2)", borderRadius: "16px", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 1.5rem" }}>
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#6bcf93" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      {/* 1. Paste & Analyze Form */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2rem", marginBottom: "3rem" }}>
+        
+        {/* Left Side: Input */}
+        <section style={{ padding: "2rem", background: "rgba(255,255,255,0.03)", borderRadius: "16px", border: "1px solid rgba(255,255,255,0.05)" }}>
+          <h2 style={{ fontSize: "1.25rem", margin: "0 0 1.5rem" }}>1. Paste the Job Details</h2>
+          
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1.5rem" }}>
+            <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem", fontSize: "0.875rem" }}>Job Title<input style={{ padding: "0.8rem", background: "rgba(0,0,0,0.2)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "6px", color: "white" }} value={title} onChange={(event) => setTitle(event.target.value)} placeholder="e.g. Product Manager" /></label>
+            <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem", fontSize: "0.875rem" }}>Company<input style={{ padding: "0.8rem", background: "rgba(0,0,0,0.2)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "6px", color: "white" }} value={employer} onChange={(event) => setEmployer(event.target.value)} placeholder="e.g. Google" /></label>
+            <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem", fontSize: "0.875rem" }}>Location<input style={{ padding: "0.8rem", background: "rgba(0,0,0,0.2)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "6px", color: "white" }} value={location} onChange={(event) => setLocation(event.target.value)} placeholder="Singapore / Remote" /></label>
+            <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem", fontSize: "0.875rem" }}>Link to Job (Optional)<input style={{ padding: "0.8rem", background: "rgba(0,0,0,0.2)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "6px", color: "white" }} value={sourceUrl} onChange={(event) => setSourceUrl(event.target.value)} placeholder="https://..." inputMode="url" /></label>
           </div>
-          <h2 style={{ fontSize: "1.5rem", marginBottom: "0.5rem" }}>Your Command Center Awaits</h2>
-          <p style={{ color: "#888", maxWidth: "500px", margin: "0 auto 2rem", lineHeight: 1.6 }}>Sartho doesn't scrape job boards. Instead, you find the roles you love on LinkedIn or Indeed, and paste them here. Sartho's AI will deeply analyze your fit and automatically tailor your resume.</p>
-          <button 
-            type="button" 
-            onClick={() => setIsTyping(true)}
-            style={{ background: "#0d402b", color: "white", padding: "12px 24px", borderRadius: "8px", fontWeight: "bold", border: "none", cursor: "pointer", transition: "0.2s" }}
-          >
-            Paste your first Job Description
-          </button>
-        </div>
-      ) : (
-        <div className="analyser-layout" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2rem", marginBottom: "3rem" }}>
-          <section className="glass-card analyser-card" style={{ padding: "2rem", background: "rgba(255,255,255,0.03)", borderRadius: "16px", border: "1px solid rgba(255,255,255,0.05)" }}>
-            <div style={{ marginBottom: "1.5rem" }}>
-              <h2 style={{ fontSize: "1.25rem", margin: "0 0 0.5rem" }}>Opportunity input</h2>
-              <p style={{ color: "#888", fontSize: "0.875rem" }}>Use the complete description so Sartho can see the real responsibilities and constraints.</p>
+
+          <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem", fontSize: "0.875rem", marginBottom: "1.5rem" }}>
+            Full Job Description
+            <textarea
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+              style={{ height: "250px", padding: "1rem", background: "rgba(0,0,0,0.2)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "6px", color: "white", resize: "vertical", fontFamily: "inherit" }}
+              placeholder="Copy the entire job description from LinkedIn/Indeed and paste it right here..."
+            />
+          </label>
+
+          <div style={{ display: "flex", gap: "1rem" }}>
+            <button 
+              type="button" 
+              onClick={analyse} 
+              style={{ flex: 1, background: "#0d402b", color: "white", padding: "1rem", borderRadius: "8px", fontWeight: "bold", border: "none", cursor: description.trim().length < 40 ? "not-allowed" : "pointer", opacity: description.trim().length < 40 ? 0.5 : 1, transition: "0.2s" }} 
+              disabled={description.trim().length < 40}
+            >
+              Analyze my fit ⚡️
+            </button>
+            <button type="button" onClick={clear} style={{ background: "transparent", color: "#888", padding: "1rem 1.5rem", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.1)", cursor: "pointer" }}>Clear</button>
+          </div>
+        </section>
+
+        {/* Right Side: Results */}
+        <section style={{ padding: "2rem", background: "rgba(255,255,255,0.03)", borderRadius: "16px", border: "1px solid rgba(255,255,255,0.05)" }}>
+          <div style={{ marginBottom: "1.5rem", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+            <h2 style={{ fontSize: "1.25rem", margin: 0 }}>2. Sartho's Assessment</h2>
+            {analysis ? <span style={{ background: "rgba(255,255,255,0.1)", padding: "4px 8px", borderRadius: "4px", fontSize: "0.75rem" }}>Confidence: {analysis.confidence}</span> : <span style={{ background: "rgba(255,255,255,0.05)", padding: "4px 8px", borderRadius: "4px", fontSize: "0.75rem", color: "#666" }}>Waiting for input...</span>}
+          </div>
+
+          {error ? <div style={{ color: "#ff6b6b", background: "rgba(255,107,107,0.1)", padding: "1rem", borderRadius: "8px", marginBottom: "1.5rem" }} role="alert">{error}</div> : null}
+
+          {!analysis ? (
+            <div style={{ color: "#666", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "70%", textAlign: "center", padding: "2rem" }}>
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.2, marginBottom: "1rem" }}><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+              <p>Paste a job description on the left and click Analyze.<br/><br/>Sartho will instantly tell you if you're a strong fit for the role based on your Master Resume.</p>
             </div>
-
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1.5rem" }}>
-              <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem", fontSize: "0.875rem" }}>Job title<input style={{ padding: "0.6rem 1rem", background: "rgba(0,0,0,0.2)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "6px", color: "white" }} value={title} onChange={(event) => setTitle(event.target.value)} placeholder="e.g. Product Manager" /></label>
-              <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem", fontSize: "0.875rem" }}>Employer<input style={{ padding: "0.6rem 1rem", background: "rgba(0,0,0,0.2)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "6px", color: "white" }} value={employer} onChange={(event) => setEmployer(event.target.value)} placeholder="e.g. Google" /></label>
-              <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem", fontSize: "0.875rem" }}>Location<input style={{ padding: "0.6rem 1rem", background: "rgba(0,0,0,0.2)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "6px", color: "white" }} value={location} onChange={(event) => setLocation(event.target.value)} placeholder="Singapore / Remote" /></label>
-              <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem", fontSize: "0.875rem" }}>Role link<input style={{ padding: "0.6rem 1rem", background: "rgba(0,0,0,0.2)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "6px", color: "white" }} value={sourceUrl} onChange={(event) => setSourceUrl(event.target.value)} placeholder="https://..." inputMode="url" /></label>
-            </div>
-
-            <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem", fontSize: "0.875rem", marginBottom: "1.5rem" }}>
-              Complete job description
-              <textarea
-                value={description}
-                onChange={(event) => setDescription(event.target.value)}
-                style={{ height: "200px", padding: "1rem", background: "rgba(0,0,0,0.2)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "6px", color: "white", resize: "vertical", fontFamily: "inherit" }}
-                placeholder="Paste the role responsibilities, requirements and preferred qualifications here…"
-              />
-            </label>
-
-            <div style={{ display: "flex", gap: "1rem" }}>
-              <button type="button" onClick={analyse} style={{ background: "#0d402b", color: "white", padding: "0.8rem 1.5rem", borderRadius: "8px", fontWeight: "bold", border: "none", cursor: description.trim().length < 40 ? "not-allowed" : "pointer", opacity: description.trim().length < 40 ? 0.5 : 1 }} disabled={description.trim().length < 40}>
-                Analyse role <span aria-hidden="true">↗</span>
-              </button>
-              <button type="button" onClick={clear} style={{ background: "transparent", color: "#888", padding: "0.8rem 1.5rem", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.1)", cursor: "pointer" }}>Clear</button>
-            </div>
-          </section>
-
-          <section className="glass-card decision-card" aria-live="polite" style={{ padding: "2rem", background: "rgba(255,255,255,0.03)", borderRadius: "16px", border: "1px solid rgba(255,255,255,0.05)" }}>
-            <div style={{ marginBottom: "1.5rem", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-              <div>
-                <div style={{ fontSize: "0.75rem", textTransform: "uppercase", letterSpacing: "0.05em", color: "#888", marginBottom: "0.25rem" }}>Preliminary decision</div>
-                <h2 style={{ fontSize: "1.25rem", margin: 0 }}>Opportunity signal</h2>
-              </div>
-              {analysis ? <span style={{ background: "rgba(255,255,255,0.1)", padding: "4px 8px", borderRadius: "4px", fontSize: "0.75rem" }}>Confidence · {analysis.confidence}</span> : <span style={{ background: "rgba(255,255,255,0.05)", padding: "4px 8px", borderRadius: "4px", fontSize: "0.75rem", color: "#666" }}>Awaiting input</span>}
-            </div>
-
-            {error ? <div style={{ color: "#ff6b6b", background: "rgba(255,107,107,0.1)", padding: "1rem", borderRadius: "8px", marginBottom: "1.5rem" }} role="alert">{error}</div> : null}
-
-            {!analysis ? (
-              <div style={{ color: "#666", display: "flex", alignItems: "center", justifyContent: "center", height: "60%", textAlign: "center", padding: "2rem" }}>
-                <p>Paste a complete job description on the left to instantly assess your leadership fit, career-lane alignment, and technical match.</p>
-              </div>
-            ) : (
-              <div>
-                <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "2rem" }}>
-                  <span className={recommendationStyles[analysis.recommendation]} style={{ padding: "4px 12px", borderRadius: "100px", textTransform: "capitalize", fontWeight: "bold", border: "1px solid", fontSize: "0.875rem" }}>{analysis.recommendation}</span>
-                  <span style={{ fontSize: "0.75rem", color: "#888" }}>Sartho recommendation</span>
-                </div>
-
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "2rem" }}>
-                  <Result label="Strongest match" value={analysis.primaryStrength ?? "No clear match found"} />
-                  <Result label="Profile support" value={`${analysis.evidenceBacking}/100`} />
-                </div>
-                
-                <SignalList title="Your skills this role asks for" values={analysis.matchedSignals} empty="No matching skills were found in your Career Profile." />
-                <SignalList title="Your strengths it does not use" values={analysis.cautionSignals} empty="This role calls on all of your strongest skills." />
-                
-                <p style={{ lineHeight: 1.6, color: "#ccc", margin: "2rem 0", padding: "1rem", background: "rgba(255,255,255,0.05)", borderRadius: "8px" }}>{analysis.explanation}</p>
-
-                <div style={{ display: "flex", alignItems: "center", gap: "1rem", marginTop: "2rem", borderTop: "1px solid rgba(255,255,255,0.1)", paddingTop: "1.5rem" }}>
-                  {savedJobId ? (
-                    <Link href={`/jobs/${savedJobId}`} style={{ background: "#0d402b", color: "white", padding: "10px 20px", borderRadius: "8px", textDecoration: "none", fontWeight: "bold" }}>Open saved job <span aria-hidden="true">→</span></Link>
-                  ) : (
-                    <button type="button" onClick={() => void saveJob()} disabled={saving || !title.trim()} style={{ background: "#0d402b", color: "white", padding: "10px 20px", borderRadius: "8px", fontWeight: "bold", border: "none", cursor: (saving || !title.trim()) ? "not-allowed" : "pointer", opacity: (saving || !title.trim()) ? 0.5 : 1 }}>
-                      {saving ? "Saving…" : "Save this job"} <span aria-hidden="true">→</span>
-                    </button>
-                  )}
-                  <span style={{ fontSize: "0.75rem", color: "#888" }}>{title.trim() ? "Saving preserves this analysis." : "Add a Job Title to save."}</span>
-                </div>
-              </div>
-            )}
-          </section>
-        </div>
-      )}
-
-      {initialJobs.length > 0 && (
-        <section className="glass-card content-card saved-jobs-section" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: "16px", overflow: "hidden" }}>
-          <div style={{ padding: "1.5rem 2rem", borderBottom: "1px solid rgba(255,255,255,0.05)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          ) : (
             <div>
-              <h2 style={{ fontSize: "1.25rem", margin: "0 0 0.25rem" }}>Saved Opportunities</h2>
-              <p style={{ color: "#888", fontSize: "0.875rem", margin: 0 }}>Reopen any opportunity to tailor a resume or track the application.</p>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "2rem" }}>
+                <span className={recommendationStyles[analysis.recommendation]} style={{ padding: "6px 16px", borderRadius: "100px", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: "bold", border: "1px solid", fontSize: "0.875rem" }}>
+                  {analysis.recommendation}
+                </span>
+                <span style={{ fontSize: "0.875rem", color: "#888" }}>Sartho's Verdict</span>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "2rem" }}>
+                <Result label="Strongest match" value={analysis.primaryStrength ?? "No clear match found"} />
+                <Result label="Profile support" value={`${analysis.evidenceBacking}/100`} />
+              </div>
+              
+              <SignalList title="✅ Skills this role requires that YOU have" values={analysis.matchedSignals} empty="No matching skills were found in your Career Profile." />
+              <SignalList title="⚠️ Your strengths this role DOES NOT use" values={analysis.cautionSignals} empty="This role calls on all of your strongest skills." />
+              
+              <div style={{ background: "rgba(255,255,255,0.05)", borderRadius: "8px", padding: "1.5rem", marginTop: "2rem" }}>
+                <h4 style={{ fontSize: "0.875rem", color: "#aaa", margin: "0 0 1rem" }}>Detailed Analysis</h4>
+                <p style={{ lineHeight: 1.6, color: "#e0e0e0", margin: 0 }}>{analysis.explanation}</p>
+              </div>
+
+              <div style={{ display: "flex", alignItems: "center", gap: "1rem", marginTop: "2rem", borderTop: "1px solid rgba(255,255,255,0.1)", paddingTop: "1.5rem" }}>
+                {savedJobId ? (
+                  <Link href={`/jobs/${savedJobId}`} style={{ background: "#0d402b", color: "white", padding: "12px 24px", borderRadius: "8px", textDecoration: "none", fontWeight: "bold" }}>Open saved job <span aria-hidden="true">→</span></Link>
+                ) : (
+                  <button type="button" onClick={() => void saveJob()} disabled={saving || !title.trim()} style={{ background: "#0d402b", color: "white", padding: "12px 24px", borderRadius: "8px", fontWeight: "bold", border: "none", cursor: (saving || !title.trim()) ? "not-allowed" : "pointer", opacity: (saving || !title.trim()) ? 0.5 : 1 }}>
+                    {saving ? "Saving…" : "Save to My Opportunities"} <span aria-hidden="true">→</span>
+                  </button>
+                )}
+                <span style={{ fontSize: "0.875rem", color: "#888" }}>{title.trim() ? "Save this job to tailor your resume for it." : "Add a Job Title to save."}</span>
+              </div>
             </div>
-            <span style={{ background: "rgba(255,255,255,0.1)", padding: "4px 12px", borderRadius: "100px", fontSize: "0.875rem" }}>{initialJobs.length} saved</span>
+          )}
+        </section>
+      </div>
+
+      {/* 3. Saved Jobs */}
+      {initialJobs.length > 0 && (
+        <section style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: "16px", overflow: "hidden" }}>
+          <div style={{ padding: "2rem", borderBottom: "1px solid rgba(255,255,255,0.05)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div>
+              <h2 style={{ fontSize: "1.5rem", margin: "0 0 0.5rem" }}>Saved Opportunities</h2>
+              <p style={{ color: "#888", fontSize: "1rem", margin: 0 }}>Jobs you have saved to Sartho. Click any job to tailor your resume for it or track its status.</p>
+            </div>
+            <span style={{ background: "rgba(255,255,255,0.1)", padding: "6px 16px", borderRadius: "100px", fontSize: "1rem", fontWeight: "bold" }}>{initialJobs.length} Saved</span>
           </div>
 
           <div style={{ display: "flex", flexDirection: "column" }}>
             {initialJobs.map((job) => (
-              <Link href={`/jobs/${job.id}`} key={job.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "1.25rem 2rem", borderBottom: "1px solid rgba(255,255,255,0.03)", textDecoration: "none", transition: "0.2s", background: "transparent" }}>
+              <Link href={`/jobs/${job.id}`} key={job.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "1.5rem 2rem", borderBottom: "1px solid rgba(255,255,255,0.03)", textDecoration: "none", transition: "0.2s", background: "transparent" }}>
                 <div>
-                  <span style={{ display: "block", fontSize: "0.75rem", color: "#888", marginBottom: "0.25rem" }}>{job.employer ?? "Employer not recorded"}</span>
-                  <strong style={{ display: "block", color: "white", fontSize: "1.1rem", marginBottom: "0.25rem" }}>{job.title}</strong>
-                  <small style={{ color: "#666" }}>{job.location ?? "Location not recorded"} · Updated {formatDate(job.updated_at)}</small>
+                  <span style={{ display: "block", fontSize: "0.875rem", color: "#aaa", marginBottom: "0.25rem", textTransform: "uppercase", letterSpacing: "0.05em" }}>{job.employer ?? "Employer not recorded"}</span>
+                  <strong style={{ display: "block", color: "white", fontSize: "1.25rem", marginBottom: "0.25rem" }}>{job.title}</strong>
+                  <small style={{ color: "#666", fontSize: "0.875rem" }}>{job.location ?? "Location not recorded"} · Updated {formatDate(job.updated_at)}</small>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-                  {job.recommendation ? <span className={recommendationStyles[job.recommendation]} style={{ padding: "4px 12px", borderRadius: "100px", textTransform: "capitalize", fontSize: "0.75rem", border: "1px solid" }}>{job.recommendation}</span> : null}
-                  <span style={{ padding: "4px 12px", borderRadius: "100px", background: "rgba(255,255,255,0.1)", color: "white", fontSize: "0.75rem", textTransform: "capitalize" }}>{job.status.replace("_", " ")}</span>
-                  <span aria-hidden="true" style={{ color: "#888" }}>→</span>
+                  {job.recommendation ? <span className={recommendationStyles[job.recommendation]} style={{ padding: "6px 16px", borderRadius: "100px", textTransform: "uppercase", fontSize: "0.75rem", fontWeight: "bold", border: "1px solid" }}>{job.recommendation}</span> : null}
+                  <span style={{ padding: "6px 16px", borderRadius: "100px", background: "rgba(255,255,255,0.1)", color: "white", fontSize: "0.75rem", textTransform: "uppercase", fontWeight: "bold" }}>{job.status.replace("_", " ")}</span>
+                  <span aria-hidden="true" style={{ color: "#888", fontSize: "1.5rem" }}>→</span>
                 </div>
               </Link>
             ))}
@@ -208,7 +197,7 @@ function Result({ label, value }: { label: string; value: string }) {
   return (
     <div style={{ background: "rgba(255,255,255,0.05)", padding: "1rem", borderRadius: "8px" }}>
       <span style={{ display: "block", fontSize: "0.75rem", color: "#888", marginBottom: "0.25rem" }}>{label}</span>
-      <strong style={{ fontSize: "1.1rem" }}>{value}</strong>
+      <strong style={{ fontSize: "1.1rem", color: "white" }}>{value}</strong>
     </div>
   );
 }
@@ -216,13 +205,13 @@ function Result({ label, value }: { label: string; value: string }) {
 function SignalList({ title, values, empty }: { title: string; values: string[]; empty: string }) {
   return (
     <div style={{ marginBottom: "1.5rem" }}>
-      <h4 style={{ fontSize: "0.875rem", color: "#aaa", marginBottom: "0.75rem" }}>{title}</h4>
+      <h4 style={{ fontSize: "0.875rem", color: "white", marginBottom: "0.75rem" }}>{title}</h4>
       {values.length ? (
         <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
-          {values.map((value) => <span key={value} style={{ background: "rgba(255,255,255,0.1)", padding: "4px 10px", borderRadius: "4px", fontSize: "0.875rem" }}>{value}</span>)}
+          {values.map((value) => <span key={value} style={{ background: "rgba(255,255,255,0.1)", color: "white", padding: "6px 12px", borderRadius: "4px", fontSize: "0.875rem" }}>{value}</span>)}
         </div>
       ) : (
-        <p style={{ color: "#666", fontSize: "0.875rem", fontStyle: "italic" }}>{empty}</p>
+        <p style={{ color: "#666", fontSize: "0.875rem", fontStyle: "italic", margin: 0 }}>{empty}</p>
       )}
     </div>
   );
