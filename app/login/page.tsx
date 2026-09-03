@@ -25,6 +25,11 @@ const entryArt =
  * switch along with the rest of the product.
  */
 
+/*
+ * Supabase names the LinkedIn provider "linkedin_oidc"; the bare "linkedin"
+ * id is the retired OAuth 2.0 one and is rejected.
+ */
+type Provider = "google" | "apple" | "linkedin_oidc";
 type Mode = "signin" | "reset";
 
 const styles = `
@@ -689,6 +694,22 @@ export default function LoginPage() {
     window.setTimeout(() => setSplash("done"), 980);
   }
 
+  async function signInWithProvider(provider: Provider) {
+    setBusy(provider);
+    setError(null);
+    setNotice(null);
+
+    const { error: failure } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: { redirectTo: `${window.location.origin}/auth/callback?next=/` },
+    });
+
+    if (failure) {
+      setBusy(null);
+      setError(friendlyAuthMessage(failure.message));
+    }
+  }
+
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
@@ -781,8 +802,24 @@ export default function LoginPage() {
           <p className="si-sub">
             {mode === "reset"
               ? "We'll email you a link to set a new one."
-              : "Enter your email and password to sign in."}
+              : "Choose how you'd like to sign in."}
           </p>
+
+          {mode === "signin" ? (
+            <>
+              <div className="si-providers">
+                <button type="button" className="si-provider" onClick={() => signInWithProvider("google")} disabled={busy !== null}>
+                  <GoogleIcon /><span>{busy === "google" ? "Opening…" : "Continue with Google"}</span>
+                </button>
+
+                <button type="button" className="si-provider" onClick={() => signInWithProvider("linkedin_oidc")} disabled={busy !== null}>
+                  <LinkedInIcon /><span>{busy === "linkedin_oidc" ? "Opening…" : "Continue with LinkedIn"}</span>
+                </button>
+              </div>
+
+              <div className="si-or">or</div>
+            </>
+          ) : null}
 
           <form className="si-form" onSubmit={submit}>
             <label>
@@ -846,3 +883,22 @@ export default function LoginPage() {
   );
 }
 
+function GoogleIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" aria-hidden="true">
+      <path fill="#4285F4" d="M21.6 12.23c0-.71-.06-1.4-.18-2.07H12v3.92h5.38a4.6 4.6 0 0 1-2 3.02v2.54h3.24c1.9-1.75 2.98-4.33 2.98-7.41Z" />
+      <path fill="#34A853" d="M12 22c2.7 0 4.97-.9 6.62-2.36l-3.24-2.54c-.9.6-2.05.96-3.38.96-2.6 0-4.8-1.76-5.59-4.12H3.06v2.62A10 10 0 0 0 12 22Z" />
+      <path fill="#FBBC05" d="M6.41 13.94A6.02 6.02 0 0 1 6.1 12c0-.67.12-1.33.31-1.94V7.44H3.06A10 10 0 0 0 2 12c0 1.61.38 3.14 1.06 4.56l3.35-2.62Z" />
+      <path fill="#EA4335" d="M12 5.94c1.47 0 2.79.5 3.83 1.5l2.87-2.88A9.62 9.62 0 0 0 12 2a10 10 0 0 0-8.94 5.44l3.35 2.62C7.2 7.7 9.4 5.94 12 5.94Z" />
+    </svg>
+  );
+}
+
+
+function LinkedInIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" aria-hidden="true">
+      <path fill="#0A66C2" d="M20.45 20.45h-3.56v-5.57c0-1.33-.02-3.04-1.85-3.04-1.85 0-2.14 1.45-2.14 2.94v5.67H9.35V9h3.41v1.56h.05a3.74 3.74 0 0 1 3.37-1.85c3.6 0 4.27 2.37 4.27 5.46zM5.34 7.43a2.06 2.06 0 1 1 0-4.13 2.06 2.06 0 0 1 0 4.13M7.12 20.45H3.55V9h3.57zM22.22 0H1.77C.79 0 0 .77 0 1.73v20.54C0 23.23.79 24 1.77 24h20.45c.98 0 1.78-.77 1.78-1.73V1.73C24 .77 23.2 0 22.22 0" />
+    </svg>
+  );
+}
