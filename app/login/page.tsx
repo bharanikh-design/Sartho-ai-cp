@@ -701,7 +701,10 @@ export default function LoginPage() {
 
     const { error: failure } = await supabase.auth.signInWithOAuth({
       provider,
-      options: { redirectTo: `${window.location.origin}/auth/callback?next=/` },
+      options: { 
+        redirectTo: `${window.location.origin}/auth/callback?next=/`,
+        queryParams: provider === "google" ? { prompt: "select_account" } : undefined,
+      },
     });
 
     if (failure) {
