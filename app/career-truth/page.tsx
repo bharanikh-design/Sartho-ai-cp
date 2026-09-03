@@ -72,7 +72,7 @@ export default async function CareerTruthPage() {
         </section>
       ) : null}
 
-      <CareerProfileReview initialItems={evidence} />
+      <CareerProfileReview initialItems={evidence} roles={roles} profile={profile} />
 
       <details className="glass-card profile-history-disclosure" id="career-history">
         <summary><span><strong>Career history</strong><small>Your complete timeline from the source résumé</small></span><span>{roles.length} roles <b aria-hidden="true">⌄</b></span></summary>
