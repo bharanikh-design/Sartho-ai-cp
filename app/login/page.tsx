@@ -85,6 +85,21 @@ const styles = `
 :root[data-theme="dark"] .si::before { opacity: .5; }
 :root[data-theme="dark"] .si::after { opacity: .42; }
 
+/* Light mode needs contrast from tokens, not taste. */
+:root[data-theme="light"] .si-proof,
+:root[data-theme="light"] .si-note,
+:root[data-theme="light"] .si-brand small,
+:root[data-theme="light"] .si-or {
+  color: var(--text-secondary);
+}
+
+/* The light palette is already bright; avoid the rose wash. */
+:root[data-theme="light"] .si::after {
+  background:
+    radial-gradient(circle at 46% 50%, color-mix(in srgb, var(--blue) 52%, transparent), transparent 60%),
+    radial-gradient(circle at 24% 78%, color-mix(in srgb, var(--violet) 30%, transparent), transparent 64%);
+}
+
 /*
  * Brand lockup — the first thing on the page, at full size, on its own.
  *
