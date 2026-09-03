@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
+import { SITE_CONFIG } from "@/lib/config/site";
 import sarthoIcon from "@/sartho.png";
 
 /*
