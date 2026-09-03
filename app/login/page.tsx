@@ -702,7 +702,7 @@ export default function LoginPage() {
     const { error: failure } = await supabase.auth.signInWithOAuth({
       provider,
       options: { 
-        redirectTo: `${window.location.origin}/auth/callback?next=/`,
+        redirectTo: `${SITE_CONFIG.defaultAppUrl}/auth/callback?next=/`,
         queryParams: provider === "google" ? { prompt: "select_account" } : undefined,
       },
     });
@@ -721,7 +721,7 @@ export default function LoginPage() {
     if (mode === "reset") {
       setBusy("reset");
       const { error: failure } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth/callback?next=/update-password`,
+        redirectTo: `${SITE_CONFIG.defaultAppUrl}/auth/callback?next=/update-password`,
       });
       setBusy(null);
       if (failure) setError(friendlyAuthMessage(failure.message));
