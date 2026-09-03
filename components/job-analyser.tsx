@@ -142,7 +142,7 @@ export function JobAnalyser({ initialJobs, skillProfile }: { initialJobs: JobRec
         {/* Right Side: Parallel Processing Results */}
         <section className="glass-card" style={{ padding: "2rem", display: "flex", flexDirection: "column" }}>
           <div style={{ marginBottom: "1.5rem", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-            <h2 className="section-heading" style={{ margin: 0 }}>2. Sartho's Assessment</h2>
+            <h2 className="section-heading" style={{ margin: 0 }}>2. Sartho&apos;s Assessment</h2>
             {isAnalyzing && <span className="meta-pill" style={{ background: "rgba(107, 207, 147, 0.2)", color: "#6bcf93", border: "1px solid #6bcf93" }}>Running Parallel AI Models...</span>}
           </div>
 
