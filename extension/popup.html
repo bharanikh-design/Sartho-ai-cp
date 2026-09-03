@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Sartho AI</title>
+  <style>
+    body { width: 320px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 16px; margin: 0; background: #0a0a0a; color: white; }
+    h2 { font-size: 16px; margin: 0 0 12px; color: #fff; }
+    button { background: #0d402b; color: white; border: none; padding: 10px 16px; border-radius: 8px; width: 100%; cursor: pointer; font-weight: bold; margin-bottom: 12px; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    #result { font-size: 14px; color: #ccc; line-height: 1.5; }
+    .score { font-size: 24px; font-weight: bold; color: #6bcf93; margin-bottom: 8px; }
+    .stat { background: rgba(255,255,255,0.1); padding: 8px; border-radius: 6px; margin-bottom: 8px; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <h2>Sartho AI Career Agent</h2>
+  <div id="controls">
+    <button id="analyzeBtn">Analyze Job on this Page</button>
+  </div>
+  <div id="result">
+    <p style="color: #888; font-size: 13px;">Open a LinkedIn or Indeed job posting and click Analyze to see your fit.</p>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>
