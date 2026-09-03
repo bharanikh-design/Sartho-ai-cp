@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
+import Script from "next/script";
 import localFont from "next/font/local";
 import "./globals.css";
 import "./auth.css";
@@ -44,7 +45,7 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
           Applied before the app paints so a light-mode user never sees a dark
           flash. Reads the saved choice, falling back to the OS preference.
         */}
-        <script
+        <Script id="theme-script" strategy="beforeInteractive"
           dangerouslySetInnerHTML={{
             __html: `(function(){try{var t=localStorage.getItem("sartho-theme-v2")||"light";document.documentElement.setAttribute("data-theme",t);}catch(e){document.documentElement.setAttribute("data-theme","light");}})();`,
           }}
