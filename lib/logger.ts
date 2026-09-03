@@ -21,18 +21,22 @@ export async function logError(
 
   // If a Supabase client is provided, persist it in the database
   if (supabase) {
-    supabase
-      .from("system_errors")
-      .insert({
+    try {
+      const result = supabase.from("system_errors").insert({
         route: context,
         message,
         stack,
         metadata: metadata ?? {},
-      })
-      .then(({ error: dbError }) => {
-        if (dbError) {
-          console.error(`[${context}] Failed to write to system_errors table:`, dbError);
-        }
       });
+      if (result && typeof result.then === "function") {
+        result.then(({ error: dbError }) => {
+          if (dbError) {
+            console.error(`[${context}] Failed to write to system_errors table:`, dbError);
+          }
+        });
+      }
+    } catch (e) {
+      console.error(`[${context}] Failed to call insert on system_errors table:`, e);
+    }
   }
 }

@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { classifyAiFailure, describeAiFailure, shortAiFailure } from "./failure";
+import { AI_ENDPOINTS } from "@/lib/config/ai-endpoints";
 
 export type AiWorkload = "fast" | "quality";
 export type AiProviderName = "openai" | "gemini" | "anthropic";
@@ -195,7 +196,7 @@ async function callOpenAI(request: StructuredRequest, apiKey: string, model: str
     "openai",
     model,
     request.workload,
-    "https://api.openai.com/v1/responses",
+    AI_ENDPOINTS.OPENAI_RESPONSES,
     {
       method: "POST",
       headers: {
@@ -257,7 +258,7 @@ async function callAnthropic(request: StructuredRequest, apiKey: string, model: 
     "anthropic",
     model,
     request.workload,
-    "https://api.anthropic.com/v1/messages",
+    AI_ENDPOINTS.ANTHROPIC_MESSAGES,
     {
       method: "POST",
       headers: {
@@ -318,7 +319,7 @@ async function callGemini(request: StructuredRequest, apiKey: string, model: str
     "gemini",
     model,
     request.workload,
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+    `${AI_ENDPOINTS.GEMINI_BASE}/${model}:generateContent`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
@@ -449,7 +450,7 @@ export function chooseGeminiModel(models: string[]): string | null {
 
 export async function listGeminiModels(apiKey: string): Promise<string[]> {
   try {
-    const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=200", {
+    const response = await fetch(`${AI_ENDPOINTS.GEMINI_BASE}?pageSize=200`, {
       headers: { "x-goog-api-key": apiKey },
       signal: AbortSignal.timeout(20_000),
     });

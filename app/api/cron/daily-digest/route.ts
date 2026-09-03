@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { SITE_CONFIG } from "@/lib/config/site";
+
 import { buildDailyDigest, renderDigestEmail, type DigestJob } from "@/lib/notifications/digest";
 
 export const runtime = "nodejs";
@@ -52,7 +54,7 @@ export async function GET(request: Request) {
 
     try {
       const digest = buildDailyDigest((jobs ?? []) as DigestJob[], since);
-      const origin = process.env.NEXT_PUBLIC_APP_URL || "https://sartho.vercel.app";
+      const origin = process.env.NEXT_PUBLIC_APP_URL || SITE_CONFIG.defaultAppUrl;
       const firstName = profile?.full_name?.split(/\s+/)[0] || "there";
       const email = renderDigestEmail(firstName, digest, origin);
       await sendEmail(preference.email, email.subject, email.html);

@@ -6,12 +6,9 @@ import { useRouter } from "next/navigation";
 import type { TargetLaneRecord } from "@/lib/types";
 import type { SearchSourcePreference } from "@/lib/data/search";
 
-export type SearchSource = SearchSourcePreference;
+import { DEFAULT_JOB_SOURCES } from "@/lib/config/job-sources";
 
-const recommendedSources: SearchSource[] = [
-  { id: "linkedin", name: "LinkedIn Jobs", url: "https://www.linkedin.com/jobs/", type: "Professional network", coverage: "Global", trust: "User-verified", active: true },
-  { id: "indeed", name: "Indeed", url: "https://www.indeed.com/", type: "Job marketplace", coverage: "Global", trust: "Established source", active: true },
-];
+export type SearchSource = SearchSourcePreference;
 
 export function SearchPlanEditor({
   initialSources,
@@ -25,7 +22,7 @@ export function SearchPlanEditor({
   targetLanes: TargetLaneRecord[];
 }) {
   const router = useRouter();
-  const [sources, setSources] = useState<SearchSource[]>(initialSources.length ? initialSources : recommendedSources);
+  const [sources, setSources] = useState<SearchSource[]>(initialSources.length ? initialSources : DEFAULT_JOB_SOURCES);
   const [locations, setLocations] = useState(initialLocations);
   const [remote, setRemote] = useState(initialRemote);
   const [locationDraft, setLocationDraft] = useState("");
