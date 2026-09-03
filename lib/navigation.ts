@@ -64,18 +64,27 @@ const strategyNavigation: NavigationItem = {
   purpose: "Save the locations, work model and sources that define a worthwhile opportunity.",
 };
 
+const directionNavigation: NavigationItem = {
+  label: "Career Direction",
+  shortLabel: "Direction",
+  href: "/career-direction",
+  icon: "interview",
+  purpose: "Select target roles and set your career positioning.",
+};
+
 /**
  * Dashboard remains the orientation point throughout setup. After activation the
  * navigation expands into the recurring opportunity and application loop.
  */
 export function getPrimaryNavigation(activated: boolean): NavigationItem[] {
-  if (!activated) return [dashboardNavigation, journeyNavigation, profileNavigation, strategyNavigation];
+  if (!activated) return [dashboardNavigation, profileNavigation, directionNavigation, strategyNavigation, opportunityNavigation];
 
   return [
     dashboardNavigation,
     opportunityNavigation,
     applicationNavigation,
     profileNavigation,
+    directionNavigation,
     strategyNavigation,
   ];
 }
@@ -86,6 +95,7 @@ export const allNavigation: NavigationItem[] = [
   opportunityNavigation,
   applicationNavigation,
   profileNavigation,
+  directionNavigation,
   strategyNavigation,
 ];
 

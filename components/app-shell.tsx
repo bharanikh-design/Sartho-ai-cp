@@ -33,6 +33,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   const profileMenuRef = useRef<HTMLDivElement>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [scrolled, setScrolled] = useState(false);
+  const [showWelcome, setShowWelcome] = useState(true);
+
   const [profileOpen, setProfileOpen] = useState(false);
   const [accountPanelOpen, setAccountPanelOpen] = useState(false);
   const [accountAction, setAccountAction] = useState<AccountAction | null>(null);
@@ -95,6 +98,21 @@ export function AppShell({ children }: { children: ReactNode }) {
       listener.subscription.unsubscribe();
     };
   }, [refreshJourneyStatus, supabase]);
+
+  useEffect(() => {
+    // Determine the scroll state
+    const handleScroll = () => setScrolled(window.scrollY > 0);
+    handleScroll();
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    
+    // Auto-dismiss welcome toast after 4 seconds
+    const timer = setTimeout(() => setShowWelcome(false), 4000);
+    
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      clearTimeout(timer);
+    };
+  }, []);
 
   useEffect(() => {
     window.addEventListener("sartho:journey-changed", refreshJourneyStatus);
@@ -290,6 +308,12 @@ export function AppShell({ children }: { children: ReactNode }) {
             </div>
           </div>
         </header>
+
+        {session && showWelcome ? (
+          <div style={{ position: "fixed", top: "20px", left: "50%", transform: "translateX(-50%)", background: "#0d402b", color: "white", padding: "12px 24px", borderRadius: "100px", zIndex: 9999, boxShadow: "0 4px 12px rgba(0,0,0,0.15)", animation: "fadeIn 0.3s ease-out", fontSize: "0.875rem", fontWeight: 500 }}>
+            Welcome back, {session.user.user_metadata?.full_name?.split(" ")[0] || "there"}!
+          </div>
+        ) : null}
 
         <main className="page-content">{children}</main>
       </div>
