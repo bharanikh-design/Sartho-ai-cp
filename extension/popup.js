@@ -22,8 +22,8 @@ document.getElementById('analyzeBtn').addEventListener('click', async () => {
     const data = results[0].result;
     parsedData = data;
     
-    if (!data.title) {
-      resultDiv.innerHTML = "<p style='color: #ff6b6b'>Could not find a job description on this page. Make sure you are on a LinkedIn or Indeed job posting.</p>";
+    if (!data.title || !data.description || data.description.length < 50) {
+      resultDiv.innerHTML = "<p style='color: #ff6b6b'>Could not extract enough job details. Make sure the job description is loaded on the screen.</p>";
       btn.disabled = false;
       btn.innerText = "Analyze Job on this Page";
       return;
@@ -50,7 +50,7 @@ document.getElementById('analyzeBtn').addEventListener('click', async () => {
           url: sourceUrl
         }
       }, () => {
-        window.close(); // Close popup once sent
+        window.close();
       });
     });
 
@@ -70,17 +70,35 @@ function scrapeJobData() {
   let applicants = '';
 
   if (url.includes('linkedin.com')) {
-    const titleEl = document.querySelector('h1');
-    title = titleEl ? titleEl.innerText : '';
+    // LinkedIn Job Titles
+    const titleEl = document.querySelector('.job-details-jobs-unified-top-card__job-title') 
+                 || document.querySelector('h1') 
+                 || document.querySelector('.topcard__title');
+    title = titleEl ? titleEl.innerText.trim() : document.title.split(' | ')[0];
     
-    const companyEl = document.querySelector('.job-details-jobs-unified-top-card__company-name') || document.querySelector('a[href*="/company/"]');
-    company = companyEl ? companyEl.innerText : '';
+    // LinkedIn Company
+    const companyEl = document.querySelector('.job-details-jobs-unified-top-card__company-name') 
+                   || document.querySelector('a[href*="/company/"]')
+                   || document.querySelector('.topcard__org-name-link');
+    company = companyEl ? companyEl.innerText.trim() : '';
     
-    const descEl = document.querySelector('.jobs-description') || document.querySelector('article');
-    description = descEl ? descEl.innerText : '';
+    // LinkedIn Description
+    const descEl = document.getElementById('job-details') 
+                || document.querySelector('.jobs-description__content') 
+                || document.querySelector('.jobs-description') 
+                || document.querySelector('article');
+    description = descEl ? descEl.innerText.trim() : '';
     
-    const applicantEl = Array.from(document.querySelectorAll('span')).find(el => el.innerText.includes('applicant'));
+    // LinkedIn Applicants
+    const applicantEl = Array.from(document.querySelectorAll('span, li')).find(el => el.innerText.toLowerCase().includes('applicant'));
     applicants = applicantEl ? applicantEl.innerText.trim() : 'Applicant data hidden by LinkedIn';
+  } else if (url.includes('indeed.com')) {
+    const titleEl = document.querySelector('h1');
+    title = titleEl ? titleEl.innerText.trim() : document.title.split(' - ')[0];
+    const companyEl = document.querySelector('[data-testid="inlineHeader-companyName"]');
+    company = companyEl ? companyEl.innerText.trim() : '';
+    const descEl = document.getElementById('jobDescriptionText');
+    description = descEl ? descEl.innerText.trim() : '';
   } else {
     title = document.title;
     description = document.body.innerText.slice(0, 5000);
