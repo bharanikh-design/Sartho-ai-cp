@@ -73,7 +73,7 @@ const directionNavigation: NavigationItem = {
 };
 
 const resumeNavigation: NavigationItem = {
-  label: "Resume Studio",
+  label: "Résumé Studio",
   shortLabel: "Resumes",
   href: "/resume-studio",
   icon: "resume",
@@ -85,24 +85,17 @@ const resumeNavigation: NavigationItem = {
  * navigation expands into the recurring opportunity and application loop.
  */
 export function getPrimaryNavigation(activated: boolean): NavigationItem[] {
-  if (!activated) return [dashboardNavigation, profileNavigation, directionNavigation, strategyNavigation, opportunityNavigation, resumeNavigation];
+  if (!activated) {
+    return [dashboardNavigation, journeyNavigation, profileNavigation, strategyNavigation];
+  }
 
-  return [
-    dashboardNavigation,
-    opportunityNavigation,
-    resumeNavigation,
-    applicationNavigation,
-    profileNavigation,
-    directionNavigation,
-    strategyNavigation,
-  ];
+  return [dashboardNavigation, opportunityNavigation, applicationNavigation, profileNavigation, strategyNavigation];
 }
 
 export const allNavigation: NavigationItem[] = [
   journeyNavigation,
   dashboardNavigation,
   opportunityNavigation,
-  resumeNavigation,
   applicationNavigation,
   profileNavigation,
   directionNavigation,
@@ -124,6 +117,7 @@ export function getNavigationForPath(activated: boolean, pathname: string) {
 const supportingPageLabels: Array<[prefix: string, label: string]> = [
   ["/interview-prep", "Interview Preparation"],
   ["/diagnostics", "Diagnostics"],
+  ["/resume-studio", "Résumé Studio"],
 ];
 
 export function isNavigationItemActive(pathname: string, href: string) {
