@@ -103,8 +103,8 @@ export function ApplicationLedger({ initialJobs }: { initialJobs: JobRecord[] })
       <section className="glass-card content-card application-list-card">
         <div className="card-header">
           <div>
-            <h2 className="section-heading">Opportunity ledger</h2>
-            <p className="section-subtitle">Move each role forward as the real-world outcome changes.</p>
+            <h2 className="section-heading">Your applications</h2>
+            <p className="section-subtitle">Move each role forward as the outcome changes.</p>
           </div>
           <Link href="/jobs" className="secondary-button">Analyse another role</Link>
         </div>
@@ -137,11 +137,8 @@ export function ApplicationLedger({ initialJobs }: { initialJobs: JobRecord[] })
             ))}
           </div>
         ) : (
-          <div className="empty-ledger-inner">
-            <div className="empty-ledger-icon" aria-hidden="true">↗</div>
-            <h3>Your application ledger is ready</h3>
-            <p>Analyse and save the first opportunity. Its status, résumé draft and next actions will remain connected here.</p>
-            <Link href="/jobs" className="primary-button">Analyse the first job <span aria-hidden="true">→</span></Link>
+          <div className="empty-inline-state">
+            No applications yet. <Link href="/jobs">Analyse and save your first opportunity</Link> — it will track here through interview and outcome.
           </div>
         )}
       </section>

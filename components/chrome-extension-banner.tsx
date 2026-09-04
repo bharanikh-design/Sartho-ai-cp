@@ -1,34 +1,40 @@
 "use client";
 import { useEffect, useState } from "react";
 
+/*
+ * The browser extension is not published to the Chrome Web Store yet, so there
+ * is no honest place to send a click. Until there is a real listing URL, this
+ * shows a plain "coming soon" pill in the top-right corner rather than a button
+ * that fakes a redirect or does nothing when pressed.
+ */
+const EXTENSION_STORE_URL = "";
+
 export function ChromeExtensionBanner() {
   const [hasExtension, setHasExtension] = useState(true); // Assume true to prevent flicker, check after mount
 
   useEffect(() => {
-    // We can detect the extension by listening for a ping or checking a flag
-    // The extension's content script sets window.__SARTHO_EXTENSION_ACTIVE__ = true;
+    // The extension's content script sets window.__SARTHO_EXTENSION_ACTIVE__ = true.
     const checkExtension = () => {
       // @ts-expect-error (window custom property)
-      if (window.__SARTHO_EXTENSION_ACTIVE__) {
-        setHasExtension(true);
-      } else {
-        setHasExtension(false);
-      }
+      setHasExtension(Boolean(window.__SARTHO_EXTENSION_ACTIVE__));
     };
-    
-    // Check immediately and then after a small delay in case the content script loads slowly
     checkExtension();
-    setTimeout(checkExtension, 1000);
+    const timer = setTimeout(checkExtension, 1000);
+    return () => clearTimeout(timer);
   }, []);
 
   if (hasExtension) return null;
 
   return (
-    <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "16px", marginTop: "-16px" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: "12px", padding: "8px 16px", background: "rgba(107, 207, 147, 0.1)", borderRadius: "100px", border: "1px solid rgba(107, 207, 147, 0.3)" }}>
-        <span style={{ fontSize: "0.8125rem", color: "#6bcf93", fontWeight: 500 }}>✦ Missing Auto-Applier</span>
-        <a href="#" onClick={(e) => { e.preventDefault(); alert('Redirecting to Chrome Web Store...'); }} style={{ color: "white", fontSize: "0.8125rem", textDecoration: "none", background: "rgba(255,255,255,0.1)", padding: "4px 12px", borderRadius: "100px" }}>Install Extension ↗</a>
-      </div>
+    <div className="extension-pill" role="note">
+      <span className="extension-pill__label">✦ Auto-Applier extension</span>
+      {EXTENSION_STORE_URL ? (
+        <a className="extension-pill__action" href={EXTENSION_STORE_URL} target="_blank" rel="noreferrer">
+          Install ↗
+        </a>
+      ) : (
+        <span className="extension-pill__soon">Coming soon</span>
+      )}
     </div>
   );
 }

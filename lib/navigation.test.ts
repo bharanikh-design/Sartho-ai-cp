@@ -35,17 +35,18 @@ describe("primary navigation", () => {
     expect(getPrimaryNavigation(false).map((item) => item.label)).toEqual([
       "Dashboard",
       "Your Journey",
-      "Opportunities",
       "Career Profile",
       "Career Direction",
       "Search Brief",
+      "Opportunities",
     ]);
     expect(getPrimaryNavigation(true).map((item) => item.label)).toEqual([
       "Dashboard",
+      "Career Profile",
+      "Career Direction",
+      "Search Brief",
       "Opportunities",
       "Applications",
-      "Career Profile",
-      "Search Brief",
       "Résumé Studio",
     ]);
     expect(getMobileNavigation(true)).toHaveLength(4);
@@ -57,10 +58,10 @@ describe("primary navigation", () => {
     expect(getNavigationForPath(false, "/applications").map((item) => item.label)).toEqual([
       "Dashboard",
       "Your Journey",
-      "Opportunities",
       "Career Profile",
       "Career Direction",
       "Search Brief",
+      "Opportunities",
       "Applications",
     ]);
   });
