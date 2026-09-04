@@ -65,19 +65,13 @@ export function JobAnalyser({ initialJobs, skillProfile }: { initialJobs: JobRec
   }, []);
 
 
-  // Parallel Processing States
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [marketIntel, setMarketIntel] = useState<{ news: string; culture: string } | null>(null);
-  const [deepFit, setDeepFit] = useState<{ score: number; missing: string } | null>(null);
-
   const [analysis, setAnalysis] = useState<SemanticAnalysis | null>(null);
 
   async function analyse() {
     if (!description.trim()) return;
     setError(null);
     setSavedJobId(null);
-    setMarketIntel(null);
-    setDeepFit(null);
     setAnalysis(null);
     setSubmittedText(description.trim());
     setIsAnalyzing(true);
@@ -106,13 +100,6 @@ export function JobAnalyser({ initialJobs, skillProfile }: { initialJobs: JobRec
         explanation: data.explanation,
         rawSemanticMatches: data.matchedRequirements // Store raw for UI enhancement
       });
-
-      // Maintain Market Intel simulation
-      setMarketIntel({
-        news: employer ? `${employer} recently announced a major expansion in their engineering division.` : "Company has seen a 12% increase in hiring over the last quarter.",
-        culture: "Glassdoor indicates a strong work-life balance but intense interview cycles."
-      });
-      
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to analyze job");
     } finally {
@@ -151,8 +138,6 @@ export function JobAnalyser({ initialJobs, skillProfile }: { initialJobs: JobRec
     setSubmittedText("");
     setSavedJobId(null);
     setError(null);
-    setMarketIntel(null);
-    setDeepFit(null);
     setIsAnalyzing(false);
   }
 
@@ -216,7 +201,7 @@ export function JobAnalyser({ initialJobs, skillProfile }: { initialJobs: JobRec
         <section className="glass-card" style={{ padding: "2rem", display: "flex", flexDirection: "column" }}>
           <div style={{ marginBottom: "1.5rem", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
             <h2 className="section-heading" style={{ margin: 0 }}>2. Sartho&apos;s Assessment</h2>
-            {isAnalyzing && <span className="meta-pill" style={{ background: "rgba(107, 207, 147, 0.2)", color: "#6bcf93", border: "1px solid #6bcf93" }}>Running Parallel AI Models...</span>}
+            {isAnalyzing && <span className="meta-pill" style={{ background: "rgba(107, 207, 147, 0.2)", color: "#6bcf93", border: "1px solid #6bcf93" }}>Analysing…</span>}
           </div>
 
           {error ? <div className="inline-error" role="alert">{error}</div> : null}
@@ -224,7 +209,7 @@ export function JobAnalyser({ initialJobs, skillProfile }: { initialJobs: JobRec
           {!analysis && !isAnalyzing ? (
             <div style={{ color: "#666", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flex: 1, textAlign: "center", padding: "2rem" }}>
               <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.2, marginBottom: "1rem" }}><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
-              <p>Paste a job description and click Analyze.<br/><br/>Sartho will fan-out requests to Gemini and Perplexity to generate a real-time assessment of your fit and company culture.</p>
+              <p>Paste a job description and click Analyze.<br/><br/>Sartho maps the role&apos;s requirements against the career evidence you approved, and shows the match with the evidence behind it.</p>
             </div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
@@ -234,9 +219,9 @@ export function JobAnalyser({ initialJobs, skillProfile }: { initialJobs: JobRec
                 <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(107, 207, 147, 0.3)", borderRadius: "8px", padding: "1.5rem", animation: "fade-in 0.5s ease-out" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "1rem" }}>
                     <h4 style={{ margin: 0, color: "white", display: "flex", alignItems: "center", gap: "8px" }}>
-                      <span style={{ color: "#6bcf93" }}>✦</span> Semantic Graph Match
+                      <span style={{ color: "#6bcf93" }}>✦</span> Fit against your evidence
                     </h4>
-                    <span style={{ fontSize: "0.75rem", color: "#6bcf93" }}>✓ OpenAI Vector Search</span>
+                    <span style={{ fontSize: "0.75rem", color: "#6bcf93" }}>Grounded in your approved profile</span>
                   </div>
                   
                   <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "1rem" }}>
@@ -274,40 +259,6 @@ export function JobAnalyser({ initialJobs, skillProfile }: { initialJobs: JobRec
                   )}
                 </div>
               )}
-
-              {/* Stream 2: Perplexity Market Intel */}
-              <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: "8px", padding: "1.5rem", opacity: marketIntel ? 1 : 0.5, transition: "0.5s opacity" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "1rem" }}>
-                  <h4 style={{ margin: 0, color: "white" }}>Market Intelligence</h4>
-                  <span style={{ fontSize: "0.75rem", color: marketIntel ? "#6bcf93" : "#888" }}>{marketIntel ? "✓ 2.0s Perplexity" : "Fetching Perplexity..."}</span>
-                </div>
-                {marketIntel ? (
-                  <div style={{ animation: "fade-in 0.5s ease-out" }}>
-                    <p style={{ fontSize: "0.875rem", color: "#ccc", margin: "0 0 0.5rem" }}><strong>News:</strong> {marketIntel.news}</p>
-                    <p style={{ fontSize: "0.875rem", color: "#ccc", margin: 0 }}><strong>Culture:</strong> {marketIntel.culture}</p>
-                  </div>
-                ) : (
-                  <div style={{ height: "40px", background: "rgba(255,255,255,0.05)", borderRadius: "4px", animation: "pulse 1.5s infinite" }} />
-                )}
-              </div>
-
-              {/* Stream 3: Gemini Deep Fit */}
-              <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: "8px", padding: "1.5rem", opacity: deepFit ? 1 : 0.5, transition: "0.5s opacity" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "1rem" }}>
-                  <h4 style={{ margin: 0, color: "white" }}>Deep Contextual Fit</h4>
-                  <span style={{ fontSize: "0.75rem", color: deepFit ? "#6bcf93" : "#888" }}>{deepFit ? "✓ 4.5s Gemini 1.5 Pro" : "Analyzing nuance..."}</span>
-                </div>
-                {deepFit ? (
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", animation: "fade-in 0.5s ease-out" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-                      <div style={{ background: "rgba(107, 207, 147, 0.1)", color: "#6bcf93", padding: "8px 16px", borderRadius: "100px", fontWeight: "bold", border: "1px solid #6bcf93" }}>{deepFit.score}% Match</div>
-                      <div style={{ fontSize: "0.875rem", color: "#ccc" }}>Missing: {deepFit.missing}</div>
-                    </div>
-                  </div>
-                ) : (
-                  <div style={{ height: "40px", background: "rgba(255,255,255,0.05)", borderRadius: "4px", animation: "pulse 1.5s infinite" }} />
-                )}
-              </div>
 
               {/* Action Bar */}
               <div style={{ marginTop: "auto", borderTop: "1px solid rgba(255,255,255,0.1)", paddingTop: "1.5rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
