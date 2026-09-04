@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { GroundedDirectionSuggestion } from "@/lib/career/direction-suggestions";
 import type { GroundedRoleRanking, MatchLevel } from "@/lib/career/direction-ranking";
@@ -156,6 +156,28 @@ export function CareerDirectionEditor({
       setRankStatus("error");
     }
   }
+
+  /*
+   * The point of this screen is to arrive and immediately see where your résumé
+   * says you can go — not to hunt for a button. So when you land with a
+   * confirmed profile and no priorities chosen yet, Sartho reads the résumé and
+   * lists suggested directions on its own. The ref keeps it to one automatic
+   * run per visit; the "Update suggestions" button drives any further passes.
+   */
+  const autoRequested = useRef(false);
+  useEffect(() => {
+    if (autoRequested.current) return;
+    if (evidenceCount > 0 && aiStatus === "idle" && suggestions.length === 0 && lanes.length === 0) {
+      autoRequested.current = true;
+      // Deferred out of the synchronous effect body so the first setState does
+      // not cascade renders.
+      const frame = requestAnimationFrame(() => void generateSuggestions());
+      return () => cancelAnimationFrame(frame);
+    }
+    // generateSuggestions is a stable in-component handler; the ref guard, not
+    // the dep list, controls the single automatic run.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [evidenceCount, aiStatus, suggestions.length, lanes.length]);
 
   async function save() {
     // Guidance sharpens matching but never blocks: the priorities are the
