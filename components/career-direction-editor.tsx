@@ -220,6 +220,11 @@ export function CareerDirectionEditor({
             <span><strong>{roleCount}</strong> roles understood</span>
             <span><strong>You decide</strong> what gets added</span>
           </div>
+          {evidenceCount > 0 ? (
+            <button type="button" className="direction-rank-button" onClick={() => void generateSuggestions()} disabled={aiStatus === "loading"} style={{ marginTop: "14px" }}>
+              <span aria-hidden="true">↻</span> {aiStatus === "loading" ? "Re-analysing your résumé…" : "Refresh suggestions"}
+            </button>
+          ) : null}
           {evidenceCount === 0 ? <div className="direction-ai-message">Upload your résumé first so every suggestion has evidence behind it.</div> : null}
           {aiError ? <div className="direction-ai-message is-error" role="alert">{aiError}</div> : null}
         </div>
