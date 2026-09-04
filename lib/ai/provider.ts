@@ -60,10 +60,10 @@ export function getProviderRoute(workload: AiWorkload): ProviderRoute {
   if (provider === "openai") {
     const legacyModel = process.env.OPENAI_MODEL?.trim();
     const primaryModel = legacyModel || (workload === "fast"
-      ? process.env.OPENAI_FAST_MODEL || "gpt-5.6-luna"
-      : process.env.OPENAI_QUALITY_MODEL || "gpt-5.6-terra");
+      ? process.env.OPENAI_FAST_MODEL || "gpt-4o-mini"
+      : process.env.OPENAI_QUALITY_MODEL || "gpt-4o");
     const fallbackModel = process.env.OPENAI_FALLBACK_MODEL?.trim()
-      || (legacyModel ? null : workload === "fast" ? "gpt-5.6-terra" : "gpt-5.6-sol");
+      || (legacyModel ? null : workload === "fast" ? "gpt-4o" : "gpt-4o");
 
     return {
       provider,
@@ -82,10 +82,10 @@ export function getProviderRoute(workload: AiWorkload): ProviderRoute {
 
     const legacyModel = process.env.GEMINI_MODEL?.trim();
     const primaryModel = legacyModel || (workload === "fast"
-      ? process.env.GEMINI_FAST_MODEL || "gemini-3.5-flash-lite"
-      : process.env.GEMINI_QUALITY_MODEL || "gemini-3.6-flash");
+      ? process.env.GEMINI_FAST_MODEL || "gemini-1.5-flash"
+      : process.env.GEMINI_QUALITY_MODEL || "gemini-1.5-pro");
     const fallbackModel = process.env.GEMINI_FALLBACK_MODEL?.trim()
-      || (legacyModel ? null : workload === "fast" ? "gemini-3.6-flash" : null);
+      || (legacyModel ? null : workload === "fast" ? "gemini-1.5-pro" : null);
 
     return {
       provider,
@@ -101,7 +101,7 @@ export function getProviderRoute(workload: AiWorkload): ProviderRoute {
 
   const legacyModel = process.env.ANTHROPIC_MODEL?.trim();
   const primaryModel = legacyModel || (workload === "fast"
-    ? process.env.ANTHROPIC_FAST_MODEL || "claude-haiku-4-5"
+    ? process.env.ANTHROPIC_FAST_MODEL || "claude-3-haiku-20240307"
     : process.env.ANTHROPIC_QUALITY_MODEL || "claude-sonnet-5");
   const fallbackModel = process.env.ANTHROPIC_FALLBACK_MODEL?.trim()
     || (legacyModel ? null : workload === "fast" ? "claude-sonnet-5" : null);
@@ -504,21 +504,21 @@ export async function probeProviders(): Promise<ProviderProbe[]> {
       name: "Gemini",
       envVar: "GEMINI_API_KEY",
       key: process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY,
-      model: process.env.GEMINI_MODEL || process.env.GEMINI_FAST_MODEL || "gemini-3.5-flash-lite",
+      model: process.env.GEMINI_MODEL || process.env.GEMINI_FAST_MODEL || "gemini-1.5-flash",
     },
     {
       id: "anthropic" as const,
       name: "Anthropic",
       envVar: "ANTHROPIC_API_KEY",
       key: process.env.ANTHROPIC_API_KEY,
-      model: process.env.ANTHROPIC_MODEL || process.env.ANTHROPIC_FAST_MODEL || "claude-haiku-4-5",
+      model: process.env.ANTHROPIC_MODEL || process.env.ANTHROPIC_FAST_MODEL || "claude-3-haiku-20240307",
     },
     {
       id: "openai" as const,
       name: "OpenAI",
       envVar: "OPENAI_API_KEY",
       key: process.env.OPENAI_API_KEY,
-      model: process.env.OPENAI_MODEL || process.env.OPENAI_FAST_MODEL || "gpt-5.6-luna",
+      model: process.env.OPENAI_MODEL || process.env.OPENAI_FAST_MODEL || "gpt-4o-mini",
     },
   ];
 
