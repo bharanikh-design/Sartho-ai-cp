@@ -5,7 +5,7 @@ import { GmailRecruiterAgent } from "@/lib/agents/gmail-agent";
 
 export const dynamic = "force-dynamic";
 
-export async function POST(request: Request) {
+export async function POST(_request: Request) {
   try {
     // 1. Authenticate the Cron Job or the Manual Trigger
     const { supabase, user } = await getAuthenticatedUser();

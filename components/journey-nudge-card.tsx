@@ -24,7 +24,7 @@ export function JourneyNudgeCard({ progress, isActivated }: { progress: number; 
           <span style={{ color: "#6bcf93" }}>✦</span> Profile 100% Complete!
         </h3>
         <p style={{ margin: "0 0 16px 0", color: "#b9d1c6", fontSize: "0.95rem", maxWidth: "600px", lineHeight: 1.5 }}>
-          Congratulations! You've successfully built your master career foundation. We have unlocked <strong>Job Analysis</strong>, <strong>Application Tracking</strong>, and the <strong>Résumé Studio</strong> in your sidebar. Sartho is now fully armed to act as your personal headhunter.
+          Congratulations! You&apos;ve successfully built your master career foundation. We have unlocked <strong>Job Analysis</strong>, <strong>Application Tracking</strong>, and the <strong>Résumé Studio</strong> in your sidebar. Sartho is now fully armed to act as your personal headhunter.
         </p>
         <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
           <Link href="/jobs" style={{ background: "#6bcf93", color: "#0d402b", padding: "10px 20px", borderRadius: "8px", fontWeight: "bold", textDecoration: "none", fontSize: "0.875rem" }}>

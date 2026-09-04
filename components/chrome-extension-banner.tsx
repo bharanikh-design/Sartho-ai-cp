@@ -8,7 +8,7 @@ export function ChromeExtensionBanner() {
     // We can detect the extension by listening for a ping or checking a flag
     // The extension's content script sets window.__SARTHO_EXTENSION_ACTIVE__ = true;
     const checkExtension = () => {
-      // @ts-expect-error
+      // @ts-expect-error (window custom property)
       if (window.__SARTHO_EXTENSION_ACTIVE__) {
         setHasExtension(true);
       } else {

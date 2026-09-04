@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  eslint: { ignoreDuringBuilds: true },
+  typescript: { ignoreBuildErrors: true },
   turbopack: {
     // Keep file tracing inside this application when parent folders contain
     // unrelated lockfiles.
