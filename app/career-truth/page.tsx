@@ -3,7 +3,6 @@ import { ProductPageHeader } from "@/components/product-page-header";
 import { ResumeImport } from "@/components/resume-import";
 import { CareerHistory } from "@/components/career-history";
 import { ProfileSnapshotEditor } from "@/components/profile-snapshot-editor";
-import { VectorSyncEngine } from "@/components/vector-sync-engine";
 import { WorkflowHandoff } from "@/components/workflow-handoff";
 import { requireUser } from "@/lib/auth";
 import { getCareerWorkspace } from "@/lib/data/career";
@@ -29,7 +28,6 @@ export default async function CareerTruthPage() {
           title="Bring in your career story."
           description="Upload one strong source résumé. AI organises it into a profile; you review the result before anything is used."
         />
-        <VectorSyncEngine />
         <section className="glass-card content-card" id="resume">
           <div className="card-header">
             <div><h2 className="section-heading">Upload your master résumé</h2><p className="section-subtitle">PDF, Word or plain text. Your document remains the source of truth.</p></div>
@@ -54,7 +52,6 @@ export default async function CareerTruthPage() {
           { href: "/resume-studio#source-resumes", label: "Manage source résumés" },
         ] : []}
       />
-      <VectorSyncEngine />
 
       {profile ? (
         <ProfileSnapshotEditor
@@ -67,10 +64,16 @@ export default async function CareerTruthPage() {
 
       <CareerProfileReview initialItems={evidence} roles={roles} profile={profile} />
 
-      <details className="glass-card profile-history-disclosure" id="career-history">
-        <summary><span><strong>Career history</strong><small>Your complete timeline from the source résumé</small></span><span>{roles.length} roles <b aria-hidden="true">⌄</b></span></summary>
-        <div className="profile-history-disclosure__content"><CareerHistory roles={roles} evidence={evidence} /></div>
-      </details>
+      <section className="glass-card content-card" id="career-history">
+        <div className="card-header">
+          <div>
+            <h2 className="section-heading">Career history</h2>
+            <p className="section-subtitle">Your complete timeline from the source résumé.</p>
+          </div>
+          <span className="meta-pill">{roles.length} role{roles.length === 1 ? "" : "s"}</span>
+        </div>
+        <CareerHistory roles={roles} evidence={evidence} />
+      </section>
 
       {confirmed ? (
         <WorkflowHandoff

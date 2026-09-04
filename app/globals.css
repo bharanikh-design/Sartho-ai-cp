@@ -600,6 +600,12 @@ button:focus-visible, a:focus-visible, textarea:focus-visible, input:focus-visib
 .empty-ledger p { margin: 8px 0 0; color: var(--text-secondary); font-size: var(--text-2xs); line-height: 1.65; }
 .empty-ledger .primary-button { margin-top: 18px; }
 
+/* Auto-Applier extension pill — sits in the top-right corner of the page. */
+.extension-pill { margin-left: auto; display: inline-flex; align-items: center; gap: 10px; width: fit-content; padding: 7px 8px 7px 14px; border: 1px solid rgba(107,207,147,.28); border-radius: 100px; background: rgba(107,207,147,.08); }
+.extension-pill__label { color: #6bcf93; font-size: var(--text-xs); font-weight: 500; }
+.extension-pill__action { padding: 4px 12px; border-radius: 100px; background: rgba(255,255,255,.1); color: var(--text-primary); font-size: var(--text-xs); text-decoration: none; }
+.extension-pill__soon { padding: 4px 12px; border-radius: 100px; background: rgba(255,255,255,.05); color: var(--text-tertiary); font-size: var(--text-xs); }
+
 .mobile-dock { display: none; }
 
 @media (max-width: 1100px) {

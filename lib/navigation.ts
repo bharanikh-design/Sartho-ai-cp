@@ -88,12 +88,16 @@ const resumeNavigation: NavigationItem = {
  */
 export function getPrimaryNavigation(activated: boolean): NavigationItem[] {
   if (!activated) {
-    // Setup reads in journey order: Profile (steps 1–2) → Direction (3) → Brief (4),
-    // so Career Direction sits in sequence rather than being appended at the end.
-    return [dashboardNavigation, journeyNavigation, opportunityNavigation, profileNavigation, directionNavigation, strategyNavigation];
+    // Setup reads top-to-bottom in the order you do it: build the profile
+    // (steps 1–2) → set direction (3) → write the brief (4), with Opportunities
+    // reachable at the end — a half-finished foundation should nudge, not wall.
+    return [dashboardNavigation, journeyNavigation, profileNavigation, directionNavigation, strategyNavigation, opportunityNavigation];
   }
 
-  return [dashboardNavigation, opportunityNavigation, applicationNavigation, profileNavigation, strategyNavigation, resumeNavigation];
+  // After activation the menu follows the same flow end to end: know yourself
+  // (Profile → Direction), define the search (Brief), then work the loop
+  // (Opportunities → Applications), with Résumé Studio for tailoring.
+  return [dashboardNavigation, profileNavigation, directionNavigation, strategyNavigation, opportunityNavigation, applicationNavigation, resumeNavigation];
 }
 
 export const allNavigation: NavigationItem[] = [

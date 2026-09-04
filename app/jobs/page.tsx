@@ -23,24 +23,24 @@ export default async function JobsPage() {
 
   return (
     <div className="page-stack">
+      <ChromeExtensionBanner />
       <ProductPageHeader
-        eyebrow="Job Analyzer · Fit Assessment"
+        eyebrow="Opportunities"
         title="Opportunities"
-        description="Sartho acts as your personal headhunter. Import a job description to instantly cross-reference it with your Career Profile. Understand your fit, spot missing skills, and save the role to your pipeline."
+        description="Paste a job description. Sartho scores the fit against your approved evidence and saves the role to your pipeline."
         metric={{ value: jobs.length, label: "saved opportunities" }}
         actions={[
           { href: "/search-plan", label: "Review search brief" },
         ]}
       />
-      
+
       <section className="summary-grid opportunity-summary-grid" aria-label="Opportunity summary">
         <Summary label="Saved opportunities" value={String(jobs.length)} />
         <Summary label="Strong rule-based signals" value={String(strongMatches)} />
         <Summary label="Sources selected" value={String(activeSources)} />
         <Summary label="Target locations" value={String(searchPreferences.targetLocations.length)} />
       </section>
-      
-      <ChromeExtensionBanner />
+
       <div id="analyse"><JobAnalyser initialJobs={jobs} skillProfile={skillProfile} /></div>
     </div>
   );
