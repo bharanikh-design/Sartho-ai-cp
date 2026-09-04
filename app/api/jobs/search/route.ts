@@ -49,24 +49,33 @@ export async function POST() {
 
   const location = preferences.targetLocations[0];
 
-  // One bounded query per priority role, merged and de-duplicated by link.
+  /*
+   * One bounded query per priority role, run sequentially with a short gap so a
+   * low free-tier rate limit is not tripped by a parallel burst. A single query
+   * failing (rate-limit or otherwise) does not sink the whole search — we keep
+   * whatever the other queries returned and only surface an error when nothing
+   * came back at all.
+   */
   const byUrl = new Map<string, JobSearchResult>();
-  try {
-    const batches = await Promise.all(
-      activeLanes.map((lane) => searchJobs({ keywords: lane.name, location, limit: 20 })),
-    );
-    for (const batch of batches) {
+  const errors: string[] = [];
+  for (let index = 0; index < activeLanes.length; index++) {
+    if (index > 0) await new Promise((resolve) => setTimeout(resolve, 1200));
+    try {
+      const batch = await searchJobs({ keywords: activeLanes[index].name, location, limit: 20 });
       for (const result of batch) {
         if (!byUrl.has(result.url)) byUrl.set(result.url, result);
       }
+    } catch (caught) {
+      if (caught instanceof JobSearchNotConfiguredError) {
+        return NextResponse.json({ error: "Jobs search isn't connected yet.", code: "not_configured" }, { status: 503 });
+      }
+      errors.push(caught instanceof Error ? caught.message : "unknown error");
     }
-  } catch (caught) {
-    if (caught instanceof JobSearchNotConfiguredError) {
-      return NextResponse.json({ error: "Jobs search isn't connected yet.", code: "not_configured" }, { status: 503 });
-    }
-    console.error("Jobs search failed", caught);
-    const detail = caught instanceof Error ? caught.message : "unknown error";
-    return NextResponse.json({ error: `Jobs provider error: ${detail}`, code: "provider_error" }, { status: 502 });
+  }
+
+  if (!byUrl.size && errors.length) {
+    console.error("Jobs search failed", errors);
+    return NextResponse.json({ error: `Jobs provider error: ${errors[errors.length - 1]}`, code: "provider_error" }, { status: 502 });
   }
 
   const ranked = Array.from(byUrl.values())
