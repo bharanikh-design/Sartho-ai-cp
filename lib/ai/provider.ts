@@ -312,7 +312,7 @@ async function callGemini(request: StructuredRequest, apiKey: string, model: str
    * tighter cost guardrail.
    */
   const maxOutputTokens = request.schemaName === "sartho_resume_extraction"
-    ? 32_768
+    ? 8_192
     : 8_192;
 
   const { response, result: unknownResult, startedAt } = await fetchProvider(
