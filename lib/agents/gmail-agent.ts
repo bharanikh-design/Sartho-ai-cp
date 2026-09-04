@@ -15,12 +15,12 @@ import { openai } from "@ai-sdk/openai";
 
 type AgentConfig = {
   accessToken: string; // The user's Google OAuth token with Gmail scopes
-  userProfile: any; // The user's Sartho Career Profile (evidence, status)
+  userProfile: unknown; // The user's Sartho Career Profile (evidence, status)
 };
 
 export class GmailRecruiterAgent {
   private accessToken: string;
-  private userProfile: any;
+  private userProfile: unknown;
 
   constructor(config: AgentConfig) {
     this.accessToken = config.accessToken;
@@ -95,7 +95,7 @@ export class GmailRecruiterAgent {
     }
   }
 
-  private async generateResponse(email: any, classification: any) {
+  private async generateResponse(email: unknown, classification: unknown) {
     const { text } = await generateText({
       model: openai("gpt-4o"),
       system: "You are the user's executive assistant. Write a polite reply to the recruiter.",
@@ -109,7 +109,7 @@ export class GmailRecruiterAgent {
     return `Hi Sarah,\n\nThanks for reaching out! I am currently open to exploring new opportunities and the Senior PM role at TechCorp sounds interesting.\n\nLet's connect this week. Feel free to find a time on my calendar: https://calendly.com/sartho-demo\n\nBest,\nBharani`;
   }
 
-  private async createGmailDraft(email: any, draftBody: string) {
+  private async createGmailDraft(email: unknown, draftBody: string) {
     // In production, this hits: POST https://gmail.googleapis.com/gmail/v1/users/me/drafts
     // Constructing the RFC 2822 email format and base64 encoding it.
     console.log(`Sartho Gmail Agent: Created draft for ${email.from}`);

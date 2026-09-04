@@ -32,7 +32,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ 
       success: true, 
       draftsCreated,
-      message: \`Successfully scanned inbox and created \${draftsCreated} drafts.\`
+      message: `Successfully scanned inbox and created ${draftsCreated} drafts.`
     });
 
   } catch (error) {

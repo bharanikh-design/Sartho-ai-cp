@@ -106,11 +106,11 @@ export function ResumeDraftPanel({
               <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: "6px" }}>
                 <li style={{ fontSize: "0.75rem", color: "#ff9f43", display: "flex", alignItems: "center", gap: "6px" }}>
                   <span style={{ width: "6px", height: "6px", background: "#ff9f43", borderRadius: "50%" }}></span>
-                  "Enterprise Architecture" (Found in JD)
+                  &quot;Enterprise Architecture&quot; (Found in JD)
                 </li>
                 <li style={{ fontSize: "0.75rem", color: "#ff9f43", display: "flex", alignItems: "center", gap: "6px" }}>
                   <span style={{ width: "6px", height: "6px", background: "#ff9f43", borderRadius: "50%" }}></span>
-                  "Budget Management" (Found in JD)
+                  &quot;Budget Management&quot; (Found in JD)
                 </li>
               </ul>
               <button type="button" style={{ marginTop: "12px", width: "100%", background: "rgba(255,159,67,0.1)", color: "#ff9f43", border: "1px solid rgba(255,159,67,0.2)", padding: "6px", borderRadius: "6px", fontSize: "0.75rem", cursor: "pointer" }}>

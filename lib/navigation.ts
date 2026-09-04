@@ -89,7 +89,7 @@ export function getPrimaryNavigation(activated: boolean): NavigationItem[] {
     return [dashboardNavigation, journeyNavigation, profileNavigation, strategyNavigation];
   }
 
-  return [dashboardNavigation, opportunityNavigation, applicationNavigation, profileNavigation, strategyNavigation];
+  return [dashboardNavigation, opportunityNavigation, applicationNavigation, profileNavigation, strategyNavigation, resumeNavigation];
 }
 
 export const allNavigation: NavigationItem[] = [
@@ -100,6 +100,7 @@ export const allNavigation: NavigationItem[] = [
   profileNavigation,
   directionNavigation,
   strategyNavigation,
+  resumeNavigation,
 ];
 
 export function getMobileNavigation(activated: boolean) {
