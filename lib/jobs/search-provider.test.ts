@@ -1,5 +1,20 @@
 import { describe, expect, it } from "vitest";
-import { mapAdzunaResult, mapJSearchResult } from "./search-provider";
+import { mapAdzunaResult, mapJSearchResult, normaliseAdzunaCountry } from "./search-provider";
+
+describe("normaliseAdzunaCountry", () => {
+  it("takes the first of a comma list and lowercases it", () => {
+    expect(normaliseAdzunaCountry("AU,SG,UK")).toBe("au");
+    expect(normaliseAdzunaCountry("au, sg")).toBe("au");
+  });
+  it("maps uk to gb and keeps valid codes", () => {
+    expect(normaliseAdzunaCountry("uk")).toBe("gb");
+    expect(normaliseAdzunaCountry("sg")).toBe("sg");
+  });
+  it("falls back to gb for empty or unsupported values", () => {
+    expect(normaliseAdzunaCountry(undefined)).toBe("gb");
+    expect(normaliseAdzunaCountry("narnia")).toBe("gb");
+  });
+});
 
 describe("mapAdzunaResult", () => {
   it("maps a complete Adzuna record into Sartho's shape", () => {
