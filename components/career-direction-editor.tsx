@@ -205,40 +205,12 @@ export function CareerDirectionEditor({
             <span className="ai-orbit" aria-hidden="true">✦</span>
             <span className="direction-ai-label">Sartho AI career strategist</span>
           </div>
-          <h2>Let your résumé suggest where you can go next.</h2>
-          <p>AI reads only the career facts you approved, proposes direct, adjacent and stretch paths, and shows the evidence behind each one. Nothing joins your priorities until you choose it.</p>
+          <h2>Roles your résumé points to.</h2>
+          <p>Grounded in the career facts you approved. Add the ones that fit — nothing joins your priorities until you choose it. You can add your own or ask AI to refine below.</p>
           <div className="direction-ai-grounding">
             <span><strong>{evidenceCount}</strong> approved career facts</span>
             <span><strong>{roleCount}</strong> roles understood</span>
             <span><strong>You decide</strong> what gets added</span>
-          </div>
-          <div className="capability-note">
-            <strong>Generative AI · grounded suggestion</strong>
-            <span>This creates new career-path ideas from your approved profile. It is not a prediction, and nothing is saved until you add it.</span>
-          </div>
-          <div className="direction-choice-grid">
-            <section>
-              <span className="direction-choice-label">I know the role I want</span>
-              <strong>Add it directly</strong>
-              <p>The role enters your priorities immediately. AI does not need to reinterpret it.</p>
-              <div className="direction-manual-add">
-                <input value={laneDraft} onChange={(event) => setLaneDraft(event.target.value)} onKeyDown={(event) => event.key === "Enter" && (event.preventDefault(), addManualLane())} placeholder="e.g. ServiceNow Senior Engagement Manager" />
-                <button type="button" onClick={addManualLane}>Add target role</button>
-              </div>
-            </section>
-            <section>
-              <span className="direction-choice-label">Help me explore</span>
-              <strong>Ask AI for possibilities</strong>
-              <p>Describe what should change or matter next. AI will update the suggestions; it will not add anything automatically.</p>
-              <div className="direction-ai-prompt">
-                <label htmlFor="direction-goal">Exploration request <span>Optional</span></label>
-                <textarea id="direction-goal" value={aiPrompt} onChange={(event) => setAiPrompt(event.target.value)} rows={2} placeholder="For example: regional leadership, less travel, more transformation ownership…" />
-                <button type="button" onClick={() => void generateSuggestions()} disabled={aiStatus === "loading" || evidenceCount === 0}>
-                  <span aria-hidden="true">✦</span>
-                  {aiStatus === "loading" ? "Analysing…" : aiStatus === "ready" ? "Update suggestions" : "Generate suggestions"}
-                </button>
-              </div>
-            </section>
           </div>
           {evidenceCount === 0 ? <div className="direction-ai-message">Confirm your Career Profile first so every suggestion has evidence behind it.</div> : null}
           {aiError ? <div className="direction-ai-message is-error" role="alert">{aiError}</div> : null}
@@ -271,6 +243,8 @@ export function CareerDirectionEditor({
               );
             })}
           </div>
+        ) : aiStatus === "ready" ? (
+          <div className="direction-ai-message">No suggestions to show right now — add a role or ask AI to refine below.</div>
         ) : null}
       </section>
 
@@ -327,6 +301,26 @@ export function CareerDirectionEditor({
           <div className="direction-priority-empty"><strong>No priorities selected yet</strong><span>Choose an AI suggestion above or add the first role yourself.</span></div>
         )}
 
+      </section>
+
+      <section className="glass-card direction-input-bar" aria-label="Add your own role or refine the suggestions">
+        <div className="direction-input-col">
+          <span className="direction-choice-label">Know the role you want? Add it directly</span>
+          <div className="direction-manual-add">
+            <input value={laneDraft} onChange={(event) => setLaneDraft(event.target.value)} onKeyDown={(event) => event.key === "Enter" && (event.preventDefault(), addManualLane())} placeholder="e.g. ServiceNow Senior Engagement Manager" />
+            <button type="button" onClick={addManualLane}>Add role</button>
+          </div>
+        </div>
+        <div className="direction-input-col">
+          <span className="direction-choice-label">Not quite right? Ask AI to refine <em>optional</em></span>
+          <div className="direction-ai-prompt">
+            <textarea id="direction-goal" value={aiPrompt} onChange={(event) => setAiPrompt(event.target.value)} rows={2} placeholder="For example: regional leadership, less travel, more transformation ownership…" />
+            <button type="button" onClick={() => void generateSuggestions()} disabled={aiStatus === "loading" || evidenceCount === 0}>
+              <span aria-hidden="true">✦</span>
+              {aiStatus === "loading" ? "Analysing…" : "Refine suggestions"}
+            </button>
+          </div>
+        </div>
       </section>
 
       <details className="glass-card direction-preferences" id="context">
