@@ -37,6 +37,7 @@ describe("primary navigation", () => {
       "Your Journey",
       "Opportunities",
       "Career Profile",
+      "Career Direction",
       "Search Brief",
     ]);
     expect(getPrimaryNavigation(true).map((item) => item.label)).toEqual([
@@ -58,6 +59,7 @@ describe("primary navigation", () => {
       "Your Journey",
       "Opportunities",
       "Career Profile",
+      "Career Direction",
       "Search Brief",
       "Applications",
     ]);

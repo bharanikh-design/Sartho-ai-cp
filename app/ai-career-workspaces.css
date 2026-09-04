@@ -66,7 +66,7 @@
 .direction-ai-intro > div:first-child { display: flex; align-items: center; gap: 9px; }
 .ai-orbit { display: grid; width: 28px; height: 28px; place-items: center; border: 1px solid rgba(196, 238, 219, .35); border-radius: 50%; color: #bde6d2; background: rgba(255,255,255,.07); }
 .direction-ai-label { color: #b9d9ca; font-size: var(--text-2xs); font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
-.direction-ai-intro h2 { max-width: 740px; margin: 18px 0 0; font-family: var(--font-sans); font-size: clamp(29px, 3.2vw, 42px); font-weight: 500; line-height: 1.08; letter-spacing: -.025em; }
+.direction-ai-intro h2 { max-width: 740px; margin: 14px 0 0; font-family: var(--font-sans); font-size: clamp(22px, 2.6vw, 28px); font-weight: 600; line-height: 1.15; letter-spacing: -.02em; }
 .direction-ai-intro > p { max-width: 830px; margin: 13px 0 0; color: #c7dbd1; font-size: var(--text-base); line-height: 1.7; }
 .direction-ai-grounding { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 21px; }
 .direction-ai-grounding span { padding: 8px 11px; border: 1px solid rgba(207, 239, 225, .18); border-radius: 999px; color: #b8d3c7; background: rgba(255,255,255,.055); font-size: var(--text-2xs); }
@@ -90,7 +90,7 @@
 .direction-suggestion-card.is-adjacent .suggestion-card-top > span { color: #685118; background: #faf1d7; }
 .direction-suggestion-card.is-stretch .suggestion-card-top > span { color: #5a4d88; background: #efecfb; }
 .suggestion-card-top > button { width: 28px; height: 28px; border: 0; color: var(--text-tertiary); background: transparent; font-size: var(--text-lg); cursor: pointer; }
-.direction-suggestion-card h3 { margin: 20px 0 0; font-family: var(--font-sans); font-size: 23px; font-weight: 600; line-height: 1.2; }
+.direction-suggestion-card h3 { margin: 20px 0 0; font-family: var(--font-sans); font-size: var(--text-lg); font-weight: 600; line-height: 1.25; }
 .direction-suggestion-card > p { margin: 10px 0 0; color: var(--text-secondary); font-size: var(--text-sm); line-height: 1.62; }
 .direction-suggestion-card details { margin: 16px 0; }
 .direction-suggestion-card details summary { color: #315f4c; font-size: var(--text-2xs); font-weight: 750; cursor: pointer; }
@@ -123,6 +123,7 @@
 .resume-source-upload p { margin: 7px 0 0; color: var(--text-secondary); font-size: var(--text-sm); line-height: 1.6; }
 .direction-priority-heading > strong,
 .resume-section-heading > strong { color: var(--blue); font-family: var(--font-sans); font-size: 30px; }
+.direction-priority-heading > strong { font-size: var(--text-xl); }
 .direction-priority-list { display: grid; gap: 8px; margin-top: 22px; }
 .direction-priority-list article { display: grid; grid-template-columns: 38px minmax(0, 1fr) auto; gap: 13px; align-items: center; padding: 12px 13px; border: 1px solid var(--line); border-radius: 12px; background: rgba(255,255,255,.02); }
 .priority-rank { display: grid; width: 34px; height: 34px; place-items: center; border-radius: 10px; color: var(--text); background: #174b3a; font-size: var(--text-xs); font-weight: 800; }
