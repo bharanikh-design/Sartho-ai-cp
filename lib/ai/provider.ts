@@ -82,10 +82,10 @@ export function getProviderRoute(workload: AiWorkload): ProviderRoute {
 
     const legacyModel = process.env.GEMINI_MODEL?.trim();
     const primaryModel = legacyModel || (workload === "fast"
-      ? process.env.GEMINI_FAST_MODEL || "gemini-1.5-flash"
-      : process.env.GEMINI_QUALITY_MODEL || "gemini-1.5-pro");
+      ? process.env.GEMINI_FAST_MODEL || "gemini-3.5-flash-lite"
+      : process.env.GEMINI_QUALITY_MODEL || "gemini-3.6-flash");
     const fallbackModel = process.env.GEMINI_FALLBACK_MODEL?.trim()
-      || (legacyModel ? null : workload === "fast" ? "gemini-1.5-pro" : null);
+      || (legacyModel ? null : workload === "fast" ? "gemini-3.6-flash" : null);
 
     return {
       provider,
@@ -520,7 +520,7 @@ export async function probeProviders(): Promise<ProviderProbe[]> {
       name: "Gemini",
       envVar: "GEMINI_API_KEY",
       key: process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY,
-      model: process.env.GEMINI_MODEL || process.env.GEMINI_FAST_MODEL || "gemini-1.5-flash",
+      model: process.env.GEMINI_MODEL || process.env.GEMINI_FAST_MODEL || "gemini-3.5-flash-lite",
     },
     {
       id: "anthropic" as const,
