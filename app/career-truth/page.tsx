@@ -2,16 +2,21 @@ import { CareerProfileReview } from "@/components/career-profile-review";
 import { ProductPageHeader } from "@/components/product-page-header";
 import { ResumeImport } from "@/components/resume-import";
 import { CareerHistory } from "@/components/career-history";
+import { JourneySteps } from "@/components/journey-steps";
 import { ProfileSnapshotEditor } from "@/components/profile-snapshot-editor";
 import { WorkflowHandoff } from "@/components/workflow-handoff";
 import { requireUser } from "@/lib/auth";
 import { getCareerWorkspace } from "@/lib/data/career";
+import { loadProductJourneyStatus } from "@/lib/journey/load-product-journey";
 
 export const dynamic = "force-dynamic";
 
 export default async function CareerTruthPage() {
   const { supabase, user } = await requireUser();
-  const { profile, lanes, roles, evidence } = await getCareerWorkspace(supabase, user.id);
+  const [{ profile, lanes, roles, evidence }, journey] = await Promise.all([
+    getCareerWorkspace(supabase, user.id),
+    loadProductJourneyStatus(supabase, user.id),
+  ]);
   const isEmpty = evidence.length === 0;
   const usableEvidence = evidence.filter((item) => item.approval_status !== "rejected");
   const pending = usableEvidence.filter((item) => item.approval_status === "pending").length;
@@ -23,6 +28,7 @@ export default async function CareerTruthPage() {
   if (isEmpty) {
     return (
       <div className="page-stack">
+        <JourneySteps journey={journey} currentId="resume" />
         <ProductPageHeader
           eyebrow="Step 1 of 4 · Add your résumé"
           title="Bring in your career story."
@@ -41,6 +47,7 @@ export default async function CareerTruthPage() {
 
   return (
     <div className="page-stack career-profile-page">
+      <JourneySteps journey={journey} currentId="confirm" />
       <ProductPageHeader
         eyebrow={confirmed ? "Career Profile · Confirmed" : "Step 2 of 4 · Confirm your profile"}
         title={confirmed ? positioning : "Confirm your Career Profile"}
