@@ -56,7 +56,7 @@ export function buildProductJourney(input: ProductJourneyInput): ProductJourneyS
   );
   const strengthsComplete = Boolean(input.profile?.strengths.length);
   const profilesComplete = input.activeLanes > 0 && input.activeLaneAllocation === 100;
-  const directionComplete = contextComplete && strengthsComplete && profilesComplete;
+  const directionComplete = strengthsComplete && profilesComplete;
   const activeSources = input.searchPreferences.sources.filter((source) => source.active).length;
   const searchComplete = input.searchPreferences.targetLocations.length > 0
     && activeSources > 0

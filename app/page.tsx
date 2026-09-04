@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { DailyDigestSettings } from "@/components/daily-digest-settings";
 import { ProductPageHeader } from "@/components/product-page-header";
+import { JourneyNudgeCard } from "@/components/journey-nudge-card";
 import { requireUser } from "@/lib/auth";
 import {
   buildCareerCommandCentre,
@@ -59,6 +60,8 @@ export default async function DashboardPage() {
         description="One connected view from Career Profile to outcome. Sartho uses your live workspace to explain what matters now and where to go next."
         metric={{ value: "1", label: "clear next action", href: "/journey" }}
       />
+
+      <JourneyNudgeCard progress={journey.progress} isActivated={journey.activated} />
 
       <section className="dashboard-workflow command-centre-journey" aria-labelledby="career-journey-title">
         <div className="dashboard-section-heading">
