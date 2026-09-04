@@ -33,6 +33,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   const profileMenuRef = useRef<HTMLDivElement>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [scrolled, setScrolled] = useState(false);
+  const [showWelcome, setShowWelcome] = useState(true);
+
   const [profileOpen, setProfileOpen] = useState(false);
   const [accountPanelOpen, setAccountPanelOpen] = useState(false);
   const [accountAction, setAccountAction] = useState<AccountAction | null>(null);
@@ -95,6 +98,21 @@ export function AppShell({ children }: { children: ReactNode }) {
       listener.subscription.unsubscribe();
     };
   }, [refreshJourneyStatus, supabase]);
+
+  useEffect(() => {
+    // Determine the scroll state
+    const handleScroll = () => setScrolled(window.scrollY > 0);
+    handleScroll();
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    
+    // Auto-dismiss welcome toast after 4 seconds
+    const timer = setTimeout(() => setShowWelcome(false), 4000);
+    
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      clearTimeout(timer);
+    };
+  }, []);
 
   useEffect(() => {
     window.addEventListener("sartho:journey-changed", refreshJourneyStatus);
@@ -219,12 +237,72 @@ export function AppShell({ children }: { children: ReactNode }) {
 
         <div className="rail-section-label">Your career</div>
         <nav className="rail-nav">
-          {navigation.map((item) => (
+          
+              {session?.user?.app_metadata?.role === "admin" && (
+                <li style={{ marginTop: "16px", paddingTop: "16px", borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+                  <Link
+                    href="/admin"
+                    className={`as-nav-link${isNavigationItemActive(pathname, "/admin") ? " is-active" : ""}`}
+                  >
+                    <Icon name="shield" />
+                    <span>Admin</span>
+                  </Link>
+                </li>
+              )}
+{navigation.map((item) => (
             <NavItem key={item.href} item={item} active={isNavigationItemActive(pathname, item.href)} />
           ))}
         </nav>
 
+        
         <div className="rail-spacer" />
+
+        <div className="profile-menu-wrap" ref={profileMenuRef} style={{ padding: "0 14px", margin: "10px 0" }}>
+          <button
+            type="button"
+            className={`avatar-button${profileOpen ? " is-open" : ""}`}
+            onClick={() => setProfileOpen((current) => !current)}
+            aria-label="Open profile menu"
+            aria-haspopup="menu"
+            aria-expanded={profileOpen}
+            aria-controls="profile-menu"
+            title="Profile and account"
+            style={{ width: "100%", display: "flex", alignItems: "center", gap: "12px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "12px", padding: "8px 12px", textAlign: "left" }}
+          >
+            <span style={{ display: "grid", placeItems: "center", width: "32px", height: "32px", borderRadius: "50%", background: "#174b3a", color: "#6bcf93", fontSize: "11px", fontWeight: "bold" }}>{initials}</span>
+            <div style={{ flex: 1, overflow: "hidden" }}>
+              <strong style={{ display: "block", fontSize: "13px", color: "white", textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>{fullName}</strong>
+              <small style={{ display: "block", fontSize: "11px", color: "#888", textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>Settings & Account</small>
+            </div>
+          </button>
+
+          {profileOpen ? (
+            <div id="profile-menu" className="profile-menu" role="menu" aria-label="Profile and account" style={{ bottom: "60px", top: "auto", left: "14px", right: "14px", width: "auto" }}>
+              <div className="profile-menu-identity">
+                <span className="profile-menu-avatar" aria-hidden="true">{initials}</span>
+                <span className="profile-menu-person"><strong>{fullName}</strong><small>{session.user.email}</small></span>
+              </div>
+              <div className="profile-menu-divider" />
+              <div className="theme-row">
+                <span><strong>Appearance</strong><small>{theme === "dark" ? "Dark theme" : "Light theme"}</small></span>
+                <button
+                  type="button"
+                  className="theme-switch"
+                  data-on={theme === "light"}
+                  role="menuitemcheckbox"
+                  aria-checked={theme === "light"}
+                  aria-label="Switch between dark and light theme"
+                  onClick={toggleTheme}
+                />
+              </div>
+              <div className="profile-menu-divider" />
+              <Link href="/career-truth" className="profile-menu-link" role="menuitem"><span><strong>Career Profile</strong><small>Review your evidence and positioning</small></span><b aria-hidden="true">→</b></Link>
+              <button type="button" className="profile-menu-action" role="menuitem" onClick={openAccountPanel}><span><strong>Data & privacy</strong><small>Manage or remove your information</small></span><b aria-hidden="true">→</b></button>
+              <button type="button" className="profile-menu-action profile-menu-signout" role="menuitem" onClick={() => void signOut()}><span><strong>Log out</strong><small>End this secure session</small></span></button>
+            </div>
+          ) : null}
+        </div>
+
         <Link href="/journey" className="privacy-card journey-summary-card" aria-label="Open career foundation status">
           <span className="privacy-icon"><Icon name={activated ? "shield" : "journey"} /></span>
           <div>
@@ -237,59 +315,9 @@ export function AppShell({ children }: { children: ReactNode }) {
       </aside>
 
       <div className="app-stage">
-        <header className="top-bar glass-soft">
-          <div className="mobile-brand">
-            <Image className="brand-mark brand-mark-small" src={sarthoIcon} alt="" width={144} height={144} quality={95} />
-            <span><strong>Sartho</strong><small>{currentPage}</small></span>
-          </div>
-          <div className="desktop-context">
-            <span className="context-kicker">{getGreeting()}, {firstName}</span>
-            <strong>{currentPage}</strong>
-          </div>
-          <div className="top-actions">
-            <span className="sync-status"><span className="live-dot" /> Workspace ready</span>
-            <div className="profile-menu-wrap" ref={profileMenuRef}>
-              <button
-                type="button"
-                className={`avatar-button${profileOpen ? " is-open" : ""}`}
-                onClick={() => setProfileOpen((current) => !current)}
-                aria-label="Open profile menu"
-                aria-haspopup="menu"
-                aria-expanded={profileOpen}
-                aria-controls="profile-menu"
-                title="Profile and account"
-              >
-                {initials}
-              </button>
+        
 
-              {profileOpen ? (
-                <div id="profile-menu" className="profile-menu" role="menu" aria-label="Profile and account">
-                  <div className="profile-menu-identity">
-                    <span className="profile-menu-avatar" aria-hidden="true">{initials}</span>
-                    <span className="profile-menu-person"><strong>{fullName}</strong><small>{session.user.email}</small></span>
-                  </div>
-                  <div className="profile-menu-divider" />
-                  <div className="theme-row">
-                    <span><strong>Appearance</strong><small>{theme === "dark" ? "Dark theme" : "Light theme"}</small></span>
-                    <button
-                      type="button"
-                      className="theme-switch"
-                      data-on={theme === "light"}
-                      role="menuitemcheckbox"
-                      aria-checked={theme === "light"}
-                      aria-label="Switch between dark and light theme"
-                      onClick={toggleTheme}
-                    />
-                  </div>
-                  <div className="profile-menu-divider" />
-                  <Link href="/career-truth" className="profile-menu-link" role="menuitem"><span><strong>Career Profile</strong><small>Review your evidence and positioning</small></span><b aria-hidden="true">→</b></Link>
-                  <button type="button" className="profile-menu-action" role="menuitem" onClick={openAccountPanel}><span><strong>Data & privacy</strong><small>Manage or remove your information</small></span><b aria-hidden="true">→</b></button>
-                  <button type="button" className="profile-menu-action profile-menu-signout" role="menuitem" onClick={() => void signOut()}><span><strong>Log out</strong><small>End this secure session</small></span></button>
-                </div>
-              ) : null}
-            </div>
-          </div>
-        </header>
+        
 
         <main className="page-content">{children}</main>
       </div>

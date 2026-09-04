@@ -2,16 +2,18 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import type { ApplicationRecord } from "@/lib/types";
+import type { ApplicationRecord, RuleAnalysis } from "@/lib/types";
 
 export function ResumeDraftPanel({
   jobId,
   deepAnalysisComplete,
   application,
+  analysis,
 }: {
   jobId: string;
   deepAnalysisComplete: boolean;
   application: ApplicationRecord | null;
+  analysis?: (RuleAnalysis & { matchScore?: number; missingSkills?: string[] }) | null;
 }) {
   const router = useRouter();
   const [running, setRunning] = useState(false);
@@ -40,6 +42,13 @@ export function ResumeDraftPanel({
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1800);
   }
+
+  // Dynamic calculations for ATS Scorecard
+  const matchScore = analysis?.matchScore ?? 0;
+  const missingSkills = (analysis?.missingSkills ?? []) as string[];
+  const metricsCount = application?.resume_draft 
+    ? (application.resume_draft.match(/(\d+%|\$\d+|\b\d+(?:,\d{3})*(?:\.\d+)?(?:k|M|B)?\b)/g)?.length ?? 0)
+    : 0;
 
   if (!application?.resume_draft) {
     return (
@@ -83,8 +92,53 @@ export function ResumeDraftPanel({
           <div className="resume-draft-label">DRAFT — REVIEW BEFORE USE</div>
           <pre>{application.resume_draft}</pre>
         </article>
+        
         <aside className="resume-change-log">
-          <h3>Change log</h3>
+          {analysis ? (
+            <div style={{ background: "rgba(107, 207, 147, 0.05)", border: "1px solid rgba(107, 207, 147, 0.2)", borderRadius: "12px", padding: "16px", marginBottom: "20px" }}>
+              <h3 style={{ margin: "0 0 12px 0", color: "#6bcf93", fontSize: "0.85rem", textTransform: "uppercase", letterSpacing: "0.05em", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                ATS Scorecard
+                <span style={{ background: "#6bcf93", color: "#111", padding: "4px 8px", borderRadius: "100px", fontWeight: "bold" }}>{matchScore}% Match</span>
+              </h3>
+              
+              <div style={{ marginBottom: "16px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.75rem", marginBottom: "4px" }}>
+                  <span style={{ color: "#aaa" }}>Keyword Density</span>
+                  <span style={{ color: "#ccc" }}>{matchScore > 80 ? "High" : matchScore > 50 ? "Medium" : "Low"}</span>
+                </div>
+                <div style={{ height: "4px", background: "rgba(255,255,255,0.1)", borderRadius: "4px", overflow: "hidden" }}>
+                  <div style={{ width: `${matchScore}%`, height: "100%", background: "#6bcf93", transition: "width 1s ease-in-out" }} />
+                </div>
+              </div>
+
+              <div>
+                <strong style={{ display: "block", fontSize: "0.75rem", color: "#ccc", marginBottom: "8px" }}>Missing Mandatory Keywords</strong>
+                {missingSkills.length > 0 ? (
+                  <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: "6px" }}>
+                    {missingSkills.map((skill, i) => (
+                      <li key={i} style={{ fontSize: "0.75rem", color: "#ff9f43", display: "flex", alignItems: "flex-start", gap: "6px" }}>
+                        <span style={{ width: "6px", height: "6px", background: "#ff9f43", borderRadius: "50%", marginTop: "4px", flexShrink: 0 }}></span>
+                        {skill}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <div style={{ fontSize: "0.75rem", color: "#6bcf93", display: "flex", alignItems: "center", gap: "6px" }}>
+                    <span style={{ color: "#6bcf93" }}>✓</span> All core requirements verified in profile.
+                  </div>
+                )}
+              </div>
+              
+              <div style={{ marginTop: "16px", paddingTop: "12px", borderTop: "1px solid rgba(107,207,147,0.2)" }}>
+                <strong style={{ display: "block", fontSize: "0.75rem", color: "#ccc", marginBottom: "8px" }}>Impact Metrics Check</strong>
+                <div style={{ display: "flex", gap: "8px", alignItems: "center", fontSize: "0.75rem", color: "#aaa" }}>
+                  <span style={{ color: metricsCount > 3 ? "#6bcf93" : "#ff9f43" }}>{metricsCount > 3 ? "✓" : "⚠"}</span> {metricsCount} measurable metrics detected in draft.
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          <h3 style={{ marginTop: 0 }}>AI Change log</h3>
           <p>Every material emphasis, rewording, omission or movement is recorded here.</p>
           {application.resume_change_log.length ? (
             <ol>

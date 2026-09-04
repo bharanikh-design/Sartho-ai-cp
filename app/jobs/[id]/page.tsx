@@ -130,7 +130,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
         requirementCount={requirements.length}
       />
 
-      <ResumeDraftPanel jobId={job.id} deepAnalysisComplete={job.deep_analysis_status === "complete"} application={application} />
+      <ResumeDraftPanel jobId={job.id} deepAnalysisComplete={job.deep_analysis_status === "complete"} application={application} analysis={analysis} />
 
       <section className="glass-card content-card">
         <div className="card-header">

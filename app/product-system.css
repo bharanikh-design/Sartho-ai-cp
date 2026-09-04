@@ -904,6 +904,31 @@
   white-space: nowrap;
 }
 
+.profile-record__actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 20px;
+}
+
+.profile-record__actions .inline-error {
+  margin-right: auto;
+}
+
+.profile-record__note {
+  color: var(--product-muted);
+  font-size: var(--text-sm);
+  margin: 20px 0 0;
+}
+
+.profile-record__note a {
+  color: var(--product-accent);
+  font-weight: 640;
+  text-decoration: none;
+}
+
 .profile-record__summary {
   color: var(--product-muted);
   font-size: var(--text-base);

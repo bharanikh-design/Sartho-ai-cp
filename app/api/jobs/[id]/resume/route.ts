@@ -106,7 +106,7 @@ export async function POST(
     return NextResponse.json({ error: "Sartho could not prepare the approved résumé evidence." }, { status: 500 });
   }
   if (!jobResult.data) return NextResponse.json({ error: "Job not found" }, { status: 404 });
-  if (!requirementsResult.data?.length || jobResult.data.deep_analysis_status !== "complete") {
+  if (jobResult.data.deep_analysis_status !== "complete") {
     return NextResponse.json({ error: "Complete deep analysis before drafting a tailored résumé." }, { status: 400 });
   }
   if (!evidenceResult.data?.length) {

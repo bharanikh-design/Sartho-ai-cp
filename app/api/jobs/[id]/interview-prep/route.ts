@@ -3,6 +3,8 @@ import { z } from "zod";
 import { createSafetyIdentifier, generateStructuredJson } from "@/lib/ai/provider";
 import { aiQuotaResponse, checkAiQuota } from "@/lib/ai/quota";
 import { getAuthenticatedUser } from "@/lib/auth";
+import { logError } from "@/lib/logger";
+
 import {
   groundInterviewPreparation,
   interviewPreparationSchema,
@@ -73,7 +75,7 @@ export async function POST(
 
   const dataError = jobResult.error ?? requirementsResult.error ?? evidenceResult.error;
   if (dataError) {
-    console.error("Unable to prepare interview coaching", dataError);
+    logError(supabase, "interview_prepare", dataError);
     return NextResponse.json({ error: "Sartho could not prepare this role for interview coaching." }, { status: 500 });
   }
   if (!jobResult.data) return NextResponse.json({ error: "Opportunity not found." }, { status: 404 });
@@ -118,7 +120,7 @@ export async function POST(
     );
     return NextResponse.json({ preparation });
   } catch (caught) {
-    console.error("Interview coaching failed", caught);
+    logError(supabase, "interview_fail", caught);
     return NextResponse.json({
       error: "AI could not create grounded interview coaching right now. The opportunity and Career Profile are unchanged.",
     }, { status: 500 });

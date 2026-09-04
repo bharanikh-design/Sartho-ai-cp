@@ -81,7 +81,7 @@ export function ResumeStudioWorkspace({
             </div>
           </div>
         ) : (
-          <div className="resume-workflow-empty"><div><span>Start here</span><strong>Add the role you want</strong><p>Paste a complete job description. Sartho will match it to your Career Profile before drafting.</p></div><Link href="/jobs" className="primary-button">Analyse a role →</Link></div>
+          <div className="resume-workflow-empty"><div><p style={{ color: "#888", fontStyle: "italic" }}>Your tailored resumes will appear here after you analyze and save an opportunity.</p></div></div>
         )}
         {error ? <div className="inline-error" role="alert">{error}</div> : null}
       </div>

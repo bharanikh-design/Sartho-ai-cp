@@ -28,8 +28,6 @@ export default async function ResumeStudioPage() {
   const readyJobs = jobs.filter((job) => job.deep_analysis_status === "complete" && !draftedJobIds.has(job.id));
   const jobsNeedingAnalysis = jobs.filter((job) => job.deep_analysis_status !== "complete" && !draftedJobIds.has(job.id));
   const approvedCount = approvedResult.count ?? 0;
-  const completeImports = imports.filter((item) => item.status === "complete").length;
-  const failedImports = imports.filter((item) => item.status === "failed").length;
 
   return (
     <div className="page-stack resume-studio-page">
@@ -65,17 +63,35 @@ export default async function ResumeStudioPage() {
         </section>
       ) : null}
 
-      <details className="glass-card resume-source-drawer" id="source-resumes">
-        <summary>
-          <span><strong>Source résumé library</strong><small>Upload or review the documents behind your Career Profile</small></span>
-          <span className="resume-source-status">{completeImports} usable{failedImports ? ` · ${failedImports} failed attempt${failedImports === 1 ? "" : "s"}` : ""}</span>
-          <span aria-hidden="true">⌄</span>
-        </summary>
-        <div className="resume-source-content">
-          <div className="resume-source-upload"><div><span>Add source material</span><h2>Upload another résumé</h2><p>Sartho reconciles anything new with the Career Profile you already reviewed.</p></div><ResumeImport hasEvidence={imports.length > 0} showLead={false} continueHref="/career-truth#profile-review" /></div>
-          <ResumeLibrary imports={imports} />
+      <section className="glass-card resume-source-drawer" id="source-resumes" style={{ display: "flex", flexDirection: "column", gap: "24px", padding: "24px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", borderBottom: "1px solid rgba(255,255,255,0.1)", paddingBottom: "16px" }}>
+          <div>
+            <h2 style={{ margin: "0 0 8px 0", color: "white", fontSize: "1.25rem" }}>Update Master Evidence</h2>
+            <p style={{ margin: 0, color: "#aaa", fontSize: "0.875rem", maxWidth: "600px" }}>
+              <strong>Sartho does not use static resumes.</strong> It dynamically generates them based on your Master Career Profile. 
+              If you want to add new skills or history, upload a source document here. We will extract the facts and update your Master Profile.
+            </p>
+          </div>
+          <Link href="/career-truth" className="secondary-button" style={{ textDecoration: "none" }}>Review Master Profile →</Link>
         </div>
-      </details>
+        
+        <div className="resume-source-content" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "32px" }}>
+          <div className="resume-source-upload">
+            <div style={{ marginBottom: "16px" }}>
+              <span style={{ fontSize: "0.75rem", color: "#6bcf93", textTransform: "uppercase", letterSpacing: "0.05em" }}>Step 1: Ingest</span>
+              <h3 style={{ margin: "4px 0 8px 0", fontSize: "1.1rem" }}>Upload source material</h3>
+            </div>
+            <ResumeImport hasEvidence={imports.length > 0} showLead={false} continueHref="/career-truth#profile-review" />
+          </div>
+          <div style={{ borderLeft: "1px solid rgba(255,255,255,0.1)", paddingLeft: "32px" }}>
+             <div style={{ marginBottom: "16px" }}>
+              <span style={{ fontSize: "0.75rem", color: "#6bcf93", textTransform: "uppercase", letterSpacing: "0.05em" }}>History</span>
+              <h3 style={{ margin: "4px 0 8px 0", fontSize: "1.1rem" }}>Source Documents Library</h3>
+            </div>
+            <ResumeLibrary imports={imports} />
+          </div>
+        </div>
+      </section>
     </div>
   );
 }

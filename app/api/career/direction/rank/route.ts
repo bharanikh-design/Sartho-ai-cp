@@ -8,6 +8,8 @@ import {
 import { createSafetyIdentifier, generateStructuredJson } from "@/lib/ai/provider";
 import { aiQuotaResponse, checkAiQuota } from "@/lib/ai/quota";
 import { getAuthenticatedUser } from "@/lib/auth";
+import { logError } from "@/lib/logger";
+
 
 /*
  * Ranks the target roles a person already chose against their approved career
@@ -37,7 +39,7 @@ export async function POST(request: Request) {
   ]);
   const dataError = profileResult.error ?? rolesResult.error ?? evidenceResult.error;
   if (dataError) {
-    console.error("Unable to prepare career direction ranking", dataError);
+    logError(supabase, "direction_rank_prepare", dataError);
     return NextResponse.json({ error: "Sartho could not prepare your Career Profile for ranking." }, { status: 500 });
   }
   if (!evidenceResult.data?.length) {
@@ -81,7 +83,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ rankings });
   } catch (caught) {
-    console.error("Career direction ranking failed", caught);
+    logError(supabase, "direction_rank_fail", caught);
     return NextResponse.json({
       error: "AI could not rank your roles right now. Your priorities are unchanged.",
     }, { status: 500 });

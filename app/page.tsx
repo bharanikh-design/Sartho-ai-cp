@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { DailyDigestSettings } from "@/components/daily-digest-settings";
 import { ProductPageHeader } from "@/components/product-page-header";
+import { JourneyNudgeCard } from "@/components/journey-nudge-card";
 import { requireUser } from "@/lib/auth";
 import {
   buildCareerCommandCentre,
@@ -40,6 +41,7 @@ export default async function DashboardPage() {
   if (applicationsResult.error) throw applicationsResult.error;
 
   const { journey, workspace } = journeyResult;
+  const pendingSteps = journey.steps.filter((s) => !s.complete);
   const approvedEvidence = workspace.evidence.filter((item) => item.approval_status === "approved").length;
   const pendingEvidence = workspace.evidence.filter((item) => item.approval_status === "pending").length;
   const commandCentre = buildCareerCommandCentre({
@@ -57,8 +59,10 @@ export default async function DashboardPage() {
         eyebrow="Career Command Centre"
         title={`Welcome back, ${firstName}.`}
         description="One connected view from Career Profile to outcome. Sartho uses your live workspace to explain what matters now and where to go next."
-        metric={{ value: "1", label: "clear next action" }}
+        metric={{ value: pendingSteps.length.toString(), label: pendingSteps.length === 1 ? "action required" : "actions required", href: "/journey" }}
       />
+
+      <JourneyNudgeCard progress={journey.progress} isActivated={journey.activated} steps={journey.steps} />
 
       <section className="dashboard-workflow command-centre-journey" aria-labelledby="career-journey-title">
         <div className="dashboard-section-heading">

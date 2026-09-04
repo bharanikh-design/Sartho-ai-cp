@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
+import { SITE_CONFIG } from "@/lib/config/site";
 import sarthoIcon from "@/sartho.png";
 
 /*
@@ -83,6 +84,21 @@ const styles = `
 /* The dark theme carries deeper colour before it turns to mud. */
 :root[data-theme="dark"] .si::before { opacity: .5; }
 :root[data-theme="dark"] .si::after { opacity: .42; }
+
+/* Light mode needs contrast from tokens, not taste. */
+:root[data-theme="light"] .si-proof,
+:root[data-theme="light"] .si-note,
+:root[data-theme="light"] .si-brand small,
+:root[data-theme="light"] .si-or {
+  color: var(--text-secondary);
+}
+
+/* The light palette is already bright; avoid the rose wash. */
+:root[data-theme="light"] .si::after {
+  background:
+    radial-gradient(circle at 46% 50%, color-mix(in srgb, var(--blue) 52%, transparent), transparent 60%),
+    radial-gradient(circle at 24% 78%, color-mix(in srgb, var(--violet) 30%, transparent), transparent 64%);
+}
 
 /*
  * Brand lockup — the first thing on the page, at full size, on its own.
@@ -701,7 +717,10 @@ export default function LoginPage() {
 
     const { error: failure } = await supabase.auth.signInWithOAuth({
       provider,
-      options: { redirectTo: `${window.location.origin}/auth/callback?next=/` },
+      options: { 
+        redirectTo: `${SITE_CONFIG.defaultAppUrl}/auth/callback?next=/`,
+        queryParams: provider === "google" ? { prompt: "select_account" } : undefined,
+      },
     });
 
     if (failure) {
@@ -718,7 +737,7 @@ export default function LoginPage() {
     if (mode === "reset") {
       setBusy("reset");
       const { error: failure } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth/callback?next=/`,
+        redirectTo: `${SITE_CONFIG.defaultAppUrl}/auth/callback?next=/update-password`,
       });
       setBusy(null);
       if (failure) setError(friendlyAuthMessage(failure.message));
@@ -811,9 +830,7 @@ export default function LoginPage() {
                 <button type="button" className="si-provider" onClick={() => signInWithProvider("google")} disabled={busy !== null}>
                   <GoogleIcon /><span>{busy === "google" ? "Opening…" : "Continue with Google"}</span>
                 </button>
-                <button type="button" className="si-provider" onClick={() => signInWithProvider("apple")} disabled={busy !== null}>
-                  <AppleIcon /><span>{busy === "apple" ? "Opening…" : "Continue with Apple"}</span>
-                </button>
+
                 <button type="button" className="si-provider" onClick={() => signInWithProvider("linkedin_oidc")} disabled={busy !== null}>
                   <LinkedInIcon /><span>{busy === "linkedin_oidc" ? "Opening…" : "Continue with LinkedIn"}</span>
                 </button>
@@ -896,13 +913,6 @@ function GoogleIcon() {
   );
 }
 
-function AppleIcon() {
-  return (
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <path d="M16.36 12.72c.02 2.6 2.28 3.47 2.3 3.48-.02.06-.36 1.24-1.19 2.45-.72 1.05-1.47 2.1-2.65 2.12-1.16.02-1.53-.69-2.86-.69-1.32 0-1.74.67-2.83.71-1.14.04-2.01-1.13-2.73-2.18-1.48-2.15-2.61-6.07-1.09-8.72.75-1.31 2.1-2.15 3.57-2.17 1.11-.02 2.17.75 2.85.75.68 0 1.96-.93 3.3-.79.56.02 2.14.23 3.15 1.71-.08.05-1.88 1.1-1.86 3.33M14.2 4.9c.6-.73 1.01-1.75.9-2.76-.87.04-1.92.58-2.55 1.31-.56.65-1.05 1.68-.92 2.68.97.07 1.96-.49 2.57-1.23" />
-    </svg>
-  );
-}
 
 function LinkedInIcon() {
   return (

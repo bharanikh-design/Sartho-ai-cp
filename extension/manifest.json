@@ -1,0 +1,31 @@
+{
+  "manifest_version": 3,
+  "name": "Sartho AI - Career Agent",
+  "version": "1.0.0",
+  "description": "Analyze LinkedIn and Indeed jobs instantly against your Sartho Career Profile.",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage",
+    "tabs"
+  ],
+  "host_permissions": [
+    "*://*.linkedin.com/*",
+    "*://*.indeed.com/*",
+    "http://localhost:3000/*",
+    "https://www.sartho.tech/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Analyze Fit with Sartho"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["http://localhost:3000/*", "https://www.sartho.tech/*"],
+      "js": ["sartho-connector.js"]
+    }
+  ]
+}

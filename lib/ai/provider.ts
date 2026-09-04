@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { classifyAiFailure, describeAiFailure, shortAiFailure } from "./failure";
+import { AI_ENDPOINTS } from "@/lib/config/ai-endpoints";
 
 export type AiWorkload = "fast" | "quality";
 export type AiProviderName = "openai" | "gemini" | "anthropic";
@@ -59,10 +60,10 @@ export function getProviderRoute(workload: AiWorkload): ProviderRoute {
   if (provider === "openai") {
     const legacyModel = process.env.OPENAI_MODEL?.trim();
     const primaryModel = legacyModel || (workload === "fast"
-      ? process.env.OPENAI_FAST_MODEL || "gpt-5.6-luna"
-      : process.env.OPENAI_QUALITY_MODEL || "gpt-5.6-terra");
+      ? process.env.OPENAI_FAST_MODEL || "gpt-4o-mini"
+      : process.env.OPENAI_QUALITY_MODEL || "gpt-4o");
     const fallbackModel = process.env.OPENAI_FALLBACK_MODEL?.trim()
-      || (legacyModel ? null : workload === "fast" ? "gpt-5.6-terra" : "gpt-5.6-sol");
+      || (legacyModel ? null : workload === "fast" ? "gpt-4o" : "gpt-4o");
 
     return {
       provider,
@@ -79,11 +80,11 @@ export function getProviderRoute(workload: AiWorkload): ProviderRoute {
       );
     }
 
-    const legacyModel = process.env.GEMINI_MODEL?.trim();
+    const legacyModel = usableGeminiModel(process.env.GEMINI_MODEL);
     const primaryModel = legacyModel || (workload === "fast"
-      ? process.env.GEMINI_FAST_MODEL || "gemini-3.5-flash-lite"
-      : process.env.GEMINI_QUALITY_MODEL || "gemini-3.6-flash");
-    const fallbackModel = process.env.GEMINI_FALLBACK_MODEL?.trim()
+      ? usableGeminiModel(process.env.GEMINI_FAST_MODEL) || "gemini-3.5-flash-lite"
+      : usableGeminiModel(process.env.GEMINI_QUALITY_MODEL) || "gemini-3.6-flash");
+    const fallbackModel = usableGeminiModel(process.env.GEMINI_FALLBACK_MODEL)
       || (legacyModel ? null : workload === "fast" ? "gemini-3.6-flash" : null);
 
     return {
@@ -100,7 +101,7 @@ export function getProviderRoute(workload: AiWorkload): ProviderRoute {
 
   const legacyModel = process.env.ANTHROPIC_MODEL?.trim();
   const primaryModel = legacyModel || (workload === "fast"
-    ? process.env.ANTHROPIC_FAST_MODEL || "claude-haiku-4-5"
+    ? process.env.ANTHROPIC_FAST_MODEL || "claude-3-haiku-20240307"
     : process.env.ANTHROPIC_QUALITY_MODEL || "claude-sonnet-5");
   const fallbackModel = process.env.ANTHROPIC_FALLBACK_MODEL?.trim()
     || (legacyModel ? null : workload === "fast" ? "claude-sonnet-5" : null);
@@ -195,7 +196,7 @@ async function callOpenAI(request: StructuredRequest, apiKey: string, model: str
     "openai",
     model,
     request.workload,
-    "https://api.openai.com/v1/responses",
+    AI_ENDPOINTS.OPENAI_RESPONSES,
     {
       method: "POST",
       headers: {
@@ -257,7 +258,7 @@ async function callAnthropic(request: StructuredRequest, apiKey: string, model: 
     "anthropic",
     model,
     request.workload,
-    "https://api.anthropic.com/v1/messages",
+    AI_ENDPOINTS.ANTHROPIC_MESSAGES,
     {
       method: "POST",
       headers: {
@@ -311,14 +312,14 @@ async function callGemini(request: StructuredRequest, apiKey: string, model: str
    * tighter cost guardrail.
    */
   const maxOutputTokens = request.schemaName === "sartho_resume_extraction"
-    ? 32_768
+    ? 8_192
     : 8_192;
 
   const { response, result: unknownResult, startedAt } = await fetchProvider(
     "gemini",
     model,
     request.workload,
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+    `${AI_ENDPOINTS.GEMINI_BASE}/${model}:generateContent`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
@@ -392,7 +393,8 @@ function callRoute(request: StructuredRequest, route: ProviderRoute, model: stri
 /*
  * One selected data processor, with at most one bounded recovery attempt.
  * A transient failure retries the same model once. A retired or unavailable
- * model moves to the configured fallback inside the same provider. No résumé
+ * model moves to the configured fallback inside the same provider, or — for
+ * Gemini with no fallback — to a model the same key still lists. No résumé
  * or job data crosses company boundaries without an operator changing
  * AI_PROVIDER for the whole deployment.
  */
@@ -407,16 +409,56 @@ export async function generateStructuredJson(request: StructuredRequest) {
       if (caught.retryKind === "transient") {
         return await callRoute(request, route, route.primaryModel);
       }
-      if (caught.retryKind === "model_unavailable" && route.fallbackModel) {
-        return await callRoute(request, route, route.fallbackModel);
+      if (caught.retryKind === "model_unavailable") {
+        const recovery = route.fallbackModel
+          ?? (route.provider === "gemini"
+            ? await recoverGeminiModel(route.key, route.primaryModel)
+            : null);
+        if (recovery) return await callRoute(request, route, recovery);
       }
     } catch (retryFailure) {
-      if (retryFailure instanceof Error) throw new Error(describeAiFailure(retryFailure.message));
-      throw retryFailure;
+      const msg = retryFailure instanceof Error ? retryFailure.message : "fallback failed";
+      if (route.provider === "gemini") {
+        let availableModels = "";
+        try {
+          const available = await listGeminiModels(process.env.GEMINI_API_KEY || "");
+          availableModels = available.join(", ");
+        } catch (e) {}
+        throw new Error(describeAiFailure(msg) + " [DIAGNOSTIC: Available models for your key: " + availableModels + "]");
+      }
+      throw new Error(describeAiFailure(msg));
     }
 
+    if (route.provider === "gemini") {
+      let availableModels = "";
+      try {
+        const available = await listGeminiModels(process.env.GEMINI_API_KEY || "");
+        availableModels = available.join(", ");
+      } catch (e) {}
+      throw new Error(describeAiFailure(caught.message) + " [DIAGNOSTIC: Available models for your key: " + availableModels + "]");
+    }
     throw new Error(describeAiFailure(caught.message));
   }
+}
+
+/*
+ * Google shut Gemini 1.5 down in 2025. A deployment that still has
+ * GEMINI_MODEL=gemini-1.5-pro treats that pin as gospel and skips fallback,
+ * which is how résumé import started failing with a model-not-found error
+ * that named a model nobody should still be asking for.
+ */
+export function isRetiredGeminiModel(name: string): boolean {
+  const id = name.trim().toLowerCase().replace(/^models\//, "");
+  return id === "gemini-pro"
+    || id.startsWith("gemini-pro-")
+    || id.startsWith("gemini-1.0")
+    || id.startsWith("gemini-1.5");
+}
+
+function usableGeminiModel(value: string | undefined): string | undefined {
+  const name = value?.trim();
+  if (!name || isRetiredGeminiModel(name)) return undefined;
+  return name;
 }
 
 export function isGeminiModelUnavailable(message: string): boolean {
@@ -424,12 +466,15 @@ export function isGeminiModelUnavailable(message: string): boolean {
   return /limit:\s*0\b/.test(text)
     || text.includes("no longer available")
     || text.includes("model not found")
-    || text.includes("model is not found");
+    || text.includes("model is not found")
+    || text.includes("is not found for api version")
+    || text.includes("not supported for generatecontent");
 }
 
 export function chooseGeminiModel(models: string[]): string | null {
   const usable = models.filter((name) =>
     name.startsWith("gemini-")
+    && !isRetiredGeminiModel(name)
     && !/embedding|imagen|veo|tts|live|image/.test(name),
   );
   if (!usable.length) return null;
@@ -447,9 +492,14 @@ export function chooseGeminiModel(models: string[]): string | null {
   return usable.slice().sort((a, b) => score(b) - score(a))[0] ?? null;
 }
 
+async function recoverGeminiModel(apiKey: string, failedModel: string) {
+  const available = await listGeminiModels(apiKey);
+  return chooseGeminiModel(available.filter((name) => name !== failedModel));
+}
+
 export async function listGeminiModels(apiKey: string): Promise<string[]> {
   try {
-    const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=200", {
+    const response = await fetch(`${AI_ENDPOINTS.GEMINI_BASE}?pageSize=200`, {
       headers: { "x-goog-api-key": apiKey },
       signal: AbortSignal.timeout(20_000),
     });
@@ -503,21 +553,23 @@ export async function probeProviders(): Promise<ProviderProbe[]> {
       name: "Gemini",
       envVar: "GEMINI_API_KEY",
       key: process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY,
-      model: process.env.GEMINI_MODEL || process.env.GEMINI_FAST_MODEL || "gemini-3.5-flash-lite",
+      model: usableGeminiModel(process.env.GEMINI_MODEL)
+        || usableGeminiModel(process.env.GEMINI_FAST_MODEL)
+        || "gemini-3.5-flash-lite",
     },
     {
       id: "anthropic" as const,
       name: "Anthropic",
       envVar: "ANTHROPIC_API_KEY",
       key: process.env.ANTHROPIC_API_KEY,
-      model: process.env.ANTHROPIC_MODEL || process.env.ANTHROPIC_FAST_MODEL || "claude-haiku-4-5",
+      model: process.env.ANTHROPIC_MODEL || process.env.ANTHROPIC_FAST_MODEL || "claude-3-haiku-20240307",
     },
     {
       id: "openai" as const,
       name: "OpenAI",
       envVar: "OPENAI_API_KEY",
       key: process.env.OPENAI_API_KEY,
-      model: process.env.OPENAI_MODEL || process.env.OPENAI_FAST_MODEL || "gpt-5.6-luna",
+      model: process.env.OPENAI_MODEL || process.env.OPENAI_FAST_MODEL || "gpt-4o-mini",
     },
   ];
 

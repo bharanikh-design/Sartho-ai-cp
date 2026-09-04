@@ -64,6 +64,22 @@ const strategyNavigation: NavigationItem = {
   purpose: "Save the locations, work model and sources that define a worthwhile opportunity.",
 };
 
+const directionNavigation: NavigationItem = {
+  label: "Career Direction",
+  shortLabel: "Direction",
+  href: "/career-direction",
+  icon: "interview",
+  purpose: "Select target roles and set your career positioning.",
+};
+
+const resumeNavigation: NavigationItem = {
+  label: "Résumé Studio",
+  shortLabel: "Resumes",
+  href: "/resume-studio",
+  icon: "resume",
+  purpose: "Manage your source resumes and create tailored drafts.",
+};
+
 /**
  * Dashboard remains the orientation point throughout setup. Opportunities is
  * reachable from the start — a half-finished foundation should nudge, not wall,
@@ -71,15 +87,11 @@ const strategyNavigation: NavigationItem = {
  * navigation expands into the full recurring loop, adding Applications.
  */
 export function getPrimaryNavigation(activated: boolean): NavigationItem[] {
-  if (!activated) return [dashboardNavigation, journeyNavigation, opportunityNavigation, profileNavigation, strategyNavigation];
+  if (!activated) {
+    return [dashboardNavigation, journeyNavigation, opportunityNavigation, profileNavigation, strategyNavigation];
+  }
 
-  return [
-    dashboardNavigation,
-    opportunityNavigation,
-    applicationNavigation,
-    profileNavigation,
-    strategyNavigation,
-  ];
+  return [dashboardNavigation, opportunityNavigation, applicationNavigation, profileNavigation, strategyNavigation, resumeNavigation];
 }
 
 export const allNavigation: NavigationItem[] = [
@@ -88,7 +100,9 @@ export const allNavigation: NavigationItem[] = [
   opportunityNavigation,
   applicationNavigation,
   profileNavigation,
+  directionNavigation,
   strategyNavigation,
+  resumeNavigation,
 ];
 
 export function getMobileNavigation(activated: boolean) {
@@ -104,10 +118,9 @@ export function getNavigationForPath(activated: boolean, pathname: string) {
 
 /* Legacy and contextual workspaces remain addressable from their parent flow. */
 const supportingPageLabels: Array<[prefix: string, label: string]> = [
-  ["/resume-studio", "Résumé Studio"],
-  ["/career-direction", "Career Direction"],
   ["/interview-prep", "Interview Preparation"],
   ["/diagnostics", "Diagnostics"],
+  ["/resume-studio", "Résumé Studio"],
 ];
 
 export function isNavigationItemActive(pathname: string, href: string) {
