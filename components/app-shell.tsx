@@ -244,7 +244,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                     href="/admin"
                     className={`as-nav-link${isNavigationItemActive(pathname, "/admin") ? " is-active" : ""}`}
                   >
-                    <Icon name="strategy" />
+                    <Icon name="shield" />
                     <span>Admin</span>
                   </Link>
                 </li>

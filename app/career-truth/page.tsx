@@ -1,8 +1,8 @@
-import Link from "next/link";
 import { CareerProfileReview } from "@/components/career-profile-review";
 import { ProductPageHeader } from "@/components/product-page-header";
 import { ResumeImport } from "@/components/resume-import";
 import { CareerHistory } from "@/components/career-history";
+import { ProfileSnapshotEditor } from "@/components/profile-snapshot-editor";
 import { VectorSyncEngine } from "@/components/vector-sync-engine";
 import { WorkflowHandoff } from "@/components/workflow-handoff";
 import { requireUser } from "@/lib/auth";
@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 
 export default async function CareerTruthPage() {
   const { supabase, user } = await requireUser();
-  const { profile, roles, evidence } = await getCareerWorkspace(supabase, user.id);
+  const { profile, lanes, roles, evidence } = await getCareerWorkspace(supabase, user.id);
   const isEmpty = evidence.length === 0;
   const usableEvidence = evidence.filter((item) => item.approval_status !== "rejected");
   const pending = usableEvidence.filter((item) => item.approval_status === "pending").length;
@@ -57,22 +57,12 @@ export default async function CareerTruthPage() {
       <VectorSyncEngine />
 
       {profile ? (
-        <section className="glass-card profile-record" aria-labelledby="profile-record-title">
-          <div className="profile-record__heading">
-            <div><p className="product-system-eyebrow">Professional snapshot</p><h2 id="profile-record-title">{positioning}</h2></div>
-            <Link href="/career-direction#context">Edit snapshot →</Link>
-          </div>
-          {profile.headline && profile.summary && profile.headline.trim() !== profile.summary.trim() ? <p className="profile-record__summary">{profile.summary}</p> : null}
-          <div className="profile-record__facts">
-            <div><span>Location</span><strong>{profile.location ?? "Not recorded"}</strong></div>
-            <div><span>Work rights and mobility</span><strong>{profile.work_authorisation ?? "Not recorded"}</strong></div>
-            <div><span>Career history</span><strong>{roles.length} role{roles.length === 1 ? "" : "s"}</strong></div>
-          </div>
-          <div className="profile-record__strengths">
-            <span>Leading strengths</span>
-            <div>{strengths.length ? strengths.map((strength) => <strong key={strength}>{strength}</strong>) : <em>No strengths recorded yet</em>}</div>
-          </div>
-        </section>
+        <ProfileSnapshotEditor
+          profile={profile}
+          lanes={lanes}
+          roleCount={roles.length}
+          displayStrengths={strengths}
+        />
       ) : null}
 
       <CareerProfileReview initialItems={evidence} roles={roles} profile={profile} />

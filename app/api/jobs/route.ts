@@ -3,6 +3,7 @@ import { z } from "zod";
 import { getAuthenticatedUser } from "@/lib/auth";
 import { getCareerWorkspace } from "@/lib/data/career";
 import { analyseJobDescription } from "@/lib/matching/analyse-job";
+import { alignToLanes, overallMatchScore, withLane } from "@/lib/matching/opportunity-score";
 import { buildSkillProfile } from "@/lib/matching/skill-profile";
 
 export const jobInputSchema = z.object({
@@ -27,8 +28,9 @@ export async function POST(request: Request) {
    * own to fall back on, which is the point — a role can only be judged
    * against skills the person has actually approved.
    */
-  const { roles, evidence } = await getCareerWorkspace(supabase, user.id);
+  const { roles, evidence, lanes } = await getCareerWorkspace(supabase, user.id);
   const analysis = analyseJobDescription(description, buildSkillProfile(evidence, roles));
+  const alignment = alignToLanes(title, description, lanes);
   const { data, error } = await supabase
     .from("jobs")
     .insert({
@@ -42,8 +44,9 @@ export async function POST(request: Request) {
       status: "saved",
       deep_analysis_status: "complete", // Bypassing async analysis queue for real-time semantic processing
       technical_heaviness: analysis.evidenceBacking,
+      overall_match: overallMatchScore(analysis, alignment),
       recommendation: analysis.recommendation,
-      rule_analysis: analysis,
+      rule_analysis: withLane(analysis, alignment),
     })
     .select("*")
     .single();

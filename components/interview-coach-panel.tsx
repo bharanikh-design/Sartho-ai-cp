@@ -133,7 +133,7 @@ export function InterviewCoachPanel({
                           {question.evidence.length ? (
                             <details style={{ marginBottom: "1rem" }}>
                               <summary style={{ cursor: "pointer", color: "#6bcf93", fontWeight: "bold" }}>{question.evidence.length} approved career fact{question.evidence.length === 1 ? "" : "s"} to use</summary>
-                              <ul style={{ marginTop: "0.5rem", paddingLeft: "1.2rem", color: "#ccc" }}>{question.evidence.map((item: any) => <li key={item.id}>{item.claim}</li>)}</ul>
+                              <ul style={{ marginTop: "0.5rem", paddingLeft: "1.2rem", color: "#ccc" }}>{question.evidence.map((item: { id: string; claim: string }) => <li key={item.id}>{item.claim}</li>)}</ul>
                             </details>
                           ) : (
                             <p className="field-hint" style={{ color: "#888", fontStyle: "italic", marginBottom: "1rem" }}>Forward-looking question — answer as a plan or judgment, not as past experience.</p>
@@ -164,22 +164,22 @@ export function InterviewCoachPanel({
                 <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "1rem" }}>
                   <article style={{ background: "rgba(255,255,255,0.02)", padding: "1.5rem", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.05)" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "1rem" }}>
-                      <strong>"The 30-60-90 Day ITSM Plan"</strong>
+                      <strong>{`"The 30-60-90 Day ITSM Plan"`}</strong>
                       <span style={{ color: "#0077b5" }}>in LinkedIn</span>
                     </div>
                     <p style={{ color: "#ccc", fontSize: "0.9rem", lineHeight: "1.5" }}>
-                      "When interviewing for a VP or Lead Service Management role, don't just talk about past ITIL implementations. Bring a drafted 30-60-90 day plan to the interview. In the first 30 days, focus purely on assessing the current MTTR metrics and stakeholder relationships. In 60 days..."
+                      {`"When interviewing for a VP or Lead Service Management role, don't just talk about past ITIL implementations. Bring a drafted 30-60-90 day plan to the interview. In the first 30 days, focus purely on assessing the current MTTR metrics and stakeholder relationships. In 60 days..."`}
                     </p>
                     <div style={{ marginTop: "1rem", fontSize: "0.8rem", color: "#888" }}>Recommended for: Final Round Interviews</div>
                   </article>
 
                   <article style={{ background: "rgba(255,255,255,0.02)", padding: "1.5rem", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.05)" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "1rem" }}>
-                      <strong>"Framework for answering 'Why ServiceNow?'"</strong>
+                      <strong>{`"Framework for answering 'Why ServiceNow?'"`}</strong>
                       <span style={{ color: "#0077b5" }}>in LinkedIn</span>
                     </div>
                     <p style={{ color: "#ccc", fontSize: "0.9rem", lineHeight: "1.5" }}>
-                      "Enterprise companies are obsessed with ROI right now. If asked about platform strategy, frame your answer around 'Consolidation vs Customization'. Explain how out-of-the-box workflows reduce technical debt by 40% compared to heavily customized legacy deployments."
+                      {`"Enterprise companies are obsessed with ROI right now. If asked about platform strategy, frame your answer around 'Consolidation vs Customization'. Explain how out-of-the-box workflows reduce technical debt by 40% compared to heavily customized legacy deployments."`}
                     </p>
                     <div style={{ marginTop: "1rem", fontSize: "0.8rem", color: "#888" }}>Recommended for: Technical / Architecture Rounds</div>
                   </article>

@@ -81,12 +81,14 @@ const resumeNavigation: NavigationItem = {
 };
 
 /**
- * Dashboard remains the orientation point throughout setup. After activation the
- * navigation expands into the recurring opportunity and application loop.
+ * Dashboard remains the orientation point throughout setup. Opportunities is
+ * reachable from the start — a half-finished foundation should nudge, not wall,
+ * and the page itself explains what it still needs. After activation the
+ * navigation expands into the full recurring loop, adding Applications.
  */
 export function getPrimaryNavigation(activated: boolean): NavigationItem[] {
   if (!activated) {
-    return [dashboardNavigation, journeyNavigation, profileNavigation, strategyNavigation];
+    return [dashboardNavigation, journeyNavigation, opportunityNavigation, profileNavigation, strategyNavigation];
   }
 
   return [dashboardNavigation, opportunityNavigation, applicationNavigation, profileNavigation, strategyNavigation, resumeNavigation];

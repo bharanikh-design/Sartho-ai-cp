@@ -44,7 +44,7 @@ export default async function AdminDashboardPage() {
         <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "16px", padding: "24px" }}>
           <h3 style={{ color: "#fff", margin: "0 0 16px 0", fontSize: "1.1rem" }}>Vercel Observability Data</h3>
           <p style={{ color: "#aaa", fontSize: "0.9rem", lineHeight: 1.5, marginBottom: "16px" }}>
-            To view "Active Minutes Spent", "Live Visitors", and Core Web Vitals, navigate to your <strong>Vercel Dashboard</strong>. Vercel Web Analytics automatically captures session lengths and active minutes natively via the edge network, avoiding heavy DB queries on our end.
+            To view &quot;Active Minutes Spent&quot;, &quot;Live Visitors&quot;, and Core Web Vitals, navigate to your <strong>Vercel Dashboard</strong>. Vercel Web Analytics automatically captures session lengths and active minutes natively via the edge network, avoiding heavy DB queries on our end.
           </p>
           <a href="https://vercel.com/dashboard" target="_blank" rel="noreferrer" style={{ display: "inline-block", background: "#333", color: "#fff", padding: "8px 16px", borderRadius: "8px", textDecoration: "none", fontSize: "0.85rem", fontWeight: 600 }}>Open Vercel Dashboard ↗</a>
         </div>

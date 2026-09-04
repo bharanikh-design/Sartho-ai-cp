@@ -27,14 +27,15 @@ describe("primary navigation", () => {
   });
 
   it("labels supporting workflow pages without adding them to primary navigation", () => {
-    expect(getPageLabel("/resume-studio")).toBe("Résumé Studio");
-    expect(primaryNavigation.some((item) => item.href === "/resume-studio")).toBe(false);
+    expect(getPageLabel("/diagnostics")).toBe("Diagnostics");
+    expect(primaryNavigation.some((item) => item.href === "/diagnostics")).toBe(false);
   });
 
   it("keeps Dashboard visible while setup is incomplete and expands the outcome loop afterwards", () => {
     expect(getPrimaryNavigation(false).map((item) => item.label)).toEqual([
       "Dashboard",
       "Your Journey",
+      "Opportunities",
       "Career Profile",
       "Search Brief",
     ]);
@@ -44,17 +45,21 @@ describe("primary navigation", () => {
       "Applications",
       "Career Profile",
       "Search Brief",
+      "Résumé Studio",
     ]);
     expect(getMobileNavigation(true)).toHaveLength(4);
   });
 
   it("keeps a directly opened contextual destination visible and active", () => {
-    expect(getNavigationForPath(false, "/jobs").map((item) => item.label)).toEqual([
+    // Applications is the one primary item hidden before activation, so opening
+    // it directly appends it rather than leaving the shell without an active tab.
+    expect(getNavigationForPath(false, "/applications").map((item) => item.label)).toEqual([
       "Dashboard",
       "Your Journey",
+      "Opportunities",
       "Career Profile",
       "Search Brief",
-      "Opportunities",
+      "Applications",
     ]);
   });
 });

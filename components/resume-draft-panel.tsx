@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import type { ApplicationRecord } from "@/lib/types";
+import type { ApplicationRecord, RuleAnalysis } from "@/lib/types";
 
 export function ResumeDraftPanel({
   jobId,
@@ -13,7 +13,7 @@ export function ResumeDraftPanel({
   jobId: string;
   deepAnalysisComplete: boolean;
   application: ApplicationRecord | null;
-  analysis?: any;
+  analysis?: (RuleAnalysis & { matchScore?: number; missingSkills?: string[] }) | null;
 }) {
   const router = useRouter();
   const [running, setRunning] = useState(false);

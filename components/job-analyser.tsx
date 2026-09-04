@@ -13,6 +13,12 @@ const recommendationStyles: Record<JobAnalysis["recommendation"], string> = {
   skip: "border-rose-300/30 bg-rose-300/10 text-rose-100",
 };
 
+// The shape the semantic analyze endpoint returns, as the UI reads it: the
+// rule-analysis fields plus the raw requirement/evidence pairs it renders.
+type SemanticAnalysis = Partial<JobAnalysis> & {
+  rawSemanticMatches?: Array<{ requirement: string; evidence: string }>;
+};
+
 export function JobAnalyser({ initialJobs, skillProfile }: { initialJobs: JobRecord[]; skillProfile?: SkillProfile }) {
   const router = useRouter();
   const [title, setTitle] = useState("");
@@ -64,7 +70,7 @@ export function JobAnalyser({ initialJobs, skillProfile }: { initialJobs: JobRec
   const [marketIntel, setMarketIntel] = useState<{ news: string; culture: string } | null>(null);
   const [deepFit, setDeepFit] = useState<{ score: number; missing: string } | null>(null);
 
-  const [analysis, setAnalysis] = useState<Record<string, unknown> | null>(null);
+  const [analysis, setAnalysis] = useState<SemanticAnalysis | null>(null);
 
   async function analyse() {
     if (!description.trim()) return;
@@ -234,7 +240,7 @@ export function JobAnalyser({ initialJobs, skillProfile }: { initialJobs: JobRec
                   </div>
                   
                   <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "1rem" }}>
-                    <span className={recommendationStyles[analysis.recommendation as JobRecommendation] || "border-gray-500 bg-gray-800 text-gray-200"} style={{ padding: "4px 12px", borderRadius: "100px", textTransform: "uppercase", fontSize: "0.75rem", fontWeight: "bold", border: "1px solid" }}>
+                    <span className={(analysis.recommendation && recommendationStyles[analysis.recommendation]) || "border-gray-500 bg-gray-800 text-gray-200"} style={{ padding: "4px 12px", borderRadius: "100px", textTransform: "uppercase", fontSize: "0.75rem", fontWeight: "bold", border: "1px solid" }}>
                       {analysis.recommendation}
                     </span>
                     <span style={{ fontSize: "0.875rem", color: "#888" }}>Match Score: <strong>{analysis.coverage}%</strong></span>

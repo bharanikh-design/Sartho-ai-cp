@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getAuthenticatedUser } from "@/lib/auth";
 import { logError } from "@/lib/logger";
-
+import { rescoreSavedJobs } from "@/lib/matching/rescore";
 
 export const directionSchema = z.object({
   headline: z.string().trim().max(240),
@@ -91,6 +91,10 @@ export async function PUT(request: Request) {
       .in("id", staleIds);
     if (cleanupError) console.warn("Removed target profiles remain disabled", cleanupError);
   }
+
+  // Priorities feed the opportunity score, so a change here re-ranks every
+  // saved role against the direction the user just set.
+  await rescoreSavedJobs(supabase, user.id);
 
   return NextResponse.json({ ok: true });
 }

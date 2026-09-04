@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getAuthenticatedUser } from "@/lib/auth";
+import { rescoreSavedJobs } from "@/lib/matching/rescore";
 
 const evidencePatchSchema = z.object({
   approval_status: z.enum(["pending", "approved", "rejected"]).optional(),
@@ -41,5 +42,12 @@ export async function PATCH(
   // Missing or owned by someone else — indistinguishable under RLS, and a 404
   // either way rather than the 500 that `.single()` produced on an empty result.
   if (!data) return NextResponse.json({ error: "Evidence record not found." }, { status: 404 });
+
+  // Approving or rejecting a claim changes the skill profile every saved
+  // opportunity was scored against, so refresh those scores before replying.
+  if (parsed.data.approval_status !== undefined) {
+    await rescoreSavedJobs(supabase, user.id);
+  }
+
   return NextResponse.json({ evidence: data });
 }

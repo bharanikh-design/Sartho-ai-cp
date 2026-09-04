@@ -59,7 +59,10 @@ export function describeAiFailure(message: string): string {
     case "model":
       return "Sartho's selected AI model is no longer available, so it could not read the document. Nothing is wrong with your résumé. The administrator needs to set a current model name in the deployment's environment variables.";
     default:
-      return `Sartho's AI provider rejected the request with this exact error: "${message}". Please screenshot this and show the Sartho administrator.`;
+      // The raw provider message is logged server-side for diagnostics; it must
+      // never be printed to the person uploading a résumé — it reads as a Sartho
+      // bug and can leak internal request IDs and provider URLs.
+      return "Sartho's AI provider could not read the document. Nothing is wrong with your résumé. Try again, and if it continues ask the Sartho administrator to check the provider.";
   }
 }
 

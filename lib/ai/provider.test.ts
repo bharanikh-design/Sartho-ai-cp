@@ -93,7 +93,7 @@ describe("explicit provider routing", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("uses Luna for extraction even when every provider key exists", async () => {
+  it("uses the fast model for extraction even when every provider key exists", async () => {
     vi.stubEnv("OPENAI_API_KEY", "o-key");
     vi.stubEnv("GEMINI_API_KEY", "g-key");
     vi.stubEnv("ANTHROPIC_API_KEY", "a-key");
@@ -103,16 +103,16 @@ describe("explicit provider routing", () => {
     expect(result.headline).toBe("from openai");
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(calls[0].url).toContain("api.openai.com");
-    expect(bodyOf(calls[0]).model).toBe("gpt-5.6-luna");
+    expect(bodyOf(calls[0]).model).toBe("gpt-4o-mini");
     expect(bodyOf(calls[0]).reasoning).toEqual({ effort: "none" });
   });
 
-  it("uses Terra with balanced reasoning for quality-critical work", async () => {
+  it("uses the quality model with balanced reasoning for quality-critical work", async () => {
     vi.stubEnv("OPENAI_API_KEY", "o-key");
 
     await generateStructuredJson({ ...REQUEST, workload: "quality" });
 
-    expect(bodyOf(calls[0]).model).toBe("gpt-5.6-terra");
+    expect(bodyOf(calls[0]).model).toBe("gpt-4o");
     expect(bodyOf(calls[0]).reasoning).toEqual({ effort: "medium" });
   });
 
@@ -169,7 +169,7 @@ describe("explicit provider routing", () => {
     await generateStructuredJson(REQUEST);
 
     expect(calls).toHaveLength(2);
-    expect(calls.map((call) => bodyOf(call).model)).toEqual(["gpt-5.6-luna", "gpt-5.6-luna"]);
+    expect(calls.map((call) => bodyOf(call).model)).toEqual(["gpt-4o-mini", "gpt-4o-mini"]);
   });
 
   it("does not retry a permanent billing failure reported as HTTP 429", async () => {
@@ -185,7 +185,7 @@ describe("explicit provider routing", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it("uses a stronger same-provider model when Luna is unavailable", async () => {
+  it("uses a stronger same-provider model when the fast model is unavailable", async () => {
     vi.stubEnv("OPENAI_API_KEY", "o-key");
     fetchMock
       .mockImplementationOnce((url: string, init: RequestInit) => {
@@ -199,7 +199,7 @@ describe("explicit provider routing", () => {
 
     await generateStructuredJson(REQUEST);
 
-    expect(calls.map((call) => bodyOf(call).model)).toEqual(["gpt-5.6-luna", "gpt-5.6-terra"]);
+    expect(calls.map((call) => bodyOf(call).model)).toEqual(["gpt-4o-mini", "gpt-4o"]);
     expect(calls.every((call) => call.url.includes("openai.com"))).toBe(true);
   });
 
@@ -266,13 +266,13 @@ describe("controlled emergency providers", () => {
     expect(JSON.stringify(body.systemInstruction)).toContain("JSON Schema");
   });
 
-  it("gives detailed résumé extraction more output room without relaxing other cost limits", async () => {
+  it("holds Gemini output to the legal 8192-token limit across workloads", async () => {
     vi.stubEnv("AI_PROVIDER", "gemini");
     vi.stubEnv("GEMINI_DATA_TIER", "paid");
     vi.stubEnv("GEMINI_API_KEY", "g-key");
 
     await generateStructuredJson(REQUEST);
-    expect((bodyOf(calls[0]).generationConfig as Record<string, unknown>).maxOutputTokens).toBe(32_768);
+    expect((bodyOf(calls[0]).generationConfig as Record<string, unknown>).maxOutputTokens).toBe(8_192);
 
     await generateStructuredJson({ ...REQUEST, schemaName: "sartho_job_analysis" });
     expect((bodyOf(calls[1]).generationConfig as Record<string, unknown>).maxOutputTokens).toBe(8_192);

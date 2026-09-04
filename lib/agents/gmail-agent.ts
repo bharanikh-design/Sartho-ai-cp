@@ -82,12 +82,12 @@ export class GmailRecruiterAgent {
     };
   }
 
-  private async generateResponse(email: any, classification: unknown) {
+  private async generateResponse(email: { from: string }, classification: unknown) {
     // In production, we'd use an LLM to draft the response.
     return `Hi Sarah,\n\nThanks for reaching out! I am currently open to exploring new opportunities and the Senior PM role at TechCorp sounds interesting.\n\nLet's connect this week. Feel free to find a time on my calendar: https://calendly.com/sartho-demo\n\nBest,\nBharani`;
   }
 
-  private async createGmailDraft(email: any, draftBody: string) {
+  private async createGmailDraft(email: { from: string }, draftBody: string) {
     // In production, this hits: POST https://gmail.googleapis.com/gmail/v1/users/me/drafts
     // Constructing the RFC 2822 email format and base64 encoding it.
     console.log(`Sartho Gmail Agent: Created draft for ${email.from}`);

@@ -42,8 +42,6 @@ export function SearchPlanEditor({
     !remote ? "choose a preferred work model" : null,
     !activeSourceCount ? "turn on at least one trusted source" : null,
   ].filter((reason): reason is string => Boolean(reason));
-  
-  const canSave = incompleteReasons.length === 0;
 
   const hasChanges = useMemo(() => {
     if (remote !== initialRemote) return true;
@@ -89,26 +87,24 @@ export function SearchPlanEditor({
   }
 
   async function save() {
-    if (!canSave) {
-      setStatus("error");
-      return;
-    }
-    
+    // The brief refines search but never blocks the loop: reaching the dashboard
+    // is the point of this screen, so we fill sensible defaults and always save.
     if (!hasChanges) {
       router.push("/");
       return;
     }
 
     setStatus("saving");
-    
-    // Pass targetCompanies to the backend if supported (prototyped for now)
-    const response = await fetch("/api/search-plan", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ sources, targetLocations: locations, remotePreference: remote }) });
-    
+    const finalLocations = locations.length ? locations : ["Remote"];
+    const finalRemote = remote || "Flexible";
+    const finalSources = sources.some((source) => source.active) ? sources : DEFAULT_JOB_SOURCES;
+    const response = await fetch("/api/search-plan", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ sources: finalSources, targetLocations: finalLocations, remotePreference: finalRemote }) });
+
     if (dailyDigest) {
       await fetch("/api/notifications/preferences", {
         method: "PUT",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ email: "user@example.com", enabled: true })
+        body: JSON.stringify({ email: "user@example.com", enabled: true }),
       }).catch(() => null);
     }
 
@@ -128,7 +124,7 @@ export function SearchPlanEditor({
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <div>
               <h2 className="section-heading" style={{ color: "#6bcf93", marginBottom: "0.5rem" }}>Generate an AI Search Strategy ✦</h2>
-              <p style={{ color: "#ccc", margin: 0, maxWidth: "600px" }}>Don't know exactly where to look? Sartho can analyze your Master Resume and auto-suggest the top locations, work models, and specific companies you should target.</p>
+              <p style={{ color: "#ccc", margin: 0, maxWidth: "600px" }}>Don&apos;t know exactly where to look? Sartho can analyze your Master Resume and auto-suggest the top locations, work models, and specific companies you should target.</p>
             </div>
             <button type="button" className="primary-button" onClick={generateAiStrategy}>
               Analyze my profile
@@ -220,16 +216,16 @@ export function SearchPlanEditor({
 
       <div className="direction-save-bar">
         <div>
-          <strong>{canSave ? (hasChanges ? "Search brief ready for your approval" : "Search brief is up to date") : "Complete your search brief before continuing"}</strong>
-          <span>{status === "saved" ? "Saved securely" : status === "error" && canSave ? "Could not save—please try again" : incompleteReasons.length ? `Next: ${incompleteReasons[0]}.` : (hasChanges ? "One click to save changes and open your Dashboard" : "No changes made.")}</span>
+          <strong>{hasChanges ? "Search brief ready" : "You can refine this later"}</strong>
+          <span>{status === "saved" ? "Saved securely" : status === "error" ? "Could not save—please try again" : incompleteReasons.length ? `Optional: ${incompleteReasons[0]}.` : (hasChanges ? "One click to save and open your Dashboard" : "This saves evaluation criteria; it does not fetch or submit applications")}</span>
         </div>
-        <button 
-          type="button" 
-          className={hasChanges ? "primary-button" : "secondary-button"} 
-          onClick={() => void save()} 
-          disabled={status === "saving" || !canSave}
+        <button
+          type="button"
+          className="primary-button"
+          onClick={() => void save()}
+          disabled={status === "saving"}
         >
-          {status === "saving" ? "Saving…" : (hasChanges ? "Save and go to Dashboard" : "Return to Dashboard")}
+          {status === "saving" ? "Saving…" : (hasChanges ? "Save and open opportunities" : "Go to Dashboard")}
         </button>
       </div>
     </div>

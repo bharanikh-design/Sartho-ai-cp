@@ -7,10 +7,12 @@ export function JourneyNudgeCard({ progress, isActivated, steps = [] }: { progre
   const [showCelebration, setShowCelebration] = useState(false);
 
   useEffect(() => {
-    // If they just hit 100%, show a celebration animation
+    // If they just hit 100%, show a celebration animation. Defer the state
+    // update out of the synchronous effect body so it does not cascade renders.
     if (isActivated && !sessionStorage.getItem("sartho-celebrated")) {
-      setShowCelebration(true);
       sessionStorage.setItem("sartho-celebrated", "true");
+      const frame = requestAnimationFrame(() => setShowCelebration(true));
+      return () => cancelAnimationFrame(frame);
     }
   }, [isActivated]);
 
