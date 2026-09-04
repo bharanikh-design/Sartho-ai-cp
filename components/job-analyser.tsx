@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { analyseJobDescription, type JobAnalysis } from "@/lib/matching/analyse-job";
+import type { JobAnalysis } from "@/lib/matching/analyse-job";
 import type { SkillProfile } from "@/lib/matching/skill-profile";
 import type { JobRecord } from "@/lib/types";
 
@@ -13,7 +13,7 @@ const recommendationStyles: Record<JobAnalysis["recommendation"], string> = {
   skip: "border-rose-300/30 bg-rose-300/10 text-rose-100",
 };
 
-export function JobAnalyser({ initialJobs, skillProfile }: { initialJobs: JobRecord[]; skillProfile: SkillProfile }) {
+export function JobAnalyser({ initialJobs, skillProfile }: { initialJobs: JobRecord[]; skillProfile?: SkillProfile }) {
   const router = useRouter();
   const [title, setTitle] = useState("");
   const [employer, setEmployer] = useState("");
@@ -64,37 +64,54 @@ export function JobAnalyser({ initialJobs, skillProfile }: { initialJobs: JobRec
   const [marketIntel, setMarketIntel] = useState<{ news: string; culture: string } | null>(null);
   const [deepFit, setDeepFit] = useState<{ score: number; missing: string } | null>(null);
 
-  const analysis = useMemo(
-    () => (submittedText ? analyseJobDescription(submittedText, skillProfile) : null),
-    [submittedText, skillProfile],
-  );
+  const [analysis, setAnalysis] = useState<Record<string, unknown> | null>(null);
 
-  function analyse() {
+  async function analyse() {
+    if (!description.trim()) return;
     setError(null);
     setSavedJobId(null);
     setMarketIntel(null);
     setDeepFit(null);
+    setAnalysis(null);
     setSubmittedText(description.trim());
     setIsAnalyzing(true);
 
-    // Simulate API Gateway Fan-Out
+    try {
+      // Execute true Semantic Job Analysis via pgvector API
+      const res = await fetch("/api/jobs/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ description: description.trim() })
+      });
+      
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Analysis failed");
 
-    // 1. Perplexity Market Intel (resolves fast)
-    setTimeout(() => {
+      // Adapt the semantic response into the shape the UI expects
+      setAnalysis({
+        recommendation: data.recommendation,
+        confidence: "high", // AI embedded implies high confidence
+        coverage: data.coverage,
+        evidenceBacking: data.coverage,
+        matchedSignals: data.matchedRequirements.map((m: Record<string, string>) => m.requirement),
+        cautionSignals: data.missingSkills,
+        matchedSkills: data.matchedRequirements.map((m: Record<string, string>) => ({ name: m.requirement, strength: "core", evidenceCount: 1 })),
+        unusedStrengths: data.missingSkills,
+        explanation: data.explanation,
+        rawSemanticMatches: data.matchedRequirements // Store raw for UI enhancement
+      });
+
+      // Maintain Market Intel simulation
       setMarketIntel({
         news: employer ? `${employer} recently announced a major expansion in their engineering division.` : "Company has seen a 12% increase in hiring over the last quarter.",
         culture: "Glassdoor indicates a strong work-life balance but intense interview cycles."
       });
-    }, 2000);
-
-    // 2. Gemini Deep Analysis (takes a bit longer)
-    setTimeout(() => {
-      setDeepFit({
-        score: Math.floor(Math.random() * 20) + 80, // 80-99
-        missing: "Advanced Stakeholder Management"
-      });
+      
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to analyze job");
+    } finally {
       setIsAnalyzing(false);
-    }, 4500);
+    }
   }
 
   async function saveJob() {
@@ -206,18 +223,49 @@ export function JobAnalyser({ initialJobs, skillProfile }: { initialJobs: JobRec
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
               
-              {/* Stream 1: Core Matching (Instant) */}
+              {/* Stream 1: Semantic Graph Matching */}
               {analysis && (
-                <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: "8px", padding: "1.5rem", animation: "fade-in 0.5s ease-out" }}>
+                <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(107, 207, 147, 0.3)", borderRadius: "8px", padding: "1.5rem", animation: "fade-in 0.5s ease-out" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "1rem" }}>
-                    <h4 style={{ margin: 0, color: "white" }}>Core Skill Match</h4>
-                    <span style={{ fontSize: "0.75rem", color: "#6bcf93" }}>✓ 0.1s Local Match</span>
+                    <h4 style={{ margin: 0, color: "white", display: "flex", alignItems: "center", gap: "8px" }}>
+                      <span style={{ color: "#6bcf93" }}>✦</span> Semantic Graph Match
+                    </h4>
+                    <span style={{ fontSize: "0.75rem", color: "#6bcf93" }}>✓ OpenAI Vector Search</span>
                   </div>
+                  
                   <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "1rem" }}>
-                    <span className={recommendationStyles[analysis.recommendation]} style={{ padding: "4px 12px", borderRadius: "100px", textTransform: "uppercase", fontSize: "0.75rem", fontWeight: "bold", border: "1px solid" }}>{analysis.recommendation}</span>
-                    <span style={{ fontSize: "0.875rem", color: "#888" }}>Primary: {analysis.primaryStrength ?? "None"}</span>
+                    <span className={recommendationStyles[analysis.recommendation as JobRecommendation] || "border-gray-500 bg-gray-800 text-gray-200"} style={{ padding: "4px 12px", borderRadius: "100px", textTransform: "uppercase", fontSize: "0.75rem", fontWeight: "bold", border: "1px solid" }}>
+                      {analysis.recommendation}
+                    </span>
+                    <span style={{ fontSize: "0.875rem", color: "#888" }}>Match Score: <strong>{analysis.coverage}%</strong></span>
                   </div>
-                  <p style={{ fontSize: "0.875rem", color: "#ccc", margin: 0 }}>{analysis.explanation}</p>
+                  
+                  <p style={{ fontSize: "0.875rem", color: "#ccc", margin: "0 0 1rem 0" }}>{analysis.explanation}</p>
+                  
+                  {analysis.rawSemanticMatches && analysis.rawSemanticMatches.length > 0 && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "12px", borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: "12px" }}>
+                      <span style={{ fontSize: "0.75rem", color: "#888", textTransform: "uppercase" }}>Evidence Found</span>
+                      {analysis.rawSemanticMatches.map((match: Record<string, string>, idx: number) => (
+                        <div key={idx} style={{ fontSize: "0.8125rem", background: "rgba(0,0,0,0.3)", padding: "8px 12px", borderRadius: "6px", borderLeft: "2px solid #6bcf93" }}>
+                          <strong style={{ color: "white", display: "block", marginBottom: "4px" }}>{match.requirement}</strong>
+                          <span style={{ color: "#aaa" }}>{match.evidence}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {analysis.unusedStrengths && analysis.unusedStrengths.length > 0 && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "12px" }}>
+                      <span style={{ fontSize: "0.75rem", color: "#888", textTransform: "uppercase" }}>Missing Skills / Gaps</span>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                        {analysis.unusedStrengths.map((gap: string, idx: number) => (
+                          <span key={idx} style={{ fontSize: "0.75rem", color: "#ff6b6b", background: "rgba(255,107,107,0.1)", border: "1px solid rgba(255,107,107,0.2)", padding: "4px 8px", borderRadius: "4px" }}>
+                            {gap}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
