@@ -317,11 +317,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <div className="app-stage">
         
 
-        {session && showWelcome ? (
-          <div style={{ position: "fixed", top: "20px", left: "50%", transform: "translateX(-50%)", background: "#0d402b", color: "white", padding: "12px 24px", borderRadius: "100px", zIndex: 9999, boxShadow: "0 4px 12px rgba(0,0,0,0.15)", animation: "fadeIn 0.3s ease-out", fontSize: "0.875rem", fontWeight: 500 }}>
-            <span style={{ color: "#6bcf93" }}>✦</span> 3 new ServiceNow Manager roles matching your Search Brief were posted today.
-          </div>
-        ) : null}
+        
 
         <main className="page-content">{children}</main>
       </div>
