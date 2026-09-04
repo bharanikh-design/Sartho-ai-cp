@@ -237,7 +237,19 @@ export function AppShell({ children }: { children: ReactNode }) {
 
         <div className="rail-section-label">Your career</div>
         <nav className="rail-nav">
-          {navigation.map((item) => (
+          
+              {session?.user?.app_metadata?.role === "admin" && (
+                <li style={{ marginTop: "16px", paddingTop: "16px", borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+                  <Link
+                    href="/admin"
+                    className={`as-nav-link${isNavigationItemActive(pathname, "/admin") ? " is-active" : ""}`}
+                  >
+                    <Icon name="strategy" />
+                    <span>Admin</span>
+                  </Link>
+                </li>
+              )}
+{navigation.map((item) => (
             <NavItem key={item.href} item={item} active={isNavigationItemActive(pathname, item.href)} />
           ))}
         </nav>
