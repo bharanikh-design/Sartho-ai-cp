@@ -243,11 +243,13 @@ async function searchJSearch(query: JobSearchQuery): Promise<JobSearchResult[]> 
  * a single provider when set.
  */
 export function configuredJobSearchProviders(): JobSearchProviderName[] {
-  // Every provider that is actually configured. Adzuna leads by default because
-  // it is a plain REST API with no gateway/subscription layer to go wrong.
+  // Every provider that is actually configured. JSearch (Google for Jobs) leads
+  // by default: it returns full job descriptions, so the evidence match is
+  // meaningful, and it reaches company career pages. Adzuna — whose short
+  // blurbs flatten every score — stays on as the fallback.
   const configured: JobSearchProviderName[] = [];
-  if (adzunaConfig()) configured.push("adzuna");
   if (jsearchConfig()) configured.push("jsearch");
+  if (adzunaConfig()) configured.push("adzuna");
 
   // JOBS_SEARCH_PROVIDER is a *preference*, not a lock: the named provider is
   // tried first, but every other configured provider stays on as a fallback so

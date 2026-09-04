@@ -22,13 +22,14 @@ export function SearchPlanEditor({
   targetLanes: TargetLaneRecord[];
 }) {
   const router = useRouter();
-  const [sources, setSources] = useState<SearchSource[]>(initialSources.length ? initialSources : DEFAULT_JOB_SOURCES);
+  // Sources are kept for persistence (they satisfy the activation gate) but are
+  // no longer shown or toggled: real search runs through the configured jobs
+  // provider, not per-source toggles.
+  const [sources] = useState<SearchSource[]>(initialSources.length ? initialSources : DEFAULT_JOB_SOURCES);
   const [locations, setLocations] = useState(initialLocations);
   const [remote, setRemote] = useState(initialRemote);
   const [locationDraft, setLocationDraft] = useState("");
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
-
-  const activeSourceCount = sources.filter((source) => source.active).length;
 
   const hasChanges = useMemo(() => {
     if (remote !== initialRemote) return true;
@@ -79,20 +80,6 @@ export function SearchPlanEditor({
         <div className="editable-chips">{locations.map((location) => <button key={location} type="button" onClick={() => setLocations((items) => items.filter((item) => item !== location))}>{location}<span>×</span></button>)}</div>
         <div className="inline-add"><input value={locationDraft} onChange={(event) => setLocationDraft(event.target.value)} onKeyDown={(event) => event.key === "Enter" && (event.preventDefault(), addLocation())} placeholder="Singapore, Dubai, Remote APAC…" /><button type="button" onClick={addLocation}>Add</button></div>
         <div className="work-model-options" role="group" aria-label="Preferred work model">{["On-site", "Hybrid", "Remote", "Flexible"].map((option) => <button key={option} type="button" className={remote === option ? "is-selected" : ""} onClick={() => setRemote(option)}>{option}</button>)}</div>
-      </section>
-
-      <section className="glass-card direction-panel">
-        <div className="direction-heading"><div><span>Trusted sources</span><h2>Where you look for roles</h2></div><strong>{activeSourceCount}/{sources.length}</strong></div>
-        <div className="production-source-list">
-          {sources.map((source) => (
-            <article key={source.id} className={source.active ? "" : "is-paused"}>
-              <span className="source-monogram">{source.name.split(/\s+/).map((part) => part[0]).slice(0, 2).join("")}</span>
-              <div><strong>{source.name}</strong><span>{source.type}</span></div>
-              <div><strong>{source.coverage}</strong><span>Coverage</span></div>
-              <button type="button" className={source.active ? "source-toggle is-on" : "source-toggle"} aria-pressed={source.active} onClick={() => setSources((items) => items.map((item) => item.id === source.id ? { ...item, active: !item.active } : item))}><span /></button>
-            </article>
-          ))}
-        </div>
       </section>
 
       {hasChanges || status !== "idle" ? (
