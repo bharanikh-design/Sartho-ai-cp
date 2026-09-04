@@ -1,13 +1,13 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import type { ProductJourneyStep } from "@/lib/journey/product-journey";
 
-export function JourneyNudgeCard({ progress, isActivated }: { progress: number; isActivated: boolean }) {
+export function JourneyNudgeCard({ progress, isActivated, steps = [] }: { progress: number; isActivated: boolean; steps?: ProductJourneyStep[] }) {
   const [showCelebration, setShowCelebration] = useState(false);
 
   useEffect(() => {
-    // If they just hit 100%, show a celebration animation (e.g. if we set a sessionStorage flag)
-    // For simplicity, we just use the raw boolean to show the 100% state
+    // If they just hit 100%, show a celebration animation
     if (isActivated && !sessionStorage.getItem("sartho-celebrated")) {
       setShowCelebration(true);
       sessionStorage.setItem("sartho-celebrated", "true");
@@ -38,18 +38,38 @@ export function JourneyNudgeCard({ progress, isActivated }: { progress: number; 
     );
   }
 
-  // Nudge state for < 100%
+  const pendingSteps = steps.filter(s => !s.complete);
+
+  // Nudge state for < 100% listing the specific pending items
   return (
-    <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", padding: "20px 24px", borderRadius: "16px", marginBottom: "32px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "24px" }}>
-      <div>
-        <h3 style={{ margin: "0 0 4px 0", color: "#fff", fontSize: "1rem" }}>Your workspace is {progress}% ready</h3>
-        <p style={{ margin: 0, color: "#aaa", fontSize: "0.85rem", lineHeight: 1.4 }}>
-          Finish your Career Profile to unlock AI Résumé Tailoring, Job Analysis, and automated interview prep.
-        </p>
+    <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", padding: "24px", borderRadius: "16px", marginBottom: "32px", display: "flex", flexDirection: "column", gap: "16px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+        <div>
+          <h3 style={{ margin: "0 0 8px 0", color: "#fff", fontSize: "1.1rem" }}>Your workspace is {progress}% ready</h3>
+          <p style={{ margin: 0, color: "#aaa", fontSize: "0.875rem", lineHeight: 1.5, maxWidth: "600px" }}>
+            Complete the remaining {pendingSteps.length} action{pendingSteps.length === 1 ? "" : "s"} below to unlock AI Résumé Tailoring, Job Analysis, and automated interview prep.
+          </p>
+        </div>
       </div>
-      <Link href="/journey" style={{ background: "#fff", color: "#07090d", padding: "10px 20px", borderRadius: "8px", fontWeight: 600, fontSize: "0.875rem", textDecoration: "none", whiteSpace: "nowrap", flexShrink: 0 }}>
-        Complete Profile →
-      </Link>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginTop: "8px" }}>
+        {pendingSteps.map((step, idx) => (
+          <div key={step.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "rgba(0,0,0,0.2)", padding: "16px", borderRadius: "12px", border: "1px solid rgba(255,255,255,0.05)" }}>
+            <div style={{ display: "flex", gap: "16px", alignItems: "center" }}>
+              <div style={{ width: "28px", height: "28px", borderRadius: "50%", background: "rgba(255,255,255,0.1)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.8rem", fontWeight: "bold" }}>
+                {idx + 1}
+              </div>
+              <div>
+                <strong style={{ color: "#fff", display: "block", fontSize: "0.95rem", marginBottom: "4px" }}>{step.label}</strong>
+                <span style={{ color: "#888", fontSize: "0.85rem" }}>{step.detail}</span>
+              </div>
+            </div>
+            <Link href={step.href} style={{ background: "#fff", color: "#07090d", padding: "8px 16px", borderRadius: "8px", fontWeight: 600, fontSize: "0.85rem", textDecoration: "none", whiteSpace: "nowrap" }}>
+              Resume Task →
+            </Link>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
