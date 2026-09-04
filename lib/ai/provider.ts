@@ -412,10 +412,26 @@ export async function generateStructuredJson(request: StructuredRequest) {
         return await callRoute(request, route, route.fallbackModel);
       }
     } catch (retryFailure) {
-      if (retryFailure instanceof Error) throw new Error(describeAiFailure(retryFailure.message));
-      throw retryFailure;
+      const msg = retryFailure instanceof Error ? retryFailure.message : "fallback failed";
+      if (route.provider === "gemini") {
+        try {
+          const available = await listGeminiModels(process.env.GEMINI_API_KEY || "");
+          throw new Error(describeAiFailure(msg) + " [DIAGNOSTIC: Available models for your key: " + available.join(", ") + "]");
+        } catch (e) {
+          throw new Error(describeAiFailure(msg) + " [DIAGNOSTIC: Could not fetch models list.]");
+        }
+      }
+      throw new Error(describeAiFailure(msg));
     }
 
+    if (route.provider === "gemini") {
+      try {
+        const available = await listGeminiModels(process.env.GEMINI_API_KEY || "");
+        throw new Error(describeAiFailure(caught.message) + " [DIAGNOSTIC: Available models for your key: " + available.join(", ") + "]");
+      } catch (e) {
+        throw new Error(describeAiFailure(caught.message) + " [DIAGNOSTIC: Could not fetch models list.]");
+      }
+    }
     throw new Error(describeAiFailure(caught.message));
   }
 }
