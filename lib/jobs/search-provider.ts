@@ -197,15 +197,15 @@ async function searchJSearch(query: JobSearchQuery): Promise<JobSearchResult[]> 
   const text = query.location?.trim() ? `${query.keywords} in ${query.location.trim()}` : query.keywords;
   const params = new URLSearchParams({
     query: text,
-    page: "1",
     num_pages: "1",
     date_posted: "all",
     country: config.country,
   });
 
-  // Header names and value exactly mirror RapidAPI's own JSearch snippet;
-  // JSearch can take ~25s to answer, so the timeout is generous.
-  const response = await fetch(`https://jsearch.p.rapidapi.com/search?${params.toString()}`, {
+  // JSearch v5's endpoint is /search-v2 (the old /search 404s with
+  // "endpoint does not exist"). Headers mirror RapidAPI's own snippet; JSearch
+  // can take ~25s to answer, so the timeout is generous.
+  const response = await fetch(`https://jsearch.p.rapidapi.com/search-v2?${params.toString()}`, {
     method: "GET",
     headers: {
       "x-rapidapi-key": config.key,
