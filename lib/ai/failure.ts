@@ -47,7 +47,7 @@ export function describeAiFailure(message: string): string {
     case "timeout":
       return "Reading the document took longer than Sartho waits. Try it again, and if it keeps happening the document may be unusually long.";
     default:
-      return "Sartho's AI provider could not read the document. Nothing is wrong with your résumé. Try again, and if it continues ask the Sartho administrator to check the provider.";
+      return `Sartho's AI provider rejected the request with this exact error: "${message}". Please screenshot this and show the Sartho administrator.`;
   }
 }
 
