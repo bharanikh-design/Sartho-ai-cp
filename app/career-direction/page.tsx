@@ -20,7 +20,7 @@ export default async function CareerDirectionPage() {
     <div className="page-stack product-page career-direction-page">
       <JourneySteps journey={journey} currentId="direction" />
       <ProductPageHeader
-        eyebrow="Step 3 of 4 · Choose your direction"
+        eyebrow="Step 2 of 3 · Choose your direction"
         title="Let AI open the possibilities. You choose the path."
         description="Sartho reads your confirmed career evidence, suggests plausible next moves and explains why. Accept, edit or dismiss every suggestion, then rank the paths you want to pursue."
         metric={{ value: lanes.length || "—", label: "selected priorities" }}

@@ -1,4 +1,5 @@
 import { SearchPlanEditor } from "@/components/search-plan-editor";
+import { JobSearchPanel } from "@/components/job-search-panel";
 import { ProductPageHeader } from "@/components/product-page-header";
 import { JourneySteps } from "@/components/journey-steps";
 import { requireUser } from "@/lib/auth";
@@ -20,9 +21,9 @@ export default async function SearchPlanPage() {
     <div className="page-stack product-page">
       <JourneySteps journey={journey} currentId="search" />
       <ProductPageHeader
-        eyebrow="Step 4 of 4 · Search brief"
+        eyebrow="Step 3 of 3 · Search brief"
         title="Where should Sartho look?"
-        description="Set your locations, work model and trusted sources — the context Sartho uses to judge each opportunity."
+        description="Set your locations and work model, then search live listings — Sartho scores each match against your approved evidence."
         metric={{ value: lanes.length || "—", label: "target roles", href: "/career-direction" }}
       />
       <SearchPlanEditor
@@ -31,6 +32,7 @@ export default async function SearchPlanPage() {
         initialRemote={preferences.remotePreference ?? "Flexible"}
         targetLanes={lanes}
       />
+      <JobSearchPanel />
     </div>
   );
 }
