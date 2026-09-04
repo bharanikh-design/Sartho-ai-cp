@@ -24,9 +24,9 @@ export default async function JobsPage() {
   return (
     <div className="page-stack">
       <ProductPageHeader
-        eyebrow="Recurring workflow · Assess fit"
-        title="Job Analyzer"
-        description="Sartho acts as your personal recruiter. Paste a job description below to instantly cross-reference it with your Master Resume. Understand your fit, spot missing skills, and save the role for tailoring."
+        eyebrow="Job Analyzer · Fit Assessment"
+        title="Opportunities"
+        description="Sartho acts as your personal headhunter. Import a job description to instantly cross-reference it with your Career Profile. Understand your fit, spot missing skills, and save the role to your pipeline."
         metric={{ value: jobs.length, label: "saved opportunities" }}
         actions={[
           { href: "/search-plan", label: "Review search brief" },
