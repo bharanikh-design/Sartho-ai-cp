@@ -2,9 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getAuthenticatedUser } from "@/lib/auth";
 import { getCareerWorkspace } from "@/lib/data/career";
-import { analyseJobDescription } from "@/lib/matching/analyse-job";
-import { alignToLanes, overallMatchScore, withLane } from "@/lib/matching/opportunity-score";
-import { buildSkillProfile } from "@/lib/matching/skill-profile";
+import { scoreOpportunity } from "@/lib/matching/opportunity-score";
 
 export const jobInputSchema = z.object({
   title: z.string().trim().min(2).max(240),
@@ -29,8 +27,7 @@ export async function POST(request: Request) {
    * against skills the person has actually approved.
    */
   const { roles, evidence, lanes } = await getCareerWorkspace(supabase, user.id);
-  const analysis = analyseJobDescription(description, buildSkillProfile(evidence, roles));
-  const alignment = alignToLanes(title, description, lanes);
+  const scored = scoreOpportunity(title, description, evidence, roles, lanes);
   const { data, error } = await supabase
     .from("jobs")
     .insert({
@@ -42,11 +39,13 @@ export async function POST(request: Request) {
       location: location || null,
       raw_description: description,
       status: "saved",
-      deep_analysis_status: "complete", // Bypassing async analysis queue for real-time semantic processing
-      technical_heaviness: analysis.evidenceBacking,
-      overall_match: overallMatchScore(analysis, alignment),
-      recommendation: analysis.recommendation,
-      rule_analysis: withLane(analysis, alignment),
+      // Honest state: the quick match is done, the grounded deep analysis is not
+      // — the user runs that on demand from the opportunity page.
+      deep_analysis_status: "not_started",
+      technical_heaviness: scored.evidenceBacking,
+      overall_match: scored.overallMatch,
+      recommendation: scored.recommendation,
+      rule_analysis: scored.analysis,
     })
     .select("*")
     .single();
