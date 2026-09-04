@@ -40,6 +40,7 @@ export async function POST(request: Request) {
       location: location || null,
       raw_description: description,
       status: "saved",
+      deep_analysis_status: "complete", // Bypassing async analysis queue for real-time semantic processing
       technical_heaviness: analysis.evidenceBacking,
       recommendation: analysis.recommendation,
       rule_analysis: analysis,
