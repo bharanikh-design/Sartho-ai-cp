@@ -22,7 +22,7 @@ export type CommandCentreApplication = {
 };
 
 export type CommandCentreStage = {
-  id: "profile" | "strategy" | "opportunities" | "applications" | "outcomes";
+  id: "resume" | "direction" | "search" | "applications" | "studio";
   label: string;
   value: string;
   detail: string;
@@ -91,10 +91,6 @@ export function buildCareerCommandCentre({
   const strongMatches = jobs.filter((job) => job.recommendation === "apply");
   const priorityOpportunity = choosePriorityOpportunity(jobs);
   const priorityApplication = priorityOpportunity ? applicationByJob.get(priorityOpportunity.id) : null;
-  const profileSteps = journey.steps.filter((step) => step.id !== "search");
-  const profileComplete = profileSteps.every((step) => step.complete);
-  const searchStep = journey.steps.find((step) => step.id === "search");
-  const strategyComplete = searchStep?.complete ?? false;
 
   let nextAction: CommandCentreAction;
   if (!journey.activated) {
@@ -120,9 +116,9 @@ export function buildCareerCommandCentre({
     nextAction = {
       eyebrow: "Next best action",
       title: "Analyse your first promising role",
-      description: "Add one complete job description. Sartho will compare it with your confirmed Career Profile before recommending what to do.",
+      description: "Add one complete job description. Sartho will compare it with your approved career evidence before recommending what to do.",
       reason: "Your career foundation and search strategy are ready; a real opportunity is the next input the workflow needs.",
-      href: "/jobs#analyse",
+      href: "/applications#add-role",
       label: "Add and analyse a role",
     };
   } else if (priorityOpportunity && priorityOpportunity.deep_analysis_status !== "complete" && priorityOpportunity.recommendation !== "skip") {
@@ -166,72 +162,67 @@ export function buildCareerCommandCentre({
     nextAction = {
       eyebrow: "Next best action",
       title: "Find the next worthwhile opportunity",
-      description: "Your saved opportunities have outcomes. Add another role and let Sartho compare it with your confirmed Career Profile.",
+      description: "Your saved opportunities have outcomes. Add another role and let Sartho compare it with your approved career evidence.",
       reason: `${plural(outcomes.length, "outcome")} recorded; there is no open opportunity waiting for action.`,
-      href: "/jobs#analyse",
+      href: "/applications#add-role",
       label: "Analyse another role",
     };
   }
 
-  const currentStage = !profileComplete
-    ? "profile"
-    : !strategyComplete
-      ? "strategy"
-      : !jobs.length
-        ? "opportunities"
-        : !activeApplications.length && !outcomes.length
-          ? "applications"
-          : "outcomes";
+  const resumeStep = journey.steps.find((step) => step.id === "resume");
+  const directionStep = journey.steps.find((step) => step.id === "direction");
+  const searchStep = journey.steps.find((step) => step.id === "search");
+  const hasDraft = applications.some((application) => Boolean(application.resume_draft?.trim()));
 
   const stages: CommandCentreStage[] = [
     {
-      id: "profile",
-      label: "Career Profile",
-      value: profileComplete ? "Ready" : `${profileSteps.filter((step) => step.complete).length}/${profileSteps.length}`,
-      detail: profileComplete ? `${plural(approvedEvidence, "approved career fact")}` : `Next: ${journey.current.label}`,
-      href: profileComplete ? "/career-truth" : journey.current.href,
-      state: profileComplete ? "complete" : "current",
+      id: "resume",
+      label: "Upload résumé",
+      value: resumeStep?.complete ? "Ready" : "To do",
+      detail: resumeStep?.complete ? plural(approvedEvidence, "approved career fact") : "Add your source résumé",
+      href: "/career-truth",
+      state: resumeStep?.complete ? "complete" : "current",
     },
     {
-      id: "strategy",
-      label: "Search Strategy",
-      value: strategyComplete ? "Ready" : "Not set",
-      detail: strategyComplete ? "Priorities, locations and sources confirmed" : "Define what a worthwhile role looks like",
+      id: "direction",
+      label: "Career direction",
+      value: directionStep?.complete ? "Ready" : "Not set",
+      detail: directionStep?.complete ? "Target roles and priorities set" : "Choose the roles Sartho should prioritise",
+      href: "/career-direction",
+      state: directionStep?.complete ? "complete" : resumeStep?.complete ? "current" : "pending",
+    },
+    {
+      id: "search",
+      label: "Search brief",
+      value: searchStep?.complete ? "Ready" : "Not set",
+      detail: searchStep?.complete ? "Locations, work model and sources set" : "Define what a worthwhile role looks like",
       href: "/search-plan",
-      state: strategyComplete ? "complete" : currentStage === "strategy" ? "current" : "pending",
-    },
-    {
-      id: "opportunities",
-      label: "Opportunities",
-      value: String(jobs.length),
-      detail: jobs.length ? `${plural(strongMatches.length, "strong match", "strong matches")}` : "Add the first real role",
-      href: "/jobs",
-      state: jobs.length ? "active" : currentStage === "opportunities" ? "current" : "pending",
+      state: searchStep?.complete ? "complete" : directionStep?.complete ? "current" : "pending",
     },
     {
       id: "applications",
       label: "Applications",
-      value: String(activeApplications.length),
-      detail: interviews.length ? `${plural(interviews.length, "role")} needs preparation` : "Applied through interview",
+      value: String(jobs.length),
+      detail: jobs.length ? plural(activeApplications.length, "active application") : "Add and analyse your first role",
       href: "/applications",
-      state: activeApplications.length ? "active" : currentStage === "applications" ? "current" : "pending",
+      state: jobs.length ? "active" : journey.activated ? "current" : "pending",
     },
     {
-      id: "outcomes",
-      label: "Outcomes",
-      value: String(outcomes.length),
-      detail: outcomes.length ? "Offers, rejections or withdrawals recorded" : "Waiting for a real outcome",
-      href: "/applications",
-      state: outcomes.length ? "complete" : currentStage === "outcomes" ? "current" : "pending",
+      id: "studio",
+      label: "Résumé Studio",
+      value: hasDraft ? "Active" : "—",
+      detail: hasDraft ? "Tailored drafts in progress" : "Tailor a résumé to a saved role",
+      href: "/resume-studio",
+      state: hasDraft ? "active" : "pending",
     },
   ];
 
   const reviewItems: CommandCentreReviewItem[] = [];
   if (pendingEvidence) {
     reviewItems.push({
-      label: `${plural(pendingEvidence, "career fact")} need your confirmation`,
-      detail: "AI suggestions cannot use these facts until you approve them.",
-      href: "/career-truth#profile-review",
+      label: `${plural(pendingEvidence, "career fact")} to reconcile`,
+      detail: "A newer résumé added details that have not been merged yet.",
+      href: "/career-truth",
       tone: "attention",
     });
   }
@@ -247,7 +238,7 @@ export function buildCareerCommandCentre({
     reviewItems.push({
       label: `${plural(strongMatches.length, "strong match", "strong matches")} ready for a decision`,
       detail: "Review the evidence and gaps before progressing any application.",
-      href: "/jobs",
+      href: "/applications",
       tone: "ready",
     });
   }

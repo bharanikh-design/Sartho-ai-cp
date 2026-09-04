@@ -3,7 +3,6 @@ import type { SearchPreferences } from "@/lib/data/search";
 
 export type ProductJourneyStepId =
   | "resume"
-  | "confirm"
   | "direction"
   | "search";
 
@@ -44,16 +43,9 @@ export type ProductJourneyState = {
  * No page may invent its own completion percentage or activation rule.
  */
 export function buildProductJourney(input: ProductJourneyInput): ProductJourneyState {
+  // An uploaded résumé is taken as approved and final — Sartho reads it straight
+  // into evidence, with no separate line-by-line confirmation step.
   const resumeReceived = input.completeImports > 0 || input.evidence > 0;
-  const extractionComplete = input.evidence > 0;
-  const evidenceConfirmed = extractionComplete
-    && input.approvedEvidence > 0
-    && input.pendingEvidence === 0;
-  const contextComplete = Boolean(
-    input.profile?.headline?.trim()
-      && input.profile.location?.trim()
-      && input.profile.work_authorisation?.trim(),
-  );
   const strengthsComplete = Boolean(input.profile?.strengths.length);
   const profilesComplete = input.activeLanes > 0 && input.activeLaneAllocation === 100;
   const directionComplete = strengthsComplete && profilesComplete;
@@ -69,23 +61,9 @@ export function buildProductJourney(input: ProductJourneyInput): ProductJourneyS
       detail: resumeReceived ? "Source document received" : "Upload or build your starting résumé",
       href: "/career-truth#resume",
       complete: resumeReceived,
-      title: "Bring in your career story",
-      description: "Upload the strongest résumé you have. If it is incomplete, Sartho can still help you strengthen the evidence after import.",
+      title: "Upload your résumé",
+      description: "Upload the strongest résumé you have. Sartho reads it straight into your approved career evidence — no line-by-line confirmation.",
       reason: "Every recommendation must begin with a source you control.",
-    },
-    {
-      id: "confirm",
-      label: "Profile review",
-      detail: evidenceConfirmed
-        ? `Career Profile confirmed from ${input.roles} role${input.roles === 1 ? "" : "s"}`
-        : extractionComplete
-          ? "AI has organised your résumé; review what it found"
-          : "Sartho will organise the résumé before your review",
-      href: "/career-truth#profile-review",
-      complete: evidenceConfirmed,
-      title: "Confirm that the profile represents you",
-      description: "Review your professional snapshot, strengths and signature achievements, then confirm the profile in one action.",
-      reason: "Sartho organises the résumé; you confirm the overall career story.",
     },
     {
       id: "direction",

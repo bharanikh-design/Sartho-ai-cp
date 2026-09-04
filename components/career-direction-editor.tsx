@@ -215,7 +215,7 @@ export function CareerDirectionEditor({
             <span><strong>{roleCount}</strong> roles understood</span>
             <span><strong>You decide</strong> what gets added</span>
           </div>
-          {evidenceCount === 0 ? <div className="direction-ai-message">Confirm your Career Profile first so every suggestion has evidence behind it.</div> : null}
+          {evidenceCount === 0 ? <div className="direction-ai-message">Upload your résumé first so every suggestion has evidence behind it.</div> : null}
           {aiError ? <div className="direction-ai-message is-error" role="alert">{aiError}</div> : null}
         </div>
 
@@ -289,7 +289,7 @@ export function CareerDirectionEditor({
                 <button type="button" className="direction-rank-apply" onClick={applyRankedOrder}>Use this order</button>
               </p>
             ) : null}
-            {evidenceCount === 0 ? <p className="direction-rank-note">Confirm your Career Profile first so the ranking has evidence behind it.</p> : null}
+            {evidenceCount === 0 ? <p className="direction-rank-note">Upload your résumé first so the ranking has evidence behind it.</p> : null}
             {rankError ? <p className="direction-rank-note is-error" role="alert">{rankError}</p> : null}
           </div>
         ) : null}

@@ -31,18 +31,20 @@ const ready: ProductJourneyInput = {
 };
 
 describe("product journey", () => {
-  it("uses one four-step definition for full activation", () => {
+  it("uses one three-step definition for full activation", () => {
     const state = buildProductJourney(ready);
     expect(state.activated).toBe(true);
     expect(state.progress).toBe(100);
-    expect(state.steps).toHaveLength(4);
+    expect(state.steps).toHaveLength(3);
+    expect(state.steps.map((step) => step.id)).toEqual(["resume", "direction", "search"]);
   });
 
-  it("does not confuse résumé understanding with profile confirmation", () => {
-    const state = buildProductJourney({ ...ready, approvedEvidence: 0, pendingEvidence: 20 });
+  it("treats an uploaded résumé as complete with no separate confirmation step", () => {
+    // An upload is approved and final — there is no 'confirm' step to clear.
+    const state = buildProductJourney({ ...ready, activeLanes: 0, activeLaneAllocation: 0 });
+    expect(state.steps.map((step) => step.id as string)).not.toContain("confirm");
     expect(state.steps.find((step) => step.id === "resume")?.complete).toBe(true);
-    expect(state.steps.find((step) => step.id === "confirm")?.complete).toBe(false);
-    expect(state.current.id).toBe("confirm");
+    expect(state.current.id).toBe("direction");
   });
 
   it("requires search coverage before the dashboard is activated", () => {
@@ -52,7 +54,7 @@ describe("product journey", () => {
     });
     expect(state.activated).toBe(false);
     expect(state.current.id).toBe("search");
-    expect(state.progress).toBe(75);
+    expect(state.progress).toBe(67);
   });
 
   it("accepts existing evidence as proof that a résumé was received", () => {

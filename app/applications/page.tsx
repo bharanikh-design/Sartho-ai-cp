@@ -1,22 +1,41 @@
 import { ApplicationLedger } from "@/components/application-ledger";
+import { JobAnalyser } from "@/components/job-analyser";
+import { ChromeExtensionBanner } from "@/components/chrome-extension-banner";
 import { ProductPageHeader } from "@/components/product-page-header";
 import { requireUser } from "@/lib/auth";
+import { getCareerWorkspace } from "@/lib/data/career";
 import { getJobs } from "@/lib/data/jobs";
+import { buildSkillProfile } from "@/lib/matching/skill-profile";
 
 export const dynamic = "force-dynamic";
 
 export default async function ApplicationsPage() {
   const { supabase, user } = await requireUser();
-  const jobs = await getJobs(supabase, user.id);
+  const [jobs, workspace] = await Promise.all([
+    getJobs(supabase, user.id),
+    getCareerWorkspace(supabase, user.id),
+  ]);
+  const skillProfile = buildSkillProfile(workspace.evidence, workspace.roles);
 
   return (
     <div className="page-stack">
+      <ChromeExtensionBanner />
       <ProductPageHeader
-        eyebrow="Recurring workflow · Track and learn"
+        eyebrow="Applications"
         title="Applications"
-        description="Keep one factual timeline for each opportunity—from decision and résumé version through acknowledgement, interview and outcome. Nothing is submitted without your approval."
+        description="Add a role, see its fit against your approved evidence, then track it from decision through interview to outcome."
         metric={{ value: jobs.length, label: "tracked opportunities" }}
       />
+
+      <section id="add-role">
+        <div className="card-header" style={{ marginBottom: "1rem" }}>
+          <div>
+            <h2 className="section-heading">Add &amp; analyse a role</h2>
+            <p className="section-subtitle">Paste a job description — Sartho scores the fit against your approved evidence, then saves it to your pipeline below.</p>
+          </div>
+        </div>
+        <JobAnalyser initialJobs={[]} skillProfile={skillProfile} />
+      </section>
 
       <ApplicationLedger initialJobs={jobs} />
     </div>

@@ -72,34 +72,36 @@ function build(jobs: CommandCentreJob[] = [], applications: CommandCentreApplica
 }
 
 describe("career command centre", () => {
-  it("shows one five-stage journey and sends a ready user to opportunities", () => {
+  it("shows one five-stage flow and sends a ready user to add a role", () => {
     const result = build();
 
     expect(result.stages.map((stage) => stage.label)).toEqual([
-      "Career Profile",
-      "Search Strategy",
-      "Opportunities",
+      "Upload résumé",
+      "Career direction",
+      "Search brief",
       "Applications",
-      "Outcomes",
+      "Résumé Studio",
     ]);
-    expect(result.stages.find((stage) => stage.id === "opportunities")?.state).toBe("current");
-    expect(result.nextAction.href).toBe("/jobs#analyse");
+    expect(result.stages.find((stage) => stage.id === "applications")?.state).toBe("current");
+    expect(result.nextAction.href).toBe("/applications#add-role");
     expect(result.aiBrief).toBeNull();
   });
 
   it("keeps foundation work ahead of recurring opportunity work", () => {
-    const journey = buildProductJourney({ ...readyInput, approvedEvidence: 0, pendingEvidence: 20 });
+    // No direction chosen yet — the flow must route back to Career Direction
+    // before any job work, and the uploaded résumé counts as done.
+    const journey = buildProductJourney({ ...readyInput, activeLanes: 0, activeLaneAllocation: 0 });
     const result = buildCareerCommandCentre({
       journey,
       jobs: [job()],
       applications: [],
-      approvedEvidence: 0,
-      pendingEvidence: 20,
+      approvedEvidence: 20,
+      pendingEvidence: 0,
     });
 
-    expect(result.nextAction.href).toContain("profile-review");
-    expect(result.stages[0].state).toBe("current");
-    expect(result.reviewItems[0].label).toContain("20 career facts");
+    expect(result.nextAction.href).toContain("career-direction");
+    expect(result.stages.find((stage) => stage.id === "resume")?.state).toBe("complete");
+    expect(result.stages.find((stage) => stage.id === "direction")?.state).toBe("current");
   });
 
   it("uses the strongest open opportunity to choose the next AI action", () => {

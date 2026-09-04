@@ -140,7 +140,7 @@ export default async function DashboardPage() {
             <div className="command-centre-ai-empty">
               <h3 id="ai-brief-title">Ready when your next role is.</h3>
               <p>Add a real job description and Sartho will explain the fit, gaps and best next action using your confirmed Career Profile.</p>
-              <Link href="/jobs#analyse">Analyse a role <span aria-hidden="true">→</span></Link>
+              <Link href="/applications#add-role">Analyse a role <span aria-hidden="true">→</span></Link>
             </div>
           )}
         </aside>

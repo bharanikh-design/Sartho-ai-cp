@@ -23,7 +23,7 @@ export default async function InterviewPrepPage() {
         title="Prepare from the role and the evidence—not from generic scripts."
         description="Choose an analysed opportunity to review its requirements, recruiter signals and the approved career stories that support your answers."
         metric={{ value: activeInterviews.length, label: "roles need attention" }}
-        actions={[{ href: "/jobs", label: "Choose or analyse a role", primary: !readyJobs.length }]}
+        actions={[{ href: "/applications#add-role", label: "Choose or analyse a role", primary: !readyJobs.length }]}
       />
 
       <div className="capability-note">
@@ -63,7 +63,7 @@ export default async function InterviewPrepPage() {
             <div className="empty-ledger-icon" aria-hidden="true">1</div>
             <h3>Analyse one real role first</h3>
             <p>Interview preparation needs the role requirements and your confirmed evidence. Add a job, save it and complete the Career Profile match.</p>
-            <Link href="/jobs" className="primary-button">Analyse a role <span aria-hidden="true">→</span></Link>
+            <Link href="/applications#add-role" className="primary-button">Analyse a role <span aria-hidden="true">→</span></Link>
           </div>
         )}
       </section>

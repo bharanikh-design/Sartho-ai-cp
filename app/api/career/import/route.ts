@@ -207,6 +207,18 @@ export async function POST(request: Request) {
     if (applyError) throw applyError;
 
     /*
+     * The résumé the person uploaded is taken as approved and final. There is
+     * no separate line-by-line confirmation step, so every claim this import
+     * created is approved immediately — the same transition the old confirm
+     * action performed, done automatically here.
+     */
+    await supabase
+      .from("evidence_items")
+      .update({ approval_status: "approved", safe_for_resume: true })
+      .eq("user_id", userId)
+      .eq("approval_status", "pending");
+
+    /*
      * Profile details are filled in only where they are still blank. Someone
      * who has written their own headline should not have it replaced by a
      * machine reading of an old résumé.

@@ -36,7 +36,7 @@ export default async function ResumeStudioPage() {
         title="Turn one analysed role into one truthful résumé draft."
         description="Choose the role first. Generative AI then builds a separate draft using only the career facts you approved and shows every material change for review."
         metric={{ value: applications.length, label: "tailored drafts" }}
-        actions={[{ href: "/jobs", label: "Open opportunities" }]}
+        actions={[{ href: "/applications", label: "Open applications" }]}
       />
 
       <ResumeStudioWorkspace

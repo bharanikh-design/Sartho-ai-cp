@@ -190,8 +190,8 @@ export function ResumeImport({
         {showLead ? (
           <p className="resume-import-lead">
             {hasEvidence
-              ? "Add another résumé and Sartho will read it for anything new. Claims you have already reviewed are left exactly as you left them."
-              : "Upload your résumé and Sartho will read every role and achievement out of it. Nothing it finds is used anywhere until you have approved it."}
+              ? "Add another résumé and Sartho will read it for anything new. Everything already captured is left exactly as it is."
+              : "Upload your résumé and Sartho will read every role and achievement out of it, straight into your approved career evidence."}
           </p>
         ) : null}
 
@@ -230,16 +230,14 @@ export function ResumeImport({
         <div className="resume-import-result" role="status">
           <strong>
             {result.evidenceCreated
-              ? "Your Career Profile is ready to review"
+              ? "Your career evidence is ready"
               : "Nothing new in that one"}
           </strong>
           <span>
             {result.rolesCreated ? `${result.rolesCreated} role${result.rolesCreated === 1 ? "" : "s"} added. ` : ""}
             {result.evidenceSkipped
-              ? "Existing Career Profile details were kept and new information was reconciled."
-              : continueHref
-                ? "Nothing is used anywhere until you approve it."
-                : "Approve or reject each one below."}
+              ? "Existing details were kept and new information was reconciled."
+              : `${result.evidenceCreated} career fact${result.evidenceCreated === 1 ? "" : "s"} approved and ready to use.`}
           </span>
 
           {/*
@@ -249,8 +247,8 @@ export function ResumeImport({
           {continueHref ? (
             <Link href={continueHref} className="resume-import-continue">
               {result.evidenceCreated
-                ? "Review my Career Profile"
-                : "Open your Career Profile"}
+                ? "Choose your career direction"
+                : "Continue"}
               <span aria-hidden="true">→</span>
             </Link>
           ) : null}
