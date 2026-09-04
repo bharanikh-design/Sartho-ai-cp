@@ -26,7 +26,7 @@ export async function POST() {
 
   if (!isJobSearchConfigured()) {
     return NextResponse.json(
-      { error: "Jobs search isn't connected yet. Add a provider key (ADZUNA_APP_ID / ADZUNA_APP_KEY) to turn on real search.", code: "not_configured" },
+      { error: "Jobs search isn't connected yet. Add a provider key (JSEARCH_RAPIDAPI_KEY for Google for Jobs, or ADZUNA_APP_ID / ADZUNA_APP_KEY) to turn on real search.", code: "not_configured" },
       { status: 503 },
     );
   }

@@ -30,7 +30,16 @@ export type JobSearchQuery = {
   limit?: number;
 };
 
-export type JobSearchProviderName = "adzuna";
+export type JobSearchProviderName = "adzuna" | "jsearch";
+
+function jsearchConfig() {
+  const key = process.env.JSEARCH_RAPIDAPI_KEY?.trim() || process.env.RAPIDAPI_KEY?.trim();
+  if (!key) return null;
+  // JSearch (Google for Jobs) takes a 2-letter country. Reuse the Adzuna market
+  // if a dedicated one is not set, so a single deployment stays consistent.
+  const country = (process.env.JSEARCH_COUNTRY || process.env.ADZUNA_COUNTRY || "us").trim().toLowerCase();
+  return { key, country };
+}
 
 function adzunaConfig() {
   const appId = process.env.ADZUNA_APP_ID?.trim();
@@ -43,8 +52,16 @@ function adzunaConfig() {
   return { appId, appKey, country };
 }
 
-/** Which provider, if any, this deployment can actually query. */
+/**
+ * Which provider, if any, this deployment can actually query. With both keys
+ * present, JSearch (Google for Jobs — broadest coverage, including company
+ * career pages) is preferred unless JOBS_SEARCH_PROVIDER pins a choice.
+ */
 export function activeJobSearchProvider(): JobSearchProviderName | null {
+  const override = process.env.JOBS_SEARCH_PROVIDER?.trim().toLowerCase();
+  if (override === "adzuna") return adzunaConfig() ? "adzuna" : null;
+  if (override === "jsearch") return jsearchConfig() ? "jsearch" : null;
+  if (jsearchConfig()) return "jsearch";
   if (adzunaConfig()) return "adzuna";
   return null;
 }
@@ -123,9 +140,68 @@ async function searchAdzuna(query: JobSearchQuery): Promise<JobSearchResult[]> {
     .filter((item): item is JobSearchResult => item !== null);
 }
 
+type JSearchResult = {
+  job_title?: string;
+  employer_name?: string;
+  job_description?: string;
+  job_apply_link?: string;
+  job_city?: string;
+  job_state?: string;
+  job_country?: string;
+  job_posted_at_datetime_utc?: string;
+  job_min_salary?: number;
+  job_max_salary?: number;
+};
+
+/** Pure mapping from one JSearch (Google for Jobs) record to Sartho's shape. */
+export function mapJSearchResult(raw: JSearchResult): JobSearchResult | null {
+  const title = raw.job_title?.trim();
+  const url = raw.job_apply_link?.trim();
+  const description = raw.job_description?.trim();
+  if (!title || !url || !description) return null;
+  const location = [raw.job_city, raw.job_state, raw.job_country]
+    .map((part) => part?.trim())
+    .filter((part): part is string => Boolean(part))
+    .join(", ") || null;
+  return {
+    title,
+    employer: raw.employer_name?.trim() || null,
+    location,
+    description,
+    url,
+    salary: formatSalary(raw.job_min_salary, raw.job_max_salary),
+    postedAt: raw.job_posted_at_datetime_utc?.trim() || null,
+    source: "Google for Jobs",
+  };
+}
+
+async function searchJSearch(query: JobSearchQuery): Promise<JobSearchResult[]> {
+  const config = jsearchConfig();
+  if (!config) throw new JobSearchNotConfiguredError();
+
+  // JSearch takes one free-text query; the location rides inside it.
+  const text = query.location?.trim() ? `${query.keywords} in ${query.location.trim()}` : query.keywords;
+  const params = new URLSearchParams({ query: text, page: "1", num_pages: "1", country: config.country });
+
+  const response = await fetch(`https://jsearch.p.rapidapi.com/search?${params.toString()}`, {
+    headers: {
+      "X-RapidAPI-Key": config.key,
+      "X-RapidAPI-Host": "jsearch.p.rapidapi.com",
+    },
+    signal: AbortSignal.timeout(20_000),
+  });
+  if (!response.ok) throw new Error(`JSearch search failed (${response.status}).`);
+
+  const body = (await response.json()) as { data?: JSearchResult[] };
+  return (body.data ?? [])
+    .map(mapJSearchResult)
+    .filter((item): item is JobSearchResult => item !== null);
+}
+
 /** Query the active provider. Throws JobSearchNotConfiguredError when none is set. */
 export async function searchJobs(query: JobSearchQuery): Promise<JobSearchResult[]> {
   const provider = activeJobSearchProvider();
+  if (provider === "jsearch") return searchJSearch(query);
   if (provider === "adzuna") return searchAdzuna(query);
   throw new JobSearchNotConfiguredError();
 }

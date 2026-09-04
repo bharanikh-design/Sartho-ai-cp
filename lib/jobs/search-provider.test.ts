@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mapAdzunaResult } from "./search-provider";
+import { mapAdzunaResult, mapJSearchResult } from "./search-provider";
 
 describe("mapAdzunaResult", () => {
   it("maps a complete Adzuna record into Sartho's shape", () => {
@@ -42,5 +42,38 @@ describe("mapAdzunaResult", () => {
     expect(result?.location).toBeNull();
     expect(result?.salary).toBeNull();
     expect(result?.postedAt).toBeNull();
+  });
+});
+
+describe("mapJSearchResult", () => {
+  it("maps a Google-for-Jobs record and joins the location parts", () => {
+    const result = mapJSearchResult({
+      job_title: "Business Analyst",
+      employer_name: "Deloitte",
+      job_description: "Deliver analysis for consulting engagements.",
+      job_apply_link: "https://deloitte.com/careers/123",
+      job_city: "Sydney",
+      job_state: "NSW",
+      job_country: "AU",
+      job_posted_at_datetime_utc: "2026-09-01T00:00:00Z",
+      job_min_salary: 90000,
+      job_max_salary: 110000,
+    });
+
+    expect(result).toEqual({
+      title: "Business Analyst",
+      employer: "Deloitte",
+      location: "Sydney, NSW, AU",
+      description: "Deliver analysis for consulting engagements.",
+      url: "https://deloitte.com/careers/123",
+      salary: "90,000–110,000",
+      postedAt: "2026-09-01T00:00:00Z",
+      source: "Google for Jobs",
+    });
+  });
+
+  it("drops a record missing a title, link or description", () => {
+    expect(mapJSearchResult({ employer_name: "X", job_description: "d", job_apply_link: "https://x" })).toBeNull();
+    expect(mapJSearchResult({ job_title: "T", job_apply_link: "https://x" })).toBeNull();
   });
 });
