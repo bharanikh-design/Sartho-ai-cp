@@ -82,7 +82,8 @@ export function SearchPlanEditor({
       setLocations(["Singapore", "Remote APAC", "Sydney, Australia"]);
       setRemote("Flexible");
       setTargetCompanies(["Deloitte", "KPMG", "Accenture", "NTT DATA", "Canva"]);
-      setAiRationale("Based on your evidence showing strong ITSM and ServiceNow deployment experience, large technology consultancies and enterprise SaaS companies in the APAC region offer the highest probability of a senior match. I have pre-populated 5 target employers and optimized your geography.");
+      setSources((prev) => prev.map(s => s.name.includes("LinkedIn") || s.name.includes("Indeed") ? { ...s, active: true } : s));
+      setAiRationale("Based on your evidence showing strong ITSM and ServiceNow deployment experience, large technology consultancies and enterprise SaaS companies in the APAC region offer the highest probability of a senior match. I have pre-populated 5 target employers and optimized your geography, and activated LinkedIn and Indeed as your highest-signal discovery sources.");
       setIsGeneratingStrategy(false);
     }, 2500);
   }
@@ -157,13 +158,27 @@ export function SearchPlanEditor({
         <Link href="/career-direction#priorities">Edit in Career Direction →</Link>
       </section>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem", marginBottom: "1.5rem" }}>
+      
+      {!aiRationale && !isGeneratingStrategy && (
+        <section className="glass-card" style={{ marginBottom: "1.5rem", padding: "1.5rem", border: "1px solid #6bcf93", background: "rgba(107, 207, 147, 0.05)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div>
+            <h3 style={{ fontSize: "1.1rem", color: "#6bcf93", margin: "0 0 0.5rem" }}>✦ Let AI generate your Search Brief</h3>
+            <p style={{ fontSize: "0.875rem", color: "#ccc", margin: 0, lineHeight: 1.5 }}>
+              Sartho can instantly recommend target locations, companies, and trusted job sources based on your Career Profile strengths.
+            </p>
+          </div>
+          <button type="button" onClick={generateAiStrategy} style={{ background: "#6bcf93", color: "#0d402b", padding: "10px 20px", borderRadius: "8px", fontWeight: "bold", border: "none", cursor: "pointer" }}>
+            Generate Brief ✦
+          </button>
+        </section>
+      )}
+<div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem", marginBottom: "1.5rem" }}>
         <section className="glass-card direction-panel" style={{ margin: 0 }}>
           <div className="direction-heading"><div><span>Search geography</span><h2>Where should Sartho look?</h2></div></div>
           
           <div className="editable-chips">{locations.map((location) => <button key={location} type="button" onClick={() => setLocations((items) => items.filter((item) => item !== location))}>{location}<span>×</span></button>)}</div>
           
-          <div className="inline-add"><input value={locationDraft} onChange={(event) => setLocationDraft(event.target.value)} onKeyDown={(event) => event.key === "Enter" && (event.preventDefault(), addLocation())} placeholder="Singapore, Dubai, Remote APAC…" /><button type="button" onClick={addLocation}>Add</button></div>
+          <div className="inline-add"><input value={locationDraft} onChange={(event) => setLocationDraft(event.target.value)} onKeyDown={(event) => event.key === "Enter" && (event.preventDefault(), addLocation())} placeholder="Singapore, Dubai, Remote APAC…" /><button type="button" onClick={addLocation} style={{ color: "#0d402b", fontWeight: "bold" }}>Add</button></div>
           
           <div className="work-model-options" role="group" style={{ marginTop: "1rem" }}>{["On-site", "Hybrid", "Remote", "Flexible"].map((option) => <button key={option} type="button" className={remote === option ? "is-selected" : ""} onClick={() => setRemote(option)}>{option}</button>)}</div>
         </section>
@@ -173,7 +188,7 @@ export function SearchPlanEditor({
           
           <div className="editable-chips">{targetCompanies.map((company) => <button key={company} type="button" onClick={() => setTargetCompanies((items) => items.filter((item) => item !== company))}>{company}<span>×</span></button>)}</div>
           
-          <div className="inline-add"><input value={companyDraft} onChange={(event) => setCompanyDraft(event.target.value)} onKeyDown={(event) => event.key === "Enter" && (event.preventDefault(), addCompany())} placeholder="Deloitte, Google, Canva..." /><button type="button" onClick={addCompany}>Add</button></div>
+          <div className="inline-add"><input value={companyDraft} onChange={(event) => setCompanyDraft(event.target.value)} onKeyDown={(event) => event.key === "Enter" && (event.preventDefault(), addCompany())} placeholder="Deloitte, Google, Canva..." /><button type="button" onClick={addCompany} style={{ color: "#0d402b", fontWeight: "bold" }}>Add</button></div>
         </section>
       </div>
 

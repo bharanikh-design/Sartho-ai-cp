@@ -25,7 +25,7 @@ export default async function SearchPlanPage() {
         eyebrow="Step 4 of 4 · Set your search brief"
         title="Define what a worthwhile opportunity looks like."
         description="Save the locations, work model and sources you trust. This brief guides analysis and future source integrations; Sartho does not yet fetch roles from these sources automatically."
-        metric={{ value: lanes.length || "—", label: "target profiles" }}
+        metric={{ value: lanes.length || "—", label: "target profiles", href: "/career-direction" }}
       />
       <SearchPlanEditor
         initialSources={preferences.sources}
