@@ -5,7 +5,8 @@ import { getSearchPreferences } from "@/lib/data/search";
 import { scoreOpportunity } from "@/lib/matching/opportunity-score";
 import {
   isJobSearchConfigured,
-  searchJobs,
+  configuredJobSearchProviders,
+  searchWithProvider,
   JobSearchNotConfiguredError,
   type JobSearchResult,
 } from "@/lib/jobs/search-provider";
@@ -56,20 +57,25 @@ export async function POST() {
    * whatever the other queries returned and only surface an error when nothing
    * came back at all.
    */
+  const providers = configuredJobSearchProviders();
+  const dead = new Set<string>(); // a provider that failed once is skipped for the rest of this request
   const byUrl = new Map<string, JobSearchResult>();
   const errors: string[] = [];
   for (let index = 0; index < activeLanes.length; index++) {
     if (index > 0) await new Promise((resolve) => setTimeout(resolve, 1200));
-    try {
-      const batch = await searchJobs({ keywords: activeLanes[index].name, location, limit: 20 });
-      for (const result of batch) {
-        if (!byUrl.has(result.url)) byUrl.set(result.url, result);
+    for (const provider of providers) {
+      if (dead.has(provider)) continue;
+      try {
+        const batch = await searchWithProvider(provider, { keywords: activeLanes[index].name, location, limit: 20 });
+        for (const result of batch) {
+          if (!byUrl.has(result.url)) byUrl.set(result.url, result);
+        }
+        break; // this provider answered; move to the next role
+      } catch (caught) {
+        if (caught instanceof JobSearchNotConfiguredError) { dead.add(provider); continue; }
+        errors.push(`${provider}: ${caught instanceof Error ? caught.message : "unknown error"}`);
+        dead.add(provider); // fall through to the next provider for this and later roles
       }
-    } catch (caught) {
-      if (caught instanceof JobSearchNotConfiguredError) {
-        return NextResponse.json({ error: "Jobs search isn't connected yet.", code: "not_configured" }, { status: 503 });
-      }
-      errors.push(caught instanceof Error ? caught.message : "unknown error");
     }
   }
 
