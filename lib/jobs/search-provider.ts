@@ -190,7 +190,18 @@ async function searchJSearch(query: JobSearchQuery): Promise<JobSearchResult[]> 
     },
     signal: AbortSignal.timeout(20_000),
   });
-  if (!response.ok) throw new Error(`JSearch search failed (${response.status}).`);
+  if (!response.ok) {
+    // Surface RapidAPI's own reason (e.g. "You are not subscribed to this API")
+    // so a configuration mistake is diagnosable instead of a blank 502.
+    let detail = "";
+    try {
+      const errorBody = (await response.json()) as { message?: string };
+      if (typeof errorBody?.message === "string") detail = errorBody.message;
+    } catch {
+      // non-JSON error body; the status alone still helps.
+    }
+    throw new Error(`JSearch returned ${response.status}${detail ? ` — ${detail}` : ""}`);
+  }
 
   const body = (await response.json()) as { data?: JSearchResult[] };
   return (body.data ?? [])
