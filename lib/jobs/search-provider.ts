@@ -243,13 +243,20 @@ async function searchJSearch(query: JobSearchQuery): Promise<JobSearchResult[]> 
  * a single provider when set.
  */
 export function configuredJobSearchProviders(): JobSearchProviderName[] {
-  const override = process.env.JOBS_SEARCH_PROVIDER?.trim().toLowerCase();
-  if (override === "jsearch") return jsearchConfig() ? ["jsearch"] : [];
-  if (override === "adzuna") return adzunaConfig() ? ["adzuna"] : [];
-  const list: JobSearchProviderName[] = [];
-  if (jsearchConfig()) list.push("jsearch");
-  if (adzunaConfig()) list.push("adzuna");
-  return list;
+  // Every provider that is actually configured. Adzuna leads by default because
+  // it is a plain REST API with no gateway/subscription layer to go wrong.
+  const configured: JobSearchProviderName[] = [];
+  if (adzunaConfig()) configured.push("adzuna");
+  if (jsearchConfig()) configured.push("jsearch");
+
+  // JOBS_SEARCH_PROVIDER is a *preference*, not a lock: the named provider is
+  // tried first, but every other configured provider stays on as a fallback so
+  // one provider being down can never take search down.
+  const pin = process.env.JOBS_SEARCH_PROVIDER?.trim().toLowerCase();
+  if ((pin === "jsearch" || pin === "adzuna") && configured.includes(pin)) {
+    return [pin, ...configured.filter((provider) => provider !== pin)];
+  }
+  return configured;
 }
 
 export async function searchWithProvider(
