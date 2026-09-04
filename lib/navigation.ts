@@ -88,7 +88,9 @@ const resumeNavigation: NavigationItem = {
  */
 export function getPrimaryNavigation(activated: boolean): NavigationItem[] {
   if (!activated) {
-    return [dashboardNavigation, journeyNavigation, opportunityNavigation, profileNavigation, strategyNavigation];
+    // Setup reads in journey order: Profile (steps 1–2) → Direction (3) → Brief (4),
+    // so Career Direction sits in sequence rather than being appended at the end.
+    return [dashboardNavigation, journeyNavigation, opportunityNavigation, profileNavigation, directionNavigation, strategyNavigation];
   }
 
   return [dashboardNavigation, opportunityNavigation, applicationNavigation, profileNavigation, strategyNavigation, resumeNavigation];

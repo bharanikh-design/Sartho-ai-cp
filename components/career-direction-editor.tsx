@@ -47,10 +47,13 @@ export function CareerDirectionEditor({
   roleCount: number;
 }) {
   const router = useRouter();
-  const [headline, setHeadline] = useState(initialProfile?.headline ?? "");
-  const [summary] = useState(initialProfile?.summary ?? "");
-  const [location, setLocation] = useState(initialProfile?.location ?? "");
-  const [workAuthorisation, setWorkAuthorisation] = useState(initialProfile?.work_authorisation ?? "");
+  // Location, work rights and headline are edited on the Career Profile page
+  // (the snapshot), not here — this screen is only about direction. They are
+  // still sent through unchanged so a save never wipes them.
+  const headline = initialProfile?.headline ?? "";
+  const summary = initialProfile?.summary ?? "";
+  const location = initialProfile?.location ?? "";
+  const workAuthorisation = initialProfile?.work_authorisation ?? "";
   const [aiPrompt, setAiPrompt] = useState("");
   const [lanes, setLanes] = useState<LaneDraft[]>(() => balanceByPriority(initialLanes));
   const [laneDraft, setLaneDraft] = useState("");
@@ -248,6 +251,26 @@ export function CareerDirectionEditor({
         ) : null}
       </section>
 
+      <section className="glass-card direction-input-bar" aria-label="Add your own role or refine the suggestions">
+        <div className="direction-input-col">
+          <span className="direction-choice-label">Know the role you want? Add it directly</span>
+          <div className="direction-manual-add">
+            <input value={laneDraft} onChange={(event) => setLaneDraft(event.target.value)} onKeyDown={(event) => event.key === "Enter" && (event.preventDefault(), addManualLane())} placeholder="e.g. ServiceNow Senior Engagement Manager" />
+            <button type="button" onClick={addManualLane}>Add role</button>
+          </div>
+        </div>
+        <div className="direction-input-col">
+          <span className="direction-choice-label">Not quite right? Ask AI to refine <em>optional</em></span>
+          <div className="direction-ai-prompt">
+            <textarea id="direction-goal" value={aiPrompt} onChange={(event) => setAiPrompt(event.target.value)} rows={2} placeholder="For example: regional leadership, less travel, more transformation ownership…" />
+            <button type="button" onClick={() => void generateSuggestions()} disabled={aiStatus === "loading" || evidenceCount === 0}>
+              <span aria-hidden="true">✦</span>
+              {aiStatus === "loading" ? "Analysing…" : "Refine suggestions"}
+            </button>
+          </div>
+        </div>
+      </section>
+
       <section className="glass-card direction-priority-panel" id="priorities">
         <div className="direction-priority-heading">
           <div><span>Your decision</span><h2>Roles Sartho should prioritise</h2><p>Order them from most to least important, or let AI rank them against your résumé. Sartho balances the search weighting automatically.</p></div>
@@ -303,36 +326,10 @@ export function CareerDirectionEditor({
 
       </section>
 
-      <section className="glass-card direction-input-bar" aria-label="Add your own role or refine the suggestions">
-        <div className="direction-input-col">
-          <span className="direction-choice-label">Know the role you want? Add it directly</span>
-          <div className="direction-manual-add">
-            <input value={laneDraft} onChange={(event) => setLaneDraft(event.target.value)} onKeyDown={(event) => event.key === "Enter" && (event.preventDefault(), addManualLane())} placeholder="e.g. ServiceNow Senior Engagement Manager" />
-            <button type="button" onClick={addManualLane}>Add role</button>
-          </div>
-        </div>
-        <div className="direction-input-col">
-          <span className="direction-choice-label">Not quite right? Ask AI to refine <em>optional</em></span>
-          <div className="direction-ai-prompt">
-            <textarea id="direction-goal" value={aiPrompt} onChange={(event) => setAiPrompt(event.target.value)} rows={2} placeholder="For example: regional leadership, less travel, more transformation ownership…" />
-            <button type="button" onClick={() => void generateSuggestions()} disabled={aiStatus === "loading" || evidenceCount === 0}>
-              <span aria-hidden="true">✦</span>
-              {aiStatus === "loading" ? "Analysing…" : "Refine suggestions"}
-            </button>
-          </div>
-        </div>
-      </section>
-
-      <details className="glass-card direction-preferences" id="context">
-        <summary><span><strong>Add context (optional)</strong><small>Location and work rights sharpen matching — you can add them later</small></span><span>Review</span></summary>
-        <div className="direction-fields">
-          <label><span>Role or level already in mind</span><input value={headline} onChange={(event) => setHeadline(event.target.value)} placeholder="e.g. Regional Transformation Director" /></label>
-          <label><span>Current location</span><input value={location} onChange={(event) => setLocation(event.target.value)} placeholder="Singapore" /></label>
-          <label className="field-wide"><span>Work rights and mobility</span><input value={workAuthorisation} onChange={(event) => setWorkAuthorisation(event.target.value)} placeholder="Countries, visa status, relocation or remote preference" /></label>
-        </div>
-      </details>
-
-      <div className="direction-save-bar"><div><strong>{lanes.length ? `${lanes.length} priorit${lanes.length === 1 ? "y" : "ies"} ready to guide Sartho` : "Choose at least one direction when you are ready"}</strong><span>{status === "saved" ? "Career direction saved" : status === "error" ? "Could not save—please try again" : "Search weighting is balanced automatically"}</span></div><button type="button" className="primary-button" onClick={() => void save()} disabled={status === "saving" || !lanes.length}>{status === "saving" ? "Saving…" : "Save and continue"}</button></div>
+      <div className="direction-save-bar">
+        {status === "error" ? <span className="direction-save-status is-error" role="alert">Could not save — please try again</span> : status === "saved" ? <span className="direction-save-status">Saved ✓</span> : null}
+        <button type="button" className="primary-button" onClick={() => void save()} disabled={status === "saving" || !lanes.length}>{status === "saving" ? "Saving…" : "Save and continue"}</button>
+      </div>
     </div>
   );
 }
