@@ -99,7 +99,7 @@ export function JobSearchPanel() {
 
       {status === "not_configured" ? (
         <div className="empty-inline-state">
-          Live search isn&apos;t connected yet. Add a jobs provider key (<code>ADZUNA_APP_ID</code> and <code>ADZUNA_APP_KEY</code>, with <code>ADZUNA_COUNTRY</code> for your market) in the deployment settings, then search here. Until then, add roles by hand on <Link href="/applications#add-role">Applications</Link>.
+          Live search isn&apos;t connected yet. Add a jobs provider key — <code>JSEARCH_RAPIDAPI_KEY</code> (Google for Jobs) or <code>ADZUNA_APP_ID</code> + <code>ADZUNA_APP_KEY</code> — in the deployment settings, then search here. Until then, add roles by hand on <Link href="/applications#add-role">Applications</Link>.
         </div>
       ) : null}
 
