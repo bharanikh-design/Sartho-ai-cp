@@ -41,13 +41,27 @@ function jsearchConfig() {
   return { key, country };
 }
 
+// Adzuna scopes every query to a country in the URL path, so a bad value 404s.
+const ADZUNA_COUNTRIES = new Set([
+  "gb", "us", "at", "au", "be", "br", "ca", "ch", "de", "es",
+  "fr", "in", "it", "mx", "nl", "nz", "pl", "sg", "za",
+]);
+
+/**
+ * Turn whatever is in ADZUNA_COUNTRY into a valid Adzuna country code. Accepts
+ * a comma-list (uses the first), normalises case, maps the common "uk" → "gb",
+ * and falls back to a supported default rather than sending an invalid path.
+ */
+export function normaliseAdzunaCountry(raw: string | undefined): string {
+  const first = (raw ?? "").split(",")[0]?.trim().toLowerCase() ?? "";
+  const mapped = first === "uk" ? "gb" : first;
+  return ADZUNA_COUNTRIES.has(mapped) ? mapped : "gb";
+}
+
 function adzunaConfig() {
   const appId = process.env.ADZUNA_APP_ID?.trim();
   const appKey = process.env.ADZUNA_APP_KEY?.trim();
-  // Adzuna scopes every query to a country. It must match the target market or
-  // the search returns nothing; default to the UK index and let an operator set
-  // ADZUNA_COUNTRY (gb, us, au, sg, in, …) for the deployment's audience.
-  const country = (process.env.ADZUNA_COUNTRY || "gb").trim().toLowerCase();
+  const country = normaliseAdzunaCountry(process.env.ADZUNA_COUNTRY);
   if (!appId || !appKey) return null;
   return { appId, appKey, country };
 }
