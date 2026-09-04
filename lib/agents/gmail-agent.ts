@@ -1,6 +1,3 @@
-import { generateText } from "ai";
-import { openai } from "@ai-sdk/openai";
-
 /**
  * Gmail Recruiter Inbox Agent
  * 
@@ -76,40 +73,21 @@ export class GmailRecruiterAgent {
   }
 
   private async classifyEmail(body: string) {
-    const { text } = await generateText({
-      model: openai("gpt-4o-mini"),
-      system: "You are a classification agent. Determine if the email is recruiter outreach. Return JSON with: isRecruiter (boolean), company (string), role (string).",
-      prompt: `Email body:\n\n${body}`
-    });
-
-    try {
-      // In production, we'd use generateObject for structured output.
-      // Mocking classification for the architectural stub:
-      return {
-        isRecruiter: true,
-        company: "TechCorp",
-        role: "Senior Product Manager"
-      };
-    } catch {
-      return { isRecruiter: false, company: null, role: null };
-    }
+    // In production, we'd use an LLM for structured output.
+    // Mocking classification for the architectural stub:
+    return {
+      isRecruiter: true,
+      company: "TechCorp",
+      role: "Senior Product Manager"
+    };
   }
 
-  private async generateResponse(email: unknown, classification: unknown) {
-    const { text } = await generateText({
-      model: openai("gpt-4o"),
-      system: "You are the user's executive assistant. Write a polite reply to the recruiter.",
-      prompt: `
-        Recruiter Email: ${email.body}
-        User's Profile context: Looking for Senior PM roles. Open to new opportunities.
-        Task: Draft a reply thanking them and providing the user's Calendly link.
-      `
-    });
-    
+  private async generateResponse(email: any, classification: unknown) {
+    // In production, we'd use an LLM to draft the response.
     return `Hi Sarah,\n\nThanks for reaching out! I am currently open to exploring new opportunities and the Senior PM role at TechCorp sounds interesting.\n\nLet's connect this week. Feel free to find a time on my calendar: https://calendly.com/sartho-demo\n\nBest,\nBharani`;
   }
 
-  private async createGmailDraft(email: unknown, draftBody: string) {
+  private async createGmailDraft(email: any, draftBody: string) {
     // In production, this hits: POST https://gmail.googleapis.com/gmail/v1/users/me/drafts
     // Constructing the RFC 2822 email format and base64 encoding it.
     console.log(`Sartho Gmail Agent: Created draft for ${email.from}`);
