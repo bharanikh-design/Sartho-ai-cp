@@ -1,4 +1,5 @@
 import { JobAnalyser } from "@/components/job-analyser";
+import { ChromeExtensionBanner } from "@/components/chrome-extension-banner";
 import { ProductPageHeader } from "@/components/product-page-header";
 import { requireUser } from "@/lib/auth";
 import { getCareerWorkspace } from "@/lib/data/career";
@@ -39,6 +40,7 @@ export default async function JobsPage() {
         <Summary label="Target locations" value={String(searchPreferences.targetLocations.length)} />
       </section>
       
+      <ChromeExtensionBanner />
       <div id="analyse"><JobAnalyser initialJobs={jobs} skillProfile={skillProfile} /></div>
     </div>
   );

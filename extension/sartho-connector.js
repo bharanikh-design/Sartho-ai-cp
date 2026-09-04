@@ -44,3 +44,4 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     sendResponse({ success: true });
   }
 });
+window.__SARTHO_EXTENSION_ACTIVE__ = true;
