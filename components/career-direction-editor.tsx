@@ -170,7 +170,12 @@ export function CareerDirectionEditor({
   const autoRequested = useRef(false);
   useEffect(() => {
     if (autoRequested.current) return;
-    if (evidenceCount > 0 && aiStatus === "idle" && suggestions.length === 0 && lanes.length === 0) {
+    // Fire once on arrival whenever there is approved evidence and no
+    // suggestions are on screen yet — regardless of whether priorities are
+    // already chosen. Previously this was gated on having zero priorities,
+    // which meant anyone returning with priorities set saw an empty panel and
+    // no AI roles at all.
+    if (evidenceCount > 0 && aiStatus === "idle" && suggestions.length === 0) {
       autoRequested.current = true;
       // Deferred out of the synchronous effect body so the first setState does
       // not cascade renders.
@@ -180,7 +185,7 @@ export function CareerDirectionEditor({
     // generateSuggestions is a stable in-component handler; the ref guard, not
     // the dep list, controls the single automatic run.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [evidenceCount, aiStatus, suggestions.length, lanes.length]);
+  }, [evidenceCount, aiStatus, suggestions.length]);
 
   async function save() {
     // Guidance sharpens matching but never blocks: the priorities are the
@@ -246,8 +251,19 @@ export function CareerDirectionEditor({
               );
             })}
           </div>
-        ) : aiStatus === "ready" ? (
-          <div className="direction-ai-message">No suggestions to show right now — add a role or ask AI to refine below.</div>
+        ) : evidenceCount > 0 ? (
+          <div className="direction-ai-message">
+            <p style={{ margin: "0 0 12px" }}>
+              {aiStatus === "error"
+                ? "AI couldn’t generate roles just now."
+                : aiStatus === "ready"
+                  ? "No new roles to suggest right now — add your own or refine below."
+                  : "See the roles your résumé points to."}
+            </p>
+            <button type="button" className="direction-rank-button" onClick={() => void generateSuggestions()}>
+              <span aria-hidden="true">✦</span> {aiStatus === "error" ? "Try again" : "Generate roles from my résumé"}
+            </button>
+          </div>
         ) : null}
       </section>
 
