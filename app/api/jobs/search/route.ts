@@ -15,6 +15,22 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 /*
+ * A target role is a person's own phrasing ("Business Analyst / Junior
+ * Consultant", "Risk & Cybersecurity Analyst"). A jobs API treats every word as
+ * a required keyword, so the slash, ampersand and trailing alternatives match
+ * almost nothing. Reduce it to the primary title: first "/"-segment, no
+ * parentheticals or punctuation, capped to the first few words.
+ */
+function toSearchKeywords(role: string): string {
+  const primary = role.split("/")[0]
+    .replace(/\([^)]*\)/g, " ")
+    .replace(/[^A-Za-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return primary.split(" ").slice(0, 4).join(" ") || role.trim();
+}
+
+/*
  * Real search: take the saved brief (target roles + locations), query the jobs
  * provider, and rank what comes back against the person's own approved
  * evidence. Nothing is saved here — the person still chooses what enters the
@@ -66,7 +82,7 @@ export async function POST() {
     for (const provider of providers) {
       if (dead.has(provider)) continue;
       try {
-        const batch = await searchWithProvider(provider, { keywords: activeLanes[index].name, location, limit: 20 });
+        const batch = await searchWithProvider(provider, { keywords: toSearchKeywords(activeLanes[index].name), location, limit: 20 });
         for (const result of batch) {
           if (!byUrl.has(result.url)) byUrl.set(result.url, result);
         }
@@ -82,6 +98,26 @@ export async function POST() {
   if (!byUrl.size && errors.length) {
     console.error("Jobs search failed", errors);
     return NextResponse.json({ error: `Jobs provider error: ${errors[errors.length - 1]}`, code: "provider_error" }, { status: 502 });
+  }
+
+  // Everything worked but the location filter matched nothing: broaden once by
+  // dropping the location, so a narrow market doesn't leave the person empty.
+  if (!byUrl.size && !errors.length && location) {
+    for (let index = 0; index < activeLanes.length; index++) {
+      if (index > 0) await new Promise((resolve) => setTimeout(resolve, 1200));
+      for (const provider of providers) {
+        if (dead.has(provider)) continue;
+        try {
+          const batch = await searchWithProvider(provider, { keywords: toSearchKeywords(activeLanes[index].name), limit: 20 });
+          for (const result of batch) {
+            if (!byUrl.has(result.url)) byUrl.set(result.url, result);
+          }
+          break;
+        } catch {
+          // Best-effort broaden pass — a failure here just leaves the empty state.
+        }
+      }
+    }
   }
 
   const ranked = Array.from(byUrl.values())
