@@ -181,14 +181,23 @@ async function searchJSearch(query: JobSearchQuery): Promise<JobSearchResult[]> 
 
   // JSearch takes one free-text query; the location rides inside it.
   const text = query.location?.trim() ? `${query.keywords} in ${query.location.trim()}` : query.keywords;
-  const params = new URLSearchParams({ query: text, page: "1", num_pages: "1", country: config.country });
+  const params = new URLSearchParams({
+    query: text,
+    page: "1",
+    num_pages: "1",
+    date_posted: "all",
+    country: config.country,
+  });
 
+  // Header names and value exactly mirror RapidAPI's own JSearch snippet;
+  // JSearch can take ~25s to answer, so the timeout is generous.
   const response = await fetch(`https://jsearch.p.rapidapi.com/search?${params.toString()}`, {
+    method: "GET",
     headers: {
-      "X-RapidAPI-Key": config.key,
-      "X-RapidAPI-Host": "jsearch.p.rapidapi.com",
+      "x-rapidapi-key": config.key,
+      "x-rapidapi-host": "jsearch.p.rapidapi.com",
     },
-    signal: AbortSignal.timeout(20_000),
+    signal: AbortSignal.timeout(30_000),
   });
   if (!response.ok) {
     // Surface RapidAPI's own reason (e.g. "You are not subscribed to this API")
