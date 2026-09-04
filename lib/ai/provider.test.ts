@@ -3,6 +3,7 @@ import {
   createSafetyIdentifier,
   generateStructuredJson,
   getProviderRoute,
+  isRetiredGeminiModel,
   probeProviders,
 } from "./provider";
 
@@ -222,6 +223,19 @@ describe("controlled emergency providers", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it("ignores a retired Gemini pin and uses the current extraction model", () => {
+    vi.stubEnv("AI_PROVIDER", "gemini");
+    vi.stubEnv("GEMINI_DATA_TIER", "paid");
+    vi.stubEnv("GEMINI_API_KEY", "g-key");
+    vi.stubEnv("GEMINI_MODEL", "gemini-1.5-pro");
+
+    expect(isRetiredGeminiModel("models/gemini-1.5-pro")).toBe(true);
+    expect(getProviderRoute("fast")).toMatchObject({
+      primaryModel: "gemini-3.5-flash-lite",
+      fallbackModel: "gemini-3.6-flash",
+    });
+  });
+
   it("uses only paid Gemini when an operator explicitly selects it", async () => {
     vi.stubEnv("AI_PROVIDER", "gemini");
     vi.stubEnv("GEMINI_DATA_TIER", "paid");
@@ -296,7 +310,44 @@ describe("Gemini catalogue helpers", () => {
     const { isGeminiModelUnavailable } = await import("./provider");
     expect(isGeminiModelUnavailable("limit: 0, model: gemini-old")).toBe(true);
     expect(isGeminiModelUnavailable("This model is no longer available")).toBe(true);
+    expect(isGeminiModelUnavailable(
+      "models/gemini-1.5-pro is not found for API version v1beta, or is not supported for generateContent.",
+    )).toBe(true);
     expect(isGeminiModelUnavailable("API key not valid")).toBe(false);
+  });
+
+  it("recovers from a pinned unavailable Gemini model via the key's catalogue", async () => {
+    vi.stubEnv("AI_PROVIDER", "gemini");
+    vi.stubEnv("GEMINI_DATA_TIER", "paid");
+    vi.stubEnv("GEMINI_API_KEY", "g-key");
+    vi.stubEnv("GEMINI_MODEL", "gemini-custom-pin");
+
+    fetchMock.mockImplementation((url: string, init: RequestInit) => {
+      calls.push({ url, init });
+      if (url.includes("/models?") || url.endsWith("/models")) {
+        return Promise.resolve(response(200, {
+          models: [
+            { name: "models/gemini-3.5-flash-lite", supportedGenerationMethods: ["generateContent"] },
+            { name: "models/gemini-1.5-pro", supportedGenerationMethods: ["generateContent"] },
+          ],
+        }));
+      }
+      if (url.includes("gemini-custom-pin")) {
+        return Promise.resolve(response(404, {
+          error: {
+            message: "models/gemini-custom-pin is not found for API version v1beta, or is not supported for generateContent.",
+          },
+        }));
+      }
+      return Promise.resolve(response(200, GEMINI_OK));
+    });
+
+    const result = await generateStructuredJson(REQUEST) as { headline: string };
+
+    expect(result.headline).toBe("from gemini");
+    expect(calls.some((call) => call.url.includes("gemini-custom-pin:generateContent"))).toBe(true);
+    expect(calls.some((call) => call.url.includes("gemini-3.5-flash-lite:generateContent"))).toBe(true);
+    expect(calls.every((call) => !call.url.includes("gemini-1.5-pro:generateContent"))).toBe(true);
   });
 });
 

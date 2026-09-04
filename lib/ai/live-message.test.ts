@@ -42,4 +42,11 @@ describe("wordings that only just differ", () => {
     expect(classifyAiFailure("Resource has been exhausted (e.g. check quota).")).toBe("rate-limit");
     expect(classifyAiFailure("RESOURCE_EXHAUSTED")).toBe("rate-limit");
   });
+
+  it("reads Google's retired Gemini 1.5 wording as a model problem, not a résumé problem", () => {
+    const google = "models/gemini-1.5-pro is not found for API version v1beta, or is not supported for generateContent. Call ModelService.ListModels to see the list of available models and their supported methods. (model: gemini-1.5-pro)";
+    expect(classifyAiFailure(google)).toBe("model");
+    expect(describeAiFailure(google)).not.toContain("gemini-1.5-pro");
+    expect(describeAiFailure(google)).not.toContain("ListModels");
+  });
 });

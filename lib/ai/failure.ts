@@ -10,7 +10,7 @@
  * survives being printed verbatim.
  */
 
-export type AiFailureKind = "credit" | "rate-limit" | "auth" | "timeout" | "unknown";
+export type AiFailureKind = "credit" | "rate-limit" | "auth" | "timeout" | "model" | "unknown";
 
 export function classifyAiFailure(message: string): AiFailureKind {
   const text = message.toLowerCase();
@@ -29,6 +29,16 @@ export function classifyAiFailure(message: string): AiFailureKind {
   if (/rate.?limit|too many requests|429|overloaded|capacity|exhausted/.test(text)) return "rate-limit";
   if (/invalid.*api key|api key not valid|api_key_invalid|incorrect api key|unauthorized|permission_denied|401|authentication/.test(text)) return "auth";
   if (/timed? ?out|timeout|aborted|abort/.test(text)) return "timeout";
+  /*
+   * Google's retired-model reply is "models/gemini-1.5-pro is not found for
+   * API version v1beta", not the tidier "model not found". That wording used
+   * to reach the upload screen verbatim, twice, because nothing recognised it.
+   */
+  if (
+    /is not found for api version|not supported for generatecontent|model not found|model is not found|no longer available|limit:\s*0\b/.test(text)
+  ) {
+    return "model";
+  }
   return "unknown";
 }
 
@@ -46,6 +56,8 @@ export function describeAiFailure(message: string): string {
       return "Sartho's AI provider is refusing requests for the moment. Nothing is wrong with your résumé — wait a minute and upload it again.";
     case "timeout":
       return "Reading the document took longer than Sartho waits. Try it again, and if it keeps happening the document may be unusually long.";
+    case "model":
+      return "Sartho's selected AI model is no longer available, so it could not read the document. Nothing is wrong with your résumé. The administrator needs to set a current model name in the deployment's environment variables.";
     default:
       return "Sartho's AI provider could not read the document. Nothing is wrong with your résumé. Try again, and if it continues ask the Sartho administrator to check the provider.";
   }
@@ -57,6 +69,7 @@ export function shortAiFailure(message: string): string {
     case "auth": return "key rejected";
     case "rate-limit": return "rate limited";
     case "timeout": return "timed out";
+    case "model": return "model no longer available";
     default: return "provider error";
   }
 }

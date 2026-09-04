@@ -34,6 +34,12 @@ describe("classifyAiFailure", () => {
   it("does not guess at anything else", () => {
     expect(classifyAiFailure("OpenAI returned no structured output.")).toBe("unknown");
   });
+
+  it("recognises a retired Gemini model in the wording Google actually sent", () => {
+    expect(classifyAiFailure(
+      "models/gemini-1.5-pro is not found for API version v1beta, or is not supported for generateContent. (model: gemini-1.5-pro)",
+    )).toBe("model");
+  });
 });
 
 describe("describeAiFailure", () => {
@@ -59,5 +65,15 @@ describe("describeAiFailure", () => {
     expect(spoken).toContain("could not read the document");
     expect(spoken).not.toContain("abc-123");
     expect(spoken).not.toContain("provider.example");
+  });
+
+  it("does not print Google's retired-model diagnostics on the upload screen", () => {
+    const spoken = describeAiFailure(
+      "models/gemini-1.5-pro is not found for API version v1beta, or is not supported for generateContent. (model: gemini-1.5-pro)",
+    );
+    expect(spoken).toContain("no longer available");
+    expect(spoken).toContain("Nothing is wrong with your résumé");
+    expect(spoken).not.toContain("gemini-1.5-pro");
+    expect(spoken).not.toContain("v1beta");
   });
 });
