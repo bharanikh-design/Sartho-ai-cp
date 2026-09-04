@@ -13,11 +13,9 @@ const recommendationStyles: Record<JobAnalysis["recommendation"], string> = {
   skip: "border-rose-300/30 bg-rose-300/10 text-rose-100",
 };
 
-// The shape the semantic analyze endpoint returns, as the UI reads it: the
-// rule-analysis fields plus the raw requirement/evidence pairs it renders.
-type SemanticAnalysis = Partial<JobAnalysis> & {
-  rawSemanticMatches?: Array<{ requirement: string; evidence: string }>;
-};
+// The scored analysis the preview endpoint returns — the exact same object the
+// save persists, so what you see here is what gets stored.
+type PreviewAnalysis = JobAnalysis & { primaryLane?: string };
 
 export function JobAnalyser({ initialJobs, skillProfile }: { initialJobs: JobRecord[]; skillProfile?: SkillProfile }) {
   const router = useRouter();
@@ -66,40 +64,31 @@ export function JobAnalyser({ initialJobs, skillProfile }: { initialJobs: JobRec
 
 
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [analysis, setAnalysis] = useState<SemanticAnalysis | null>(null);
+  const [analysis, setAnalysis] = useState<PreviewAnalysis | null>(null);
+  const [overallMatch, setOverallMatch] = useState<number | null>(null);
 
   async function analyse() {
     if (!description.trim()) return;
     setError(null);
     setSavedJobId(null);
     setAnalysis(null);
+    setOverallMatch(null);
     setSubmittedText(description.trim());
     setIsAnalyzing(true);
 
     try {
-      // Execute true Semantic Job Analysis via pgvector API
-      const res = await fetch("/api/jobs/analyze", {
+      // Same scorer the save uses, so this preview is exactly what gets stored.
+      const res = await fetch("/api/jobs/preview", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ description: description.trim() })
+        body: JSON.stringify({ title: title.trim(), description: description.trim() }),
       });
-      
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Analysis failed");
 
-      // Adapt the semantic response into the shape the UI expects
-      setAnalysis({
-        recommendation: data.recommendation,
-        confidence: "high", // AI embedded implies high confidence
-        coverage: data.coverage,
-        evidenceBacking: data.coverage,
-        matchedSignals: data.matchedRequirements.map((m: Record<string, string>) => m.requirement),
-        cautionSignals: data.missingSkills,
-        matchedSkills: data.matchedRequirements.map((m: Record<string, string>) => ({ name: m.requirement, strength: "core", evidenceCount: 1 })),
-        unusedStrengths: data.missingSkills,
-        explanation: data.explanation,
-        rawSemanticMatches: data.matchedRequirements // Store raw for UI enhancement
-      });
+      const data = await res.json() as { analysis?: PreviewAnalysis; overallMatch?: number; error?: string };
+      if (!res.ok || !data.analysis) throw new Error(data.error || "Analysis failed");
+
+      setAnalysis(data.analysis);
+      setOverallMatch(data.overallMatch ?? null);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to analyze job");
     } finally {
@@ -138,6 +127,8 @@ export function JobAnalyser({ initialJobs, skillProfile }: { initialJobs: JobRec
     setSubmittedText("");
     setSavedJobId(null);
     setError(null);
+    setAnalysis(null);
+    setOverallMatch(null);
     setIsAnalyzing(false);
   }
 
@@ -225,38 +216,41 @@ export function JobAnalyser({ initialJobs, skillProfile }: { initialJobs: JobRec
                   </div>
                   
                   <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "1rem" }}>
-                    <span className={(analysis.recommendation && recommendationStyles[analysis.recommendation]) || "border-gray-500 bg-gray-800 text-gray-200"} style={{ padding: "4px 12px", borderRadius: "100px", textTransform: "uppercase", fontSize: "0.75rem", fontWeight: "bold", border: "1px solid" }}>
+                    <span className={recommendationStyles[analysis.recommendation] || "border-gray-500 bg-gray-800 text-gray-200"} style={{ padding: "4px 12px", borderRadius: "100px", textTransform: "uppercase", fontSize: "0.75rem", fontWeight: "bold", border: "1px solid" }}>
                       {analysis.recommendation}
                     </span>
-                    <span style={{ fontSize: "0.875rem", color: "#888" }}>Match Score: <strong>{analysis.coverage}%</strong></span>
+                    {overallMatch !== null && <span style={{ fontSize: "0.875rem", color: "#888" }}>Match Score: <strong>{overallMatch}%</strong></span>}
                   </div>
-                  
-                  <p style={{ fontSize: "0.875rem", color: "#ccc", margin: "0 0 1rem 0" }}>{analysis.explanation}</p>
-                  
-                  {analysis.rawSemanticMatches && analysis.rawSemanticMatches.length > 0 && (
-                    <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "12px", borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: "12px" }}>
-                      <span style={{ fontSize: "0.75rem", color: "#888", textTransform: "uppercase" }}>Evidence Found</span>
-                      {analysis.rawSemanticMatches.map((match: Record<string, string>, idx: number) => (
-                        <div key={idx} style={{ fontSize: "0.8125rem", background: "rgba(0,0,0,0.3)", padding: "8px 12px", borderRadius: "6px", borderLeft: "2px solid #6bcf93" }}>
-                          <strong style={{ color: "white", display: "block", marginBottom: "4px" }}>{match.requirement}</strong>
-                          <span style={{ color: "#aaa" }}>{match.evidence}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
 
-                  {analysis.unusedStrengths && analysis.unusedStrengths.length > 0 && (
-                    <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "12px" }}>
-                      <span style={{ fontSize: "0.75rem", color: "#888", textTransform: "uppercase" }}>Missing Skills / Gaps</span>
+                  <p style={{ fontSize: "0.875rem", color: "#ccc", margin: "0 0 1rem 0" }}>{analysis.explanation}</p>
+
+                  {analysis.matchedSkills && analysis.matchedSkills.length > 0 && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "12px", borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: "12px" }}>
+                      <span style={{ fontSize: "0.75rem", color: "#888", textTransform: "uppercase" }}>Matched from your approved evidence</span>
                       <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
-                        {analysis.unusedStrengths.map((gap: string, idx: number) => (
-                          <span key={idx} style={{ fontSize: "0.75rem", color: "#ff6b6b", background: "rgba(255,107,107,0.1)", border: "1px solid rgba(255,107,107,0.2)", padding: "4px 8px", borderRadius: "4px" }}>
-                            {gap}
+                        {analysis.matchedSkills.map((skill) => (
+                          <span key={skill.name} style={{ fontSize: "0.75rem", color: "#6bcf93", background: "rgba(107,207,147,0.1)", border: "1px solid rgba(107,207,147,0.25)", padding: "4px 8px", borderRadius: "4px" }}>
+                            {skill.name}
                           </span>
                         ))}
                       </div>
                     </div>
                   )}
+
+                  {analysis.unusedStrengths && analysis.unusedStrengths.length > 0 && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "12px" }}>
+                      <span style={{ fontSize: "0.75rem", color: "#888", textTransform: "uppercase" }}>Your strengths this role doesn&apos;t ask for</span>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                        {analysis.unusedStrengths.map((skill) => (
+                          <span key={skill} style={{ fontSize: "0.75rem", color: "#aaa", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", padding: "4px 8px", borderRadius: "4px" }}>
+                            {skill}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <p style={{ fontSize: "0.75rem", color: "#888", marginTop: "12px" }}>This is a quick evidence match. Save the role to run a full requirement-by-requirement deep analysis.</p>
                 </div>
               )}
 

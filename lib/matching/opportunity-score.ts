@@ -1,5 +1,6 @@
-import type { TargetLaneRecord } from "@/lib/types";
-import type { JobAnalysis } from "@/lib/matching/analyse-job";
+import type { CareerRoleRecord, EvidenceRecord, TargetLaneRecord } from "@/lib/types";
+import { analyseJobDescription, type JobAnalysis } from "@/lib/matching/analyse-job";
+import { buildSkillProfile } from "@/lib/matching/skill-profile";
 
 /*
  * Turning a match into a ranked opportunity.
@@ -71,4 +72,27 @@ export function overallMatchScore(analysis: JobAnalysis, alignment: LaneAlignmen
  */
 export function withLane(analysis: JobAnalysis, alignment: LaneAlignment | null): JobAnalysis & { primaryLane?: string } {
   return alignment ? { ...analysis, primaryLane: alignment.lane.name } : analysis;
+}
+
+/**
+ * The one place a role is scored. Both the analyse-preview and the save go
+ * through this, so what you see before saving is exactly what gets stored —
+ * no second, divergent matcher. Deterministic and evidence-only: no embeddings,
+ * so it never silently returns "skip" because a sync did not run.
+ */
+export function scoreOpportunity(
+  title: string,
+  description: string,
+  evidence: EvidenceRecord[],
+  roles: CareerRoleRecord[],
+  lanes: TargetLaneRecord[],
+) {
+  const analysis = analyseJobDescription(description, buildSkillProfile(evidence, roles));
+  const alignment = alignToLanes(title, description, lanes);
+  return {
+    analysis: withLane(analysis, alignment),
+    overallMatch: overallMatchScore(analysis, alignment),
+    evidenceBacking: analysis.evidenceBacking,
+    recommendation: analysis.recommendation,
+  };
 }
