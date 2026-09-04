@@ -29,8 +29,8 @@ export function JourneyNudgeCard({ progress, isActivated, steps = [] }: { progre
           Congratulations! You&apos;ve successfully built your master career foundation. We have unlocked <strong>Job Analysis</strong>, <strong>Application Tracking</strong>, and the <strong>Résumé Studio</strong> in your sidebar. Sartho is now fully armed to act as your personal headhunter.
         </p>
         <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
-          <Link href="/jobs" style={{ background: "#6bcf93", color: "#0d402b", padding: "10px 20px", borderRadius: "8px", fontWeight: "bold", textDecoration: "none", fontSize: "0.875rem" }}>
-            Explore Opportunities →
+          <Link href="/applications#add-role" style={{ background: "#6bcf93", color: "#0d402b", padding: "10px 20px", borderRadius: "8px", fontWeight: "bold", textDecoration: "none", fontSize: "0.875rem" }}>
+            Add your first role →
           </Link>
           <button type="button" onClick={() => setShowCelebration(false)} style={{ background: "transparent", color: "#b9d1c6", padding: "10px", border: "none", cursor: "pointer", fontSize: "0.875rem" }}>
             Dismiss

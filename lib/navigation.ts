@@ -49,11 +49,11 @@ const applicationNavigation: NavigationItem = {
 };
 
 const profileNavigation: NavigationItem = {
-  label: "Career Profile",
-  shortLabel: "Profile",
+  label: "Upload Résumé",
+  shortLabel: "Résumé",
   href: "/career-truth",
   icon: "truth",
-  purpose: "Review your professional story, strengths, career history and direction.",
+  purpose: "Add your source résumé — Sartho reads it straight into your approved career evidence.",
 };
 
 const strategyNavigation: NavigationItem = {
@@ -86,18 +86,22 @@ const resumeNavigation: NavigationItem = {
  * and the page itself explains what it still needs. After activation the
  * navigation expands into the full recurring loop, adding Applications.
  */
-export function getPrimaryNavigation(activated: boolean): NavigationItem[] {
-  if (!activated) {
-    // Setup reads top-to-bottom in the order you do it: build the profile
-    // (steps 1–2) → set direction (3) → write the brief (4), with Opportunities
-    // reachable at the end — a half-finished foundation should nudge, not wall.
-    return [dashboardNavigation, journeyNavigation, profileNavigation, directionNavigation, strategyNavigation, opportunityNavigation];
-  }
-
-  // After activation the menu follows the same flow end to end: know yourself
-  // (Profile → Direction), define the search (Brief), then work the loop
-  // (Opportunities → Applications), with Résumé Studio for tailoring.
-  return [dashboardNavigation, profileNavigation, directionNavigation, strategyNavigation, opportunityNavigation, applicationNavigation, resumeNavigation];
+/**
+ * One flat menu, in process order, the same before and after activation:
+ * Dashboard, then the five steps of the flow it orients — Upload Résumé →
+ * Career Direction → Search Brief → Applications → Résumé Studio. Job analysis
+ * now lives inside Applications, so there is no separate Opportunities tab, and
+ * the standalone Journey page is retired in favour of the Dashboard.
+ */
+export function getPrimaryNavigation(_activated: boolean): NavigationItem[] {
+  return [
+    dashboardNavigation,
+    profileNavigation,
+    directionNavigation,
+    strategyNavigation,
+    applicationNavigation,
+    resumeNavigation,
+  ];
 }
 
 export const allNavigation: NavigationItem[] = [

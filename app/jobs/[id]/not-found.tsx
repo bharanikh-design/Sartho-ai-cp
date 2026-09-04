@@ -18,7 +18,7 @@ export default function JobNotFound() {
         description="It may have been removed, or the link may be out of date. Everything else you are tracking is still where you left it."
       />
       <section className="glass-card content-card empty-state-card">
-        <Link href="/jobs" className="primary-button">Back to opportunities <span aria-hidden="true">→</span></Link>
+        <Link href="/applications" className="primary-button">Back to applications <span aria-hidden="true">→</span></Link>
       </section>
     </div>
   );

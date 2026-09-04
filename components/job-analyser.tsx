@@ -260,7 +260,7 @@ export function JobAnalyser({ initialJobs, skillProfile }: { initialJobs: JobRec
                   <Link href={`/jobs/${savedJobId}`} className="primary-button" style={{ textDecoration: "none" }}>Open saved job <span aria-hidden="true">→</span></Link>
                 ) : (
                   <button type="button" onClick={() => void saveJob()} disabled={saving || !title.trim() || isAnalyzing} className="primary-button">
-                    {saving ? "Saving…" : "Save to My Opportunities"} <span aria-hidden="true">→</span>
+                    {saving ? "Saving…" : "Save to my pipeline"} <span aria-hidden="true">→</span>
                   </button>
                 )}
                 <span style={{ fontSize: "0.75rem", color: "#888" }}>{title.trim() ? "Save this job to tailor your resume." : "Add a Job Title to save."}</span>

@@ -296,18 +296,18 @@ export function AppShell({ children }: { children: ReactNode }) {
                 />
               </div>
               <div className="profile-menu-divider" />
-              <Link href="/career-truth" className="profile-menu-link" role="menuitem"><span><strong>Career Profile</strong><small>Review your evidence and positioning</small></span><b aria-hidden="true">→</b></Link>
+              <Link href="/career-truth" className="profile-menu-link" role="menuitem"><span><strong>Upload résumé</strong><small>Add or replace your source résumé</small></span><b aria-hidden="true">→</b></Link>
               <button type="button" className="profile-menu-action" role="menuitem" onClick={openAccountPanel}><span><strong>Data & privacy</strong><small>Manage or remove your information</small></span><b aria-hidden="true">→</b></button>
               <button type="button" className="profile-menu-action profile-menu-signout" role="menuitem" onClick={() => void signOut()}><span><strong>Log out</strong><small>End this secure session</small></span></button>
             </div>
           ) : null}
         </div>
 
-        <Link href="/journey" className="privacy-card journey-summary-card" aria-label="Open career foundation status">
-          <span className="privacy-icon"><Icon name={activated ? "shield" : "journey"} /></span>
+        <Link href="/" className="privacy-card journey-summary-card" aria-label="Open your dashboard">
+          <span className="privacy-icon"><Icon name={activated ? "shield" : "home"} /></span>
           <div>
-            <strong>{activated ? "Career foundation ready" : `Career foundation · ${journeyStatus?.progress ?? "—"}%`}</strong>
-            <p>{activated ? "Review it whenever your goals change." : `Next: ${journeyStatus?.currentLabel ?? "Loading your next step"}`}</p>
+            <strong>{activated ? "Setup complete" : `Setup · ${journeyStatus?.progress ?? "—"}%`}</strong>
+            <p>{activated ? "Everything is ready — head to your dashboard." : `Next: ${journeyStatus?.currentLabel ?? "Loading your next step"}`}</p>
             <span className="journey-card-progress" aria-hidden="true"><i style={{ width: `${journeyStatus?.progress ?? 0}%` }} /></span>
           </div>
         </Link>

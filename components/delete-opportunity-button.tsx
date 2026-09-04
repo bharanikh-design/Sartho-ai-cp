@@ -17,7 +17,7 @@ export function DeleteOpportunityButton({ jobId }: { jobId: string }) {
       const response = await fetch(`/api/jobs/${jobId}`, { method: "DELETE" });
       const result = await response.json() as { error?: string };
       if (!response.ok) throw new Error(result.error ?? "Unable to remove this opportunity.");
-      router.push("/jobs");
+      router.push("/applications");
       router.refresh();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Unable to remove this opportunity.");

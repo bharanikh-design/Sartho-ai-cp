@@ -106,7 +106,7 @@ export function ApplicationLedger({ initialJobs }: { initialJobs: JobRecord[] })
             <h2 className="section-heading">Your applications</h2>
             <p className="section-subtitle">Move each role forward as the outcome changes.</p>
           </div>
-          <Link href="/jobs" className="secondary-button">Analyse another role</Link>
+          <Link href="#add-role" className="secondary-button">Analyse another role</Link>
         </div>
 
         {error ? <div className="inline-error" role="alert">{error}</div> : null}
@@ -138,7 +138,7 @@ export function ApplicationLedger({ initialJobs }: { initialJobs: JobRecord[] })
           </div>
         ) : (
           <div className="empty-inline-state">
-            No applications yet. <Link href="/jobs">Analyse and save your first opportunity</Link> — it will track here through interview and outcome.
+            No applications yet. <Link href="#add-role">Analyse and save your first role</Link> above — it will track here through interview and outcome.
           </div>
         )}
       </section>

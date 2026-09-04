@@ -56,7 +56,7 @@ export default async function JourneyPage() {
         title={activated ? "Your foundation is ready. Start with the next opportunity." : current.title}
         description={activated ? "Sartho can now compare roles with your confirmed Career Profile and keep each decision connected to preparation and outcomes." : current.description}
         reason={activated ? "The setup exists to support opportunity decisions—not to become a permanent checklist." : current.reason}
-        href={activated ? "/jobs" : current.href}
+        href={activated ? "/applications" : current.href}
         label={activated ? "Open opportunities" : "Continue this step"}
       />
     </div>

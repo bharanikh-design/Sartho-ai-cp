@@ -12,8 +12,7 @@ import type { ProductJourneyState, ProductJourneyStepId } from "@/lib/journey/pr
  */
 
 const STEP_TITLES: Record<ProductJourneyStepId, string> = {
-  resume: "Résumé",
-  confirm: "Confirm profile",
+  resume: "Upload résumé",
   direction: "Career direction",
   search: "Search brief",
 };

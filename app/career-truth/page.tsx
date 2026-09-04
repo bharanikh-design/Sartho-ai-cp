@@ -1,96 +1,59 @@
-import { CareerProfileReview } from "@/components/career-profile-review";
+import Link from "next/link";
 import { ProductPageHeader } from "@/components/product-page-header";
 import { ResumeImport } from "@/components/resume-import";
-import { CareerHistory } from "@/components/career-history";
 import { JourneySteps } from "@/components/journey-steps";
-import { ProfileSnapshotEditor } from "@/components/profile-snapshot-editor";
-import { WorkflowHandoff } from "@/components/workflow-handoff";
 import { requireUser } from "@/lib/auth";
 import { getCareerWorkspace } from "@/lib/data/career";
 import { loadProductJourneyStatus } from "@/lib/journey/load-product-journey";
 
 export const dynamic = "force-dynamic";
 
-export default async function CareerTruthPage() {
+/*
+ * Step 1 — Upload résumé.
+ *
+ * An uploaded résumé is taken as approved and final: Sartho reads it straight
+ * into the approved career evidence, with no line-by-line confirmation and no
+ * separate "career story" page. This screen is only the upload and a plain
+ * confirmation of what was captured, then it points on to Career Direction.
+ */
+export default async function UploadResumePage() {
   const { supabase, user } = await requireUser();
-  const [{ profile, lanes, roles, evidence }, journey] = await Promise.all([
+  const [{ roles, evidence }, journey] = await Promise.all([
     getCareerWorkspace(supabase, user.id),
     loadProductJourneyStatus(supabase, user.id),
   ]);
-  const isEmpty = evidence.length === 0;
-  const usableEvidence = evidence.filter((item) => item.approval_status !== "rejected");
-  const pending = usableEvidence.filter((item) => item.approval_status === "pending").length;
-  const approved = usableEvidence.filter((item) => item.approval_status === "approved").length;
-  const confirmed = approved > 0 && pending === 0;
-  const strengths = Array.from(new Set(usableEvidence.flatMap((item) => item.domains))).slice(0, 8);
-  const positioning = profile?.headline?.trim() || profile?.summary?.trim() || "Your confirmed career story";
-
-  if (isEmpty) {
-    return (
-      <div className="page-stack">
-        <JourneySteps journey={journey} currentId="resume" />
-        <ProductPageHeader
-          eyebrow="Step 1 of 4 · Add your résumé"
-          title="Bring in your career story."
-          description="Upload one strong source résumé. AI organises it into a profile; you review the result before anything is used."
-        />
-        <section className="glass-card content-card" id="resume">
-          <div className="card-header">
-            <div><h2 className="section-heading">Upload your master résumé</h2><p className="section-subtitle">PDF, Word or plain text. Your document remains the source of truth.</p></div>
-            <span className="status-chip status-pending">Step 1</span>
-          </div>
-          <ResumeImport hasEvidence={false} />
-        </section>
-      </div>
-    );
-  }
+  const approved = evidence.filter((item) => item.approval_status === "approved").length;
+  const hasEvidence = evidence.length > 0;
 
   return (
-    <div className="page-stack career-profile-page">
-      <JourneySteps journey={journey} currentId="confirm" />
+    <div className="page-stack">
+      <JourneySteps journey={journey} currentId="resume" />
       <ProductPageHeader
-        eyebrow={confirmed ? "Career Profile · Confirmed" : "Step 2 of 4 · Confirm your profile"}
-        title={confirmed ? positioning : "Confirm your Career Profile"}
-        description={confirmed
-          ? "This is the career evidence Sartho uses for direction suggestions, opportunity matching and preparation."
-          : "Review what AI organised from your résumé. Correct uncertain details, then confirm the profile once."}
-        metric={{ value: confirmed ? approved : pending, label: confirmed ? "approved career facts" : "items need review" }}
-        actions={confirmed ? [
-          { href: "/resume-studio#source-resumes", label: "Manage source résumés" },
-        ] : []}
+        eyebrow="Step 1 of 3 · Upload your résumé"
+        title="Start with your résumé."
+        description="Upload one strong source résumé. Sartho reads every role and achievement straight into your approved career evidence — no line-by-line confirmation."
+        metric={hasEvidence ? { value: approved, label: "approved career facts" } : undefined}
       />
 
-      {profile ? (
-        <ProfileSnapshotEditor
-          profile={profile}
-          lanes={lanes}
-          roleCount={roles.length}
-          displayStrengths={strengths}
-        />
-      ) : null}
-
-      <CareerProfileReview initialItems={evidence} roles={roles} profile={profile} />
-
-      <section className="glass-card content-card" id="career-history">
+      <section className="glass-card content-card" id="resume">
         <div className="card-header">
           <div>
-            <h2 className="section-heading">Career history</h2>
-            <p className="section-subtitle">Your complete timeline from the source résumé.</p>
+            <h2 className="section-heading">{hasEvidence ? "Add or replace your résumé" : "Upload your master résumé"}</h2>
+            <p className="section-subtitle">PDF, Word or plain text. Your document remains the source of truth.</p>
           </div>
-          <span className="meta-pill">{roles.length} role{roles.length === 1 ? "" : "s"}</span>
+          {hasEvidence
+            ? <span className="meta-pill">{roles.length} role{roles.length === 1 ? "" : "s"} · {approved} fact{approved === 1 ? "" : "s"}</span>
+            : <span className="status-chip status-pending">Step 1</span>}
         </div>
-        <CareerHistory roles={roles} evidence={evidence} />
+        <ResumeImport hasEvidence={hasEvidence} continueHref="/career-direction" />
       </section>
 
-      {confirmed ? (
-        <WorkflowHandoff
-          eyebrow="Next · Career Direction"
-          title="Your profile is complete. Now choose where you want to go."
-          description="AI will suggest direct, adjacent and stretch paths from this confirmed evidence. You decide which roles enter your priorities."
-          reason="Career Direction turns a record of your past into an intentional next move."
-          href="/career-direction"
-          label="Continue to Career Direction"
-        />
+      {hasEvidence ? (
+        <div className="direction-save-bar">
+          <Link href="/career-direction" className="primary-button">
+            Continue to Career Direction <span aria-hidden="true">→</span>
+          </Link>
+        </div>
       ) : null}
     </div>
   );

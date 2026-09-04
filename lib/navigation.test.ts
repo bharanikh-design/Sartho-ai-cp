@@ -31,38 +31,29 @@ describe("primary navigation", () => {
     expect(primaryNavigation.some((item) => item.href === "/diagnostics")).toBe(false);
   });
 
-  it("keeps Dashboard visible while setup is incomplete and expands the outcome loop afterwards", () => {
-    expect(getPrimaryNavigation(false).map((item) => item.label)).toEqual([
+  it("shows one flat process-order menu, the same before and after activation", () => {
+    const flow = [
       "Dashboard",
-      "Your Journey",
-      "Career Profile",
+      "Upload Résumé",
       "Career Direction",
       "Search Brief",
-      "Opportunities",
-    ]);
-    expect(getPrimaryNavigation(true).map((item) => item.label)).toEqual([
-      "Dashboard",
-      "Career Profile",
-      "Career Direction",
-      "Search Brief",
-      "Opportunities",
       "Applications",
       "Résumé Studio",
-    ]);
+    ];
+    expect(getPrimaryNavigation(false).map((item) => item.label)).toEqual(flow);
+    expect(getPrimaryNavigation(true).map((item) => item.label)).toEqual(flow);
     expect(getMobileNavigation(true)).toHaveLength(4);
   });
 
-  it("keeps a directly opened contextual destination visible and active", () => {
-    // Applications is the one primary item hidden before activation, so opening
-    // it directly appends it rather than leaving the shell without an active tab.
+  it("leaves a primary destination in place when opened directly", () => {
+    // Applications is a primary item now, so opening it needs no appended tab.
     expect(getNavigationForPath(false, "/applications").map((item) => item.label)).toEqual([
       "Dashboard",
-      "Your Journey",
-      "Career Profile",
+      "Upload Résumé",
       "Career Direction",
       "Search Brief",
-      "Opportunities",
       "Applications",
+      "Résumé Studio",
     ]);
   });
 });

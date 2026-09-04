@@ -145,7 +145,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
 
       <div className="page-footer-actions">
         <div className="job-detail-management">
-          <Link href="/jobs" className="secondary-button">← Back to jobs</Link>
+          <Link href="/applications" className="secondary-button">← Back to applications</Link>
           <DeleteOpportunityButton jobId={job.id} />
         </div>
         <Link href="/applications" className="primary-button">Open Applications <span aria-hidden="true">→</span></Link>
