@@ -50,12 +50,7 @@ export function SearchPlanEditor({
   }
 
   async function save() {
-    // The brief refines search but never blocks the loop: reaching the dashboard
-    // is the point of this screen, so we fill sensible defaults and always save.
-    if (!hasChanges) {
-      router.push("/");
-      return;
-    }
+    if (!hasChanges) return;
     setStatus("saving");
     const finalLocations = locations.length ? locations : ["Remote"];
     const finalRemote = remote || "Flexible";
@@ -68,7 +63,7 @@ export function SearchPlanEditor({
     setStatus(response.ok ? "saved" : "error");
     if (response.ok) {
       window.dispatchEvent(new Event("sartho:journey-changed"));
-      router.push("/");
+      router.refresh();
     }
   }
 
@@ -100,10 +95,12 @@ export function SearchPlanEditor({
         </div>
       </section>
 
-      <div className="direction-save-bar">
-        {status === "error" ? <span className="direction-save-status is-error" role="alert">Could not save — please try again</span> : status === "saved" ? <span className="direction-save-status">Saved ✓</span> : null}
-        <button type="button" className="primary-button" onClick={() => void save()} disabled={status === "saving"}>{status === "saving" ? "Saving…" : hasChanges ? "Save and continue" : "Go to Dashboard"}</button>
-      </div>
+      {hasChanges || status !== "idle" ? (
+        <div className="direction-save-bar">
+          {status === "error" ? <span className="direction-save-status is-error" role="alert">Could not save — please try again</span> : status === "saved" ? <span className="direction-save-status">Saved ✓</span> : null}
+          <button type="button" className="primary-button" onClick={() => void save()} disabled={status === "saving"}>{status === "saving" ? "Saving…" : "Save changes"}</button>
+        </div>
+      ) : null}
     </div>
   );
 }
