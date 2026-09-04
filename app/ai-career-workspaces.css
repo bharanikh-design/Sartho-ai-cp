@@ -101,6 +101,15 @@
 @keyframes suggestionShimmer { to { background-position-x: -250%; } }
 
 .direction-priority-panel { padding: 27px 29px; }
+
+/* Compact secondary controls, below the suggestions and priorities. */
+.direction-input-bar { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; padding: 22px 26px; }
+.direction-input-col { display: flex; flex-direction: column; }
+.direction-input-bar .direction-choice-label em { color: #92b8a7; font-weight: 500; font-style: normal; }
+.direction-input-bar .direction-manual-add { margin-top: 10px; }
+.direction-input-bar .direction-ai-prompt { margin-top: 10px; }
+.direction-input-bar .direction-ai-prompt textarea { min-height: 74px; }
+@media (max-width: 720px) { .direction-input-bar { grid-template-columns: 1fr; gap: 18px; } }
 .direction-priority-heading,
 .resume-section-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 28px; }
 .direction-priority-heading > div > span { color: #527565; font-size: var(--text-2xs); font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
