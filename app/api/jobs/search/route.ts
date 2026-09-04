@@ -65,7 +65,8 @@ export async function POST() {
       return NextResponse.json({ error: "Jobs search isn't connected yet.", code: "not_configured" }, { status: 503 });
     }
     console.error("Jobs search failed", caught);
-    return NextResponse.json({ error: "The jobs provider could not be reached. Try again shortly." }, { status: 502 });
+    const detail = caught instanceof Error ? caught.message : "unknown error";
+    return NextResponse.json({ error: `Jobs provider error: ${detail}`, code: "provider_error" }, { status: 502 });
   }
 
   const ranked = Array.from(byUrl.values())
