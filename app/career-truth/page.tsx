@@ -3,6 +3,7 @@ import { CareerProfileReview } from "@/components/career-profile-review";
 import { ProductPageHeader } from "@/components/product-page-header";
 import { ResumeImport } from "@/components/resume-import";
 import { CareerHistory } from "@/components/career-history";
+import { VectorSyncEngine } from "@/components/vector-sync-engine";
 import { WorkflowHandoff } from "@/components/workflow-handoff";
 import { requireUser } from "@/lib/auth";
 import { getCareerWorkspace } from "@/lib/data/career";
@@ -28,6 +29,7 @@ export default async function CareerTruthPage() {
           title="Bring in your career story."
           description="Upload one strong source résumé. AI organises it into a profile; you review the result before anything is used."
         />
+        <VectorSyncEngine />
         <section className="glass-card content-card" id="resume">
           <div className="card-header">
             <div><h2 className="section-heading">Upload your master résumé</h2><p className="section-subtitle">PDF, Word or plain text. Your document remains the source of truth.</p></div>
@@ -52,6 +54,7 @@ export default async function CareerTruthPage() {
           { href: "/resume-studio#source-resumes", label: "Manage source résumés" },
         ] : []}
       />
+      <VectorSyncEngine />
 
       {profile ? (
         <section className="glass-card profile-record" aria-labelledby="profile-record-title">
