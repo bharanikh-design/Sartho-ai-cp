@@ -222,6 +222,30 @@ async function searchJSearch(query: JobSearchQuery): Promise<JobSearchResult[]> 
     .filter((item): item is JobSearchResult => item !== null);
 }
 
+/**
+ * Every configured provider, in fall-back order. JSearch leads (broadest
+ * coverage) but if it fails at request time the caller can drop to Adzuna, so
+ * one provider being down does not take search down. JOBS_SEARCH_PROVIDER pins
+ * a single provider when set.
+ */
+export function configuredJobSearchProviders(): JobSearchProviderName[] {
+  const override = process.env.JOBS_SEARCH_PROVIDER?.trim().toLowerCase();
+  if (override === "jsearch") return jsearchConfig() ? ["jsearch"] : [];
+  if (override === "adzuna") return adzunaConfig() ? ["adzuna"] : [];
+  const list: JobSearchProviderName[] = [];
+  if (jsearchConfig()) list.push("jsearch");
+  if (adzunaConfig()) list.push("adzuna");
+  return list;
+}
+
+export async function searchWithProvider(
+  provider: JobSearchProviderName,
+  query: JobSearchQuery,
+): Promise<JobSearchResult[]> {
+  if (provider === "jsearch") return searchJSearch(query);
+  return searchAdzuna(query);
+}
+
 /** Query the active provider. Throws JobSearchNotConfiguredError when none is set. */
 export async function searchJobs(query: JobSearchQuery): Promise<JobSearchResult[]> {
   const provider = activeJobSearchProvider();
