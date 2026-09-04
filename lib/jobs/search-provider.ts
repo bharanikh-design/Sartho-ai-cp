@@ -209,7 +209,11 @@ async function searchJSearch(query: JobSearchQuery): Promise<JobSearchResult[]> 
     } catch {
       // non-JSON error body; the status alone still helps.
     }
-    throw new Error(`JSearch returned ${response.status}${detail ? ` — ${detail}` : ""}`);
+    // A masked key fingerprint (never the full value) so a bad paste is
+    // diagnosable: a real RapidAPI key is 50 chars. Anything else is the cause.
+    const key = config.key;
+    const keyHint = `key ${key.length}ch ${key.slice(0, 3)}…${key.slice(-3)}`;
+    throw new Error(`JSearch returned ${response.status}${detail ? ` — ${detail}` : ""} [${keyHint}]`);
   }
 
   const body = (await response.json()) as { data?: JSearchResult[] };
