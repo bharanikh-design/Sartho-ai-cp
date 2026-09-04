@@ -151,7 +151,7 @@ export function JobAnalyser({ initialJobs, skillProfile }: { initialJobs: JobRec
           
   {extensionIntel && (
     <div style={{ marginBottom: "1.5rem", padding: "12px 16px", background: "rgba(107, 207, 147, 0.05)", border: "1px solid rgba(107, 207, 147, 0.2)", borderRadius: "8px" }}>
-      <h4 style={{ margin: "0 0 8px 0", fontSize: "0.75rem", color: "#6bcf93", textTransform: "uppercase", letterSpacing: "0.05em" }}>Sartho Role Intelligence</h4>
+      <h4 style={{ margin: "0 0 8px 0", fontSize: "0.75rem", color: "#6bcf93", textTransform: "uppercase", letterSpacing: "0.05em" }}>LinkedIn Opportunity Details</h4>
       <div style={{ display: "flex", gap: "16px", flexWrap: "wrap" }}>
         {extensionIntel.applicants && extensionIntel.applicants !== "hidden" && (
           <span style={{ fontSize: "0.8125rem", color: "#ccc" }}>👥 {extensionIntel.applicants}</span>
