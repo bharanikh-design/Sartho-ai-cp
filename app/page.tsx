@@ -57,7 +57,7 @@ export default async function DashboardPage() {
         eyebrow="Career Command Centre"
         title={`Welcome back, ${firstName}.`}
         description="One connected view from Career Profile to outcome. Sartho uses your live workspace to explain what matters now and where to go next."
-        metric={{ value: "1", label: "clear next action" }}
+        metric={{ value: "1", label: "clear next action", href: "/journey" }}
       />
 
       <section className="dashboard-workflow command-centre-journey" aria-labelledby="career-journey-title">

@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 type HeaderMetric = {
   value: ReactNode;
   label: string;
+  href?: string;
 };
 
 type HeaderAction = {
@@ -46,10 +47,17 @@ export function ProductPageHeader({
         ) : null}
       </div>
       {metric ? (
-        <div className="product-system-header__metric" aria-label={metric.label}>
-          <strong>{metric.value}</strong>
-          <span>{metric.label}</span>
-        </div>
+        metric.href ? (
+          <Link href={metric.href} className="product-system-header__metric" aria-label={metric.label} style={{ textDecoration: 'none', cursor: 'pointer' }}>
+            <strong>{metric.value}</strong>
+            <span>{metric.label}</span>
+          </Link>
+        ) : (
+          <div className="product-system-header__metric" aria-label={metric.label}>
+            <strong>{metric.value}</strong>
+            <span>{metric.label}</span>
+          </div>
+        )
       ) : null}
     </header>
   );
