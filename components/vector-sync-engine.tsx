@@ -69,7 +69,7 @@ export function VectorSyncEngine() {
               ? "Vectorizing your master career facts into the Semantic Graph..." 
               : status === "complete" 
                 ? `Successfully synchronized ${syncedCount} new career facts.`
-                : "Failed to connect to the OpenAI embedding engine."}
+                : "Failed to connect to the AI provider."}
           </span>
         </div>
       </div>

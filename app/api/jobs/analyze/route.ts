@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
 import { embedText } from "@/lib/ai/embed";
+import { createSafetyIdentifier, generateStructuredJson } from "@/lib/ai/provider";
 
 export async function POST(req: Request) {
   try {
@@ -11,37 +12,27 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Job description is too short to analyze." }, { status: 400 });
     }
 
-    const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) throw new Error("OPENAI_API_KEY missing");
-
-    // 1. Ask LLM to extract key requirements from the job description
-    const extractRes = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
-        messages: [{
-          role: "system",
-          content: "You are an expert technical recruiter. Extract the 5 most important skills/requirements from the provided job description. Return JSON exactly like this: { \"requirements\": [\"AWS Architecture\", \"Agile Team Leadership\"] }"
-        }, {
-          role: "user",
-          content: description
-        }],
-        response_format: { type: "json_object" }
-      })
+    // 1. Ask LLM to extract key requirements from the job description (Uses configured AI_PROVIDER)
+    const raw = await generateStructuredJson({
+      workload: "fast",
+      safetyIdentifier: createSafetyIdentifier(user.id),
+      schemaName: "sartho_job_requirements",
+      schema: {
+        type: "object",
+        additionalProperties: false,
+        required: ["requirements"],
+        properties: {
+          requirements: {
+            type: "array",
+            items: { type: "string" }
+          }
+        }
+      },
+      system: "You are an expert technical recruiter. Extract the 5 most important skills/requirements from the provided job description. Return ONLY the requested JSON schema.",
+      prompt: description,
     });
-
-    if (!extractRes.ok) throw new Error("Failed to extract requirements");
-    const extractData = await extractRes.json();
     
-    // Parse response
-    let requirements: string[] = [];
-    try {
-      const parsed = JSON.parse(extractData.choices[0].message.content);
-      requirements = parsed.requirements || [];
-    } catch {
-      requirements = [];
-    }
+    const requirements = (raw as { requirements?: string[] }).requirements || [];
 
     if (requirements.length === 0) {
       return NextResponse.json({ error: "Failed to parse requirements" }, { status: 500 });
