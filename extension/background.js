@@ -3,6 +3,40 @@ chrome.runtime.onInstalled.addListener(() => {
 });
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.type === "TRIGGER_AUTOFILL") {
+    (async () => {
+      // Find Sartho tab
+      const tabs = await chrome.tabs.query({ url: ["http://localhost:3000/*", "https://www.sartho.tech/*"] });
+      if (tabs.length === 0) {
+        sendResponse({ success: false, error: "Sartho not open" });
+        return;
+      }
+      
+      const sarthoTab = tabs[0];
+      
+      // Request profile data from Sartho
+      chrome.tabs.sendMessage(sarthoTab.id, { type: "REQUEST_PROFILE" }, async (response) => {
+        if (response && response.profileData) {
+          // Inject autofill.js into the ATS tab if not already there
+          await chrome.scripting.executeScript({
+            target: { tabId: message.tabId },
+            files: ["autofill.js"]
+          }).catch(e => console.log("Script already injected or error:", e));
+
+          // Send data to ATS tab
+          chrome.tabs.sendMessage(message.tabId, {
+            type: "EXECUTE_AUTOFILL",
+            payload: response.profileData
+          });
+          sendResponse({ success: true });
+        } else {
+          sendResponse({ success: false, error: "Could not get profile data from Sartho" });
+        }
+      });
+    })();
+    return true; // async
+  }
+
   if (message.type === "SEND_TO_SARTHO") {
     (async () => {
       // Find an existing Sartho tab or create one

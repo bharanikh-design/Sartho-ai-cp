@@ -1,5 +1,43 @@
 let parsedData = null;
+
+let parsedData = null;
 let sourceUrl = '';
+let isAtsPage = false;
+
+// Check if we are on an ATS page when the popup opens
+chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+  const url = tabs[0].url || "";
+  if (url.includes('greenhouse.io') || url.includes('lever.co') || url.includes('workday.com') || url.includes('myworkdayjobs.com')) {
+    isAtsPage = true;
+    document.getElementById('analyzeBtn').style.display = 'none';
+    
+    const atsContainer = document.createElement('div');
+    atsContainer.innerHTML = `
+      <div style="padding: 12px; background: rgba(107, 207, 147, 0.1); border: 1px solid rgba(107, 207, 147, 0.2); border-radius: 8px; margin-bottom: 12px;">
+        <h4 style="margin: 0 0 4px 0; color: #6bcf93; font-size: 13px;">ATS Detected</h4>
+        <p style="margin: 0; font-size: 11px; color: #ccc;">Sartho can auto-fill this application using your Career Profile.</p>
+      </div>
+      <button id="autofillBtn" style="background: #174b3a; border: 1px solid #6bcf93; color: white; font-weight: bold;">Auto-fill Application ✦</button>
+    `;
+    document.getElementById('result').appendChild(atsContainer);
+
+    document.getElementById('autofillBtn').addEventListener('click', async () => {
+      document.getElementById('autofillBtn').innerText = "Filling...";
+      
+      // Tell background script to get profile from Sartho and inject autofill
+      chrome.runtime.sendMessage({ type: "TRIGGER_AUTOFILL", tabId: tabs[0].id }, (response) => {
+        if (response && response.success) {
+          document.getElementById('autofillBtn').innerText = "✓ Filled";
+          document.getElementById('autofillBtn').style.background = "#0d402b";
+        } else {
+          document.getElementById('autofillBtn').innerText = "Error (Ensure Sartho is open)";
+          document.getElementById('autofillBtn').style.background = "#ff6b6b";
+        }
+      });
+    });
+  }
+});
+
 
 document.getElementById('analyzeBtn').addEventListener('click', async () => {
   const resultDiv = document.getElementById('result');
