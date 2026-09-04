@@ -38,6 +38,7 @@ export function JobSearchPanel() {
   const [savingUrl, setSavingUrl] = useState<string | null>(null);
   const [savedUrls, setSavedUrls] = useState<string[]>([]);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [showWeak, setShowWeak] = useState(false);
 
   async function runSearch() {
     setStatus("loading");
@@ -85,6 +86,57 @@ export function JobSearchPanel() {
     }
   }
 
+  const renderResult = (result: SearchResult) => {
+    const saved = savedUrls.includes(result.url);
+    return (
+      <article className="application-row" key={result.url} style={{ alignItems: "flex-start" }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <span style={{ display: "block", fontSize: "0.75rem", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+            {result.employer ?? "Employer not listed"}{result.location ? ` · ${result.location}` : ""}
+          </span>
+          <strong style={{ display: "block", fontSize: "1.0625rem", margin: "2px 0" }}>{result.title}</strong>
+          <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap", margin: "6px 0" }}>
+            <span style={{ fontSize: "0.75rem", fontWeight: 700, textTransform: "uppercase", color: recTone[result.recommendation], border: `1px solid ${recTone[result.recommendation]}55`, background: `${recTone[result.recommendation]}18`, padding: "3px 10px", borderRadius: "100px" }}>{result.recommendation}</span>
+            <span style={{ fontSize: "0.8125rem", color: "var(--text-secondary)" }}>{result.overallMatch}% match</span>
+            {result.salary ? <span style={{ fontSize: "0.8125rem", color: "var(--text-tertiary)" }}>{result.salary}</span> : null}
+            <span style={{ fontSize: "0.75rem", color: "var(--text-tertiary)" }}>{result.source}</span>
+          </div>
+          {result.matchedSkills.length ? (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+              {result.matchedSkills.map((skill) => (
+                <span key={skill} style={{ fontSize: "0.7rem", color: "#6bcf93", background: "rgba(107,207,147,0.1)", border: "1px solid rgba(107,207,147,0.25)", padding: "3px 8px", borderRadius: "4px" }}>{skill}</span>
+              ))}
+            </div>
+          ) : null}
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: "8px", flex: "none" }}>
+          {saved ? (
+            <Link href="/applications" className="secondary-button" style={{ whiteSpace: "nowrap" }}>Saved ✓</Link>
+          ) : (
+            <button type="button" className="primary-button" onClick={() => void save(result)} disabled={savingUrl === result.url} style={{ whiteSpace: "nowrap" }}>
+              {savingUrl === result.url ? "Saving…" : "Save to pipeline"}
+            </button>
+          )}
+          <a href={result.url} target="_blank" rel="noreferrer" className="secondary-button" style={{ whiteSpace: "nowrap", textAlign: "center" }}>View ↗</a>
+        </div>
+      </article>
+    );
+  };
+
+  // De-duplicate near-identical reposts (same title + employer), then split into
+  // strong matches (worth acting on) and weaker ones (collapsed by default).
+  const seen = new Set<string>();
+  const unique = results.filter((result) => {
+    const key = `${result.title}|${result.employer ?? ""}`.toLowerCase().trim();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  const strong = unique.filter((result) => result.recommendation !== "skip");
+  const weak = unique.filter((result) => result.recommendation === "skip");
+  const primary = strong.length ? strong : weak.slice(0, 3);
+  const collapsed = strong.length ? weak : weak.slice(3);
+
   return (
     <section className="glass-card content-card" id="find-roles">
       <div className="card-header">
@@ -117,45 +169,27 @@ export function JobSearchPanel() {
 
       {saveError ? <div className="inline-error" role="alert">{saveError}</div> : null}
 
-      {results.length ? (
-        <div className="application-list" style={{ marginTop: "8px" }}>
-          {results.map((result) => {
-            const saved = savedUrls.includes(result.url);
-            return (
-              <article className="application-row" key={result.url} style={{ alignItems: "flex-start" }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <span style={{ display: "block", fontSize: "0.75rem", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                    {result.employer ?? "Employer not listed"}{result.location ? ` · ${result.location}` : ""}
-                  </span>
-                  <strong style={{ display: "block", fontSize: "1.0625rem", margin: "2px 0" }}>{result.title}</strong>
-                  <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap", margin: "6px 0" }}>
-                    <span style={{ fontSize: "0.75rem", fontWeight: 700, textTransform: "uppercase", color: recTone[result.recommendation], border: `1px solid ${recTone[result.recommendation]}55`, background: `${recTone[result.recommendation]}18`, padding: "3px 10px", borderRadius: "100px" }}>{result.recommendation}</span>
-                    <span style={{ fontSize: "0.8125rem", color: "var(--text-secondary)" }}>{result.overallMatch}% match</span>
-                    {result.salary ? <span style={{ fontSize: "0.8125rem", color: "var(--text-tertiary)" }}>{result.salary}</span> : null}
-                    <span style={{ fontSize: "0.75rem", color: "var(--text-tertiary)" }}>{result.source}</span>
-                  </div>
-                  {result.matchedSkills.length ? (
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
-                      {result.matchedSkills.map((skill) => (
-                        <span key={skill} style={{ fontSize: "0.7rem", color: "#6bcf93", background: "rgba(107,207,147,0.1)", border: "1px solid rgba(107,207,147,0.25)", padding: "3px 8px", borderRadius: "4px" }}>{skill}</span>
-                      ))}
-                    </div>
-                  ) : null}
+      {unique.length ? (
+        <>
+          {!strong.length ? (
+            <div className="empty-inline-state">No strong matches against your evidence yet — here are the closest. Adding more approved evidence, or refining your target roles, sharpens these.</div>
+          ) : null}
+          <div className="application-list" style={{ marginTop: "8px" }}>
+            {primary.map(renderResult)}
+          </div>
+          {collapsed.length ? (
+            <>
+              <button type="button" className="secondary-button" onClick={() => setShowWeak((value) => !value)} style={{ marginTop: "12px" }}>
+                {showWeak ? "Hide weaker matches" : `Show ${collapsed.length} weaker match${collapsed.length === 1 ? "" : "es"}`}
+              </button>
+              {showWeak ? (
+                <div className="application-list" style={{ marginTop: "8px", opacity: 0.7 }}>
+                  {collapsed.map(renderResult)}
                 </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: "8px", flex: "none" }}>
-                  {saved ? (
-                    <Link href="/applications" className="secondary-button" style={{ whiteSpace: "nowrap" }}>Saved ✓</Link>
-                  ) : (
-                    <button type="button" className="primary-button" onClick={() => void save(result)} disabled={savingUrl === result.url} style={{ whiteSpace: "nowrap" }}>
-                      {savingUrl === result.url ? "Saving…" : "Save to pipeline"}
-                    </button>
-                  )}
-                  <a href={result.url} target="_blank" rel="noreferrer" className="secondary-button" style={{ whiteSpace: "nowrap", textAlign: "center" }}>View ↗</a>
-                </div>
-              </article>
-            );
-          })}
-        </div>
+              ) : null}
+            </>
+          ) : null}
+        </>
       ) : null}
     </section>
   );
