@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/lib/auth";
+import { rescoreSavedJobs } from "@/lib/matching/rescore";
 
 export async function PUT() {
   const { supabase, user } = await getAuthenticatedUser();
@@ -16,6 +17,9 @@ export async function PUT() {
     console.error("Unable to confirm career profile", error);
     return NextResponse.json({ error: "Sartho could not confirm your career profile." }, { status: 500 });
   }
+
+  // Newly approved evidence can change how every saved role scores.
+  await rescoreSavedJobs(supabase, user.id);
 
   return NextResponse.json({ confirmed: data?.length ?? 0 });
 }

@@ -20,7 +20,14 @@ beforeEach(() => {
   update.mockReturnValue({ eq: userEq });
   getAuthenticatedUser.mockResolvedValue({
     user: { id: "user-1" },
-    supabase: { from: vi.fn(() => ({ update })) },
+    supabase: {
+      // evidence_items goes through the update chain; the jobs read belongs to
+      // the post-confirm re-score, which no-ops when there are no saved roles.
+      from: vi.fn((table: string) =>
+        table === "jobs"
+          ? { select: () => ({ eq: () => Promise.resolve({ data: [], error: null }) }) }
+          : { update }),
+    },
   });
 });
 
