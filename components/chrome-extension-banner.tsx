@@ -24,12 +24,11 @@ export function ChromeExtensionBanner() {
   if (hasExtension) return null;
 
   return (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 24px", background: "linear-gradient(90deg, #103d2e 0%, #174b3a 100%)", borderRadius: "12px", border: "1px solid #6bcf93", marginBottom: "32px", boxShadow: "0 8px 30px rgba(23, 75, 58, 0.2)" }}>
-      <div>
-        <h3 style={{ margin: "0 0 4px 0", color: "white", fontSize: "1rem" }}>Install the Sartho Auto-Applier Extension</h3>
-        <p style={{ margin: 0, color: "#b9d1c6", fontSize: "0.875rem" }}>Import jobs directly from LinkedIn in one click and auto-fill applications on Workday & Greenhouse.</p>
+    <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "16px", marginTop: "-16px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "12px", padding: "8px 16px", background: "rgba(107, 207, 147, 0.1)", borderRadius: "100px", border: "1px solid rgba(107, 207, 147, 0.3)" }}>
+        <span style={{ fontSize: "0.8125rem", color: "#6bcf93", fontWeight: 500 }}>✦ Missing Auto-Applier</span>
+        <a href="#" onClick={(e) => { e.preventDefault(); alert('Redirecting to Chrome Web Store...'); }} style={{ color: "white", fontSize: "0.8125rem", textDecoration: "none", background: "rgba(255,255,255,0.1)", padding: "4px 12px", borderRadius: "100px" }}>Install Extension ↗</a>
       </div>
-      <a href="#" onClick={(e) => { e.preventDefault(); alert('Redirecting to Chrome Web Store...'); }} style={{ background: "white", color: "#174b3a", padding: "10px 20px", borderRadius: "8px", fontWeight: "bold", fontSize: "0.875rem", textDecoration: "none", flexShrink: 0 }}>Download Extension ↗</a>
     </div>
   );
 }
