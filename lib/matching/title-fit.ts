@@ -131,7 +131,7 @@ export function scoreTitleFit(
    * number simply looking pessimistic.
    */
   const seniorityGap = jobLevel - best.level;
-  const penalty = seniorityGap >= 2 ? 0.6 : seniorityGap === 1 ? 0.85 : 1;
+  const penalty = seniorityGap >= 3 ? 0.3 : seniorityGap === 2 ? 0.6 : seniorityGap === 1 ? 0.85 : 1;
 
   return {
     score: Math.max(0, Math.min(100, Math.round(best.score * penalty))),

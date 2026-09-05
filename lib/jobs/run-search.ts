@@ -4,7 +4,8 @@ import { getSearchPreferences } from "@/lib/data/search";
 import { countryName, normaliseCountryCode } from "@/lib/jobs/countries";
 import { splitMisfiledCompanies } from "@/lib/jobs/employers";
 import { scoreOpportunity } from "@/lib/matching/opportunity-score";
-import { candidateSeniority, seniorityOf } from "@/lib/matching/title-fit";
+import { candidateSeniority } from "@/lib/matching/title-fit";
+import { seniorityReach } from "@/lib/matching/seniority-reach";
 import {
   MAX_COMPANY_QUERIES,
   MAX_LOCATION_QUERIES,
@@ -53,8 +54,16 @@ export type ScoredJobMatch = {
 };
 
 /* What was actually searched, so the page (or email) can say so. */
-/** How far above the person a role may sit before it stops being for them. */
-export const MAX_SENIORITY_STRETCH = 2;
+/*
+ * How far above the person a role may sit before it stops being for them.
+ *
+ * One level, not two. At two, someone six months out of university — level 1
+ * once an inflated title is tempered by years — was still shown level 3
+ * "Senior" postings. One level lets them see the unqualified grade they should
+ * actually be applying for (Analyst, Consultant) and stops there. Nobody
+ * becomes a Senior Consultant or an Engagement Manager in six months.
+ */
+export const MAX_SENIORITY_STRETCH = 1;
 
 export type SearchCriteria = {
   /** The primary market. */
@@ -280,7 +289,7 @@ export async function runBriefSearch(
   const withinReach: ScoredJobMatch[] = [];
   let tooSenior = 0;
   for (const match of scoredByUrl.values()) {
-    if (seniorityOf(match.title) - level > MAX_SENIORITY_STRETCH) { tooSenior += 1; continue; }
+    if (!seniorityReach(match.title, heldTitles, profile?.total_experience_years ?? null).withinReach) { tooSenior += 1; continue; }
     withinReach.push(match);
   }
 
