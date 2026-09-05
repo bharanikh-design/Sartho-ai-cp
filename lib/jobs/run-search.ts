@@ -3,6 +3,7 @@ import { getCareerWorkspace } from "@/lib/data/career";
 import { getSearchPreferences } from "@/lib/data/search";
 import { countryName, normaliseCountryCode } from "@/lib/jobs/countries";
 import { splitMisfiledCompanies } from "@/lib/jobs/employers";
+import { familiesOf, familyFit } from "@/lib/matching/job-family";
 import { scoreOpportunity } from "@/lib/matching/opportunity-score";
 import { candidateSeniority } from "@/lib/matching/title-fit";
 import { seniorityReach } from "@/lib/matching/seniority-reach";
@@ -75,6 +76,9 @@ export type SearchCriteria = {
   /** The level the person is at, and how many roles were dropped as too senior. */
   candidateLevel: number;
   tooSenior: number;
+  /** Roles dropped as a different line of work, and the families kept. */
+  offFamily: number;
+  families: string[];
   /** All markets, named. */
   countryName: string;
   countrySource: "brief" | "resume" | "default";
@@ -288,8 +292,21 @@ export async function runBriefSearch(
   const level = candidateSeniority(heldTitles, profile?.total_experience_years ?? null);
   const withinReach: ScoredJobMatch[] = [];
   let tooSenior = 0;
+  let offFamily = 0;
+
+  /*
+   * Job family is the second hard filter, and the one a recruiter applies first.
+   *
+   * Seniority alone let a Business Analyst be shown "Solutions Consultant"
+   * roles: the level was right, so nothing stopped it, and 65% of the score
+   * comes from requirement coverage and evidence depth — which a pre-sales
+   * advert and a BA CV share plenty of. Scoring it low was never enough. A job
+   * in a different function is not a weak match, it is the wrong job, and it
+   * pushes the right ones off the page.
+   */
   for (const match of scoredByUrl.values()) {
     if (!seniorityReach(match.title, heldTitles, profile?.total_experience_years ?? null).withinReach) { tooSenior += 1; continue; }
+    if (!familyFit(match.title, heldTitles, roleNames).withinReach) { offFamily += 1; continue; }
     withinReach.push(match);
   }
 
@@ -303,6 +320,8 @@ export async function runBriefSearch(
     employmentTypes: preferences.employmentTypes,
     candidateLevel: level,
     tooSenior,
+    offFamily,
+    families: [...familiesOf([...heldTitles, ...roleNames])],
     countryName: countryLabel,
     countrySource: preferences.country ? "brief" : profile?.country ? "resume" : "default",
     locations: usedLocations,

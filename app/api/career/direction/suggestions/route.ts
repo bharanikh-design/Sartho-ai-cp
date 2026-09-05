@@ -57,7 +57,7 @@ export async function POST(request: Request) {
   if (!input.success) return NextResponse.json({ error: "Review the guidance you gave Sartho." }, { status: 400 });
 
   const [profileResult, rolesResult, evidenceResult] = await Promise.all([
-    supabase.from("profiles").select("headline,summary,location,work_authorisation,strengths").eq("id", user.id).maybeSingle(),
+    supabase.from("profiles").select("headline,summary,location,work_authorisation,strengths,total_experience_years").eq("id", user.id).maybeSingle(),
     supabase.from("career_roles").select("id,employer,title,location,start_date,end_date,is_current,summary").eq("user_id", user.id).order("start_date", { ascending: false }),
     supabase.from("evidence_items").select("id,claim,context,metrics,domains,career_role_id,confidence").eq("user_id", user.id).eq("approval_status", "approved").order("updated_at", { ascending: false }).limit(80),
   ]);
@@ -87,12 +87,21 @@ export async function POST(request: Request) {
         "Base every suggestion on transferable experience explicitly present in the supplied approved evidence.",
         "A stretch move may require learning, but do not claim the person already has an unsupported skill, certification, employer, metric or responsibility.",
         "Use market-recognisable role families rather than over-specific vacancy titles.",
+        /*
+         * Two constraints that were missing, and between them they let "Sales
+         * Manager / Solutions Consultant" be proposed to a business analyst six
+         * months into their career — and then saved as a target role, which is
+         * what the job search goes and looks for.
+         */
+        "totalExperienceYears is how long this person has actually worked. Respect it: under two years means entry level whatever their titles say, and nobody becomes a manager, head, director or engagement manager in that time. Never propose a role more than one grade above the level their experience supports.",
+        "Stay in the same line of work as their evidence, or a genuine neighbour of it. Analysis, data, consulting, product and project delivery are neighbours. Sales, pre-sales, marketing and customer success are a different function: do not propose them to someone whose evidence is analytical unless they have asked for that change in `steering`, and if they have, say plainly in the rationale that it is a change of function.",
         "Cite only supplied evidence IDs. Explain why the move is plausible in plain language.",
         "Do not repeat an existing selected priority.",
         "If `steering` is non-empty it is the person's own instruction about what to change: every suggestion must satisfy it (for example a named function, industry, seniority, location or constraint), drop directions that contradict it, and say in each rationale how the direction fits it. Only when it cannot be satisfied by any evidence-backed direction, return the closest evidence-backed directions and say plainly in the rationale why.",
       ].join(" "),
       prompt: JSON.stringify({
         steering: input.data.explorationPrompt,
+        totalExperienceYears: profileResult.data?.total_experience_years ?? null,
         savedProfile: profileResult.data,
         currentGuidance: {
           headline: input.data.headline,
@@ -108,10 +117,21 @@ export async function POST(request: Request) {
     });
 
     const parsed = directionSuggestionsOutputSchema.parse(raw);
+    /*
+     * The person's own steering is what unlocks a change of function: if they
+     * typed "I want to move into sales", sales directions are exactly right.
+     * Without that, an analytical CV gets analytical directions.
+     */
+    const steering = (input.data.explorationPrompt ?? "").trim();
     const suggestions = groundDirectionSuggestions(
       parsed,
       evidenceResult.data.map((item) => ({ id: item.id, claim: item.claim })),
       input.data.existingLanes,
+      {
+        heldTitles: (rolesResult.data ?? []).map((role) => role.title).filter(Boolean),
+        totalExperienceYears: profileResult.data?.total_experience_years ?? null,
+        allowFunctionChange: steering.length > 0,
+      },
     );
     if (!suggestions.length) throw new Error("The suggestions were not grounded in approved Career Profile evidence.");
 

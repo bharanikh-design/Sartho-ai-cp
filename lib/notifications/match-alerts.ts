@@ -90,8 +90,8 @@ export function renderMatchAlertEmail(input: {
     <p>${intro}</p>
     <p style="font-size:12px;color:#65756d">Searched: ${escapeHtml(describeCriteria(criteria))}</p>
     <table style="width:100%;border-collapse:collapse">${rows}</table>
-    <p style="margin-top:20px"><a href="${escapeHtml(appUrl)}/search-plan#find-roles" style="display:inline-block;padding:12px 18px;background:#155b45;color:white;text-decoration:none;border-radius:10px">Open Search Brief to save any of these</a></p>
-    <p style="color:#65756d;font-size:12px">Sartho never applies to a role or sends career information without your approval. Turn match alerts off from your Search Brief.</p>
+    <p style="margin-top:20px"><a href="${escapeHtml(appUrl)}/search-plan#find-roles" style="display:inline-block;padding:12px 18px;background:#155b45;color:white;text-decoration:none;border-radius:10px">Open Find Roles to save any of these</a></p>
+    <p style="color:#65756d;font-size:12px">Sartho never applies to a role or sends career information without your approval. Turn match alerts off from Find Roles.</p>
   </div>`;
 
   return { subject, html };

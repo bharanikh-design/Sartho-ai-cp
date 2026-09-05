@@ -21,8 +21,8 @@ export default async function ApplicationsPage() {
     <div className="page-stack">
       <ChromeExtensionBanner />
       <ProductPageHeader
-        eyebrow="Applications"
-        title="Applications"
+        eyebrow="Opportunities"
+        title="Every role you have kept"
         description="Add a role, see its fit against your approved evidence, then track it from decision through interview to outcome."
         metric={{ value: jobs.length, label: "tracked opportunities" }}
       />

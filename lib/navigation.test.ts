@@ -36,8 +36,8 @@ describe("primary navigation", () => {
     const flow = [
       "Dashboard",
       "Career Direction",
-      "Search Brief",
-      "Applications",
+      "Find Roles",
+      "Opportunities",
       "Résumé Studio",
     ];
     expect(getPrimaryNavigation(false).map((item) => item.label)).toEqual(flow);
@@ -50,8 +50,8 @@ describe("primary navigation", () => {
     expect(getNavigationForPath(false, "/applications").map((item) => item.label)).toEqual([
       "Dashboard",
       "Career Direction",
-      "Search Brief",
-      "Applications",
+      "Find Roles",
+      "Opportunities",
       "Résumé Studio",
     ]);
   });
