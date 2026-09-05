@@ -53,7 +53,7 @@ describe("scoreAts", () => {
 
     expect(result.weakBullets.map((bullet) => bullet.index)).toEqual([1, 2]);
     expect(result.weakBullets[0].text).toMatch(/live retail dataset/);
-    expect(result.checks[1].detail).toMatch(/2 bullets carry no number/);
+    expect(result.checks[1].detail).toMatch(/1 of 3 bullets carry a figure/);
   });
 
   /*
@@ -107,5 +107,97 @@ describe("bulletsIn", () => {
 
   it("returns nothing for a draft with no bullets", () => {
     expect(bulletsIn("Just prose, no list.")).toEqual([]);
+  });
+});
+
+
+/*
+ * A green tick sat directly above "5 bullets carry no number at all", because
+ * the check passed on four figures anywhere in the draft. Both cannot be true.
+ */
+describe("quantified achievement, judged per bullet", () => {
+  const noAnalysis = null;
+  const draftOf = (bullets: string[]) => ["HEADLINE", "", "EXPERIENCE", ...bullets.map((b) => `• ${b}`)].join("\n");
+
+  it("fails a draft whose figures are clustered in a couple of lines", () => {
+    const result = scoreAts(draftOf([
+      "Cut rework by 30% and cost by 12% across 4 releases in 2 regions.",
+      "Analysed a live retail dataset to diagnose inefficiencies.",
+      "Designed decision logic for an automated tool.",
+      "Presented a structured recommendation to a judging panel.",
+      "Collaborated with an industry mentor to refine the solution.",
+    ]), noAnalysis);
+
+    /* Exactly four figures in the document — the old rule's pass threshold. */
+    expect(result.metricsFound).toBe(4);
+    expect(result.checks[1].state).toBe("fail");
+    expect(result.checks[1].detail).toMatch(/1 of 5 bullets carry a figure/);
+  });
+
+  it("passes when most lines carry one", () => {
+    const result = scoreAts(draftOf([
+      "Cut rework by 30%.",
+      "Analysed 40,000 rows of retail data.",
+      "Led a team of 3.",
+      "Presented to a panel.",
+    ]), noAnalysis);
+    expect(result.checks[1].state).toBe("pass");
+    expect(result.checks[1].detail).toMatch(/3 of 4 bullets carry a figure/);
+  });
+
+  it("says so plainly when there are no bullets to judge", () => {
+    const result = scoreAts("Just prose, no list at all, running to some length.", noAnalysis);
+    expect(result.bulletCount).toBe(0);
+    expect(result.checks[1].state).toBe("fail");
+    expect(result.checks[1].detail).toMatch(/No bullet points found/);
+  });
+});
+
+/*
+ * "100% of the strengths this role wants" reads like a complete answer, and off
+ * two matched capabilities it is barely an opinion — while carrying 60% of the
+ * score. Same reasoning as the matcher's requirement coverage.
+ */
+describe("strength coverage, scaled by how much there was to use", () => {
+  const body = (text: string) => text.padEnd(2400, " delivery experience requirement");
+
+  it("discounts a perfect score drawn from one or two strengths", () => {
+    const thin = scoreAts(body("Business analysis every day."), analysis([], ["Business analysis"]));
+    expect(thin.checks[0].detail).toMatch(/1 of the 1 strength/);
+    expect(thin.checks[0].state).not.toBe("pass");
+
+    const full = scoreAts(
+      body("Business analysis, agile delivery, data analysis and stakeholder management."),
+      analysis([], ["Business analysis", "Agile delivery", "Data analysis", "Stakeholder management"]),
+    );
+    expect(full.checks[0].detail).toMatch(/4 of the 4 strengths/);
+    expect(full.checks[0].state).toBe("pass");
+  });
+});
+
+/*
+ * Sartho's own drafts use "•", but the workbench takes a résumé somebody
+ * already has, and those arrive with hyphens and asterisks. Recognising only
+ * the marker Sartho emits meant a pasted CV looked like prose with no bullets
+ * to improve at all.
+ */
+describe("bullet markers as people actually write them", () => {
+  it("reads hyphen and asterisk bullets, not only Sartho's own", () => {
+    expect(bulletsIn([
+      "EXPERIENCE",
+      "- Delivered an implementation roadmap.",
+      "* Designed a phased rollout strategy.",
+      "• Presented to a judging panel.",
+      "  – Ran the workshop series.",
+    ].join("\n"))).toEqual([
+      "Delivered an implementation roadmap.",
+      "Designed a phased rollout strategy.",
+      "Presented to a judging panel.",
+      "Ran the workshop series.",
+    ]);
+  });
+
+  it("does not mistake a sentence containing a dash for a bullet", () => {
+    expect(bulletsIn("Analysed data — and reported on it.")).toEqual([]);
   });
 });

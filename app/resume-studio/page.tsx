@@ -78,8 +78,14 @@ export default async function ResumeStudioPage() {
    * would reject is a dead button, and listing the ones that still need
    * analysis is the chase list this page is no longer allowed to be.
    */
-  const tailorable: TailorableRole[] = jobs
-    .filter((job) => job.deep_analysis_status === "complete" && !draftedJobIds.has(job.id))
+  /*
+   * Counted separately from `tailorable`, because "none of your roles have been
+   * analysed" and "every analysed role already has a résumé" are different
+   * situations and the page was reporting the first while the second was true.
+   */
+  const analysed = jobs.filter((job) => job.deep_analysis_status === "complete");
+  const tailorable: TailorableRole[] = analysed
+    .filter((job) => !draftedJobIds.has(job.id))
     .map((job) => ({ id: job.id, title: job.title, employer: job.employer }));
 
   return (
@@ -95,6 +101,7 @@ export default async function ResumeStudioPage() {
         drafts={drafts}
         tailorable={tailorable}
         hasAnyJobs={jobs.length > 0}
+        analysedCount={analysed.length}
         evidenceReady={(approvedResult.count ?? 0) > 0}
       />
     </div>

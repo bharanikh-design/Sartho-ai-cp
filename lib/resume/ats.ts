@@ -26,6 +26,13 @@ import type { RuleAnalysis } from "@/lib/types";
  * is a stretch, never as something to type in.
  */
 
+/*
+ * How many matched strengths make a coverage figure worth stating at full
+ * confidence. Below this the analysis found too little to be sure the draft is
+ * presenting the person well, however much of that little it used.
+ */
+export const MIN_STRENGTHS_FOR_CONFIDENCE = 4;
+
 export type AtsCheck = {
   label: string;
   /** Whether this passed, or "warn" when it is worth a look but not wrong. */
@@ -55,6 +62,8 @@ export type AtsScore = {
   unbackedRequirements: string[];
   /** Bullets carrying no figure, listed so the advice is specific. */
   weakBullets: WeakBullet[];
+  /** Bullets in the draft, so a proportion has a denominator. */
+  bulletCount: number;
   metricsFound: number;
   wordCount: number;
   checks: AtsCheck[];
@@ -86,13 +95,23 @@ function normalise(value: string) {
   return ` ${value.toLowerCase().replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim()} `;
 }
 
-/** The bullet lines of a generated draft, in order. */
+/*
+ * A bullet marker as people actually write them.
+ *
+ * Sartho's own drafts use "•", but the workbench takes a résumé somebody
+ * already has, and those come with hyphens and asterisks. Recognising only the
+ * one Sartho emits meant a pasted CV appeared to have no bullets at all —
+ * scored as prose, with nothing to offer improving.
+ */
+export const BULLET_MARKER = /^[•\u2022\u2023\u25E6\u2043\u2219*\u00B7\u2013\u2014-]\s+/;
+
+/** The bullet lines of a résumé, in order. */
 export function bulletsIn(draft: string): string[] {
   return draft
     .split("\n")
     .map((line) => line.trim())
-    .filter((line) => line.startsWith("•"))
-    .map((line) => line.replace(/^•\s*/, "").trim())
+    .filter((line) => BULLET_MARKER.test(line))
+    .map((line) => line.replace(BULLET_MARKER, "").trim())
     .filter(Boolean);
 }
 
@@ -105,9 +124,18 @@ export function scoreAts(draft: string, analysis: RuleAnalysis | null): AtsScore
   const unusedStrengths = evidenced.filter((term) => !haystack.includes(normalise(term).trim()));
   const unbackedRequirements = [...new Set((analysis?.missingRequirements ?? []).filter(Boolean))];
 
-  const strengthCoverage = evidenced.length
-    ? Math.round(((evidenced.length - unusedStrengths.length) / evidenced.length) * 100)
+  /*
+   * Scaled by how many strengths there were to use, for the same reason the
+   * matcher scales requirement coverage: "100% of the strengths this role
+   * wants" reads like a complete answer, and off two matched capabilities it
+   * is barely an opinion. It carries 60% of this score, so an unearned 100
+   * flatters the whole number.
+   */
+  const rawStrengthCoverage = evidenced.length
+    ? ((evidenced.length - unusedStrengths.length) / evidenced.length) * 100
     : 0;
+  const legibility = Math.min(1, evidenced.length / MIN_STRENGTHS_FOR_CONFIDENCE);
+  const strengthCoverage = Math.round(rawStrengthCoverage * legibility);
 
   const bullets = bulletsIn(text);
   const weakBullets = bullets
@@ -115,20 +143,34 @@ export function scoreAts(draft: string, analysis: RuleAnalysis | null): AtsScore
     .filter((bullet) => !hasMetric(bullet.text));
   const metricsFound = text.match(new RegExp(METRIC_SOURCE.source, "gi"))?.length ?? 0;
 
+  /*
+   * Judged per bullet, not per document.
+   *
+   * The check used to pass on four figures anywhere in the draft, which put a
+   * green tick directly above the sentence "5 bullets carry no number at all".
+   * Both cannot be true. Six numbers clustered in two bullets is not a
+   * quantified résumé; what a reader notices is the lines that say nothing
+   * measurable, so that is what gets counted.
+   */
+  const quantifiedBullets = bullets.length - weakBullets.length;
+  const bulletCoverage = bullets.length ? Math.round((quantifiedBullets / bullets.length) * 100) : 0;
+
   const checks: AtsCheck[] = [
     {
       label: "Evidence you can back, used",
       state: strengthCoverage >= 80 ? "pass" : strengthCoverage >= 50 ? "warn" : "fail",
       detail: evidenced.length
-        ? `${strengthCoverage}% of the strengths this role wants — and that your evidence supports — appear in the draft.`
+        ? `${evidenced.length - unusedStrengths.length} of the ${evidenced.length} strength${evidenced.length === 1 ? "" : "s"} this role wants — and that your evidence supports — appear in the draft.`
         : "Run the role analysis first: without it there is nothing to check the draft against.",
     },
     {
       label: "Quantified achievement",
-      state: metricsFound >= 4 ? "pass" : metricsFound >= 2 ? "warn" : "fail",
-      detail: weakBullets.length
-        ? `${metricsFound} measurable figure${metricsFound === 1 ? "" : "s"}. ${weakBullets.length} bullet${weakBullets.length === 1 ? " carries" : "s carry"} no number at all.`
-        : `${metricsFound} measurable figures, and every bullet carries one.`,
+      state: !bullets.length ? "fail" : bulletCoverage >= 70 ? "pass" : bulletCoverage >= 40 ? "warn" : "fail",
+      detail: !bullets.length
+        ? "No bullet points found, so there is nothing to quantify."
+        : weakBullets.length
+          ? `${quantifiedBullets} of ${bullets.length} bullets carry a figure. ${weakBullets.length} say nothing measurable.`
+          : `All ${bullets.length} bullets carry a figure.`,
     },
     {
       label: "Length",
@@ -150,5 +192,5 @@ export function scoreAts(draft: string, analysis: RuleAnalysis | null): AtsScore
     + stateScore(checks[2].state) * 0.15,
   );
 
-  return { score, unusedStrengths, unbackedRequirements, weakBullets, metricsFound, wordCount, checks };
+  return { score, unusedStrengths, unbackedRequirements, weakBullets, bulletCount: bullets.length, metricsFound, wordCount, checks };
 }
