@@ -49,12 +49,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         await chrome.windows.update(sarthoTab.windowId, { focused: true });
         // If not on the /jobs page, navigate there
         if (!sarthoTab.url.includes('/jobs')) {
-          await chrome.tabs.update(sarthoTab.id, { url: 'http://localhost:3000/jobs' });
+          const origin = new URL(sarthoTab.url).origin;
+          await chrome.tabs.update(sarthoTab.id, { url: origin + '/jobs' });
           // Give it a moment to load
           await new Promise(r => setTimeout(r, 1000));
         }
       } else {
-        sarthoTab = await chrome.tabs.create({ url: "http://localhost:3000/jobs" });
+        sarthoTab = await chrome.tabs.create({ url: "https://www.sartho.tech/jobs" });
         // Wait for tab to finish loading
         await new Promise(resolve => {
           chrome.tabs.onUpdated.addListener(function listener(tabId, info) {
