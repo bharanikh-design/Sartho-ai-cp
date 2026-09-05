@@ -21,12 +21,14 @@ export function toSearchKeywords(role: string): string {
  * companies, then roles, then work model. This turns a saved brief into the
  * concrete list of provider queries, in priority order:
  *
- *   1. one query per priority role (top 3), scoped to country + first city;
- *   2. one query per target company (top 4), for the top role, scoped to country.
+ *   1. the top role in each of the first two cities (or nationwide when none);
+ *   2. the next priority roles (up to 3 in total) in the first city;
+ *   3. one query per target company (top 4), for the top role, country-wide.
  *
  * Kept pure so the mapping from brief to queries is testable without a network.
  */
 export const MAX_ROLE_QUERIES = 3;
+export const MAX_LOCATION_QUERIES = 2;
 export const MAX_COMPANY_QUERIES = 4;
 
 export function planSearchQueries(input: {
@@ -37,16 +39,44 @@ export function planSearchQueries(input: {
   remotePreference: string | null;
 }): JobSearchQuery[] {
   const remoteOnly = input.remotePreference === "Remote";
-  const location = input.locations[0]?.trim() || undefined;
+  const locations = input.locations.map((item) => item.trim()).filter(Boolean).slice(0, MAX_LOCATION_QUERIES);
+  const primaryLocation = locations[0];
   const roles = input.roles.map(toSearchKeywords).filter(Boolean).slice(0, MAX_ROLE_QUERIES);
-  const queries: JobSearchQuery[] = roles.map((keywords) => ({
-    keywords, country: input.country, location, remoteOnly, limit: 20,
-  }));
+  const queries: JobSearchQuery[] = [];
   const topRole = roles[0];
-  if (topRole) {
-    for (const employer of input.companies.slice(0, MAX_COMPANY_QUERIES)) {
-      queries.push({ keywords: topRole, country: input.country, employer, remoteOnly, limit: 10 });
+  if (!topRole) return queries;
+
+  // The top role gets every city; a second city is where most "expand my
+  // radius" asks actually land, and one extra query is affordable.
+  if (locations.length) {
+    for (const location of locations) {
+      queries.push({ keywords: topRole, country: input.country, location, remoteOnly, limit: 20 });
     }
+  } else {
+    queries.push({ keywords: topRole, country: input.country, remoteOnly, limit: 20 });
+  }
+  for (const keywords of roles.slice(1)) {
+    queries.push({ keywords, country: input.country, location: primaryLocation, remoteOnly, limit: 20 });
+  }
+  for (const employer of input.companies.slice(0, MAX_COMPANY_QUERIES)) {
+    queries.push({ keywords: topRole, country: input.country, employer, remoteOnly, limit: 10 });
   }
   return queries;
+}
+
+/**
+ * The queries to add when the cities came back thin: every role again, with no
+ * city, so the rest of the country is covered. Company queries are already
+ * country-wide and are not repeated.
+ */
+export function widenToCountry(queries: JobSearchQuery[]): JobSearchQuery[] {
+  const seen = new Set<string>();
+  return queries
+    .filter((query) => query.location && !query.employer)
+    .map((query) => ({ ...query, location: undefined }))
+    .filter((query) => {
+      if (seen.has(query.keywords)) return false;
+      seen.add(query.keywords);
+      return true;
+    });
 }

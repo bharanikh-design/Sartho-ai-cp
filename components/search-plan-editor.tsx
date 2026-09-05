@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { TargetLaneRecord } from "@/lib/types";
 import type { SearchSourcePreference } from "@/lib/data/search";
-import { JOB_MARKETS, countryName } from "@/lib/jobs/countries";
+import { JOB_MARKETS, countryName, majorCities } from "@/lib/jobs/countries";
 
 import { DEFAULT_JOB_SOURCES } from "@/lib/config/job-sources";
 
@@ -109,6 +109,9 @@ export function SearchPlanEditor({
   }
 
   const marketName = countryName(country);
+  const suggestedCities = majorCities(country).filter(
+    (city) => !locations.some((item) => item.toLowerCase() === city.toLowerCase()),
+  );
   const countryHint = !country
     ? "Sartho could not read a country from your résumé — choose the market you want to work in."
     : !initialCountry && inferredCountry === country
@@ -137,9 +140,24 @@ export function SearchPlanEditor({
       </section>
 
       <section className="glass-card direction-panel" id="geography">
-        <div className="direction-heading"><div><span>2 · Geography</span><h2>Which cities{marketName ? ` in ${marketName}` : ""}?</h2><p>Add the cities you would work in. Leave this empty to search {marketName ? `all of ${marketName}` : "the whole country"}.</p></div></div>
-        <div className="editable-chips">{locations.map((location) => <button key={location} type="button" onClick={() => setLocations((items) => items.filter((item) => item !== location))}>{location}<span>×</span></button>)}</div>
-        <div className="inline-add"><input value={locationDraft} onChange={(event) => setLocationDraft(event.target.value)} onKeyDown={(event) => event.key === "Enter" && (event.preventDefault(), addLocation())} placeholder={marketName === "Australia" ? "Sydney, Melbourne, Brisbane…" : "City name"} /><button type="button" onClick={addLocation}>Add</button></div>
+        <div className="direction-heading"><div><span>2 · Geography</span><h2>Which cities{marketName ? ` in ${marketName}` : ""}?</h2><p>Add the cities you would work in — the first two are searched, and if they come back thin Sartho widens to the rest of {marketName ?? "the country"} automatically. Leave this empty to search {marketName ? `all of ${marketName}` : "the whole country"} from the start.</p></div></div>
+        <div className="editable-chips">
+          {locations.length
+            ? locations.map((location) => <button key={location} type="button" onClick={() => setLocations((items) => items.filter((item) => item !== location))}>{location}<span>×</span></button>)
+            : <span className="search-field-hint" style={{ alignSelf: "center" }}>{marketName ? `Anywhere in ${marketName}` : "Anywhere in the country"}</span>}
+        </div>
+        <div className="inline-add"><input value={locationDraft} onChange={(event) => setLocationDraft(event.target.value)} onKeyDown={(event) => event.key === "Enter" && (event.preventDefault(), addLocation())} placeholder={suggestedCities[0] ? `${suggestedCities.slice(0, 3).join(", ")}…` : "City name"} /><button type="button" onClick={addLocation}>Add</button></div>
+        {suggestedCities.length || locations.length ? (
+          <div className="city-quick-add" role="group" aria-label="Quick add cities">
+            {suggestedCities.length ? <span>Quick add:</span> : null}
+            {suggestedCities.map((city) => (
+              <button key={city} type="button" onClick={() => setLocations((items) => [...items, city])}>+ {city}</button>
+            ))}
+            {locations.length && marketName ? (
+              <button type="button" className="is-clear" onClick={() => setLocations([])}>Anywhere in {marketName}</button>
+            ) : null}
+          </div>
+        ) : null}
         <div className="work-model-options" role="group" aria-label="Preferred work model">{["On-site", "Hybrid", "Remote", "Flexible"].map((option) => <button key={option} type="button" className={remote === option ? "is-selected" : ""} onClick={() => setRemote(option)}>{option}</button>)}</div>
       </section>
 

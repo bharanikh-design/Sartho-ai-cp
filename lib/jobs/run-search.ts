@@ -3,7 +3,14 @@ import { getCareerWorkspace } from "@/lib/data/career";
 import { getSearchPreferences } from "@/lib/data/search";
 import { countryName, normaliseCountryCode } from "@/lib/jobs/countries";
 import { scoreOpportunity } from "@/lib/matching/opportunity-score";
-import { MAX_COMPANY_QUERIES, MAX_ROLE_QUERIES, planSearchQueries, toSearchKeywords } from "@/lib/jobs/search-plan";
+import {
+  MAX_COMPANY_QUERIES,
+  MAX_LOCATION_QUERIES,
+  MAX_ROLE_QUERIES,
+  planSearchQueries,
+  toSearchKeywords,
+  widenToCountry,
+} from "@/lib/jobs/search-plan";
 import {
   isJobSearchConfigured,
   configuredJobSearchProviders,
@@ -43,7 +50,9 @@ export type SearchCriteria = {
   country: string;
   countryName: string;
   countrySource: "brief" | "resume" | "default";
+  /** The cities actually queried (up to two). */
   locations: string[];
+  /** True when the cities were thin and the whole country was searched as well. */
   broadened: boolean;
   companies: string[];
   roles: string[];
@@ -58,6 +67,9 @@ export type BriefSearchFailureCode = "not_configured" | "no_targets" | "country_
 export type BriefSearchOutcome =
   | { ok: true; results: ScoredJobMatch[]; criteria: SearchCriteria }
   | { ok: false; code: BriefSearchFailureCode; error: string };
+
+/** Fewer strong matches than this from the cities alone triggers a country-wide pass. */
+export const MIN_STRONG_BEFORE_WIDENING = 3;
 
 export const NOT_CONFIGURED_MESSAGE =
   "Jobs search isn't connected yet. Add a provider key (JSEARCH_RAPIDAPI_KEY for Google for Jobs, or ADZUNA_APP_ID / ADZUNA_APP_KEY) to turn on real search.";
@@ -166,31 +178,45 @@ export async function runBriefSearch(
     return { ok: false, code: "provider_error", error: `Jobs provider error: ${errors[errors.length - 1]}` };
   }
 
-  // Everything worked but the city filter matched nothing: broaden once to the
-  // whole country, so a narrow market doesn't leave the person empty.
+  const score = (result: JobSearchResult): ScoredJobMatch => {
+    const scored = scoreOpportunity(result.title, result.description, evidence, roles, lanes);
+    return {
+      title: result.title,
+      employer: result.employer,
+      location: result.location,
+      url: result.url,
+      salary: result.salary,
+      postedAt: result.postedAt,
+      source: result.source,
+      description: result.description,
+      overallMatch: scored.overallMatch,
+      recommendation: scored.recommendation,
+      matchedSkills: scored.analysis.matchedSkills?.map((skill) => skill.name).slice(0, 6) ?? [],
+    };
+  };
+
+  /*
+   * Location intelligence, step one: the cities are the first radius, not the
+   * only one. If they yield fewer than a handful of strong matches, the same
+   * roles are searched again with no city, so the rest of the country is
+   * covered — and the criteria say so, rather than silently mixing the two.
+   */
+  const scoredByUrl = new Map<string, ScoredJobMatch>();
+  const strongCount = () => Array.from(scoredByUrl.values()).filter((item) => item.recommendation !== "skip").length;
+  for (const [url, result] of byUrl) scoredByUrl.set(url, score(result));
+
+  const usedLocations = preferences.targetLocations.slice(0, MAX_LOCATION_QUERIES);
   let broadened = false;
-  if (!byUrl.size && !errors.length && preferences.targetLocations.length) {
+  if (usedLocations.length && strongCount() < MIN_STRONG_BEFORE_WIDENING && dead.size < providers.length) {
     broadened = true;
-    await run(queries.filter((query) => query.location).map((query) => ({ ...query, location: undefined })));
+    const before = new Set(byUrl.keys());
+    await run(widenToCountry(queries));
+    for (const [url, result] of byUrl) {
+      if (!before.has(url)) scoredByUrl.set(url, score(result));
+    }
   }
 
-  const results: ScoredJobMatch[] = Array.from(byUrl.values())
-    .map((result) => {
-      const scored = scoreOpportunity(result.title, result.description, evidence, roles, lanes);
-      return {
-        title: result.title,
-        employer: result.employer,
-        location: result.location,
-        url: result.url,
-        salary: result.salary,
-        postedAt: result.postedAt,
-        source: result.source,
-        description: result.description,
-        overallMatch: scored.overallMatch,
-        recommendation: scored.recommendation,
-        matchedSkills: scored.analysis.matchedSkills?.map((skill) => skill.name).slice(0, 6) ?? [],
-      };
-    })
+  const results: ScoredJobMatch[] = Array.from(scoredByUrl.values())
     .sort((a, b) => b.overallMatch - a.overallMatch)
     .slice(0, options.maxResults ?? 20);
 
@@ -198,7 +224,7 @@ export async function runBriefSearch(
     country,
     countryName: countryLabel,
     countrySource: preferences.country ? "brief" : profile?.country ? "resume" : "default",
-    locations: broadened ? [] : preferences.targetLocations.slice(0, 1),
+    locations: usedLocations,
     broadened,
     companies: preferences.targetCompanies.slice(0, MAX_COMPANY_QUERIES),
     roles: activeLanes.map((lane) => toSearchKeywords(lane.name)),
