@@ -15,6 +15,10 @@ export const dynamic = "force-dynamic";
  * upload and source-document library already on Career Truth — was opportunity
  * and profile work wearing a résumé label. It has gone back where it belongs.
  */
+import { constructMetadata } from "@/lib/seo";
+
+export const metadata = constructMetadata("Résumé Studio", "Write tailored résumés and test ATS readability.", "/resume-studio");
+
 export default async function ResumeStudioPage() {
   const { supabase, user } = await requireUser();
   const [jobs, applicationsResult, approvedResult, versionsResult] = await Promise.all([

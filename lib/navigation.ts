@@ -93,19 +93,14 @@ const resumeNavigation: NavigationItem = {
   purpose: "Write a tailored résumé draft and check how it reads to an applicant tracking system.",
 };
 
-/**
- * Dashboard remains the orientation point throughout setup. Opportunities is
- * reachable from the start — a half-finished foundation should nudge, not wall,
- * and the page itself explains what it still needs. After activation the
- * navigation expands into the full recurring loop, adding Applications.
- */
-/**
- * One flat menu, in process order, the same before and after activation:
- * Dashboard → Career Direction → Find Roles → Opportunities → Résumé Studio.
- * Five destinations, each named for what it does rather than what it is called
- * internally. Job analysis lives inside Opportunities, and the standalone
- * Journey page is retired in favour of the Dashboard.
- */
+const extensionNavigation: NavigationItem = {
+  label: "Browser Extension",
+  shortLabel: "Extension",
+  href: "/extension",
+  icon: "applications",
+  purpose: "Download and install the Sartho extension for Chrome, Safari, or Edge.",
+};
+
 export function getPrimaryNavigation(_activated: boolean): NavigationItem[] {
   return [
     dashboardNavigation,
@@ -113,6 +108,7 @@ export function getPrimaryNavigation(_activated: boolean): NavigationItem[] {
     strategyNavigation,
     applicationNavigation,
     resumeNavigation,
+    extensionNavigation,
   ];
 }
 
@@ -148,6 +144,7 @@ export const allNavigation: NavigationItem[] = [
   strategyNavigation,
   resumeNavigation,
   notificationsNavigation,
+  extensionNavigation,
 ];
 
 export function getMobileNavigation(activated: boolean) {
