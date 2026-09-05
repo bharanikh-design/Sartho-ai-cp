@@ -204,7 +204,12 @@
 .resume-workflow-steps small { display: block; }
 .resume-workflow-steps strong { font-size: var(--text-xs); }
 .resume-workflow-steps small { margin-top: 3px; color: var(--text-tertiary); font-size: var(--text-2xs); }
-.resume-workflow-action { padding: 23px 30px 28px; border-top: 1px solid var(--line); background: #f8faf9; }
+/*
+ * A raised surface, not a fixed colour. This was #f8faf9 — near-white — while
+ * the text inside uses var(--text), which is near-white in the dark theme. The
+ * role names were rendered all along; they were white on white.
+ */
+.resume-workflow-action { padding: 23px 30px 28px; border-top: 1px solid var(--line); background: rgba(255,255,255,.04); }
 .resume-workflow-empty { display: flex; align-items: center; justify-content: space-between; gap: 30px; }
 .resume-workflow-empty > div > span,
 .resume-action-title > div > span { color: #527565; font-size: var(--text-2xs); font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }

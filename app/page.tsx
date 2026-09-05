@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { ProductPageHeader } from "@/components/product-page-header";
 import { JourneyNudgeCard } from "@/components/journey-nudge-card";
+import { ProfileScorecard } from "@/components/profile-scorecard";
+import { ResumeImport } from "@/components/resume-import";
 import { requireUser } from "@/lib/auth";
 import {
   buildCareerCommandCentre,
@@ -46,6 +48,53 @@ export default async function DashboardPage() {
   });
   const firstName = ((user.user_metadata?.full_name as string | undefined) ?? user.email?.split("@")[0] ?? "there").split(" ")[0];
 
+  /*
+   * Everything Sartho does rests on approved evidence, so before a résumé
+   * exists the dashboard is the upload and nothing else. Showing a pipeline, a
+   * next-best-action and a résumé-tailoring workflow to someone with no data
+   * is a room full of doors that all open onto empty.
+   */
+  const hasResume = journey.steps.find((step) => step.id === "resume")?.complete ?? false;
+  if (!hasResume) {
+    return (
+      <div className="page-stack dashboard-page">
+        <ProductPageHeader
+          eyebrow="Welcome to Sartho"
+          title={`Let's start with your résumé, ${firstName}.`}
+          description="Everything Sartho does is grounded in evidence you approve. Upload one strong résumé and it reads every role and achievement into your career profile — no line-by-line confirmation."
+        />
+
+        <section className="glass-card content-card" id="resume">
+          <div className="card-header">
+            <div>
+              <h2 className="section-heading">Upload your résumé</h2>
+              <p className="section-subtitle">PDF, Word or plain text. Your document stays the source of truth, and nothing is shared without you.</p>
+            </div>
+            <span className="status-chip status-pending">Step 1 of 3</span>
+          </div>
+          <ResumeImport hasEvidence={false} continueHref="/career-direction" />
+        </section>
+
+        <section className="glass-card content-card">
+          <div className="card-header">
+            <div>
+              <h2 className="section-heading">What happens next</h2>
+              <p className="section-subtitle">Each step unlocks once the one before it is done.</p>
+            </div>
+          </div>
+          <ol className="scorecard-steps">
+            {journey.steps.map((step) => (
+              <li key={step.id} className={step.id === "resume" ? "is-next" : ""}>
+                <span aria-hidden="true">{step.id === "resume" ? "○" : "🔒"}</span>
+                <div><strong>{step.title}</strong><small>{step.description}</small></div>
+              </li>
+            ))}
+          </ol>
+        </section>
+      </div>
+    );
+  }
+
   return (
     <div className="page-stack dashboard-page command-centre-page">
       <ProductPageHeader
@@ -56,6 +105,8 @@ export default async function DashboardPage() {
       />
 
       <JourneyNudgeCard progress={journey.progress} isActivated={journey.activated} steps={journey.steps} />
+
+      <ProfileScorecard steps={journey.steps} progress={journey.progress} activated={journey.activated} />
 
       <section className="dashboard-workflow command-centre-journey" aria-labelledby="career-journey-title">
         <div className="dashboard-section-heading">

@@ -16,6 +16,9 @@ export async function GET() {
         progress: journey.progress,
         currentHref: journey.current.href,
         currentLabel: journey.current.label,
+        // Uploading is the prerequisite for everything else, so the shell needs
+        // to know whether it has happened before it renders the menu.
+        hasResume: journey.steps.find((step) => step.id === "resume")?.complete ?? false,
       },
       { headers: { "Cache-Control": "private, no-store" } },
     );
