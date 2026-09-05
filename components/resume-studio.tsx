@@ -60,6 +60,89 @@ export function ResumeStudio({
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  /*
+   * The improvement loop, per draft. `facts` is what the person typed for a
+   * bullet, `rewrites` is what came back and has not been accepted yet, and
+   * `accepted` is what will be written when they save. Nothing is persisted
+   * until Save, so abandoning a half-finished edit costs nothing.
+   */
+  const [openBullet, setOpenBullet] = useState<string | null>(null);
+  const [facts, setFacts] = useState<Record<string, string>>({});
+  const [rewrites, setRewrites] = useState<Record<string, string>>({});
+  const [accepted, setAccepted] = useState<Record<string, Record<number, string>>>({});
+  const [busyBullet, setBusyBullet] = useState<string | null>(null);
+  const [savingId, setSavingId] = useState<string | null>(null);
+
+  /** The draft as it stands with every accepted rewrite applied. */
+  function withAccepted(draft: StudioDraft, text: string) {
+    const edits = accepted[draft.application.id];
+    if (!edits) return text;
+    let seen = -1;
+    return text
+      .split("\n")
+      .map((line) => {
+        if (!line.trim().startsWith("•")) return line;
+        seen += 1;
+        const replacement = edits[seen];
+        return replacement ? `• ${replacement}` : line;
+      })
+      .join("\n");
+  }
+
+  async function improve(draft: StudioDraft, bullet: { index: number; text: string }) {
+    const key = `${draft.application.id}:${bullet.index}`;
+    const fact = (facts[key] ?? "").trim();
+    if (!fact || busyBullet) return;
+    setBusyBullet(key);
+    setError(null);
+    try {
+      const response = await fetch(`/api/jobs/${draft.jobId}/resume/improve`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bullet: bullet.text, fact }),
+      });
+      const result = await response.json() as { rewritten?: string; error?: string };
+      if (!response.ok || !result.rewritten) throw new Error(result.error ?? "Sartho could not rewrite this line.");
+      setRewrites((state) => ({ ...state, [key]: result.rewritten as string }));
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Sartho could not rewrite this line.");
+    } finally {
+      setBusyBullet(null);
+    }
+  }
+
+  async function saveVersion(draft: StudioDraft, text: string) {
+    const edits = accepted[draft.application.id];
+    if (!edits || savingId) return;
+    setSavingId(draft.application.id);
+    setError(null);
+    try {
+      const response = await fetch(`/api/jobs/${draft.jobId}/resume/version`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          draft: withAccepted(draft, text),
+          changes: Object.values(edits).map((line) => ({
+            type: "reworded" as const,
+            description: `Quantified from a figure you supplied: ${line.slice(0, 160)}`,
+            evidenceIds: [],
+          })),
+        }),
+      });
+      const result = await response.json() as { error?: string };
+      if (!response.ok) throw new Error(result.error ?? "Sartho could not save this version.");
+      setAccepted((state) => ({ ...state, [draft.application.id]: {} }));
+      setRewrites({});
+      setFacts({});
+      setOpenBullet(null);
+      router.refresh();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Sartho could not save this version.");
+    } finally {
+      setSavingId(null);
+    }
+  }
+
   async function generate(jobId: string) {
     if (generatingId) return;
     setGeneratingId(jobId);
@@ -109,8 +192,12 @@ export function ResumeStudio({
               const current = draft.history[0];
               const shownText = chosen?.draft ?? draft.application.resume_draft ?? "";
               const shownLog: ResumeChange[] = chosen?.change_log ?? draft.application.resume_change_log;
-              const ats = scoreAts(shownText, draft.analysis);
+              const edited = withAccepted(draft, shownText);
+              const ats = scoreAts(edited, draft.analysis);
               const currentAts = scoreAts(draft.application.resume_draft ?? "", draft.analysis);
+              /* Weak lines are read from the unedited text so indexes stay stable. */
+              const atsWeak = scoreAts(shownText, draft.analysis).weakBullets;
+              const acceptedCount = Object.keys(accepted[draft.application.id] ?? {}).length;
               return (
                 <article className={`studio-draft${open ? " is-open" : ""}`} key={draft.application.id}>
                   <button
@@ -162,7 +249,7 @@ export function ResumeStudio({
                             ? <>Version {chosen.version_number} — an earlier draft, kept for comparison</>
                             : <>Draft — review before use</>}
                         </div>
-                        <pre>{shownText}</pre>
+                        <pre>{withAccepted(draft, shownText)}</pre>
                         <div className="studio-draft-actions">
                           <button type="button" className="secondary-button" onClick={() => void copy(shownText, draft.application.id)}>
                             {copiedId === draft.application.id ? "Copied ✓" : "Copy draft"}
@@ -186,13 +273,120 @@ export function ResumeStudio({
                             </li>
                           ))}
                         </ul>
-                        {ats.missingKeywords.length ? (
+                        {ats.unusedStrengths.length ? (
                           <div className="studio-ats-missing">
-                            <strong>Terms this role uses that your draft does not</strong>
+                            <strong>Strengths you can back that the draft never names</strong>
                             <div className="chip-row">
-                              {ats.missingKeywords.slice(0, 8).map((keyword) => <span className="signal-chip" key={keyword}>{keyword}</span>)}
+                              {ats.unusedStrengths.slice(0, 8).map((term) => <span className="signal-chip" key={term}>{term}</span>)}
                             </div>
-                            <small>Only add one where your approved evidence genuinely supports it. A keyword you cannot back is a lie that survives the filter and fails the interview.</small>
+                            <small>Your approved evidence supports every one of these. Regenerate, or work them into a line yourself.</small>
+                          </div>
+                        ) : null}
+
+                        {/*
+                          * Stated, never suggested. These are things the role
+                          * wants that the evidence cannot back — putting one in
+                          * the draft would be a lie that survives the filter and
+                          * fails the interview.
+                          */}
+                        {ats.unbackedRequirements.length ? (
+                          <div className="studio-ats-unbacked">
+                            <strong>What this role wants that you cannot evidence</strong>
+                            <div className="chip-row">
+                              {ats.unbackedRequirements.slice(0, 8).map((term) => <span className="signal-chip is-caution" key={term}>{term}</span>)}
+                            </div>
+                            <small>Do not add these to the draft. They are the honest reason this role is a stretch, not a gap to write over.</small>
+                          </div>
+                        ) : null}
+
+                        {atsWeak.length ? (
+                          <div className="studio-fixes">
+                            <strong>Lines worth a number</strong>
+                            <small>Sartho will not invent a figure. Tell it what actually happened and it rewrites the line around your words.</small>
+                            {atsWeak.map((bullet) => {
+                              const key = `${draft.application.id}:${bullet.index}`;
+                              const isOpen = openBullet === key;
+                              const rewritten = rewrites[key];
+                              const isAccepted = Boolean(accepted[draft.application.id]?.[bullet.index]);
+                              return (
+                                <div className={`studio-fix${isAccepted ? " is-accepted" : ""}`} key={key}>
+                                  <button
+                                    type="button"
+                                    className="studio-fix-line"
+                                    onClick={() => setOpenBullet(isOpen ? null : key)}
+                                    aria-expanded={isOpen}
+                                  >
+                                    {isAccepted ? "✓ " : ""}{bullet.text}
+                                  </button>
+                                  {isOpen && !isAccepted ? (
+                                    <div className="studio-fix-form">
+                                      <label htmlFor={`fact-${key}`}>
+                                        What was the number, scale or result? Plain words are fine.
+                                      </label>
+                                      <textarea
+                                        id={`fact-${key}`}
+                                        rows={2}
+                                        placeholder="about 40,000 rows, over six weeks, for a team of 3"
+                                        value={facts[key] ?? ""}
+                                        onChange={(event) => setFacts((state) => ({ ...state, [key]: event.target.value }))}
+                                      />
+                                      <button
+                                        type="button"
+                                        className="secondary-button"
+                                        disabled={!(facts[key] ?? "").trim() || busyBullet === key}
+                                        onClick={() => void improve(draft, bullet)}
+                                      >
+                                        {busyBullet === key ? "Rewriting…" : "Rewrite this line"}
+                                      </button>
+                                      {rewritten ? (
+                                        <div className="studio-fix-result">
+                                          <p>{rewritten}</p>
+                                          <div>
+                                            <button
+                                              type="button"
+                                              className="primary-button"
+                                              onClick={() => {
+                                                setAccepted((state) => ({
+                                                  ...state,
+                                                  [draft.application.id]: {
+                                                    ...(state[draft.application.id] ?? {}),
+                                                    [bullet.index]: rewritten,
+                                                  },
+                                                }));
+                                                setOpenBullet(null);
+                                              }}
+                                            >
+                                              Use this
+                                            </button>
+                                            <button
+                                              type="button"
+                                              className="secondary-button"
+                                              onClick={() => setRewrites((state) => ({ ...state, [key]: "" }))}
+                                            >
+                                              Discard
+                                            </button>
+                                          </div>
+                                        </div>
+                                      ) : null}
+                                    </div>
+                                  ) : null}
+                                </div>
+                              );
+                            })}
+
+                            {acceptedCount ? (
+                              <div className="studio-fix-save">
+                                <span>{acceptedCount} line{acceptedCount === 1 ? "" : "s"} rewritten, not yet saved.</span>
+                                <button
+                                  type="button"
+                                  className="primary-button"
+                                  disabled={savingId === draft.application.id}
+                                  onClick={() => void saveVersion(draft, shownText)}
+                                >
+                                  {savingId === draft.application.id ? "Saving…" : "Save as a new version"}
+                                </button>
+                              </div>
+                            ) : null}
                           </div>
                         ) : null}
 

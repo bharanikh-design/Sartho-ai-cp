@@ -7,7 +7,9 @@ export type AiOperation =
   | "deep_analysis"
   | "resume_draft"
   /* One bounded call for career-direction roles; billed apart from deep analysis. */
-  | "direction_suggestions";
+  | "direction_suggestions"
+  /* Rewriting a single résumé bullet around a figure the person supplied. */
+  | "resume_bullet";
 
 const decisionSchema = z.object({
   allowed: z.boolean(),
