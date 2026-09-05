@@ -41,6 +41,44 @@ export const JOB_MARKETS: JobMarket[] = [
   { code: "mx", name: "Mexico" },
 ];
 
+/*
+ * The cities where most of a market's roles are posted. Offered as one-tap
+ * additions on Search Brief and used to explain widening ("Sydney was thin, so
+ * the rest of Australia was searched too"). Not exhaustive; a person can type
+ * any city.
+ */
+const MAJOR_CITIES: Record<string, string[]> = {
+  au: ["Sydney", "Melbourne", "Brisbane", "Perth", "Adelaide", "Canberra"],
+  nz: ["Auckland", "Wellington", "Christchurch"],
+  sg: ["Singapore"],
+  in: ["Bengaluru", "Hyderabad", "Mumbai", "Pune", "Chennai", "Delhi NCR", "Gurugram"],
+  ae: ["Dubai", "Abu Dhabi"],
+  gb: ["London", "Manchester", "Birmingham", "Edinburgh", "Leeds", "Bristol"],
+  ie: ["Dublin", "Cork"],
+  us: ["New York", "San Francisco", "Seattle", "Austin", "Chicago", "Boston", "Los Angeles"],
+  ca: ["Toronto", "Vancouver", "Montreal", "Calgary"],
+  de: ["Berlin", "Munich", "Frankfurt", "Hamburg"],
+  nl: ["Amsterdam", "Rotterdam", "Utrecht"],
+  fr: ["Paris", "Lyon"],
+  es: ["Madrid", "Barcelona"],
+  it: ["Milan", "Rome"],
+  ch: ["Zurich", "Geneva"],
+  at: ["Vienna"],
+  be: ["Brussels", "Antwerp"],
+  pl: ["Warsaw", "Krakow"],
+  za: ["Johannesburg", "Cape Town"],
+  hk: ["Hong Kong"],
+  my: ["Kuala Lumpur"],
+  jp: ["Tokyo", "Osaka"],
+  br: ["São Paulo", "Rio de Janeiro"],
+  mx: ["Mexico City", "Guadalajara", "Monterrey"],
+};
+
+export function majorCities(code: string | null | undefined): string[] {
+  const normalised = normaliseCountryCode(code);
+  return normalised ? MAJOR_CITIES[normalised] ?? [] : [];
+}
+
 const byCode = new Map(JOB_MARKETS.map((market) => [market.code, market]));
 
 /** Lower-cased, "uk" → "gb"; null when the value is not a market Sartho knows. */

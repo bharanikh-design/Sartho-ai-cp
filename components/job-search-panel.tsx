@@ -172,7 +172,7 @@ export function JobSearchPanel() {
         <p className="search-field-hint" style={{ marginTop: "12px" }}>
           Searched <strong>{criteria.countryName}</strong>
           {criteria.locations.length ? <> · {criteria.locations.join(", ")}</> : <> · nationwide</>}
-          {criteria.broadened ? <> (no city matches, so widened to the whole country)</> : null}
+          {criteria.broadened ? <> (few strong matches there, so the rest of {criteria.countryName} was searched too)</> : null}
           {criteria.remoteOnly ? <> · remote only</> : null}
           <> · roles: {criteria.roles.join(", ")}</>
           {criteria.companies.length ? <> · companies: {criteria.companies.join(", ")}</> : null}

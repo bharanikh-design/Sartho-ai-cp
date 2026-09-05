@@ -43,7 +43,7 @@ function escapeHtml(value: string) {
 
 function describeCriteria(criteria: SearchCriteria): string {
   const parts = [criteria.countryName];
-  if (criteria.locations.length) parts.push(criteria.locations.join(", "));
+  if (criteria.locations.length) parts.push(criteria.locations.join(", ") + (criteria.broadened ? ` + rest of ${criteria.countryName}` : ""));
   else parts.push("nationwide");
   if (criteria.remoteOnly) parts.push("remote only");
   if (criteria.roles.length) parts.push(`roles: ${criteria.roles.join(", ")}`);
