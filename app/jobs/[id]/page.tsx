@@ -7,6 +7,8 @@ import { ProductPageHeader } from "@/components/product-page-header";
 import { requireUser } from "@/lib/auth";
 import { getJobWorkspace } from "@/lib/data/jobs";
 import { presentRuleAnalysis } from "@/lib/matching/present-rule-analysis";
+import { seniorityReach } from "@/lib/matching/seniority-reach";
+import { getCareerWorkspace } from "@/lib/data/career";
 import type { EvidenceRecord, JobRequirementRecord, RequirementType } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -24,6 +26,18 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
     .eq("approval_status", "approved");
   if (evidenceError) throw evidenceError;
 
+  /*
+   * A saved role is never hidden — the person chose to save it — but it must
+   * not sit there silently when it is years above them. Search filters these
+   * out; the pipeline says so instead.
+   */
+  const { profile, roles } = await getCareerWorkspace(supabase, user.id);
+  const reach = seniorityReach(
+    job.title,
+    roles.map((role) => role.title).filter(Boolean),
+    profile?.total_experience_years ?? null,
+  );
+
   const evidenceMap = new Map((approvedEvidence ?? []).map((item) => [item.id, item as Pick<EvidenceRecord, "id" | "claim" | "source_name" | "source_locator">]));
   const analysis = job.rule_analysis;
   const analysisPresentation = analysis ? presentRuleAnalysis(analysis, job.technical_heaviness) : null;
@@ -37,6 +51,13 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
         description={`${job.employer ?? "Employer not recorded"}${job.location ? ` · ${job.location}` : ""}. Review the signal, evidence mapping and preparation outputs in that order.`}
         metric={{ value: <JobStatusSelect jobId={job.id} initialStatus={job.status} initialOutcome={application ? { stage: application.outcome_stage, reason: application.outcome_reason, note: application.outcome_note, recordedAt: application.outcome_recorded_at } : null} />, label: "current stage" }}
       />
+
+      {reach.warning ? (
+        <div className="seniority-warning" role="note">
+          <strong>Above your current level</strong>
+          <p>{reach.warning}</p>
+        </div>
+      ) : null}
 
       <section className="dashboard-grid job-summary-grid">
         <article className="glass-card content-card">
