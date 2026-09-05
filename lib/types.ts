@@ -74,6 +74,15 @@ export type RuleAnalysis = {
   primaryStrength?: string | null;
   coverage?: number;
   evidenceBacking?: number;
+  /*
+   * The parts of the score, stored so a saved analysis can still explain
+   * itself. Optional: an analysis saved before these existed simply omits them.
+   */
+  titleFit?: number;
+  closestTitle?: string | null;
+  requirementCoverage?: number;
+  seniorityGap?: number;
+  missingRequirements?: string[];
   matchedSignals: string[];
   cautionSignals: string[];
   matchedSkills?: Array<{

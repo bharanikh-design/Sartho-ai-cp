@@ -64,6 +64,29 @@ function subjectOverlap(job: string[], held: string[]): number {
   return hits / Math.min(job.length, held.length);
 }
 
+/**
+ * The level this person is currently at, from the titles they have held and how
+ * long they have worked. Someone fresh out of university is level 0; the fact
+ * that a job is titled "Senior Manager" then tells you it is not for them yet.
+ */
+export function candidateSeniority(heldTitles: string[], totalExperienceYears: number | null): SeniorityLevel {
+  const fromTitles = heldTitles.length
+    ? (Math.max(...heldTitles.map((title) => seniorityOf(title))) as SeniorityLevel)
+    : null;
+
+  /*
+   * Years are the sanity check on titles. Job titles inflate — a six-month
+   * internship can be called "Consultant" — so someone with under two years is
+   * treated as entry level whatever their title said, and the title only takes
+   * over once there is enough history to support it.
+   */
+  const years = totalExperienceYears ?? 0;
+  const fromYears: SeniorityLevel = years < 2 ? 0 : years < 4 ? 1 : years < 8 ? 2 : years < 12 ? 3 : 4;
+
+  if (fromTitles === null) return fromYears;
+  return Math.min(fromTitles, fromYears + 1) as SeniorityLevel;
+}
+
 export type TitleFit = {
   /** 0–100. How well the job title matches something this person has done or targets. */
   score: number;

@@ -111,9 +111,15 @@ export function getPrimaryNavigation(_activated: boolean): NavigationItem[] {
     strategyNavigation,
     applicationNavigation,
     resumeNavigation,
-    notificationsNavigation,
   ];
 }
+
+/*
+ * Email Alerts is a setting, not a step in the flow, so it lives in the profile
+ * menu rather than the rail. Five destinations is the whole product:
+ * Dashboard → Career Direction → Search Brief → Applications → Résumé Studio.
+ */
+export const notificationsDestination = notificationsNavigation;
 
 /*
  * Everything Sartho does is grounded in approved evidence, so with no résumé

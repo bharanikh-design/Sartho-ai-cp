@@ -4,6 +4,7 @@ import { getSearchPreferences } from "@/lib/data/search";
 import { countryName, normaliseCountryCode } from "@/lib/jobs/countries";
 import { splitMisfiledCompanies } from "@/lib/jobs/employers";
 import { scoreOpportunity } from "@/lib/matching/opportunity-score";
+import { candidateSeniority, seniorityOf } from "@/lib/matching/title-fit";
 import {
   MAX_COMPANY_QUERIES,
   MAX_LOCATION_QUERIES,
@@ -52,6 +53,9 @@ export type ScoredJobMatch = {
 };
 
 /* What was actually searched, so the page (or email) can say so. */
+/** How far above the person a role may sit before it stops being for them. */
+export const MAX_SENIORITY_STRETCH = 2;
+
 export type SearchCriteria = {
   /** The primary market. */
   country: string;
@@ -59,6 +63,9 @@ export type SearchCriteria = {
   countries: string[];
   /** Employment types applied as a provider filter. */
   employmentTypes: string[];
+  /** The level the person is at, and how many roles were dropped as too senior. */
+  candidateLevel: number;
+  tooSenior: number;
   /** All markets, named. */
   countryName: string;
   countrySource: "brief" | "resume" | "default";
@@ -259,7 +266,25 @@ export async function runBriefSearch(
     }
   }
 
-  const results: ScoredJobMatch[] = Array.from(scoredByUrl.values())
+  /*
+   * Seniority is a hard filter, not a soft penalty.
+   *
+   * Someone fresh out of university was being shown Consultant and Manager
+   * roles. Scoring them low is not enough — a list of jobs a person cannot get
+   * is noise however it is ordered, and it makes every other result harder to
+   * see. A role more than two levels above them is dropped, and the count is
+   * reported so the filtering is visible rather than silent.
+   */
+  const heldTitles = roles.map((role) => role.title).filter(Boolean);
+  const level = candidateSeniority(heldTitles, profile?.total_experience_years ?? null);
+  const withinReach: ScoredJobMatch[] = [];
+  let tooSenior = 0;
+  for (const match of scoredByUrl.values()) {
+    if (seniorityOf(match.title) - level > MAX_SENIORITY_STRETCH) { tooSenior += 1; continue; }
+    withinReach.push(match);
+  }
+
+  const results: ScoredJobMatch[] = withinReach
     .sort((a, b) => b.overallMatch - a.overallMatch)
     .slice(0, options.maxResults ?? 20);
 
@@ -267,6 +292,8 @@ export async function runBriefSearch(
     country,
     countries: markets,
     employmentTypes: preferences.employmentTypes,
+    candidateLevel: level,
+    tooSenior,
     countryName: countryLabel,
     countrySource: preferences.country ? "brief" : profile?.country ? "resume" : "default",
     locations: usedLocations,
