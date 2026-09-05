@@ -22,8 +22,8 @@ export default async function CareerDirectionPage() {
       <ProductPageHeader
         eyebrow="Step 2 of 3 · Choose your direction"
         title="Let AI open the possibilities. You choose the path."
-        description="Sartho reads your confirmed career evidence, suggests plausible next moves and explains why. Accept, edit or dismiss every suggestion, then rank the paths you want to pursue."
-        metric={{ value: lanes.length || "—", label: "selected priorities" }}
+        description="Two ways in: take a role AI found in your résumé, or type the one you already want. Both land in your priority list, which drives every search."
+        metric={{ value: lanes.length || "—", label: "selected priorities", href: "#priorities" }}
       />
       <CareerDirectionEditor
         initialProfile={profile}

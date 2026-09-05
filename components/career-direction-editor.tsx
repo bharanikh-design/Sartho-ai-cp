@@ -65,6 +65,12 @@ export function CareerDirectionEditor({
   const [rankStatus, setRankStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [rankError, setRankError] = useState<string | null>(null);
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const manualInputRef = useRef<HTMLInputElement>(null);
+
+  function focusManualAdd() {
+    manualInputRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    manualInputRef.current?.focus();
+  }
 
   const visibleSuggestions = suggestions.filter((item) => !dismissed.includes(item.name));
   const rankingByName = useMemo(
@@ -207,25 +213,79 @@ export function CareerDirectionEditor({
 
   return (
     <div className="direction-workspace direction-ai-workspace">
-      <section className="direction-ai-advisor" id="strengths">
-        <div className="direction-ai-intro">
-          <div>
-            <span className="ai-orbit" aria-hidden="true">✦</span>
-            <span className="direction-ai-label">Sartho AI career strategist</span>
+      {/*
+        Two ways in, side by side and equal in weight. Before this, "add your
+        own role" lived in a dim bar under six AI cards and read as an
+        afterthought; the person who already knows the role they want had to
+        scroll past everything to find it.
+      */}
+      <div className="direction-paths" aria-label="Two ways to choose your direction">
+        <a className="direction-path is-ai" href="#suggestions">
+          <span className="direction-choice-label">Path A · Let AI suggest</span>
+          <strong>See the roles your résumé points to</strong>
+          <p>
+            {evidenceCount === 0
+              ? "Upload your résumé first so every suggestion has evidence behind it."
+              : aiStatus === "loading"
+                ? "Reading your approved career facts…"
+                : visibleSuggestions.length
+                  ? `${visibleSuggestions.length} roles found from ${evidenceCount} approved career facts. Add the ones that fit.`
+                  : `Grounded in ${evidenceCount} approved career facts across ${roleCount} roles.`}
+          </p>
+          <span className="direction-path-cta">{visibleSuggestions.length ? "Review suggestions ↓" : "Generate suggestions ↓"}</span>
+        </a>
+        <div className="direction-path is-manual">
+          <span className="direction-choice-label">Path B · I already know the role</span>
+          <strong>Know the role you want? Add it directly.</strong>
+          <p>Type it exactly as you would search for it. It joins your priorities alongside anything you take from AI.</p>
+          <div className="direction-manual-add">
+            <input
+              ref={manualInputRef}
+              aria-label="Role to add"
+              value={laneDraft}
+              onChange={(event) => setLaneDraft(event.target.value)}
+              onKeyDown={(event) => event.key === "Enter" && (event.preventDefault(), addManualLane())}
+              placeholder="e.g. ServiceNow Senior Engagement Manager"
+            />
+            <button type="button" onClick={addManualLane} disabled={!laneDraft.trim()}>Add role</button>
           </div>
-          <h2>Roles your résumé points to.</h2>
-          <p>Grounded in the career facts you approved. Add the ones that fit — nothing joins your priorities until you choose it. You can add your own or ask AI to refine below.</p>
-          <div className="direction-ai-grounding">
-            <span><strong>{evidenceCount}</strong> approved career facts</span>
-            <span><strong>{roleCount}</strong> roles understood</span>
-            <span><strong>You decide</strong> what gets added</span>
+        </div>
+      </div>
+
+      <section className="direction-ai-advisor" id="suggestions">
+        <div className="direction-ai-intro is-compact">
+          <div className="direction-ai-intro-row">
+            <div>
+              <div>
+                <span className="ai-orbit" aria-hidden="true">✦</span>
+                <span className="direction-ai-label">Path A · Sartho AI career strategist</span>
+              </div>
+              <h2>Roles your résumé points to</h2>
+              <p>Nothing joins your priorities until you choose it. Dismiss what doesn&apos;t fit; open “Why AI suggested this” to see the evidence.</p>
+            </div>
+            <div className="direction-ai-grounding">
+              <span><strong>{evidenceCount}</strong> career facts</span>
+              <span><strong>{roleCount}</strong> roles read</span>
+            </div>
           </div>
           {evidenceCount > 0 ? (
-            <button type="button" className="direction-rank-button" onClick={() => void generateSuggestions()} disabled={aiStatus === "loading"} style={{ marginTop: "14px" }}>
-              <span aria-hidden="true">↻</span> {aiStatus === "loading" ? "Re-analysing your résumé…" : "Refresh suggestions"}
-            </button>
-          ) : null}
-          {evidenceCount === 0 ? <div className="direction-ai-message">Upload your résumé first so every suggestion has evidence behind it.</div> : null}
+            <div className="direction-ai-toolbar">
+              <label htmlFor="direction-goal" className="direction-ai-toolbar-label">Steer the AI <em>optional</em></label>
+              <input
+                id="direction-goal"
+                value={aiPrompt}
+                onChange={(event) => setAiPrompt(event.target.value)}
+                onKeyDown={(event) => event.key === "Enter" && (event.preventDefault(), void generateSuggestions())}
+                placeholder="e.g. less travel, regional leadership, more transformation ownership"
+              />
+              <button type="button" className="direction-rank-button" onClick={() => void generateSuggestions()} disabled={aiStatus === "loading"}>
+                <span aria-hidden="true">{aiPrompt.trim() ? "✦" : "↻"}</span>
+                {aiStatus === "loading" ? "Re-analysing…" : aiPrompt.trim() ? "Refine suggestions" : "Refresh suggestions"}
+              </button>
+            </div>
+          ) : (
+            <div className="direction-ai-message">Upload your résumé first so every suggestion has evidence behind it.</div>
+          )}
           {aiError ? <div className="direction-ai-message is-error" role="alert">{aiError}</div> : null}
         </div>
 
@@ -262,7 +322,7 @@ export function CareerDirectionEditor({
               {aiStatus === "error"
                 ? "AI couldn’t generate roles just now."
                 : aiStatus === "ready"
-                  ? "No new roles to suggest right now — add your own or refine below."
+                  ? "No new roles to suggest right now — steer the AI above, or add your own role in Path B."
                   : "See the roles your résumé points to."}
             </p>
             <button type="button" className="direction-rank-button" onClick={() => void generateSuggestions()}>
@@ -272,29 +332,9 @@ export function CareerDirectionEditor({
         ) : null}
       </section>
 
-      <section className="glass-card direction-input-bar" aria-label="Add your own role or refine the suggestions">
-        <div className="direction-input-col">
-          <span className="direction-choice-label">Know the role you want? Add it directly</span>
-          <div className="direction-manual-add">
-            <input value={laneDraft} onChange={(event) => setLaneDraft(event.target.value)} onKeyDown={(event) => event.key === "Enter" && (event.preventDefault(), addManualLane())} placeholder="e.g. ServiceNow Senior Engagement Manager" />
-            <button type="button" onClick={addManualLane}>Add role</button>
-          </div>
-        </div>
-        <div className="direction-input-col">
-          <span className="direction-choice-label">Not quite right? Ask AI to refine <em>optional</em></span>
-          <div className="direction-ai-prompt">
-            <textarea id="direction-goal" value={aiPrompt} onChange={(event) => setAiPrompt(event.target.value)} rows={2} placeholder="For example: regional leadership, less travel, more transformation ownership…" />
-            <button type="button" onClick={() => void generateSuggestions()} disabled={aiStatus === "loading" || evidenceCount === 0}>
-              <span aria-hidden="true">✦</span>
-              {aiStatus === "loading" ? "Analysing…" : "Refine suggestions"}
-            </button>
-          </div>
-        </div>
-      </section>
-
       <section className="glass-card direction-priority-panel" id="priorities">
         <div className="direction-priority-heading">
-          <div><span>Your decision</span><h2>Roles Sartho should prioritise</h2><p>Order them from most to least important, or let AI rank them against your résumé. Sartho balances the search weighting automatically.</p></div>
+          <div><span>Your decision</span><h2>Roles Sartho should prioritise</h2><p>Everything you add from Path A or Path B lands here. Order them from most to least important, or let AI rank them against your résumé. Sartho balances the search weighting automatically.</p></div>
           <strong>{lanes.length}</strong>
         </div>
 
@@ -340,9 +380,13 @@ export function CareerDirectionEditor({
                 </article>
               );
             })}
+            <button type="button" className="direction-priority-add-more" onClick={focusManualAdd}>+ Add another role</button>
           </div>
         ) : (
-          <div className="direction-priority-empty"><strong>No priorities selected yet</strong><span>Choose an AI suggestion above or add the first role yourself.</span></div>
+          <div className="direction-priority-empty">
+            <strong>No priorities selected yet</strong>
+            <span>Take a role from the AI suggestions, or <button type="button" className="direction-inline-link" onClick={focusManualAdd}>add the first one yourself</button>.</span>
+          </div>
         )}
 
       </section>
