@@ -43,12 +43,15 @@ export function ResumeStudio({
   drafts,
   tailorable,
   hasAnyJobs,
+  analysedCount,
   evidenceReady,
 }: {
   drafts: StudioDraft[];
   /** Roles whose analysis is finished, so a truthful draft can be built. */
   tailorable: TailorableRole[];
   hasAnyJobs: boolean;
+  /** Roles that have been analysed at all, drafted or not. */
+  analysedCount: number;
   /** Whether any approved, résumé-safe career fact exists to write from. */
   evidenceReady: boolean;
 }) {
@@ -486,13 +489,19 @@ export function ResumeStudio({
           </div>
         ) : (
           /*
-           * One sentence and one link, not a queue of unfinished work. Chasing
-           * role analysis belongs in Applications, which is where this points.
+           * One sentence and one link, not a queue of unfinished work — chasing
+           * role analysis belongs in Opportunities, which is where this points.
+           *
+           * And three situations, not one. This said the same thing for all of
+           * them, telling somebody with two finished résumés that none of their
+           * roles had been analysed.
            */
           <div className="empty-inline-state">
-            {hasAnyJobs
-              ? <>None of your saved roles have been analysed yet. Run the analysis on one in <Link href="/applications">Applications</Link>, then come back.</>
-              : <>Save a role in <Link href="/applications">Applications</Link> first — a résumé is tailored to one real advert, not written in the abstract.</>}
+            {!hasAnyJobs
+              ? <>Save a role in <Link href="/applications">Opportunities</Link> first — a résumé is tailored to one real advert, not written in the abstract.</>
+              : analysedCount === 0
+                ? <>None of your saved roles have been analysed yet. Run the analysis on one in <Link href="/applications">Opportunities</Link>, then come back.</>
+                : <>Every analysed role already has a résumé. Analyse another one in <Link href="/applications">Opportunities</Link> to build a new draft.</>}
           </div>
         )}
       </section>
