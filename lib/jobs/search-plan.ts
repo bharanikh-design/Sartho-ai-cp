@@ -37,8 +37,10 @@ export function planSearchQueries(input: {
   locations: string[];
   companies: string[];
   remotePreference: string | null;
+  employmentTypes?: string[];
 }): JobSearchQuery[] {
   const remoteOnly = input.remotePreference === "Remote";
+  const employmentTypes = input.employmentTypes?.length ? input.employmentTypes : undefined;
   const locations = input.locations.map((item) => item.trim()).filter(Boolean).slice(0, MAX_LOCATION_QUERIES);
   const primaryLocation = locations[0];
   const roles = input.roles.map(toSearchKeywords).filter(Boolean).slice(0, MAX_ROLE_QUERIES);
@@ -50,16 +52,16 @@ export function planSearchQueries(input: {
   // radius" asks actually land, and one extra query is affordable.
   if (locations.length) {
     for (const location of locations) {
-      queries.push({ keywords: topRole, country: input.country, location, remoteOnly, limit: 20 });
+      queries.push({ keywords: topRole, country: input.country, location, remoteOnly, employmentTypes, limit: 20 });
     }
   } else {
-    queries.push({ keywords: topRole, country: input.country, remoteOnly, limit: 20 });
+    queries.push({ keywords: topRole, country: input.country, remoteOnly, employmentTypes, limit: 20 });
   }
   for (const keywords of roles.slice(1)) {
-    queries.push({ keywords, country: input.country, location: primaryLocation, remoteOnly, limit: 20 });
+    queries.push({ keywords, country: input.country, location: primaryLocation, remoteOnly, employmentTypes, limit: 20 });
   }
   for (const employer of input.companies.slice(0, MAX_COMPANY_QUERIES)) {
-    queries.push({ keywords: topRole, country: input.country, employer, remoteOnly, limit: 10 });
+    queries.push({ keywords: topRole, country: input.country, employer, remoteOnly, employmentTypes, limit: 10 });
   }
   return queries;
 }

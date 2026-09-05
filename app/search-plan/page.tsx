@@ -8,6 +8,7 @@ import { getSearchPreferences } from "@/lib/data/search";
 import { normaliseCountryCode } from "@/lib/jobs/countries";
 import { splitMisfiledCompanies } from "@/lib/jobs/employers";
 import { isJobSearchConfigured } from "@/lib/jobs/search-provider";
+import { getStoredSearch } from "@/lib/jobs/run-search";
 import { loadProductJourneyStatus } from "@/lib/journey/load-product-journey";
 
 export const dynamic = "force-dynamic";
@@ -18,11 +19,13 @@ export const dynamic = "force-dynamic";
  */
 export default async function SearchPlanPage() {
   const { supabase, user } = await requireUser();
-  const [lanes, preferences, journey, profileResult] = await Promise.all([
+  const [lanes, preferences, journey, profileResult, stored] = await Promise.all([
     getTargetLanes(supabase, user.id),
     getSearchPreferences(supabase, user.id),
     loadProductJourneyStatus(supabase, user.id),
     supabase.from("profiles").select("country").eq("id", user.id).maybeSingle(),
+    // The last search, so arriving here shows matches without re-querying.
+    getStoredSearch(supabase, user.id),
   ]);
   const inferredCountry = normaliseCountryCode(
     typeof profileResult.data?.country === "string" ? profileResult.data.country : null,
@@ -42,15 +45,21 @@ export default async function SearchPlanPage() {
       />
       <SearchPlanEditor
         initialSources={preferences.sources}
-        initialCountry={country}
+        initialCountries={preferences.countries.length ? preferences.countries : country ? [country] : []}
         inferredCountry={inferredCountry}
+        initialEmploymentTypes={preferences.employmentTypes}
         initialLocations={split.locations}
         initialCompanies={split.companies}
         initialRemote={preferences.remotePreference ?? "Flexible"}
         targetLanes={lanes}
         movedCompanies={split.moved}
       />
-      <JobSearchPanel autoRun={briefReady} />
+      <JobSearchPanel
+        autoRun={briefReady}
+        initialResults={stored?.results ?? []}
+        initialCriteria={stored?.criteria ?? null}
+        searchedAt={stored?.searchedAt ?? null}
+      />
     </div>
   );
 }

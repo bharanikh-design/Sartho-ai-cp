@@ -11,8 +11,12 @@ export type SearchSourcePreference = {
 };
 
 export type SearchPreferences = {
-  /** ISO-3166 alpha-2 job market the person chose; null until they confirm one. */
+  /** The primary market. Kept for everything that reads a single country. */
   country: string | null;
+  /** Every market to search; the first is the primary one. */
+  countries: string[];
+  /** Full-time, Part-time, Contract… empty means any. */
+  employmentTypes: string[];
   targetLocations: string[];
   /** Employers to search directly, on top of the role queries. */
   targetCompanies: string[];
@@ -36,7 +40,7 @@ function stringList(value: unknown): string[] {
 export async function getSearchPreferences(supabase: SupabaseClient, userId: string): Promise<SearchPreferences> {
   const { data, error } = await supabase
     .from("search_preferences")
-    .select("country,target_locations,target_companies,remote_preference,sources")
+    .select("country,countries,employment_types,target_locations,target_companies,remote_preference,sources")
     .eq("user_id", userId)
     .maybeSingle();
 
@@ -44,6 +48,8 @@ export async function getSearchPreferences(supabase: SupabaseClient, userId: str
 
   return {
     country: typeof data?.country === "string" && data.country.trim() ? data.country.trim().toLowerCase() : null,
+    countries: stringList(data?.countries).map((code) => code.trim().toLowerCase()).filter(Boolean),
+    employmentTypes: stringList(data?.employment_types),
     targetLocations: stringList(data?.target_locations),
     targetCompanies: stringList(data?.target_companies),
     remotePreference: typeof data?.remote_preference === "string" ? data.remote_preference : null,

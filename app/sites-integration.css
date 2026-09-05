@@ -185,6 +185,10 @@
 .chip-combobox-list li.is-active, .chip-combobox-list li:hover { background: rgba(107,207,147,.14); }
 .chip-combobox-free { color: var(--text-secondary) !important; border-top: 1px solid var(--line); margin-top: 4px; border-radius: 0 0 7px 7px !important; }
 :root[data-theme="light"] .chip-combobox-list { background: #ffffff; }
+.employment-type-options { display: flex; flex-wrap: wrap; gap: 7px; }
+.employment-type-options button { border: 1px solid var(--line); border-radius: 9px; padding: 9px 12px; background: rgba(255,255,255,0.05); color: var(--text-secondary); font-size: var(--text-2xs); cursor: pointer; }
+.employment-type-options button:hover { border-color: #79a58f; color: var(--text); }
+.employment-type-options button.is-selected { color: white; border-color: #174b3a; background: #174b3a; }
 .match-reason { margin: 6px 0 0; color: var(--text-secondary); font-size: var(--text-2xs); line-height: 1.5; }
 .match-reason strong { color: var(--text); }
 .match-gap { margin: 6px 0 0; color: var(--text-tertiary); font-size: var(--text-2xs); line-height: 1.5; }

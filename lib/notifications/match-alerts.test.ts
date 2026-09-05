@@ -25,6 +25,8 @@ function match(overrides: Partial<ScoredJobMatch>): ScoredJobMatch {
 
 const criteria: SearchCriteria = {
   country: "au",
+  countries: ["au"],
+  employmentTypes: [],
   countryName: "Australia",
   countrySource: "brief",
   locations: ["Sydney"],

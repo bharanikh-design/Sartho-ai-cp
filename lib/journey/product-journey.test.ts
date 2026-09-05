@@ -25,6 +25,8 @@ const ready: ProductJourneyInput = {
   activeLaneAllocation: 100,
   searchPreferences: {
     country: "sg",
+    countries: ["sg"],
+    employmentTypes: [],
     targetLocations: ["Singapore"],
     targetCompanies: [],
     remotePreference: "Flexible",
@@ -52,7 +54,7 @@ describe("product journey", () => {
   it("requires search coverage before the dashboard is activated", () => {
     const state = buildProductJourney({
       ...ready,
-      searchPreferences: { country: null, targetLocations: [], targetCompanies: [], remotePreference: "Flexible", sources: [] },
+      searchPreferences: { country: null, countries: [], employmentTypes: [], targetLocations: [], targetCompanies: [], remotePreference: "Flexible", sources: [] },
     });
     expect(state.activated).toBe(false);
     expect(state.current.id).toBe("search");

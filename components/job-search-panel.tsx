@@ -38,14 +38,25 @@ const recTone: Record<SearchResult["recommendation"], string> = {
   skip: "#e5917a",
 };
 
-const CACHE_KEY = "sartho:search-results";
-const CACHE_TTL_MS = 30 * 60 * 1000;
-
-export function JobSearchPanel({ autoRun = false }: { autoRun?: boolean }) {
-  const [status, setStatus] = useState<"idle" | "loading" | "ready" | "error" | "not_configured" | "no_targets">("idle");
+export function JobSearchPanel({
+  autoRun = false,
+  initialResults = [],
+  initialCriteria = null,
+  searchedAt = null,
+}: {
+  autoRun?: boolean;
+  /** The last stored search, read on the server. */
+  initialResults?: SearchResult[];
+  initialCriteria?: SearchCriteria | null;
+  searchedAt?: string | null;
+}) {
+  const [status, setStatus] = useState<"idle" | "loading" | "ready" | "error" | "not_configured" | "no_targets">(
+    initialResults.length ? "ready" : "idle",
+  );
   const [error, setError] = useState<string | null>(null);
-  const [results, setResults] = useState<SearchResult[]>([]);
-  const [criteria, setCriteria] = useState<SearchCriteria | null>(null);
+  const [results, setResults] = useState<SearchResult[]>(initialResults);
+  const [criteria, setCriteria] = useState<SearchCriteria | null>(initialCriteria);
+  const [lastRun, setLastRun] = useState<string | null>(searchedAt);
   const [savingUrl, setSavingUrl] = useState<string | null>(null);
   const [savedUrls, setSavedUrls] = useState<string[]>([]);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -65,12 +76,8 @@ export function JobSearchPanel({ autoRun = false }: { autoRun?: boolean }) {
       }
       setResults(data.results ?? []);
       setCriteria(data.criteria ?? null);
+      setLastRun(new Date().toISOString());
       setStatus("ready");
-      try {
-        sessionStorage.setItem(CACHE_KEY, JSON.stringify({ at: Date.now(), results: data.results ?? [], criteria: data.criteria ?? null }));
-      } catch {
-        // Storage unavailable (private mode); the search still ran.
-      }
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Search failed.");
       setStatus("error");
@@ -78,29 +85,17 @@ export function JobSearchPanel({ autoRun = false }: { autoRun?: boolean }) {
   }
 
   /*
-   * The matches are this page's content, so they load on arrival when the brief
-   * is complete — not behind a button. A recent result set is reused from this
-   * tab's session so coming back to the page does not re-spend provider calls;
-   * "Search again" always runs fresh.
+   * The matches are this page's content, so they load on arrival — but the last
+   * search is stored, so arriving is normally a read. Only someone who has
+   * never searched triggers a live one; "Search again" always runs fresh.
    */
   const autoRan = useRef(false);
   useEffect(() => {
-    if (!autoRun || autoRan.current) return;
+    if (!autoRun || autoRan.current || initialResults.length) return;
     autoRan.current = true;
-    try {
-      const cached = JSON.parse(sessionStorage.getItem(CACHE_KEY) ?? "null") as { at: number; results: SearchResult[]; criteria: SearchCriteria | null } | null;
-      if (cached && Date.now() - cached.at < CACHE_TTL_MS && Array.isArray(cached.results)) {
-        setResults(cached.results);
-        setCriteria(cached.criteria);
-        setStatus("ready");
-        return;
-      }
-    } catch {
-      // Ignore a bad cache and search fresh.
-    }
     void runSearch();
     // runSearch is a stable in-component handler; the ref keeps this to one run.
-  }, [autoRun]);
+  }, [autoRun, initialResults.length]);
 
   async function save(result: SearchResult) {
     if (savingUrl) return;
@@ -198,7 +193,10 @@ export function JobSearchPanel({ autoRun = false }: { autoRun?: boolean }) {
       <div className="card-header">
         <div>
           <h2 className="section-heading">Matching roles</h2>
-          <p className="section-subtitle">Live listings for your target roles, each scored against your approved evidence.</p>
+          <p className="section-subtitle">
+            Live listings for your target roles, each scored against your approved evidence.
+            {lastRun ? ` Last searched ${new Date(lastRun).toLocaleString()}.` : ""}
+          </p>
         </div>
         <button type="button" className="primary-button" onClick={() => void runSearch()} disabled={status === "loading"}>
           {status === "loading" ? "Searching…" : status === "ready" ? "Search again" : "Search now"}
