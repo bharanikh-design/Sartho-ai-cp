@@ -39,6 +39,7 @@ describe("primary navigation", () => {
       "Find Roles",
       "Opportunities",
       "Résumé Studio",
+      "Browser Extension",
     ];
     expect(getPrimaryNavigation(false).map((item) => item.label)).toEqual(flow);
     expect(getPrimaryNavigation(true).map((item) => item.label)).toEqual(flow);
@@ -53,6 +54,7 @@ describe("primary navigation", () => {
       "Find Roles",
       "Opportunities",
       "Résumé Studio",
+      "Browser Extension",
     ]);
   });
 });
