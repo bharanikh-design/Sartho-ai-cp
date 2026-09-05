@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { ProductPageHeader } from "@/components/product-page-header";
 import { ResumeImport } from "@/components/resume-import";
+import { ResumeLibrary } from "@/components/resume-library";
 import { JourneySteps } from "@/components/journey-steps";
 import { requireUser } from "@/lib/auth";
-import { getCareerWorkspace } from "@/lib/data/career";
+import { getCareerWorkspace, getResumeImports } from "@/lib/data/career";
 import { loadProductJourneyStatus } from "@/lib/journey/load-product-journey";
 
 export const dynamic = "force-dynamic";
@@ -18,9 +19,10 @@ export const dynamic = "force-dynamic";
  */
 export default async function UploadResumePage() {
   const { supabase, user } = await requireUser();
-  const [{ roles, evidence }, journey] = await Promise.all([
+  const [{ roles, evidence }, journey, imports] = await Promise.all([
     getCareerWorkspace(supabase, user.id),
     loadProductJourneyStatus(supabase, user.id),
+    getResumeImports(supabase, user.id),
   ]);
   const approved = evidence.filter((item) => item.approval_status === "approved").length;
   const hasEvidence = evidence.length > 0;
@@ -47,6 +49,24 @@ export default async function UploadResumePage() {
         </div>
         <ResumeImport hasEvidence={hasEvidence} continueHref="/career-direction" />
       </section>
+
+      {/*
+        * The documents themselves, kept where they were uploaded. This list used
+        * to sit on Résumé Studio behind a second copy of the upload form, which
+        * put profile work on a page meant for writing and checking a résumé.
+        */}
+      {imports.length ? (
+        <section className="glass-card content-card" id="source-resumes">
+          <div className="card-header">
+            <div>
+              <h2 className="section-heading">Source documents</h2>
+              <p className="section-subtitle">Every résumé you have handed over, kept — so a claim can point at the document it came from.</p>
+            </div>
+            <span className="meta-pill">{imports.length} document{imports.length === 1 ? "" : "s"}</span>
+          </div>
+          <ResumeLibrary imports={imports} />
+        </section>
+      ) : null}
 
       {hasEvidence ? (
         <div className="direction-save-bar">

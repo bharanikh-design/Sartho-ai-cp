@@ -88,7 +88,7 @@ const resumeNavigation: NavigationItem = {
   shortLabel: "Resumes",
   href: "/resume-studio",
   icon: "resume",
-  purpose: "Manage your source resumes and create tailored drafts.",
+  purpose: "Write a tailored résumé draft and check how it reads to an applicant tracking system.",
 };
 
 /**
