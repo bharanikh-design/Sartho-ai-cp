@@ -26,19 +26,7 @@ type SearchResult = {
 };
 
 /* What the server actually searched — echoed back so nobody has to guess. */
-type SearchCriteria = {
-  country: string;
-  countryName: string;
-  countrySource: "brief" | "resume" | "default";
-  locations: string[];
-  broadened: boolean;
-  companies: string[];
-  roles: string[];
-  remoteOnly: boolean;
-  providers: string[];
-  queriesRun: number;
-  queriesSkipped: number;
-};
+type SearchCriteria = import("@/lib/jobs/run-search").SearchCriteria;
 
 const recTone: Record<SearchResult["recommendation"], string> = {
   apply: "#6bcf93",
