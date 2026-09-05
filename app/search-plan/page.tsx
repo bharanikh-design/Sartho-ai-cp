@@ -17,6 +17,10 @@ export const dynamic = "force-dynamic";
  * Search Brief is the roles that match. The criteria card above them is short
  * on purpose — four questions — and email alerts live on their own page.
  */
+import { constructMetadata } from "@/lib/seo";
+
+export const metadata = constructMetadata("Find Roles", "Find live job listings matched against your approved evidence.", "/search-plan");
+
 export default async function SearchPlanPage() {
   const { supabase, user } = await requireUser();
   const [lanes, preferences, journey, profileResult, stored] = await Promise.all([

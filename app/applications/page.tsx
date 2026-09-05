@@ -9,6 +9,10 @@ import { buildSkillProfile } from "@/lib/matching/skill-profile";
 
 export const dynamic = "force-dynamic";
 
+import { constructMetadata } from "@/lib/seo";
+
+export const metadata = constructMetadata("Opportunities", "Track your saved roles and applications.", "/applications");
+
 export default async function ApplicationsPage() {
   const { supabase, user } = await requireUser();
   const [jobs, workspace] = await Promise.all([

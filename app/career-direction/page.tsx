@@ -7,6 +7,10 @@ import { loadProductJourneyStatus } from "@/lib/journey/load-product-journey";
 
 export const dynamic = "force-dynamic";
 
+import { constructMetadata } from "@/lib/seo";
+
+export const metadata = constructMetadata("Career Direction", "Define your career positioning and target roles.", "/career-direction");
+
 export default async function CareerDirectionPage() {
   const { supabase, user } = await requireUser();
   const [{ profile, lanes, roles, evidence }, journey, suggestionSet] = await Promise.all([

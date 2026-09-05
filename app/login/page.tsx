@@ -605,6 +605,10 @@ function friendlyAuthMessage(message: string) {
   return message;
 }
 
+import { constructMetadata } from "@/lib/seo";
+
+export const metadata = constructMetadata("Sign In", "Sign in to your Sartho account to access your AI career copilot.", "/login");
+
 export default function LoginPage() {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
