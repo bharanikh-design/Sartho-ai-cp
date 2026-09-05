@@ -27,6 +27,8 @@ const criteria: SearchCriteria = {
   country: "au",
   countries: ["au"],
   employmentTypes: [],
+  candidateLevel: 2,
+  tooSenior: 0,
   countryName: "Australia",
   countrySource: "brief",
   locations: ["Sydney"],

@@ -61,11 +61,20 @@ export function JobSearchPanel({
   const [savedUrls, setSavedUrls] = useState<string[]>([]);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [showWeak, setShowWeak] = useState(false);
+  /* Six to a page. A laundry list is not a shortlist. */
+  const [page, setPage] = useState(0);
+  const PAGE_SIZE = 6;
 
   async function runSearch() {
     setStatus("loading");
     setError(null);
     setSaveError(null);
+    // Clear the previous run outright. Leaving old rows on screen while new
+    // ones arrive was showing two different searches at once.
+    setResults([]);
+    setCriteria(null);
+    setShowWeak(false);
+    setPage(0);
     try {
       const response = await fetch("/api/jobs/search", { method: "POST" });
       const data = await response.json() as { results?: SearchResult[]; criteria?: SearchCriteria; error?: string; code?: string };
@@ -77,6 +86,7 @@ export function JobSearchPanel({
       setResults(data.results ?? []);
       setCriteria(data.criteria ?? null);
       setLastRun(new Date().toISOString());
+      setPage(0);
       setStatus("ready");
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Search failed.");
@@ -188,6 +198,10 @@ export function JobSearchPanel({
   const primary = strong.length ? strong : weak.slice(0, 3);
   const collapsed = strong.length ? weak : weak.slice(3);
 
+  const pageCount = Math.max(1, Math.ceil(primary.length / PAGE_SIZE));
+  const currentPage = Math.min(page, pageCount - 1);
+  const pageItems = primary.slice(currentPage * PAGE_SIZE, currentPage * PAGE_SIZE + PAGE_SIZE);
+
   return (
     <section className="glass-card content-card" id="find-roles">
       <div className="card-header">
@@ -227,6 +241,7 @@ export function JobSearchPanel({
           {criteria.companies.length ? <> · companies: {criteria.companies.join(", ")}</> : null}
           {criteria.providers.length ? <> · via {criteria.providers.join(" + ")}</> : null}
           {criteria.countrySource === "default" ? <> · <Link href="#country">choose your country</Link> to search the right market</> : null}
+          {criteria.tooSenior ? <> · {criteria.tooSenior} roles hidden as too senior for your experience</> : null}
           {criteria.queriesSkipped > 0 ? <> · {criteria.queriesSkipped} queries skipped (time limit)</> : null}
         </p>
       ) : null}
@@ -253,8 +268,15 @@ export function JobSearchPanel({
             <div className="empty-inline-state">No strong matches against your evidence yet — here are the closest. Adding more approved evidence, or refining your target roles, sharpens these.</div>
           ) : null}
           <div className="application-list" style={{ marginTop: "8px" }}>
-            {primary.map(renderResult)}
+            {pageItems.map(renderResult)}
           </div>
+          {pageCount > 1 ? (
+            <nav className="result-pager" aria-label="Result pages">
+              <button type="button" onClick={() => setPage((value) => Math.max(0, value - 1))} disabled={currentPage === 0}>‹ Previous</button>
+              <span>{currentPage * PAGE_SIZE + 1}–{Math.min((currentPage + 1) * PAGE_SIZE, primary.length)} of {primary.length}</span>
+              <button type="button" onClick={() => setPage((value) => Math.min(pageCount - 1, value + 1))} disabled={currentPage >= pageCount - 1}>Next ›</button>
+            </nav>
+          ) : null}
           {collapsed.length ? (
             <>
               <button type="button" className="secondary-button" onClick={() => setShowWeak((value) => !value)} style={{ marginTop: "12px" }}>

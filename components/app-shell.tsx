@@ -198,7 +198,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   async function confirmAccountAction() {
     if (!accountAction || accountBusy) return;
-    const requiredPhrase = accountAction === "delete" ? "DELETE" : "WIPE";
+    const requiredPhrase = accountAction === "delete" ? "DELETE ACCOUNT" : "DELETE DATA";
     if (confirmation.trim().toUpperCase() !== requiredPhrase) return;
 
     setAccountBusy(true);
@@ -226,8 +226,8 @@ export function AppShell({ children }: { children: ReactNode }) {
     router.refresh();
   }
 
-  const actionTitle = accountAction === "delete" ? "Delete Profile" : "Wipe Data";
-  const requiredPhrase = accountAction === "delete" ? "DELETE" : "WIPE";
+  const actionTitle = accountAction === "delete" ? "Delete account" : "Delete data";
+  const requiredPhrase = accountAction === "delete" ? "DELETE ACCOUNT" : "DELETE DATA";
 
   return (
     <div className="app-shell">
@@ -302,6 +302,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               </div>
               <div className="profile-menu-divider" />
               <Link href="/career-truth" className="profile-menu-link" role="menuitem"><span><strong>Upload résumé</strong><small>Add or replace your source résumé</small></span><b aria-hidden="true">→</b></Link>
+              <Link href="/notifications" className="profile-menu-link" role="menuitem" onClick={() => setProfileOpen(false)}><span><strong>Email alerts</strong><small>Daily new matches and the pipeline summary</small></span><b aria-hidden="true">→</b></Link>
               <button type="button" className="profile-menu-action" role="menuitem" onClick={openAccountPanel}><span><strong>Data & privacy</strong><small>Manage or remove your information</small></span><b aria-hidden="true">→</b></button>
               <button type="button" className="profile-menu-action profile-menu-signout" role="menuitem" onClick={() => void signOut()}><span><strong>Log out</strong><small>End this secure session</small></span></button>
             </div>
@@ -343,7 +344,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <p>Your career information stays private to your account. Choose what you want to keep or remove.</p>
             <div className="account-privacy-options">
               <button type="button" onClick={() => openAccountAction("wipe")}>
-                <span><strong>Clear workspace data</strong><small>Remove your Career Profile, jobs and applications while keeping your login.</small></span><b>Review →</b>
+                <span><strong>Delete my data</strong><small>Erase your résumé, evidence, jobs and applications. Your login stays.</small></span><b>Review →</b>
               </button>
               <button type="button" className="is-danger" onClick={() => openAccountAction("delete")}>
                 <span><strong>Delete account</strong><small>Permanently remove your login and all information associated with it.</small></span><b>Review →</b>
@@ -362,10 +363,18 @@ export function AppShell({ children }: { children: ReactNode }) {
             <h2 id="account-action-title">{actionTitle}</h2>
             <p>
               {accountAction === "delete"
-                ? "This permanently removes your Sartho login, Career Profile, evidence, jobs, analyses, résumé drafts and application history."
-                : "This permanently removes your Career Profile, evidence, jobs, analyses, résumé drafts and application history, but keeps your Google login connected."}
+                ? "Your Sartho login is removed along with everything below. You will be signed out and cannot sign back in with this account."
+                : "Your login stays connected, but Sartho forgets everything it knows about your career. You would start again from an empty résumé upload."}
             </p>
-            <div className="profile-protection-note">This cannot be undone. Type <strong>{requiredPhrase}</strong> to confirm.</div>
+            <ul className="deletion-manifest">
+              <li>Every uploaded résumé and the text read from it</li>
+              <li>All approved career evidence and roles</li>
+              <li>Your target roles, search brief and saved search results</li>
+              <li>Saved jobs, analyses and requirement mappings</li>
+              <li>Résumé drafts and application history</li>
+              <li>Email alert preferences and the record of what was sent</li>
+            </ul>
+            <div className="profile-protection-note">This cannot be undone and there is no backup. Type <strong>{requiredPhrase}</strong> to confirm.</div>
             <label className="account-confirmation-field">
               <span>Confirmation</span>
               <input
@@ -385,7 +394,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 onClick={() => void confirmAccountAction()}
                 disabled={accountBusy || confirmation.trim().toUpperCase() !== requiredPhrase}
               >
-                {accountBusy ? "Deleting…" : accountAction === "delete" ? "Delete everything" : "Wipe my data"}
+                {accountBusy ? "Deleting…" : accountAction === "delete" ? "Delete my account" : "Delete my data"}
               </button>
             </div>
           </section>

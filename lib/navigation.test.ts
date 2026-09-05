@@ -39,7 +39,6 @@ describe("primary navigation", () => {
       "Search Brief",
       "Applications",
       "Résumé Studio",
-      "Email Alerts",
     ];
     expect(getPrimaryNavigation(false).map((item) => item.label)).toEqual(flow);
     expect(getPrimaryNavigation(true).map((item) => item.label)).toEqual(flow);
@@ -54,7 +53,6 @@ describe("primary navigation", () => {
       "Search Brief",
       "Applications",
       "Résumé Studio",
-      "Email Alerts",
     ]);
   });
 });
