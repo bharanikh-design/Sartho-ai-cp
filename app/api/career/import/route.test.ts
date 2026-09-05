@@ -50,6 +50,7 @@ const EXTRACTION = {
   headline: "Head of End User Computing",
   summary: "Twenty years in service transformation.",
   location: "London",
+  country: "GB",
   totalExperienceYears: 20,
 };
 
@@ -367,6 +368,13 @@ describe("POST /api/career/import", () => {
     await drain(await POST(upload()));
     expect(recorded.updates).toContainEqual(
       expect.objectContaining({ table: "profiles", headline: "Head of End User Computing" }),
+    );
+  });
+
+  it("stores the country read from the résumé as a lower-case ISO code", async () => {
+    await drain(await POST(upload()));
+    expect(recorded.updates).toContainEqual(
+      expect.objectContaining({ table: "profiles", country: "gb" }),
     );
   });
 

@@ -29,7 +29,9 @@ const readyInput: ProductJourneyInput = {
   activeLanes: 2,
   activeLaneAllocation: 100,
   searchPreferences: {
+    country: "sg",
     targetLocations: ["Singapore"],
+    targetCompanies: [],
     remotePreference: "Flexible",
     sources: [{ id: "official", name: "Employer", url: "https://example.com/jobs", type: "Official", coverage: "Global", trust: "Primary", active: true }],
   },

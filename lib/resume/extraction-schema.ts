@@ -11,7 +11,7 @@
 export const RESUME_EXTRACTION_SCHEMA = {
   type: "object",
   additionalProperties: false,
-  required: ["roles", "evidence", "headline", "summary", "location", "totalExperienceYears"],
+  required: ["roles", "evidence", "headline", "summary", "location", "country", "totalExperienceYears"],
   properties: {
     roles: {
       type: "array",
@@ -53,6 +53,10 @@ export const RESUME_EXTRACTION_SCHEMA = {
     headline: { type: ["string", "null"] },
     summary: { type: ["string", "null"] },
     location: { type: ["string", "null"] },
+    country: {
+      type: ["string", "null"],
+      description: "ISO-3166 alpha-2 code of the country the person is based in, lower-case (e.g. au, in, sg, us). Null when the résumé gives no reliable signal.",
+    },
     totalExperienceYears: { type: ["number", "null"] },
   },
 };
@@ -67,6 +71,7 @@ export const RESUME_EXTRACTION_SYSTEM = [
   "Attribute every claim to the employer and title it sits under. Leave both null when the résumé does not make that clear.",
   "Dates must be YYYY, YYYY-MM or YYYY-MM-DD exactly as precise as the document is. Use null when a date is absent, and never guess one.",
   "Split responsibilities into separate claims rather than merging several into one sentence.",
+  "For country, infer the ISO-3166 alpha-2 code (lower-case) of where the person is based from concrete signals in the document: a stated address or city, a phone dialling code (+61 au, +91 in, +65 sg, +1 us, +44 gb), the location of their current employer or university, or stated work rights. Use null when those signals are absent or conflict; never guess from a name.",
 ].join(" ");
 
 export const RESUME_EXTRACTION_SCHEMA_NAME = "sartho_resume_extraction";

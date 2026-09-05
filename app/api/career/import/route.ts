@@ -61,6 +61,8 @@ const outputSchema = z.object({
   headline: z.string().nullable(),
   summary: z.string().nullable(),
   location: z.string().nullable(),
+  // Optional so a response from before the field existed still parses.
+  country: z.string().nullable().optional(),
   totalExperienceYears: z.number().nullable(),
 });
 
@@ -225,7 +227,7 @@ export async function POST(request: Request) {
      */
     const { data: profile } = await supabase
       .from("profiles")
-      .select("id,headline,summary,location,total_experience_years")
+      .select("id,headline,summary,location,country,total_experience_years")
       .eq("id", userId)
       .maybeSingle();
 
@@ -234,6 +236,12 @@ export async function POST(request: Request) {
       if (!profile.headline && parsed.headline) patch.headline = parsed.headline.trim();
       if (!profile.summary && parsed.summary) patch.summary = parsed.summary.trim();
       if (!profile.location && parsed.location) patch.location = parsed.location.trim();
+      // The inferred country is a default the person confirms on Search Brief —
+      // it is only ever filled in, never overwritten.
+      const inferredCountry = parsed.country?.trim().toLowerCase();
+      if (!profile.country && inferredCountry && /^[a-z]{2}$/.test(inferredCountry)) {
+        patch.country = inferredCountry;
+      }
       if (profile.total_experience_years === null && parsed.totalExperienceYears !== null) {
         patch.total_experience_years = parsed.totalExperienceYears;
       }

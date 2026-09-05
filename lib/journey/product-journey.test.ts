@@ -24,7 +24,9 @@ const ready: ProductJourneyInput = {
   activeLanes: 2,
   activeLaneAllocation: 100,
   searchPreferences: {
+    country: "sg",
     targetLocations: ["Singapore"],
+    targetCompanies: [],
     remotePreference: "Flexible",
     sources: [{ id: "official", name: "Employer", url: "https://example.com/jobs", type: "Official", coverage: "Global", trust: "Primary", active: true }],
   },
@@ -50,11 +52,20 @@ describe("product journey", () => {
   it("requires search coverage before the dashboard is activated", () => {
     const state = buildProductJourney({
       ...ready,
-      searchPreferences: { targetLocations: [], remotePreference: "Flexible", sources: [] },
+      searchPreferences: { country: null, targetLocations: [], targetCompanies: [], remotePreference: "Flexible", sources: [] },
     });
     expect(state.activated).toBe(false);
     expect(state.current.id).toBe("search");
     expect(state.progress).toBe(67);
+  });
+
+  it("counts a country with no cities as search coverage (anywhere in the country)", () => {
+    const state = buildProductJourney({
+      ...ready,
+      searchPreferences: { ...ready.searchPreferences, country: "au", targetLocations: [] },
+    });
+    expect(state.activated).toBe(true);
+    expect(state.steps.find((step) => step.id === "search")?.detail).toContain("AU nationwide");
   });
 
   it("accepts existing evidence as proof that a résumé was received", () => {

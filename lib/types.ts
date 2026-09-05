@@ -17,6 +17,8 @@ export type ProfileRecord = {
   id: string;
   full_name: string;
   location: string | null;
+  /** ISO-3166 alpha-2, inferred from the résumé at import; the Search Brief default. */
+  country?: string | null;
   headline: string | null;
   summary: string | null;
   total_experience_years: number | null;

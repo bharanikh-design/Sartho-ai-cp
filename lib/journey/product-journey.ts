@@ -50,9 +50,16 @@ export function buildProductJourney(input: ProductJourneyInput): ProductJourneyS
   const profilesComplete = input.activeLanes > 0 && input.activeLaneAllocation === 100;
   const directionComplete = strengthsComplete && profilesComplete;
   const activeSources = input.searchPreferences.sources.filter((source) => source.active).length;
-  const searchComplete = input.searchPreferences.targetLocations.length > 0
+  // Coverage is a country (anywhere in it) or at least one city. Cities alone
+  // still count so a brief saved before the country model keeps working.
+  const hasCoverage = Boolean(input.searchPreferences.country)
+    || input.searchPreferences.targetLocations.length > 0;
+  const searchComplete = hasCoverage
     && activeSources > 0
     && Boolean(input.searchPreferences.remotePreference);
+  const coverageLabel = input.searchPreferences.targetLocations.length
+    ? `${input.searchPreferences.targetLocations.length} locations`
+    : `${input.searchPreferences.country?.toUpperCase() ?? "?"} nationwide`;
 
   const steps: ProductJourneyStep[] = [
     {
@@ -81,8 +88,8 @@ export function buildProductJourney(input: ProductJourneyInput): ProductJourneyS
       id: "search",
       label: "Search brief",
       detail: searchComplete
-        ? `${input.searchPreferences.targetLocations.length} locations · ${activeSources} active sources`
-        : "Choose locations, work model and trusted sources",
+        ? `${coverageLabel} · ${activeSources} active sources`
+        : "Choose your country, locations and work model",
       href: "/search-plan",
       complete: searchComplete,
       title: "Set the brief for worthwhile opportunities",
