@@ -51,9 +51,22 @@ describe("analyseJobDescription", () => {
   });
 
   it("recommends applying when the role calls for several leading skills", () => {
+    /*
+     * The advert names four capabilities, not two. It used to name two and
+     * still assert full coverage — which is the shape of the bug this file's
+     * discount now catches, so the fixture has to mean what the test says.
+     */
     const result = analyseJobDescription(
-      longEnough("You will own requirements gathering, the BRD and dashboards for our reporting suite"),
-      profileOf(skill("Business analysis", "core", 6), skill("Data analysis", "strong", 4)),
+      longEnough(
+        "You will own requirements gathering, the BRD and dashboards for our reporting suite, "
+        + "run sprint planning with the delivery squad and lead stakeholder engagement across the business",
+      ),
+      profileOf(
+        skill("Business analysis", "core", 6),
+        skill("Data analysis", "strong", 4),
+        skill("Agile delivery", "strong", 4),
+        skill("Stakeholder management", "strong", 3),
+      ),
     );
     expect(result.recommendation).toBe("apply");
     expect(result.requirementCoverage).toBe(100);
@@ -131,8 +144,50 @@ describe("analyseJobDescription", () => {
   it("counts a requirement as covered when the evidence resolves to it", () => {
     const jd = longEnough("You will own the BRD, the RTM and requirements elicitation for each release.");
     const result = analyseJobDescription(jd, profileOf(skill("Business analysis", "core", 5)));
-    expect(result.requirementCoverage).toBe(100);
     expect(result.missingRequirements).toEqual([]);
+    expect(result.requirementsRead).toBe(1);
+  });
+
+  /*
+   * A live search returned two adverts as unalike as "ESG Due Diligence
+   * Managing Consultant" and "Club Managers | Membership Consultants", and both
+   * reported "you can evidence 100% of what it asks for". Coverage over one or
+   * two legible capabilities is not knowledge of the job, and it was carrying
+   * 40% of the score at full strength.
+   */
+  it("discounts coverage until enough of the advert has been read", () => {
+    const thin = analyseJobDescription(
+      longEnough("You will own the BRD and the RTM."),
+      profileOf(skill("Business analysis", "core", 5)),
+    );
+    expect(thin.requirementsRead).toBe(1);
+    expect(thin.requirementCoverage).toBe(25);
+
+    const full = analyseJobDescription(
+      longEnough(
+        "You will own the BRD and the RTM, run sprint planning and backlog refinement, "
+        + "build dashboards in Power BI, and lead stakeholder engagement workshops.",
+      ),
+      profileOf(
+        skill("Business analysis", "core", 5),
+        skill("Agile delivery", "core", 4),
+        skill("Data analysis", "core", 4),
+        skill("Stakeholder management", "core", 4),
+      ),
+    );
+    expect(full.requirementsRead).toBeGreaterThanOrEqual(4);
+    expect(full.requirementCoverage).toBe(100);
+  });
+
+  /*
+   * One passing mention is a thing somebody has touched, not a thing they can
+   * claim. Treating "emerging" as full coverage is how a gym's membership-sales
+   * advert came back fully evidenced for an analyst.
+   */
+  it("does not let an emerging skill cover a requirement", () => {
+    const jd = longEnough("You will own the BRD, the RTM and requirements elicitation for each release.");
+    const result = analyseJobDescription(jd, profileOf(skill("Business analysis", "emerging", 1)));
+    expect(result.missingRequirements).toContain("Business analysis");
   });
 
   it("carries no hard-coded career terms of its own", async () => {

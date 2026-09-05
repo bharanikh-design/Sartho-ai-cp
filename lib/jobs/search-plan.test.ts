@@ -4,8 +4,23 @@ import { planSearchQueries, toSearchKeywords, widenToCountry } from "@/lib/jobs/
 describe("toSearchKeywords", () => {
   it("reduces a person's phrasing to the primary title", () => {
     expect(toSearchKeywords("Business Analyst / Junior Consultant")).toBe("Business Analyst");
-    expect(toSearchKeywords("Risk & Cybersecurity Analyst (Graduate)")).toBe("Risk Cybersecurity Analyst");
-    expect(toSearchKeywords("Senior Product Manager Payments Platform Lead")).toBe("Senior Product Manager Payments");
+    expect(toSearchKeywords("Senior Product Manager Payments Platform Lead")).toBe("Product Manager");
+  });
+
+  /*
+   * This assertion used to read "Risk Cybersecurity Analyst" — the composite
+   * verbatim. No employer posts that, so the provider returned almost nothing,
+   * and a three-role search came back with two survivors. The real title inside
+   * the phrase is what gets searched now.
+   */
+  it("searches the market title inside a composite, not the composite", () => {
+    expect(toSearchKeywords("Risk & Cybersecurity Analyst (Graduate)")).toBe("Cybersecurity Analyst");
+    expect(toSearchKeywords("Strategy Operations Analyst")).toBe("Operations Analyst");
+    expect(toSearchKeywords("Management Consultant")).toBe("Management Consultant");
+  });
+
+  it("falls back to trimming when no market title is recognisable", () => {
+    expect(toSearchKeywords("Chief Vibes Officer (Remote)")).toBe("Chief Vibes Officer");
   });
 });
 

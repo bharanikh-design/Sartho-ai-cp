@@ -149,7 +149,7 @@ export const JOB_FAMILIES: JobFamily[] = [
      */
     id: "Sales",
     titles: [
-      "solutions consultant", "solution consultant", "sales engineer", "pre sales",
+      "membership consultant", "solutions consultant", "solution consultant", "sales engineer", "pre sales",
       "presales", "pre sales consultant", "solutions engineer", "solution architect sales",
       "sales manager", "sales representative", "sales executive", "account executive",
       "account manager", "business development manager", "business development representative",
@@ -297,10 +297,39 @@ export function adjacentFamilies(family: string): string[] {
  * this table knows. Null is not "no match" — it is "no opinion", and the caller
  * must not use it to reject something.
  */
+/*
+ * Adverts pluralise titles — "Club Managers | Membership Consultants",
+ * "Business Analysts (x3)". Matching only the singular meant every one of those
+ * resolved to no family at all, and the abstention rule then let them straight
+ * through the filter. A trailing "s" is checked alongside the canonical form.
+ */
+function containsTitle(haystack: string, title: string): boolean {
+  return haystack.includes(` ${title} `) || haystack.includes(` ${title}s `);
+}
+
 export function familyOfTitle(title: string): string | null {
   const haystack = normaliseText(title);
   for (const entry of TITLE_INDEX) {
-    if (haystack.includes(` ${entry.title} `)) return entry.family;
+    if (containsTitle(haystack, entry.title)) return entry.family;
+  }
+  return null;
+}
+
+/**
+ * The market-recognised title inside a longer string, or null.
+ *
+ * Career Direction produces composites — "Risk Cybersecurity Analyst",
+ * "Strategy Operations Analyst" — which read fine to a person and match nothing
+ * on a job board, because no employer posts that title. This pulls the real
+ * title back out so the search asks for something that exists.
+ */
+export function marketTitleIn(title: string): string | null {
+  const haystack = normaliseText(title);
+  for (const entry of TITLE_INDEX) {
+    if (containsTitle(haystack, entry.title)) {
+      /* Title case, because this is shown back as "roles searched". */
+      return entry.title.replace(/\b[a-z]/g, (letter) => letter.toUpperCase());
+    }
   }
   return null;
 }
@@ -345,9 +374,27 @@ export type FamilyFit = {
  * because the person cannot tell the difference between "nothing matched" and
  * "we threw yours away".
  */
+/**
+ * The families a person's results should be drawn from.
+ *
+ * Target roles govern when the person has set any. Held titles only fill in
+ * when they have not.
+ *
+ * Pooling the two was wrong in a way a real search made obvious: one casual
+ * shop job in somebody's history put "retail assistant" in the Sales family,
+ * which opened Sales and every neighbour of it — Marketing, Customer success,
+ * Strategy — and a gym's membership-sales advert came back as a match for an
+ * analyst. What a person is aiming at is a deliberate statement; a job they
+ * held years ago is not a request to be shown more like it.
+ */
+export function reachFrom(heldTitles: string[], targetTitles: string[]): string[] {
+  const targeted = familiesOf(targetTitles);
+  return [...(targeted.size ? targeted : familiesOf(heldTitles))];
+}
+
 export function familyFit(jobTitle: string, heldTitles: string[], targetTitles: string[] = []): FamilyFit {
   const jobFamily = familyOfTitle(jobTitle);
-  const candidateFamilies = [...familiesOf([...heldTitles, ...targetTitles])];
+  const candidateFamilies = reachFrom(heldTitles, targetTitles);
 
   if (!jobFamily || !candidateFamilies.length) {
     return { jobFamily, candidateFamilies, withinReach: true, reason: null };

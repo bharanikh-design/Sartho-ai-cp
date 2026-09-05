@@ -18,6 +18,8 @@ function match(overrides: Partial<ScoredJobMatch>): ScoredJobMatch {
     titleFit: 80,
     requirementCoverage: 60,
     closestTitle: "Business Analyst",
+    closestIsHeld: true,
+    requirementsRead: 6,
     missingRequirements: [],
     ...overrides,
   };

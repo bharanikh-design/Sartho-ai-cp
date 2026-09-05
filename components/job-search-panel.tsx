@@ -26,6 +26,8 @@ type SearchResult = {
   titleFit?: number;
   requirementCoverage?: number;
   closestTitle?: string | null;
+  closestIsHeld?: boolean;
+  requirementsRead?: number;
   missingRequirements?: string[];
 };
 
@@ -151,11 +153,23 @@ export function JobSearchPanel({
           {/* The score, in its parts — a bare percentage explains nothing. */}
           {typeof result.titleFit === "number" ? (
             <p className="match-reason">
+              {/*
+                * This said "matches your Management Consultant experience"
+                * about a role the person had never held — Management Consultant
+                * was a target they had typed on Career Direction. A target is a
+                * wish; saying it back as experience is the product lying.
+                */}
               {result.titleFit >= 50 && result.closestTitle
-                ? <>Title matches your <strong>{result.closestTitle}</strong> experience ({result.titleFit}%)</>
+                ? result.closestIsHeld
+                  ? <>Title matches your <strong>{result.closestTitle}</strong> experience ({result.titleFit}%)</>
+                  : <>Title matches <strong>{result.closestTitle}</strong>, a role you are targeting ({result.titleFit}%)</>
                 : <>Title is unlike anything in your history</>}
-              {typeof result.requirementCoverage === "number"
-                ? <> · you can evidence <strong>{result.requirementCoverage}%</strong> of what it asks for</>
+              {/*
+                * A percentage with no denominator is how two adverts as unalike
+                * as ESG due diligence and gym memberships both read "100%".
+                */}
+              {typeof result.requirementCoverage === "number" && result.requirementsRead
+                ? <> · evidences <strong>{result.requirementCoverage}%</strong> of the {result.requirementsRead} requirement{result.requirementsRead === 1 ? "" : "s"} legible in this advert</>
                 : null}
             </p>
           ) : null}

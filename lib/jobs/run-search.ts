@@ -3,7 +3,7 @@ import { getCareerWorkspace } from "@/lib/data/career";
 import { getSearchPreferences } from "@/lib/data/search";
 import { countryName, normaliseCountryCode } from "@/lib/jobs/countries";
 import { splitMisfiledCompanies } from "@/lib/jobs/employers";
-import { familiesOf, familyFit } from "@/lib/matching/job-family";
+import { familyFit, reachFrom } from "@/lib/matching/job-family";
 import { scoreOpportunity } from "@/lib/matching/opportunity-score";
 import { candidateSeniority } from "@/lib/matching/title-fit";
 import { seniorityReach } from "@/lib/matching/seniority-reach";
@@ -51,6 +51,10 @@ export type ScoredJobMatch = {
   titleFit: number;
   requirementCoverage: number;
   closestTitle: string | null;
+  /** Whether closestTitle is a job held, or only one being aimed at. */
+  closestIsHeld: boolean;
+  /** How many capabilities were legible in the advert, so a % has a denominator. */
+  requirementsRead: number;
   missingRequirements: string[];
 };
 
@@ -254,6 +258,8 @@ export async function runBriefSearch(
       titleFit: scored.breakdown.titleFit,
       requirementCoverage: scored.breakdown.requirementCoverage,
       closestTitle: scored.analysis.closestTitle ?? null,
+      closestIsHeld: scored.analysis.closestIsHeld ?? false,
+      requirementsRead: scored.analysis.requirementsRead ?? 0,
       missingRequirements: scored.analysis.missingRequirements?.slice(0, 4) ?? [],
     };
   };
@@ -321,7 +327,7 @@ export async function runBriefSearch(
     candidateLevel: level,
     tooSenior,
     offFamily,
-    families: [...familiesOf([...heldTitles, ...roleNames])],
+    families: reachFrom(heldTitles, roleNames),
     countryName: countryLabel,
     countrySource: preferences.country ? "brief" : profile?.country ? "resume" : "default",
     locations: usedLocations,
