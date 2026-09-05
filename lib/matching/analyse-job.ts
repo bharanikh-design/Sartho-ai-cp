@@ -3,6 +3,14 @@ import { capabilitiesIn } from "@/lib/matching/skill-vocabulary";
 import type { TitleFit } from "@/lib/matching/title-fit";
 
 /*
+ * How many distinct capabilities an advert has to name before its coverage
+ * figure is worth stating at full confidence. Below this the advert is thin,
+ * badly written, or mostly boilerplate, and a percentage drawn from one or two
+ * hits says more about the reader than the job.
+ */
+export const MIN_REQUIREMENTS_FOR_CONFIDENCE = 4;
+
+/*
  * Reading a job description against one person's evidence.
  *
  * This file used to carry a career hard-coded into it: three named role lanes,
@@ -51,6 +59,10 @@ export type JobAnalysis = {
   seniorityGap: number;
   /** Capabilities this role asks for that the person cannot yet evidence. */
   missingRequirements: string[];
+  /** How many distinct capabilities were legible in the advert at all. */
+  requirementsRead: number;
+  /** Whether closestTitle is a job actually held, rather than only targeted. */
+  closestIsHeld: boolean;
   matchedSignals: string[];
   cautionSignals: string[];
   matchedSkills: SkillHit[];
@@ -92,6 +104,8 @@ function nothingToSayYet(explanation: string): JobAnalysis {
     confidence: "low",
     coverage: 0,
     requirementCoverage: 0,
+    requirementsRead: 0,
+    closestIsHeld: false,
     evidenceBacking: 0,
     titleFit: 0,
     closestTitle: null,
@@ -112,6 +126,7 @@ export function analyseJobDescription(
 ): JobAnalysis {
   const titleFit = context.titleFit?.score ?? 0;
   const closestTitle = context.titleFit?.closest ?? null;
+  const closestIsHeld = context.titleFit?.closestIsHeld ?? false;
   const seniorityGap = context.titleFit?.seniorityGap ?? 0;
 
   if (rawText.trim().length < 120) {
@@ -147,7 +162,16 @@ export function analyseJobDescription(
     .filter((skill) => asked.has(skill.capability) || mentions(haystack, skill.name))
     .map((skill) => ({ name: skill.name, strength: skill.strength, evidenceCount: skill.evidenceCount }));
 
-  const evidenced = new Set(profile.skills.map((skill) => skill.capability));
+  /*
+   * A requirement counts as evidenced only where the capability is actually
+   * established. `emerging` is one passing mention: it is a thing the person
+   * has touched, not a thing they can claim, and treating it as full coverage
+   * is how a gym's "Membership Consultant" advert came back reading "you can
+   * evidence 100% of what it asks for".
+   */
+  const evidenced = new Set(
+    profile.skills.filter((skill) => skill.strength !== "emerging").map((skill) => skill.capability),
+  );
   const missingRequirements = [...asked].filter((capability) => !evidenced.has(capability));
 
   /*
@@ -155,10 +179,21 @@ export function analyseJobDescription(
    *   requirementCoverage — how much of this job can I evidence?
    *   coverage            — how much of what I am best at does this job use?
    * The first decides whether to apply; the second says how big a pivot it is.
+   *
+   * Coverage is discounted by how much of the advert was actually legible.
+   * Undiscounted, an advert yielding two recognised capabilities that the
+   * person happens to hold reports 100% — full marks on the leg carrying 40%
+   * of the score — off almost no reading at all. Two adverts as unalike as ESG
+   * due diligence and gym memberships both scored 100% that way. Confidence
+   * has to rise with evidence, so coverage is scaled until enough of the
+   * advert has been read to mean something.
    */
-  const requirementCoverage = asked.size
-    ? Math.round(((asked.size - missingRequirements.length) / asked.size) * 100)
+  const requirementsRead = asked.size;
+  const legibility = Math.min(1, requirementsRead / MIN_REQUIREMENTS_FOR_CONFIDENCE);
+  const rawCoverage = requirementsRead
+    ? ((requirementsRead - missingRequirements.length) / requirementsRead) * 100
     : 0;
+  const requirementCoverage = Math.round(rawCoverage * legibility);
 
   const leading = profile.skills.filter((skill) => skill.strength === "core" || skill.strength === "strong");
   const leadingMatched = matchedSkills.filter((skill) => skill.strength === "core" || skill.strength === "strong");
@@ -226,6 +261,8 @@ export function analyseJobDescription(
     closestTitle,
     seniorityGap,
     missingRequirements,
+    requirementsRead,
+    closestIsHeld,
     matchedSignals: matchedSkills.map((skill) => skill.name).slice(0, 10),
     cautionSignals: missingRequirements.slice(0, 10),
     matchedSkills,

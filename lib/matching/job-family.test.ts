@@ -6,6 +6,8 @@ import {
   familiesOf,
   familyFit,
   familyOfTitle,
+  marketTitleIn,
+  reachFrom,
   reachableFamilies,
 } from "@/lib/matching/job-family";
 
@@ -127,5 +129,33 @@ describe("the table itself", () => {
   it("collects every family a person spans", () => {
     expect([...familiesOf(["Business Analyst", "Data Analyst", "Chief Vibes Officer"])])
       .toEqual(["Analysis", "Data"]);
+  });
+});
+
+/*
+ * A live search on 5 September returned two roles, both wrong, and the reasons
+ * were in this file and its callers. These hold the fixes.
+ */
+describe("the September search regression", () => {
+  it("does not let an old shop job open the whole Sales family", () => {
+    const held = ["Business Analyst", "Retail Assistant"];
+    const targets = ["Business Analyst", "Data Analyst"];
+
+    /* Targets govern: the shop job no longer widens anything. */
+    expect(reachFrom(held, targets)).not.toContain("Sales");
+    expect(familyFit("Membership Consultant", held, targets).withinReach).toBe(false);
+
+    /* With no targets set, held titles still fill in. */
+    expect(reachFrom(held, [])).toContain("Sales");
+  });
+
+  it("reads a membership consultant as sales, not consulting", () => {
+    expect(familyOfTitle("Club Managers | Assistant Managers | Membership Consultants")).toBe("Sales");
+  });
+
+  it("finds the market title inside a composite Career Direction invented", () => {
+    expect(marketTitleIn("Risk & Cybersecurity Analyst")).toBe("Cybersecurity Analyst");
+    expect(marketTitleIn("Strategy Operations Analyst")).toBe("Operations Analyst");
+    expect(marketTitleIn("Chief Vibes Officer")).toBeNull();
   });
 });

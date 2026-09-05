@@ -21,8 +21,15 @@ const SENIORITY_WORDS: Array<{ words: string[]; level: SeniorityLevel }> = [
   { words: ["intern", "internship", "trainee", "cadet", "graduate", "grad", "entry level", "apprentice"], level: 0 },
   { words: ["junior", "assistant", "associate", "jr"], level: 1 },
   { words: ["senior", "snr", "sr"], level: 3 },
-  { words: ["lead", "principal", "staff", "manager", "management"], level: 4 },
-  { words: ["head", "director", "chief", "vp", "vice president", "partner"], level: 5 },
+  /*
+   * "managing" was missing, and it cost a real search: ERM's "Managing
+   * Consultant — ESG Due Diligence" scored 96% and was recommended to somebody
+   * six months into their career. `includes(" manager ")` never matches
+   * " managing ", so the title fell through to the unqualified default of 2,
+   * one rung above the candidate, and passed the seniority filter.
+   */
+  { words: ["lead", "principal", "staff", "manager", "managing", "management", "executive"], level: 4 },
+  { words: ["head", "director", "chief", "vp", "vice president", "partner", "associate director"], level: 5 },
 ];
 
 /* Words that describe the shape of a job rather than its subject. */
@@ -92,6 +99,12 @@ export type TitleFit = {
   score: number;
   /** The closest title from their history or targets, for showing the reason. */
   closest: string | null;
+  /**
+   * Whether `closest` is a job they have held or one they are only aiming at.
+   * The UI said "matches your Management Consultant experience" about a role
+   * the person had never held — it was a target they had typed.
+   */
+  closestIsHeld: boolean;
   /** Levels the job sits above their strongest comparable title. Negative means below. */
   seniorityGap: number;
 };
@@ -108,21 +121,21 @@ export function scoreTitleFit(
 ): TitleFit {
   const jobSubject = titleSubject(jobTitle);
   const jobLevel = seniorityOf(jobTitle);
-  if (!jobSubject.length) return { score: 0, closest: null, seniorityGap: 0 };
+  if (!jobSubject.length) return { score: 0, closest: null, closestIsHeld: false, seniorityGap: 0 };
 
-  let best = { score: 0, closest: null as string | null, level: jobLevel };
+  let best = { score: 0, closest: null as string | null, level: jobLevel, held: false };
 
-  const consider = (title: string, weight: number) => {
+  const consider = (title: string, weight: number, held: boolean) => {
     const overlap = subjectOverlap(jobSubject, titleSubject(title));
     if (overlap <= 0) return;
     const score = Math.round(overlap * 100 * weight);
-    if (score > best.score) best = { score, closest: title, level: seniorityOf(title) };
+    if (score > best.score) best = { score, closest: title, level: seniorityOf(title), held };
   };
 
-  for (const title of heldTitles) consider(title, 1);
-  for (const title of targetTitles) consider(title, 0.85);
+  for (const title of heldTitles) consider(title, 1, true);
+  for (const title of targetTitles) consider(title, 0.85, false);
 
-  if (!best.closest) return { score: 0, closest: null, seniorityGap: 0 };
+  if (!best.closest) return { score: 0, closest: null, closestIsHeld: false, seniorityGap: 0 };
 
   /*
    * A job two or more levels above anything held is a genuine stretch. The
@@ -136,6 +149,7 @@ export function scoreTitleFit(
   return {
     score: Math.max(0, Math.min(100, Math.round(best.score * penalty))),
     closest: best.closest,
+    closestIsHeld: best.held,
     seniorityGap,
   };
 }

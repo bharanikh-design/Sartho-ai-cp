@@ -1,4 +1,5 @@
 import type { JobSearchQuery } from "@/lib/jobs/search-provider";
+import { marketTitleIn } from "@/lib/matching/job-family";
 
 /*
  * A target role is a person's own phrasing ("Business Analyst / Junior
@@ -8,6 +9,19 @@ import type { JobSearchQuery } from "@/lib/jobs/search-provider";
  * parentheticals or punctuation, capped to the first few words.
  */
 export function toSearchKeywords(role: string): string {
+  /*
+   * Ask for a title employers actually post.
+   *
+   * Career Direction names roles the way a person thinks about them — "Risk
+   * Cybersecurity Analyst", "Strategy Operations Analyst" — and those went to
+   * the provider verbatim. No employer advertises either string, so a search
+   * across three target roles came back with about twenty listings, two of
+   * which survived filtering. Where the name contains a real market title, that
+   * is what gets searched; where it does not, the old trimming stands.
+   */
+  const market = marketTitleIn(role);
+  if (market && market.split(" ").length > 1) return market;
+
   const primary = role.split("/")[0]
     .replace(/\([^)]*\)/g, " ")
     .replace(/[^A-Za-z0-9\s]/g, " ")

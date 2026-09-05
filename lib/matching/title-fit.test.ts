@@ -59,3 +59,32 @@ describe("scoreTitleFit", () => {
     expect(targeted.score).toBeLessThan(held.score);
   });
 });
+
+/*
+ * "Managing Consultant — ESG Due Diligence" was recommended at 96% to somebody
+ * six months into their career. `includes(" manager ")` never matches
+ * " managing ", so the title fell through to the unqualified default of 2.
+ */
+describe("senior titles that were being read as mid-level", () => {
+  it("reads a managing grade as senior", () => {
+    expect(seniorityOf("Managing Consultant - ESG Due Diligence")).toBe(4);
+    expect(seniorityOf("Managing Director")).toBe(5);
+    expect(seniorityOf("Associate Director, Risk")).toBe(5);
+    expect(seniorityOf("Executive Consultant")).toBe(4);
+  });
+
+  it("keeps that role out of reach of an entry-level candidate", () => {
+    const level = candidateSeniority(["Business Analyst"], 0.5);
+    expect(level).toBe(1);
+    expect(seniorityOf("Managing Consultant") - level).toBeGreaterThan(1);
+  });
+
+  it("says whether the closest title was held or only targeted", () => {
+    const targeted = scoreTitleFit("Managing Consultant", [], ["Management Consultant"]);
+    expect(targeted.closest).toBe("Management Consultant");
+    expect(targeted.closestIsHeld).toBe(false);
+
+    const held = scoreTitleFit("Business Analyst", ["Business Analyst"], []);
+    expect(held.closestIsHeld).toBe(true);
+  });
+});
