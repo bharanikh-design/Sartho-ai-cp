@@ -47,23 +47,35 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sarthoTab = tabs[0];
         await chrome.tabs.update(sarthoTab.id, { active: true });
         await chrome.windows.update(sarthoTab.windowId, { focused: true });
-        // If not on the /jobs page, navigate there
-        if (!sarthoTab.url.includes('/jobs')) {
+        // If not on the /applications page, navigate there
+        if (!sarthoTab.url.includes('/applications')) {
           const origin = new URL(sarthoTab.url).origin;
-          await chrome.tabs.update(sarthoTab.id, { url: origin + '/jobs' });
-          // Give it a moment to load
-          await new Promise(r => setTimeout(r, 1000));
+          await chrome.tabs.update(sarthoTab.id, { url: origin + '/applications#add-role' });
+          
+          // Wait for tab to finish loading
+          await new Promise(resolve => {
+            chrome.tabs.onUpdated.addListener(function listener(tabId, info) {
+              if (tabId === sarthoTab.id && info.status === 'complete') {
+                chrome.tabs.onUpdated.removeListener(listener);
+                // Give React a tiny bit of extra time to mount JobAnalyser after load
+                setTimeout(resolve, 500);
+              }
+            });
+            // Fallback timeout just in case it's already loaded or gets stuck
+            setTimeout(() => resolve(), 3000);
+          });
         }
       } else {
-        sarthoTab = await chrome.tabs.create({ url: "https://www.sartho.tech/jobs" });
+        sarthoTab = await chrome.tabs.create({ url: "https://www.sartho.tech/applications#add-role" });
         // Wait for tab to finish loading
         await new Promise(resolve => {
           chrome.tabs.onUpdated.addListener(function listener(tabId, info) {
             if (tabId === sarthoTab.id && info.status === 'complete') {
               chrome.tabs.onUpdated.removeListener(listener);
-              resolve();
+              setTimeout(resolve, 500);
             }
           });
+          setTimeout(() => resolve(), 4000);
         });
       }
 
