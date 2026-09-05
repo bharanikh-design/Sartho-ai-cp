@@ -53,7 +53,13 @@ export type ScoredJobMatch = {
 
 /* What was actually searched, so the page (or email) can say so. */
 export type SearchCriteria = {
+  /** The primary market. */
   country: string;
+  /** Every market searched. */
+  countries: string[];
+  /** Employment types applied as a provider filter. */
+  employmentTypes: string[];
+  /** All markets, named. */
   countryName: string;
   countrySource: "brief" | "resume" | "default";
   /** The cities actually queried (up to two). */
@@ -111,12 +117,18 @@ export async function runBriefSearch(
    * chose on Search Brief, then the one read from their résumé, then the
    * deployment default (only for briefs saved before country existed).
    */
-  const country = normaliseCountryCode(preferences.country)
-    ?? normaliseCountryCode(profile?.country)
-    ?? defaultJobMarket();
-  const countryLabel = countryName(country) ?? country.toUpperCase();
+  const chosen = preferences.countries.length
+    ? preferences.countries
+    : [preferences.country ?? profile?.country ?? ""];
+  const markets = [...new Set(
+    chosen.map((code) => normaliseCountryCode(code)).filter((code): code is string => Boolean(code)),
+  )];
+  if (!markets.length) markets.push(defaultJobMarket());
 
-  const providers = providersForCountry(country);
+  const country = markets[0];
+  const countryLabel = markets.map((code) => countryName(code) ?? code.toUpperCase()).join(", ");
+
+  const providers = [...new Set(markets.flatMap((market) => providersForCountry(market)))];
   if (!providers.length) {
     const configured = configuredJobSearchProviders();
     return {
@@ -131,13 +143,31 @@ export async function runBriefSearch(
   // Employers typed into the cities list (before companies had a field) are
   // treated as companies here too, so an unsaved brief still searches sensibly.
   const brief = splitMisfiledCompanies(preferences.targetLocations, preferences.targetCompanies);
-  const queries = planSearchQueries({
-    roles: activeLanes.map((lane) => lane.name),
-    country,
-    locations: brief.locations,
-    companies: brief.companies,
-    remotePreference: preferences.remotePreference,
-  });
+  const roleNames = activeLanes.map((lane) => lane.name);
+
+  /*
+   * The primary market gets the full plan. Each additional market gets the top
+   * role only — someone with work rights in three countries should see all
+   * three, without tripling the provider calls for every role and employer.
+   */
+  const queries = [
+    ...planSearchQueries({
+      roles: roleNames,
+      country,
+      locations: brief.locations,
+      companies: brief.companies,
+      remotePreference: preferences.remotePreference,
+      employmentTypes: preferences.employmentTypes,
+    }),
+    ...markets.slice(1).flatMap((market) => planSearchQueries({
+      roles: roleNames.slice(0, 1),
+      country: market,
+      locations: [],
+      companies: [],
+      remotePreference: preferences.remotePreference,
+      employmentTypes: preferences.employmentTypes,
+    })),
+  ];
 
   /*
    * Queries run sequentially with a short gap so a low rate limit is not
@@ -235,6 +265,8 @@ export async function runBriefSearch(
 
   const criteria: SearchCriteria = {
     country,
+    countries: markets,
+    employmentTypes: preferences.employmentTypes,
     countryName: countryLabel,
     countrySource: preferences.country ? "brief" : profile?.country ? "resume" : "default",
     locations: usedLocations,
@@ -247,5 +279,37 @@ export async function runBriefSearch(
     queriesSkipped,
   };
 
+  /*
+   * Kept, so returning to Search Brief is a read. Results used to live in one
+   * browser tab for thirty minutes; closing it meant spending provider calls
+   * again to see the same roles.
+   */
+  const { error: storeError } = await supabase.from("search_results").upsert({
+    user_id: userId,
+    results,
+    criteria,
+    searched_at: new Date().toISOString(),
+  });
+  if (storeError) console.error("Could not store search results", { code: storeError.code });
+
   return { ok: true, results, criteria };
+}
+
+/** The last stored search, or null when this person has never run one. */
+export async function getStoredSearch(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<{ results: ScoredJobMatch[]; criteria: SearchCriteria; searchedAt: string } | null> {
+  const { data } = await supabase
+    .from("search_results")
+    .select("results,criteria,searched_at")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (!data || !Array.isArray(data.results) || !data.results.length) return null;
+  return {
+    results: data.results as ScoredJobMatch[],
+    criteria: data.criteria as SearchCriteria,
+    searchedAt: typeof data.searched_at === "string" ? data.searched_at : new Date().toISOString(),
+  };
 }

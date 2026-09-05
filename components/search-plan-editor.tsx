@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import type { TargetLaneRecord } from "@/lib/types";
 import type { SearchSourcePreference } from "@/lib/data/search";
 import { JOB_MARKETS, cityOptions, countryName } from "@/lib/jobs/countries";
+import { EMPLOYMENT_TYPES } from "@/lib/jobs/employment-types";
 import { KNOWN_EMPLOYERS } from "@/lib/jobs/employers";
 import { ChipCombobox } from "@/components/chip-combobox";
 
@@ -14,11 +15,14 @@ import { DEFAULT_JOB_SOURCES } from "@/lib/config/job-sources";
 export type SearchSource = SearchSourcePreference;
 
 /*
- * The search criteria as four follow-up questions in one card, in the order the
- * engine applies them: country → cities → employers → work model. Each question
- * appears once the one before it is answered. The page's real content — the
- * matching roles — sits directly below, so this card stays short.
+ * The search criteria as follow-up questions in one card, in the order the
+ * engine applies them: countries → cities → employers → type of work → work
+ * model. Each question appears once the one before it is answered. The page's
+ * real content — the matching roles — sits directly below, so this stays short.
  */
+
+const MARKET_NAMES = JOB_MARKETS.map((market) => market.name);
+const CODE_BY_NAME = new Map(JOB_MARKETS.map((market) => [market.name.toLowerCase(), market.code]));
 
 function sameList(a: string[], b: string[]) {
   return a.length === b.length && a.every((item, index) => item === b[index]);
@@ -26,8 +30,9 @@ function sameList(a: string[], b: string[]) {
 
 export function SearchPlanEditor({
   initialSources,
-  initialCountry,
+  initialCountries,
   inferredCountry,
+  initialEmploymentTypes,
   initialLocations,
   initialCompanies,
   initialRemote,
@@ -35,8 +40,11 @@ export function SearchPlanEditor({
   movedCompanies = 0,
 }: {
   initialSources: SearchSource[];
-  initialCountry: string | null;
+  /** Saved markets, primary first. */
+  initialCountries: string[];
+  /** The résumé-inferred market, offered when nothing is saved. */
   inferredCountry: string | null;
+  initialEmploymentTypes: string[];
   initialLocations: string[];
   initialCompanies: string[];
   initialRemote: string;
@@ -46,22 +54,40 @@ export function SearchPlanEditor({
 }) {
   const router = useRouter();
   const [sources] = useState<SearchSource[]>(initialSources.length ? initialSources : DEFAULT_JOB_SOURCES);
-  const [country, setCountry] = useState(initialCountry ?? inferredCountry ?? "");
+
+  const startingCountries = initialCountries.length
+    ? initialCountries
+    : inferredCountry ? [inferredCountry] : [];
+  // The combobox works in names; codes are what gets saved.
+  const [countryNames, setCountryNames] = useState<string[]>(
+    startingCountries.map((code) => countryName(code)).filter((name): name is string => Boolean(name)),
+  );
+  const [employmentTypes, setEmploymentTypes] = useState(initialEmploymentTypes);
   const [locations, setLocations] = useState(initialLocations);
   const [companies, setCompanies] = useState(initialCompanies);
   const [remote, setRemote] = useState(initialRemote);
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
 
-  // A country read from the résumé but never saved still counts as a change, as
-  // do employers moved out of the cities list: both need a save to take effect.
+  const codes = useMemo(
+    () => countryNames.map((name) => CODE_BY_NAME.get(name.toLowerCase())).filter((code): code is string => Boolean(code)),
+    [countryNames],
+  );
+  const primary = codes[0] ?? null;
+  const primaryName = primary ? countryName(primary) : null;
+
+  /*
+   * A country read from the résumé but never saved still counts as a change, as
+   * do employers moved out of the cities list: both need a save to take effect.
+   */
   const hasChanges = useMemo(() => {
-    if (country !== (initialCountry ?? "")) return true;
+    if (!sameList(codes, initialCountries)) return true;
     if (movedCompanies > 0) return true;
     if (remote !== initialRemote) return true;
+    if (!sameList(employmentTypes, initialEmploymentTypes)) return true;
     if (!sameList(locations, initialLocations)) return true;
     if (!sameList(companies, initialCompanies)) return true;
     return false;
-  }, [country, movedCompanies, remote, locations, companies, initialCountry, initialRemote, initialLocations, initialCompanies]);
+  }, [codes, movedCompanies, remote, employmentTypes, locations, companies, initialCountries, initialRemote, initialEmploymentTypes, initialLocations, initialCompanies]);
 
   async function save() {
     if (!hasChanges) return;
@@ -70,7 +96,9 @@ export function SearchPlanEditor({
       method: "PUT",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        country: country || null,
+        country: primary,
+        countries: codes,
+        employmentTypes,
         sources: sources.some((source) => source.active) ? sources : DEFAULT_JOB_SOURCES,
         targetLocations: locations,
         targetCompanies: companies,
@@ -84,8 +112,15 @@ export function SearchPlanEditor({
     }
   }
 
-  const marketName = countryName(country);
-  const cities = useMemo(() => cityOptions(country), [country]);
+  // Cities come from every chosen market, so someone searching two countries
+  // can name a city in either.
+  const cities = useMemo(() => [...new Set(codes.flatMap((code) => cityOptions(code)))], [codes]);
+
+  function toggleEmployment(id: string) {
+    setEmploymentTypes((current) =>
+      current.includes(id) ? current.filter((item) => item !== id) : [...current, id],
+    );
+  }
 
   return (
     <section className="glass-card search-criteria" id="criteria" aria-label="Search criteria">
@@ -96,31 +131,43 @@ export function SearchPlanEditor({
       </div>
 
       <div className="search-criteria-row" id="country">
-        <label htmlFor="criteria-country">
+        <label htmlFor="criteria-countries">
           <strong>Where do you want to work?</strong>
-          <small>{!country ? "Choose the job market. It may not be where you live today." : !initialCountry && inferredCountry === country ? "Read from your résumé — change it if you are targeting elsewhere." : "The job market every search is scoped to."}</small>
+          <small>
+            {!codes.length
+              ? "Choose one or more markets. They may not be where you live today."
+              : codes.length > 1
+                ? `${primaryName} is searched in full; the others are searched for your top role.`
+                : "Add another if you hold work rights in more than one country."}
+          </small>
         </label>
-        <select id="criteria-country" className="search-country-select" value={country} onChange={(event) => { setCountry(event.target.value); setLocations([]); }}>
-          <option value="">Choose a country…</option>
-          {JOB_MARKETS.map((market) => <option key={market.code} value={market.code}>{market.name}</option>)}
-        </select>
+        <ChipCombobox
+          id="criteria-countries"
+          ariaLabel="Countries to search"
+          value={countryNames}
+          onChange={(next) => { setCountryNames(next); setLocations([]); }}
+          options={MARKET_NAMES}
+          placeholder="Australia, Singapore, India…"
+          emptyHint="No country chosen"
+          max={8}
+        />
       </div>
 
-      {country ? (
+      {codes.length ? (
         <>
           <div className="search-criteria-row" id="geography">
             <label htmlFor="criteria-cities">
-              <strong>Which cities in {marketName}?</strong>
-              <small>Start typing to pick. Leave empty for anywhere in {marketName}; a thin city widens to the rest automatically.</small>
+              <strong>Which cities?</strong>
+              <small>Start typing to pick. Leave empty for anywhere in {primaryName}; a thin city widens to the rest automatically.</small>
             </label>
             <ChipCombobox
               id="criteria-cities"
-              ariaLabel={`Cities in ${marketName}`}
+              ariaLabel="Cities to search"
               value={locations}
               onChange={setLocations}
               options={cities}
               placeholder={cities.length ? `${cities.slice(0, 3).join(", ")}…` : "Type a city"}
-              emptyHint={`Anywhere in ${marketName}`}
+              emptyHint={`Anywhere in ${primaryName}`}
             />
           </div>
 
@@ -138,6 +185,26 @@ export function SearchPlanEditor({
               placeholder="PwC, Deloitte, Atlassian…"
               emptyHint="No preference"
             />
+          </div>
+
+          <div className="search-criteria-row" id="employment-type">
+            <label>
+              <strong>What type of work?</strong>
+              <small>Sent to the job boards as a filter. Choose none for any type.</small>
+            </label>
+            <div className="employment-type-options" role="group" aria-label="Type of work">
+              {EMPLOYMENT_TYPES.map((type) => (
+                <button
+                  key={type.id}
+                  type="button"
+                  aria-pressed={employmentTypes.includes(type.id)}
+                  className={employmentTypes.includes(type.id) ? "is-selected" : ""}
+                  onClick={() => toggleEmployment(type.id)}
+                >
+                  {type.id}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="search-criteria-row" id="work-model">

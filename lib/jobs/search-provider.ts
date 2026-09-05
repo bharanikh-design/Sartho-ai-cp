@@ -17,6 +17,8 @@
  * approved evidence before it is shown or saved.
  */
 
+import { adzunaEmploymentParams, employmentQueryHints, jsearchEmploymentTypes } from "@/lib/jobs/employment-types";
+
 export type JobSearchResult = {
   title: string;
   employer: string | null;
@@ -38,6 +40,8 @@ export type JobSearchQuery = {
   employer?: string;
   /** Only remote / work-from-home listings. */
   remoteOnly?: boolean;
+  /** Full-time, Part-time, Contract… applied as a real provider filter. */
+  employmentTypes?: string[];
   limit?: number;
 };
 
@@ -169,6 +173,7 @@ export function buildAdzunaUrl(query: JobSearchQuery, credentials: { appId: stri
   // Adzuna has no remote flag; "remote" as a location term is the documented
   // workaround and matches how listings there are labelled.
   if (query.remoteOnly && !query.location?.trim()) params.set("where", "remote");
+  for (const flag of adzunaEmploymentParams(query.employmentTypes ?? [])) params.set(flag, "1");
   const country = resolveCountry(query);
   return `https://api.adzuna.com/v1/api/jobs/${country}/search/1?${params.toString()}`;
 }
@@ -234,6 +239,8 @@ export function mapJSearchResult(raw: JSearchResult): JobSearchResult | null {
  */
 export function buildJSearchParams(query: JobSearchQuery): URLSearchParams {
   let text = query.keywords.trim();
+  const hints = employmentQueryHints(query.employmentTypes ?? []);
+  if (hints.length) text = `${text} ${hints.join(" ")}`;
   if (query.employer?.trim()) text = `${text} at ${query.employer.trim()}`;
   if (query.location?.trim()) text = `${text} in ${query.location.trim()}`;
   const params = new URLSearchParams({
@@ -243,6 +250,8 @@ export function buildJSearchParams(query: JobSearchQuery): URLSearchParams {
     country: resolveCountry(query),
   });
   if (query.remoteOnly) params.set("work_from_home", "true");
+  const employment = jsearchEmploymentTypes(query.employmentTypes ?? []);
+  if (employment) params.set("employment_types", employment);
   return params;
 }
 

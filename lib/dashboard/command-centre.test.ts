@@ -30,6 +30,8 @@ const readyInput: ProductJourneyInput = {
   activeLaneAllocation: 100,
   searchPreferences: {
     country: "sg",
+    countries: ["sg"],
+    employmentTypes: [],
     targetLocations: ["Singapore"],
     targetCompanies: [],
     remotePreference: "Flexible",

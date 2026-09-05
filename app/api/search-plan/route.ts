@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getAuthenticatedUser } from "@/lib/auth";
 import { normaliseCountryCode } from "@/lib/jobs/countries";
+import { isEmploymentType } from "@/lib/jobs/employment-types";
 
 export const searchPlanSchema = z.object({
   // The job market. Nullable so an older client that never sends it still
@@ -9,6 +10,11 @@ export const searchPlanSchema = z.object({
   country: z.string().trim().min(2).max(2).nullable().optional()
     .transform((value) => (value ? normaliseCountryCode(value) : null)),
   // Cities within the country. May be empty: that means anywhere in the country.
+  // Every market to search. The first is the primary one.
+  countries: z.array(z.string().trim().min(2).max(2)).max(8).optional().default([])
+    .transform((codes) => [...new Set(codes.map(normaliseCountryCode).filter((code): code is string => Boolean(code)))]),
+  employmentTypes: z.array(z.string().trim().min(1).max(40)).max(8).optional().default([])
+    .transform((types) => [...new Set(types.filter(isEmploymentType))]),
   targetLocations: z.array(z.string().trim().min(1).max(120)).max(20),
   targetCompanies: z.array(z.string().trim().min(1).max(120)).max(20).optional().default([]),
   remotePreference: z.enum(["On-site", "Hybrid", "Remote", "Flexible"]),
@@ -33,7 +39,12 @@ export async function PUT(request: Request) {
   if (!parsed.success) return NextResponse.json({ error: "Review the search plan fields." }, { status: 400 });
   const { error } = await supabase.from("search_preferences").upsert({
     user_id: user.id,
-    country: parsed.data.country,
+    // The primary market stays on `country` for everything that reads one.
+    country: parsed.data.countries[0] ?? parsed.data.country,
+    countries: parsed.data.countries.length
+      ? parsed.data.countries
+      : parsed.data.country ? [parsed.data.country] : [],
+    employment_types: parsed.data.employmentTypes,
     target_locations: dedupe(parsed.data.targetLocations),
     target_companies: dedupe(parsed.data.targetCompanies),
     remote_preference: parsed.data.remotePreference,
