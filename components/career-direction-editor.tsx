@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { GroundedDirectionSuggestion } from "@/lib/career/direction-suggestions";
 import type { GroundedRoleRanking, MatchLevel } from "@/lib/career/direction-ranking";
@@ -66,6 +66,32 @@ export function CareerDirectionEditor({
   const [rankError, setRankError] = useState<string | null>(null);
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const manualInputRef = useRef<HTMLInputElement>(null);
+
+  /*
+   * The suggestions sit on a horizontal rail: as many cards as the AI returns,
+   * three or so visible at a time, arrows to move by a page. Six cards in a
+   * grid was already a wall; twelve would have been a scroll of walls.
+   */
+  const railRef = useRef<HTMLDivElement>(null);
+  const [rail, setRail] = useState({ page: 1, pages: 1, canPrev: false, canNext: false });
+  const measureRail = useCallback(() => {
+    const element = railRef.current;
+    if (!element) return;
+    const width = element.clientWidth || 1;
+    const pages = Math.max(1, Math.ceil(element.scrollWidth / width));
+    const page = Math.min(pages, Math.round(element.scrollLeft / width) + 1);
+    setRail({
+      page,
+      pages,
+      canPrev: element.scrollLeft > 4,
+      canNext: element.scrollLeft + width < element.scrollWidth - 4,
+    });
+  }, []);
+  function scrollRail(direction: -1 | 1) {
+    const element = railRef.current;
+    if (!element) return;
+    element.scrollBy({ left: direction * element.clientWidth, behavior: "smooth" });
+  }
 
   function focusManualAdd() {
     manualInputRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -193,6 +219,12 @@ export function CareerDirectionEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [evidenceCount, aiStatus, suggestions.length]);
 
+  useEffect(() => {
+    measureRail();
+    window.addEventListener("resize", measureRail);
+    return () => window.removeEventListener("resize", measureRail);
+  }, [measureRail, visibleSuggestions.length, aiStatus]);
+
   async function save() {
     // Guidance sharpens matching but never blocks: the priorities are the
     // point of this screen, so saving them always goes through.
@@ -253,6 +285,11 @@ export function CareerDirectionEditor({
       </div>
 
       <section className="direction-ai-advisor" id="suggestions">
+        {/*
+          Header → rail of cards → steer. The header only names the section and
+          holds the rail arrows; the "not quite right?" control sits *after* the
+          cards, at the moment a person has seen them and knows what to change.
+        */}
         <div className="direction-ai-intro is-compact">
           <div className="direction-ai-intro-row">
             <div>
@@ -261,40 +298,29 @@ export function CareerDirectionEditor({
                 <span className="direction-ai-label">Path A · Sartho AI career strategist</span>
               </div>
               <h2>Roles your résumé points to</h2>
-              <p>Nothing joins your priorities until you choose it. Dismiss what doesn&apos;t fit; open “Why AI suggested this” to see the evidence.</p>
+              <p>
+                {evidenceCount > 0
+                  ? `Grounded in ${evidenceCount} approved career facts across ${roleCount} roles. Nothing joins your priorities until you choose it.`
+                  : "Upload your résumé first so every suggestion has evidence behind it."}
+              </p>
             </div>
-            <div className="direction-ai-grounding">
-              <span><strong>{evidenceCount}</strong> career facts</span>
-              <span><strong>{roleCount}</strong> roles read</span>
-            </div>
+            {visibleSuggestions.length > 0 && aiStatus !== "loading" ? (
+              <div className="direction-rail-nav" aria-label="Browse suggestions">
+                <span className="direction-rail-count" aria-live="polite">{rail.page} of {rail.pages}</span>
+                <button type="button" onClick={() => scrollRail(-1)} disabled={!rail.canPrev} aria-label="Previous suggestions">‹</button>
+                <button type="button" onClick={() => scrollRail(1)} disabled={!rail.canNext} aria-label="Next suggestions">›</button>
+              </div>
+            ) : null}
           </div>
-          {evidenceCount > 0 ? (
-            <div className="direction-ai-toolbar">
-              <label htmlFor="direction-goal" className="direction-ai-toolbar-label">Steer the AI <em>optional</em></label>
-              <input
-                id="direction-goal"
-                value={aiPrompt}
-                onChange={(event) => setAiPrompt(event.target.value)}
-                onKeyDown={(event) => event.key === "Enter" && (event.preventDefault(), void generateSuggestions())}
-                placeholder="e.g. less travel, regional leadership, more transformation ownership"
-              />
-              <button type="button" className="direction-rank-button" onClick={() => void generateSuggestions()} disabled={aiStatus === "loading"}>
-                <span aria-hidden="true">{aiPrompt.trim() ? "✦" : "↻"}</span>
-                {aiStatus === "loading" ? "Re-analysing…" : aiPrompt.trim() ? "Refine suggestions" : "Refresh suggestions"}
-              </button>
-            </div>
-          ) : (
-            <div className="direction-ai-message">Upload your résumé first so every suggestion has evidence behind it.</div>
-          )}
           {aiError ? <div className="direction-ai-message is-error" role="alert">{aiError}</div> : null}
         </div>
 
         {aiStatus === "loading" ? (
-          <div className="direction-suggestion-grid" aria-label="Generating career suggestions">
-            {[1, 2, 3].map((item) => <div key={item} className="direction-suggestion-skeleton" />)}
+          <div className="direction-suggestion-rail" aria-label="Generating career suggestions">
+            {[1, 2, 3].map((item) => <div key={item} className="direction-suggestion-card direction-suggestion-skeleton" />)}
           </div>
         ) : visibleSuggestions.length ? (
-          <div className="direction-suggestion-grid" aria-live="polite">
+          <div className="direction-suggestion-rail" ref={railRef} onScroll={measureRail} tabIndex={0} aria-live="polite">
             {visibleSuggestions.map((suggestion) => {
               const added = lanes.some((lane) => lane.name.toLocaleLowerCase() === suggestion.name.toLocaleLowerCase());
               return (
@@ -317,16 +343,35 @@ export function CareerDirectionEditor({
             })}
           </div>
         ) : evidenceCount > 0 ? (
-          <div className="direction-ai-message">
+          <div className="direction-ai-message" style={{ margin: "0 26px 22px" }}>
             <p style={{ margin: "0 0 12px" }}>
               {aiStatus === "error"
                 ? "AI couldn’t generate roles just now."
                 : aiStatus === "ready"
-                  ? "No new roles to suggest right now — steer the AI above, or add your own role in Path B."
+                  ? "No new roles to suggest right now — steer the AI below, or add your own role in Path B."
                   : "See the roles your résumé points to."}
             </p>
             <button type="button" className="direction-rank-button" onClick={() => void generateSuggestions()}>
               <span aria-hidden="true">✦</span> {aiStatus === "error" ? "Try again" : "Generate roles from my résumé"}
+            </button>
+          </div>
+        ) : null}
+
+        {evidenceCount > 0 ? (
+          <div className="direction-ai-steer">
+            <label htmlFor="direction-goal" className="direction-ai-steer-label">
+              Not quite right? <em>Tell the AI what to change (optional)</em>
+            </label>
+            <input
+              id="direction-goal"
+              value={aiPrompt}
+              onChange={(event) => setAiPrompt(event.target.value)}
+              onKeyDown={(event) => event.key === "Enter" && (event.preventDefault(), void generateSuggestions())}
+              placeholder="e.g. less travel, regional leadership, more transformation ownership"
+            />
+            <button type="button" className="direction-rank-button" onClick={() => void generateSuggestions()} disabled={aiStatus === "loading"}>
+              <span aria-hidden="true">{aiPrompt.trim() ? "✦" : "↻"}</span>
+              {aiStatus === "loading" ? "Re-analysing…" : aiPrompt.trim() ? "Refine suggestions" : "Refresh suggestions"}
             </button>
           </div>
         ) : null}
