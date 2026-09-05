@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   getMobileNavigation,
+  getNavigationWithGate,
   getNavigationForPath,
   getPageLabel,
   getPrimaryNavigation,
@@ -34,7 +35,6 @@ describe("primary navigation", () => {
   it("shows one flat process-order menu, the same before and after activation", () => {
     const flow = [
       "Dashboard",
-      "Upload Résumé",
       "Career Direction",
       "Search Brief",
       "Applications",
@@ -50,12 +50,27 @@ describe("primary navigation", () => {
     // Applications is a primary item now, so opening it needs no appended tab.
     expect(getNavigationForPath(false, "/applications").map((item) => item.label)).toEqual([
       "Dashboard",
-      "Upload Résumé",
       "Career Direction",
       "Search Brief",
       "Applications",
       "Résumé Studio",
       "Email Alerts",
     ]);
+  });
+});
+
+describe("résumé gate", () => {
+  it("locks every destination except the Dashboard until a résumé exists", () => {
+    const locked = getNavigationWithGate(false, false);
+    expect(locked.find((item) => item.href === "/")?.lockedReason).toBeUndefined();
+    expect(locked.filter((item) => item.href !== "/").every((item) => item.lockedReason)).toBe(true);
+  });
+
+  it("unlocks everything once a résumé is in", () => {
+    expect(getNavigationWithGate(false, true).some((item) => item.lockedReason)).toBe(false);
+  });
+
+  it("no longer carries Upload Résumé as a destination — it is the Dashboard", () => {
+    expect(getNavigationWithGate(true, true).map((item) => item.href)).not.toContain("/career-truth");
   });
 });

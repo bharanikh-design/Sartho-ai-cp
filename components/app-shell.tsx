@@ -24,6 +24,7 @@ type JourneyStatus = {
   progress: number;
   currentHref: string;
   currentLabel: string;
+  hasResume: boolean;
 };
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -46,7 +47,11 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [journeyStatus, setJourneyStatus] = useState<JourneyStatus | null>(null);
   const currentPage = getPageLabel(pathname);
   const activated = journeyStatus?.activated ?? false;
-  const navigation = getNavigationForPath(activated, pathname);
+  // Until the journey status arrives, assume a résumé exists: flashing a locked
+  // menu at someone who has one would be worse than a moment of optimism.
+  const hasResume = journeyStatus?.hasResume ?? true;
+  const navigation = getNavigationForPath(activated, pathname)
+    .map((item) => (hasResume || item.href === "/" ? item : { ...item, lockedReason: "Upload your résumé first" }));
   const mobileNavigation = getMobileNavigation(activated);
 
   useEffect(() => {
@@ -391,6 +396,20 @@ export function AppShell({ children }: { children: ReactNode }) {
 }
 
 function NavItem({ item, active }: { item: NavigationItem; active: boolean }) {
+  /*
+   * A locked item is shown, not hidden: someone new should see where they are
+   * going. It says why it is unavailable rather than simply not responding.
+   */
+  if (item.lockedReason) {
+    return (
+      <span className="rail-link is-locked" title={item.lockedReason} aria-disabled="true">
+        <span className="rail-link-icon"><Icon name={item.icon} /></span>
+        <span>{item.label}</span>
+        <span className="rail-lock" aria-label={item.lockedReason}>🔒</span>
+      </span>
+    );
+  }
+
   return (
     <Link
       href={item.href}

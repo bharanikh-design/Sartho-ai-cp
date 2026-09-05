@@ -21,6 +21,13 @@ export function ApplicationLedger({ initialJobs }: { initialJobs: JobRecord[] })
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [undo, setUndo] = useState<{ id: string; previous: JobStatus; label: string } | null>(null);
+  /* Set by clicking a pipeline tile; clicking the same tile again clears it. */
+  const [filter, setFilter] = useState<JobStatus | null>(null);
+
+  const visibleJobs = useMemo(
+    () => (filter ? jobs.filter((job) => job.status === filter) : jobs),
+    [jobs, filter],
+  );
 
   const counts = useMemo(() => {
     const result = new Map<JobStatus, number>();
@@ -90,30 +97,44 @@ export function ApplicationLedger({ initialJobs }: { initialJobs: JobRecord[] })
         </div>
 
         <div className="pipeline-grid live-pipeline-grid">
+          {/* Each tile is a filter on the list below — a count you cannot act
+              on is only decoration. */}
           {statusOrder.map((status) => (
-            <article key={status.id} className={`pipeline-stage${counts.get(status.id) ? " has-items" : ""}`}>
+            <Link
+              href={`#applications-${status.id}`}
+              key={status.id}
+              className={`pipeline-stage${counts.get(status.id) ? " has-items" : ""}${filter === status.id ? " is-filtered" : ""}`}
+              onClick={() => setFilter((current) => (current === status.id ? null : status.id))}
+              aria-pressed={filter === status.id}
+            >
               <span>{status.label}</span>
               <strong>{counts.get(status.id) ?? 0}</strong>
               <p className="section-subtitle">{status.description}</p>
-            </article>
+            </Link>
           ))}
         </div>
       </section>
 
-      <section className="glass-card content-card application-list-card">
+      <section className="glass-card content-card application-list-card" id="applications-list">
         <div className="card-header">
           <div>
             <h2 className="section-heading">Your applications</h2>
-            <p className="section-subtitle">Move each role forward as the outcome changes.</p>
+            <p className="section-subtitle">
+              {filter
+                ? `Showing ${statusOrder.find((status) => status.id === filter)?.label ?? filter} only.`
+                : "Move each role forward as the outcome changes."}
+            </p>
           </div>
-          <Link href="#add-role" className="secondary-button">Analyse another role</Link>
+          {filter
+            ? <button type="button" className="secondary-button" onClick={() => setFilter(null)}>Show all</button>
+            : <Link href="#add-role" className="secondary-button">Analyse another role</Link>}
         </div>
 
         {error ? <div className="inline-error" role="alert">{error}</div> : null}
 
-        {jobs.length ? (
+        {visibleJobs.length ? (
           <div className="application-list">
-            {jobs.map((job) => (
+            {visibleJobs.map((job) => (
               <article className="application-row" key={job.id}>
                 <Link href={`/jobs/${job.id}`} className="application-main-link">
                   <span>{job.employer ?? "Employer not recorded"}</span>
@@ -135,6 +156,10 @@ export function ApplicationLedger({ initialJobs }: { initialJobs: JobRecord[] })
                 <Link href={`/jobs/${job.id}`} className="application-open" aria-label={`Open ${job.title}`}>→</Link>
               </article>
             ))}
+          </div>
+        ) : filter ? (
+          <div className="empty-inline-state">
+            Nothing at this stage yet. <button type="button" className="direction-inline-link" onClick={() => setFilter(null)}>Show all applications</button>
           </div>
         ) : (
           <div className="empty-inline-state">

@@ -15,6 +15,8 @@ export type NavigationItem = {
   href: string;
   icon: NavigationIconName;
   purpose: string;
+  /** Why this is unavailable, when it is. Shown rather than silently disabled. */
+  lockedReason?: string;
 };
 
 const journeyNavigation: NavigationItem = {
@@ -105,13 +107,29 @@ const resumeNavigation: NavigationItem = {
 export function getPrimaryNavigation(_activated: boolean): NavigationItem[] {
   return [
     dashboardNavigation,
-    profileNavigation,
     directionNavigation,
     strategyNavigation,
     applicationNavigation,
     resumeNavigation,
     notificationsNavigation,
   ];
+}
+
+/*
+ * Everything Sartho does is grounded in approved evidence, so with no résumé
+ * uploaded every other page is an empty room. They stay visible — a menu that
+ * vanishes reads as a broken app — but locked, each saying why.
+ *
+ * Upload itself is no longer a menu item: it is the Dashboard until it is done.
+ */
+export function getNavigationWithGate(activated: boolean, hasResume: boolean): NavigationItem[] {
+  const navigation = getPrimaryNavigation(activated);
+  if (hasResume) return navigation;
+  return navigation.map((item) =>
+    item.href === "/"
+      ? item
+      : { ...item, lockedReason: "Upload your résumé first" },
+  );
 }
 
 export const allNavigation: NavigationItem[] = [

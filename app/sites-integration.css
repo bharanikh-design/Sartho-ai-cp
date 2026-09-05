@@ -78,6 +78,30 @@
 :root[data-theme="light"] .privacy-card strong { color: #6bcf93; }
 :root[data-theme="light"] .privacy-card p { color: #66736e; }
 :root[data-theme="light"] .rail-footer { color: #7e8985; }
+:root[data-theme="light"] .resume-workflow-action { background: #f8faf9; }
+.rail-link.is-locked { opacity: .45; cursor: not-allowed; }
+.rail-link.is-locked:hover { background: transparent; }
+.rail-lock { margin-left: auto; font-size: 11px; }
+.profile-scorecard { padding: 24px 26px; }
+.scorecard-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 28px; }
+.scorecard-head h2 { margin: 8px 0 0; font-family: var(--font-sans); font-size: clamp(22px, 2.4vw, 28px); font-weight: 600; letter-spacing: -.02em; }
+.scorecard-detail { max-width: 640px; margin: 8px 0 0; color: var(--text-secondary); font-size: var(--text-sm); line-height: 1.6; }
+.scorecard-dial { flex: none; min-width: 118px; padding: 12px 16px; border: 1px solid var(--line); border-radius: 14px; text-align: right; }
+.scorecard-dial strong { display: block; color: #6bcf93; font-family: var(--font-sans); font-size: 30px; font-weight: 650; }
+.scorecard-dial span { display: block; margin-top: 3px; color: var(--text-tertiary); font-size: var(--text-2xs); }
+.scorecard-steps { display: grid; gap: 8px; margin: 20px 0 0; padding: 0; list-style: none; }
+.scorecard-steps li { display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 10px; align-items: start; padding: 11px 12px; border: 1px solid var(--line); border-radius: 11px; background: rgba(255,255,255,.02); }
+.scorecard-steps li > span { display: grid; width: 24px; height: 24px; place-items: center; border-radius: 50%; background: rgba(255,255,255,.06); font-size: var(--text-2xs); }
+.scorecard-steps li.is-complete > span { color: white; background: #2f8b69; }
+.scorecard-steps li.is-next { border-color: #6bcf93; background: rgba(107,207,147,.06); }
+.scorecard-steps strong { display: block; color: var(--text); font-size: var(--text-sm); }
+.scorecard-steps small { display: block; margin-top: 3px; color: var(--text-secondary); font-size: var(--text-2xs); line-height: 1.5; }
+.scorecard-action { display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); }
+.scorecard-action p { margin: 0; max-width: 560px; color: var(--text-secondary); font-size: var(--text-2xs); line-height: 1.55; }
+@media (max-width: 720px) { .scorecard-head { flex-direction: column; } .scorecard-dial { text-align: left; } }
+.pipeline-stage { color: inherit; text-decoration: none; cursor: pointer; transition: border-color .15s ease, transform .15s ease; }
+.pipeline-stage:hover { border-color: #79a58f; transform: translateY(-1px); }
+.pipeline-stage.is-filtered { border-color: #6bcf93; box-shadow: 0 0 0 2px rgba(107,207,147,.2); }
 
 :root[data-theme="light"] .app-stage { gap: 0; }
 :root[data-theme="light"] .top-bar {
