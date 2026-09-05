@@ -42,6 +42,8 @@ export type JobSearchQuery = {
   remoteOnly?: boolean;
   /** Full-time, Part-time, Contract… applied as a real provider filter. */
   employmentTypes?: string[];
+  /** This query chases internships and graduate programmes; skip conflicting flags. */
+  earlyCareerOnly?: boolean;
   limit?: number;
 };
 
@@ -168,12 +170,30 @@ export function buildAdzunaUrl(query: JobSearchQuery, credentials: { appId: stri
     results_per_page: String(Math.min(Math.max(query.limit ?? 20, 1), 50)),
     "content-type": "application/json",
   });
+  /*
+   * Hints only on the pass that asks for them. Folding "internship graduate
+   * program" into every query would poison the ordinary full-time searches,
+   * which is the opposite of the problem being fixed.
+   */
+  if (query.earlyCareerOnly) {
+    const hints = employmentQueryHints(query.employmentTypes ?? [], "adzuna");
+    if (hints.length) params.set("what", `${query.keywords} ${hints.join(" ")}`.trim());
+  }
   if (query.location?.trim()) params.set("where", query.location.trim());
   if (query.employer?.trim()) params.set("company", query.employer.trim());
   // Adzuna has no remote flag; "remote" as a location term is the documented
   // workaround and matches how listings there are labelled.
   if (query.remoteOnly && !query.location?.trim()) params.set("where", "remote");
-  for (const flag of adzunaEmploymentParams(query.employmentTypes ?? [])) params.set(flag, "1");
+  /*
+   * Adzuna ANDs its flags, so full_time=1 and permanent=1 exclude the
+   * internships and graduate programmes selected alongside them. When the
+   * caller marks a query as the early-career pass, the conflicting flags are
+   * left off and the words carry it instead — otherwise the two selections
+   * cancel each other out and the search returns neither.
+   */
+  if (!query.earlyCareerOnly) {
+    for (const flag of adzunaEmploymentParams(query.employmentTypes ?? [])) params.set(flag, "1");
+  }
   const country = resolveCountry(query);
   return `https://api.adzuna.com/v1/api/jobs/${country}/search/1?${params.toString()}`;
 }
@@ -239,7 +259,7 @@ export function mapJSearchResult(raw: JSearchResult): JobSearchResult | null {
  */
 export function buildJSearchParams(query: JobSearchQuery): URLSearchParams {
   let text = query.keywords.trim();
-  const hints = employmentQueryHints(query.employmentTypes ?? []);
+  const hints = employmentQueryHints(query.employmentTypes ?? [], "jsearch");
   if (hints.length) text = `${text} ${hints.join(" ")}`;
   if (query.employer?.trim()) text = `${text} at ${query.employer.trim()}`;
   if (query.location?.trim()) text = `${text} in ${query.location.trim()}`;

@@ -252,7 +252,23 @@ export function JobSearchPanel({
           {criteria.broadened ? <> (few strong matches there, so the rest of {criteria.countryName} was searched too)</> : null}
           {criteria.remoteOnly ? <> · remote only</> : null}
           <> · roles: {criteria.roles.join(", ")}</>
-          {criteria.companies.length ? <> · companies: {criteria.companies.join(", ")}</> : null}
+          {criteria.companies.length ? (
+            <> · companies: {criteria.companies.join(", ")}
+              {/* Said out loud when the cap bites, rather than implying the list was the whole list. */}
+              {criteria.companiesRequested > criteria.companies.length
+                ? <> ({criteria.companies.length} of {criteria.companiesRequested} searched)</>
+                : null}
+            </>
+          ) : null}
+          {criteria.employmentTypes.length ? <> · filtered to {criteria.employmentTypes.join(", ")}</> : null}
+          {/*
+            * A hint is a word in the query, not a filter. Internship and
+            * Graduate programme have no Adzuna filter at all, and used to be
+            * dropped in silence while the brief implied they had been applied.
+            */}
+          {criteria.employmentHinted.length
+            ? <> · {criteria.employmentHinted.join(" and ")} searched by keyword only — no provider filters for {criteria.employmentHinted.length === 1 ? "it" : "them"}</>
+            : null}
           {criteria.providers.length ? <> · via {criteria.providers.join(" + ")}</> : null}
           {criteria.countrySource === "default" ? <> · <Link href="#country">choose your country</Link> to search the right market</> : null}
           {criteria.tooSenior ? <> · {criteria.tooSenior} hidden as too senior for your experience</> : null}

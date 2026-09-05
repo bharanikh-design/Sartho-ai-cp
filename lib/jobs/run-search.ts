@@ -3,6 +3,7 @@ import { getCareerWorkspace } from "@/lib/data/career";
 import { getSearchPreferences } from "@/lib/data/search";
 import { countryName, normaliseCountryCode } from "@/lib/jobs/countries";
 import { splitMisfiledCompanies } from "@/lib/jobs/employers";
+import { filterableSelections } from "@/lib/jobs/employment-types";
 import { familyFit, reachFrom } from "@/lib/matching/job-family";
 import { scoreOpportunity } from "@/lib/matching/opportunity-score";
 import { candidateSeniority } from "@/lib/matching/title-fit";
@@ -75,8 +76,12 @@ export type SearchCriteria = {
   country: string;
   /** Every market searched. */
   countries: string[];
-  /** Employment types applied as a provider filter. */
+  /** Employment types applied as a real provider filter. */
   employmentTypes: string[];
+  /** Selections carried only as words in the query, because no filter exists. */
+  employmentHinted: string[];
+  /** Employers actually queried, and how many were asked for. */
+  companiesRequested: number;
   /** The level the person is at, and how many roles were dropped as too senior. */
   candidateLevel: number;
   tooSenior: number;
@@ -323,7 +328,19 @@ export async function runBriefSearch(
   const criteria: SearchCriteria = {
     country,
     countries: markets,
-    employmentTypes: preferences.employmentTypes,
+    /*
+     * Split, because they are not the same promise. A filter narrows at the
+     * provider; a hint is a word in the query and may be ignored. Reporting
+     * both as "employment types" is how two of four selections looked applied
+     * while doing nothing at all.
+     */
+    employmentTypes: preferences.employmentTypes.filter(
+      (type) => providers.some((provider) => filterableSelections([type], provider).length),
+    ),
+    employmentHinted: preferences.employmentTypes.filter(
+      (type) => !providers.some((provider) => filterableSelections([type], provider).length),
+    ),
+    companiesRequested: brief.companies.length,
     candidateLevel: level,
     tooSenior,
     offFamily,

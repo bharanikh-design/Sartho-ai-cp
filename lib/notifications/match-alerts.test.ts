@@ -29,6 +29,8 @@ const criteria: SearchCriteria = {
   country: "au",
   countries: ["au"],
   employmentTypes: [],
+  employmentHinted: [],
+  companiesRequested: 0,
   candidateLevel: 2,
   tooSenior: 0,
   offFamily: 0,

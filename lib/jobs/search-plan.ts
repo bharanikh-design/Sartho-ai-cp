@@ -1,4 +1,5 @@
 import type { JobSearchQuery } from "@/lib/jobs/search-provider";
+import { earlyCareerSelections } from "@/lib/jobs/employment-types";
 import { marketTitleIn } from "@/lib/matching/job-family";
 
 /*
@@ -43,7 +44,23 @@ export function toSearchKeywords(role: string): string {
  */
 export const MAX_ROLE_QUERIES = 3;
 export const MAX_LOCATION_QUERIES = 2;
-export const MAX_COMPANY_QUERIES = 4;
+
+/*
+ * Every employer a person lists gets searched — the cap used to be four, so
+ * nine selected employers meant five were silently never queried, and the brief
+ * said "companies: PwC, KPMG, Deloitte, EY" as though that were the whole list.
+ * A ceiling still exists so one person cannot spend the entire time budget on
+ * employer queries alone, but it is far above any realistic shortlist.
+ */
+export const MAX_COMPANY_QUERIES = 12;
+
+/*
+ * Employers are searched against the top two roles rather than only the first.
+ * "Deloitte" alone is not what somebody means when they list an employer beside
+ * three target roles; the second role roughly doubles useful employer coverage
+ * for one extra query each, which the budget absorbs.
+ */
+export const COMPANY_ROLE_DEPTH = 2;
 
 export function planSearchQueries(input: {
   roles: string[];
@@ -75,8 +92,32 @@ export function planSearchQueries(input: {
     queries.push({ keywords, country: input.country, location: primaryLocation, remoteOnly, employmentTypes, limit: 20 });
   }
   for (const employer of input.companies.slice(0, MAX_COMPANY_QUERIES)) {
-    queries.push({ keywords: topRole, country: input.country, employer, remoteOnly, employmentTypes, limit: 10 });
+    for (const keywords of roles.slice(0, COMPANY_ROLE_DEPTH)) {
+      queries.push({ keywords, country: input.country, employer, remoteOnly, employmentTypes, limit: 10 });
+    }
   }
+
+  /*
+   * Internship and graduate programme get their own pass. Neither has an Adzuna
+   * filter, and the full-time and permanent flags selected alongside them would
+   * exclude exactly what they are looking for, so this pass drops those flags
+   * and carries the words in the query text instead.
+   */
+  const earlyCareer = earlyCareerSelections(input.employmentTypes ?? []);
+  if (earlyCareer.length) {
+    for (const keywords of roles.slice(0, COMPANY_ROLE_DEPTH)) {
+      queries.push({
+        keywords,
+        country: input.country,
+        location: primaryLocation,
+        remoteOnly,
+        employmentTypes,
+        earlyCareerOnly: true,
+        limit: 20,
+      });
+    }
+  }
+
   return queries;
 }
 
