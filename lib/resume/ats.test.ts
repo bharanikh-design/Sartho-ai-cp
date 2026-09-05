@@ -174,3 +174,30 @@ describe("strength coverage, scaled by how much there was to use", () => {
     expect(full.checks[0].state).toBe("pass");
   });
 });
+
+/*
+ * Sartho's own drafts use "•", but the workbench takes a résumé somebody
+ * already has, and those arrive with hyphens and asterisks. Recognising only
+ * the marker Sartho emits meant a pasted CV looked like prose with no bullets
+ * to improve at all.
+ */
+describe("bullet markers as people actually write them", () => {
+  it("reads hyphen and asterisk bullets, not only Sartho's own", () => {
+    expect(bulletsIn([
+      "EXPERIENCE",
+      "- Delivered an implementation roadmap.",
+      "* Designed a phased rollout strategy.",
+      "• Presented to a judging panel.",
+      "  – Ran the workshop series.",
+    ].join("\n"))).toEqual([
+      "Delivered an implementation roadmap.",
+      "Designed a phased rollout strategy.",
+      "Presented to a judging panel.",
+      "Ran the workshop series.",
+    ]);
+  });
+
+  it("does not mistake a sentence containing a dash for a bullet", () => {
+    expect(bulletsIn("Analysed data — and reported on it.")).toEqual([]);
+  });
+});

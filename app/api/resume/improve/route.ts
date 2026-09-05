@@ -6,19 +6,14 @@ import { getAuthenticatedUser } from "@/lib/auth";
 import { BULLET_REWRITE_RULES, inventedNumbersIn } from "@/lib/resume/bullet-rewrite";
 
 /*
- * Rewrite one résumé bullet around a fact the person supplied.
+ * Rewrite one bullet of a résumé that is not aimed at any particular role.
  *
- * This is the honest version of what every résumé tool sells. Teal and Zety
- * will happily turn "Analysed a retail dataset" into "Analysed a 2M-row retail
- * dataset, driving a 15% margin improvement" — numbers nobody gave them. The
- * result passes the filter and then falls apart in the interview, which is
- * worse for the candidate than the weak bullet was.
- *
- * So the loop here has a human in it, and the model is given exactly one job:
- * take the bullet, take the figure the person typed, and write the sentence
- * they would have written if they had thought to include it. It is a rewrite,
- * not a generation. Everything it may say has to come from one of those two
- * inputs.
+ * The same loop the job-specific route runs, for the workbench: somebody
+ * improving a résumé they already have, before deciding to make it their
+ * master. There is no advert to aim at, so the model gets the bullet and the
+ * fact and nothing else — which if anything makes the no-invention rule easier
+ * to hold. Both routes share BULLET_REWRITE_RULES and the same guard, so they
+ * cannot drift apart on what they will and will not say.
  */
 
 export const runtime = "nodejs";
@@ -45,33 +40,14 @@ const jsonSchema = {
   },
 };
 
-export async function POST(
-  request: Request,
-  context: { params: Promise<{ id: string }> },
-) {
+export async function POST(request: Request) {
   const { supabase, user } = await getAuthenticatedUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const { id } = await context.params;
-  if (!z.string().uuid().safeParse(id).success) {
-    return NextResponse.json({ error: "Opportunity not found." }, { status: 404 });
-  }
 
   const input = inputSchema.safeParse(await request.json().catch(() => null));
   if (!input.success) {
     return NextResponse.json({ error: "Tell Sartho what the figure was, in a few words." }, { status: 400 });
   }
-
-  const { data: job, error } = await supabase
-    .from("jobs")
-    .select("id,title")
-    .eq("id", id)
-    .eq("user_id", user.id)
-    .maybeSingle();
-  if (error) {
-    console.error("Unable to load the role for a bullet rewrite", error);
-    return NextResponse.json({ error: "Sartho could not read this role." }, { status: 500 });
-  }
-  if (!job) return NextResponse.json({ error: "Job not found" }, { status: 404 });
 
   const quota = await checkAiQuota(supabase, "resume_bullet");
   if (!quota.allowed) return aiQuotaResponse(quota);
@@ -84,7 +60,6 @@ export async function POST(
       schema: jsonSchema,
       system: BULLET_REWRITE_RULES,
       prompt: JSON.stringify({
-        roleTitle: job.title,
         bullet: input.data.bullet,
         factFromCandidate: input.data.fact,
       }),

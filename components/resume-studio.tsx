@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { scoreAts } from "@/lib/resume/ats";
+import { ResumeWorkbench } from "@/components/resume-workbench";
 import type { ApplicationRecord, ResumeChange, ResumeVersionRecord, RuleAnalysis } from "@/lib/types";
 
 /*
@@ -458,6 +459,24 @@ export function ResumeStudio({
             No résumés yet. Build one from an analysed role below.
           </div>
         )}
+      </section>
+
+      {/*
+        * Two ways to get a résumé, and they answer different questions.
+        * "Build a new one" tailors to a role you are applying for; this takes
+        * the CV you already have and makes it better. Neither invents.
+        */}
+      <section className="glass-card content-card" id="improve">
+        <div className="card-header">
+          <div>
+            <h2 className="section-heading">Improve a résumé you already have</h2>
+            <p className="section-subtitle">
+              Paste it or read it in from a file. Sartho scores it, names the lines carrying no measurable
+              result, and rewrites those around a figure you supply — it will not invent one.
+            </p>
+          </div>
+        </div>
+        <ResumeWorkbench />
       </section>
 
       <section className="glass-card content-card" id="create">

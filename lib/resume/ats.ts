@@ -95,13 +95,23 @@ function normalise(value: string) {
   return ` ${value.toLowerCase().replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim()} `;
 }
 
-/** The bullet lines of a generated draft, in order. */
+/*
+ * A bullet marker as people actually write them.
+ *
+ * Sartho's own drafts use "•", but the workbench takes a résumé somebody
+ * already has, and those come with hyphens and asterisks. Recognising only the
+ * one Sartho emits meant a pasted CV appeared to have no bullets at all —
+ * scored as prose, with nothing to offer improving.
+ */
+export const BULLET_MARKER = /^[•\u2022\u2023\u25E6\u2043\u2219*\u00B7\u2013\u2014-]\s+/;
+
+/** The bullet lines of a résumé, in order. */
 export function bulletsIn(draft: string): string[] {
   return draft
     .split("\n")
     .map((line) => line.trim())
-    .filter((line) => line.startsWith("•"))
-    .map((line) => line.replace(/^•\s*/, "").trim())
+    .filter((line) => BULLET_MARKER.test(line))
+    .map((line) => line.replace(BULLET_MARKER, "").trim())
     .filter(Boolean);
 }
 
