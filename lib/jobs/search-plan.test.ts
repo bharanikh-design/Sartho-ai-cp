@@ -48,10 +48,40 @@ describe("planSearchQueries", () => {
     ]);
   });
 
-  it("adds a targeted query per company (capped) for the top role, country-wide", () => {
+  /*
+   * This used to assert a cap of four employers against the top role only. Nine
+   * selected employers meant five were never queried, and the criteria line
+   * still read "companies: PwC, KPMG, Deloitte, EY" as if that were the list.
+   */
+  it("searches every employer, against the top two roles, country-wide", () => {
     const companyQueries = planSearchQueries(brief).filter((query) => query.employer);
-    expect(companyQueries.map((query) => query.employer)).toEqual(["PwC", "Deloitte", "KPMG", "Accenture"]);
-    expect(companyQueries.every((query) => query.keywords === "Business Analyst" && query.location === undefined)).toBe(true);
+    expect([...new Set(companyQueries.map((query) => query.employer))])
+      .toEqual(["PwC", "Deloitte", "KPMG", "Accenture", "BCG"]);
+    expect([...new Set(companyQueries.map((query) => query.keywords))])
+      .toEqual(["Business Analyst", "Data Analyst"]);
+    expect(companyQueries.every((query) => query.location === undefined)).toBe(true);
+  });
+
+  /*
+   * Adzuna ANDs full_time and permanent, which excludes exactly the internships
+   * and graduate programmes selected beside them. Those get their own pass with
+   * the conflicting flags dropped.
+   */
+  it("adds an early-career pass when internships or graduate roles are wanted", () => {
+    const withEarly = planSearchQueries({
+      ...brief,
+      companies: [],
+      employmentTypes: ["Full-time", "Permanent", "Internship", "Graduate programme"],
+    });
+    const early = withEarly.filter((query) => query.earlyCareerOnly);
+    expect(early.map((query) => query.keywords)).toEqual(["Business Analyst", "Data Analyst"]);
+
+    const withoutEarly = planSearchQueries({
+      ...brief,
+      companies: [],
+      employmentTypes: ["Full-time", "Permanent"],
+    });
+    expect(withoutEarly.some((query) => query.earlyCareerOnly)).toBe(false);
   });
 
   it("searches the whole country when no city is set", () => {

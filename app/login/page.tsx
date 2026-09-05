@@ -605,10 +605,10 @@ function friendlyAuthMessage(message: string) {
   return message;
 }
 
-import { constructMetadata } from "@/lib/seo";
-
-export const metadata = constructMetadata("Sign In", "Sign in to your Sartho account to access your AI career copilot.", "/login");
-
+/*
+ * The page's metadata lives in ./layout.tsx. Next disallows a `metadata` export
+ * from a "use client" component, and exporting it here failed the build.
+ */
 export default function LoginPage() {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);

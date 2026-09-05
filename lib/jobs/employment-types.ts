@@ -16,20 +16,54 @@ export type EmploymentType = {
   /** JSearch's employment_types value, when it has one. */
   jsearchValue?: "FULLTIME" | "PARTTIME" | "CONTRACTOR" | "INTERN";
   /**
-   * Words added to the query when neither provider can filter for it. A hint
-   * is weaker than a filter, and the UI says so rather than implying parity.
+   * Words folded into the query text when THIS provider cannot filter for it.
+   *
+   * It used to be "when neither provider can filter for it", which quietly
+   * threw selections away. Internship has a JSearch filter, so it was excluded
+   * from the hints — and on an Adzuna-only search, which is what actually runs,
+   * Adzuna has no internship parameter and never saw the word either. Same for
+   * Permanent in reverse: an Adzuna flag, nothing at all on JSearch. Two of a
+   * person's four selections did nothing, and the brief said they had.
+   *
+   * A hint is weaker than a filter, and the UI says which one each got.
    */
-  queryHint?: string;
+  queryHint: string;
 };
 
 export const EMPLOYMENT_TYPES: EmploymentType[] = [
-  { id: "Full-time", adzunaParam: "full_time", jsearchValue: "FULLTIME" },
-  { id: "Part-time", adzunaParam: "part_time", jsearchValue: "PARTTIME" },
-  { id: "Contract", adzunaParam: "contract", jsearchValue: "CONTRACTOR" },
-  { id: "Permanent", adzunaParam: "permanent" },
+  { id: "Full-time", adzunaParam: "full_time", jsearchValue: "FULLTIME", queryHint: "full time" },
+  { id: "Part-time", adzunaParam: "part_time", jsearchValue: "PARTTIME", queryHint: "part time" },
+  { id: "Contract", adzunaParam: "contract", jsearchValue: "CONTRACTOR", queryHint: "contract" },
+  { id: "Permanent", adzunaParam: "permanent", queryHint: "permanent" },
   { id: "Internship", jsearchValue: "INTERN", queryHint: "internship" },
   { id: "Graduate programme", queryHint: "graduate program" },
 ];
+
+export type ProviderName = "adzuna" | "jsearch";
+
+/** Whether this provider can filter for a type, rather than only hint at it. */
+export function canFilter(type: EmploymentType, provider: ProviderName): boolean {
+  return provider === "adzuna" ? Boolean(type.adzunaParam) : Boolean(type.jsearchValue);
+}
+
+/*
+ * Early-career types are the ones with no filter anywhere useful, and they sit
+ * badly beside the others: Adzuna ANDs its flags, so full_time=1 and
+ * permanent=1 exclude exactly the internships and graduate programmes a person
+ * asked for in the same breath. Selecting all four returned neither.
+ */
+export const EARLY_CAREER_TYPES = ["Internship", "Graduate programme"];
+
+export function earlyCareerSelections(selected: string[]): string[] {
+  return selected.filter((id) => EARLY_CAREER_TYPES.some((early) => early.toLowerCase() === id.trim().toLowerCase()));
+}
+
+export function filterableSelections(selected: string[], provider: ProviderName): string[] {
+  return selected.filter((id) => {
+    const type = employmentType(id);
+    return type ? canFilter(type, provider) : false;
+  });
+}
 
 const byId = new Map(EMPLOYMENT_TYPES.map((type) => [type.id.toLowerCase(), type]));
 
@@ -58,14 +92,13 @@ export function adzunaEmploymentParams(selected: string[]): string[] {
   )];
 }
 
-/** Words to fold into the query text for selections no provider can filter. */
-export function employmentQueryHints(selected: string[]): string[] {
+/** Words to fold into the query text for selections THIS provider cannot filter. */
+export function employmentQueryHints(selected: string[], provider: ProviderName): string[] {
   return [...new Set(
     selected
       .map((id) => employmentType(id))
       .filter((type): type is EmploymentType => Boolean(type))
-      // Only when the type has no filter of its own on either provider.
-      .filter((type) => !type.jsearchValue && !type.adzunaParam && type.queryHint)
-      .map((type) => type.queryHint as string),
+      .filter((type) => !canFilter(type, provider))
+      .map((type) => type.queryHint),
   )];
 }
