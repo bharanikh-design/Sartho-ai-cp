@@ -1,6 +1,4 @@
 let parsedData = null;
-
-let parsedData = null;
 let sourceUrl = '';
 let isAtsPage = false;
 
