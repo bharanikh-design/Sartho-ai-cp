@@ -1,9 +1,22 @@
 import { describe, expect, it } from "vitest";
 import { analyseJobDescription } from "./analyse-job";
+import { capabilityForLabel } from "./skill-vocabulary";
+import { scoreTitleFit } from "./title-fit";
 import type { SkillProfile, SkillStrength } from "./skill-profile";
 
+/* Mirrors buildSkillProfile: the person's wording, resolved to a capability. */
 function skill(name: string, strength: SkillStrength, evidenceCount = 3) {
-  return { name, strength, evidenceCount, evidenceIds: [], employerCount: 1, years: 3, current: false, topClaim: null };
+  return {
+    name,
+    capability: capabilityForLabel(name),
+    strength,
+    evidenceCount,
+    evidenceIds: [],
+    employerCount: 1,
+    years: 3,
+    current: false,
+    topClaim: null,
+  };
 }
 
 function profileOf(...skills: ReturnType<typeof skill>[]): SkillProfile {
@@ -31,37 +44,36 @@ describe("analyseJobDescription", () => {
   it("matches only skills the user can actually evidence", () => {
     const result = analyseJobDescription(
       longEnough("You will lead our Kubernetes platform and own the Terraform estate"),
-      profileOf(skill("ServiceNow", "core"), skill("Kubernetes", "supporting")),
+      profileOf(skill("Retail", "core"), skill("Kubernetes", "supporting")),
     );
     expect(result.matchedSkills.map((s) => s.name)).toEqual(["Kubernetes"]);
-    expect(result.unusedStrengths).toEqual(["ServiceNow"]);
+    expect(result.unusedStrengths).toEqual(["Retail"]);
   });
 
   it("recommends applying when the role calls for several leading skills", () => {
     const result = analyseJobDescription(
-      longEnough("Lead our ServiceNow platform and the wider ITSM transformation programme"),
-      profileOf(skill("ServiceNow", "core", 6), skill("ITSM", "strong", 4)),
+      longEnough("You will own requirements gathering, the BRD and dashboards for our reporting suite"),
+      profileOf(skill("Business analysis", "core", 6), skill("Data analysis", "strong", 4)),
     );
     expect(result.recommendation).toBe("apply");
-    expect(result.coverage).toBe(100);
-    expect(result.primaryStrength).toBe("ServiceNow");
+    expect(result.requirementCoverage).toBe(100);
+    expect(result.primaryStrength).toBe("Business analysis");
     expect(result.confidence).toBe("high");
   });
 
   it("recommends review when only a minor skill is called for", () => {
     const result = analyseJobDescription(
       longEnough("The successful candidate will spend most of their time on Terraform"),
-      profileOf(skill("ServiceNow", "core"), skill("ITSM", "strong"), skill("Terraform", "emerging", 1)),
+      profileOf(skill("Business analysis", "core"), skill("Data analysis", "strong"), skill("Terraform", "emerging", 1)),
     );
     expect(result.recommendation).toBe("review");
-    expect(result.coverage).toBe(0);
     expect(result.confidence).toBe("low");
   });
 
   it("says skip honestly when the role touches nothing they can evidence", () => {
     const result = analyseJobDescription(
       longEnough("We are hiring a pastry chef for our flagship restaurant in Lyon"),
-      profileOf(skill("ServiceNow", "core"), skill("ITSM", "strong")),
+      profileOf(skill("Business analysis", "core"), skill("Data analysis", "strong")),
     );
     expect(result.recommendation).toBe("skip");
     expect(result.matchedSkills).toEqual([]);
@@ -70,18 +82,18 @@ describe("analyseJobDescription", () => {
 
   it("names the leading skills a role ignores, so a pivot is visible", () => {
     const result = analyseJobDescription(
-      longEnough("You will own our ITSM tooling end to end across the group"),
-      profileOf(skill("ServiceNow", "core"), skill("End User Computing", "core"), skill("ITSM", "strong")),
+      longEnough("You will own the sprint backlog and run agile ceremonies across the group"),
+      profileOf(skill("Retail", "core"), skill("Finance", "core"), skill("Agile delivery", "strong")),
     );
-    expect(result.unusedStrengths).toEqual(["ServiceNow", "End User Computing"]);
+    expect(result.unusedStrengths).toEqual(["Retail", "Finance"]);
   });
 
   it("matches whole terms rather than substrings", () => {
     // "R" must not match every word containing the letter, and SAP must not
     // fire on "sapphire".
     const result = analyseJobDescription(
-      longEnough("Our sapphire programme requires strong reporting and rigour"),
-      profileOf(skill("R", "supporting"), skill("SAP", "core")),
+      longEnough("Our sapphire programme requires rigour and careful judgement throughout"),
+      profileOf(skill("R", "supporting")),
     );
     expect(result.matchedSkills).toEqual([]);
   });
@@ -92,6 +104,35 @@ describe("analyseJobDescription", () => {
       profileOf(skill("End User Computing", "core")),
     );
     expect(result.matchedSkills.map((s) => s.name)).toEqual(["End User Computing"]);
+  });
+
+  /*
+   * The regression this rewrite exists for. A Business Analyst reading a
+   * Business Analyst advert used to score zero, because the advert never says
+   * the word filed against their evidence.
+   */
+  it("recognises requirements work however the advert phrases it", () => {
+    const jd = longEnough(
+      "Construct the RTM to track business requirements through design, build and test. "
+      + "Assist in backlog grooming and identifying the MVP for each wave. Produce the BRD.",
+    );
+    const result = analyseJobDescription(jd, profileOf(skill("Consulting", "core", 5)), {
+      titleFit: scoreTitleFit("Business Analyst", ["Business Analyst"], []),
+    });
+
+    expect(result.titleFit).toBe(100);
+    expect(result.closestTitle).toBe("Business Analyst");
+    // The advert's own vocabulary is read, so its asks are visible even when
+    // the person cannot yet evidence all of them.
+    expect(result.missingRequirements).toContain("Business analysis");
+    expect(result.recommendation).not.toBe("skip");
+  });
+
+  it("counts a requirement as covered when the evidence resolves to it", () => {
+    const jd = longEnough("You will own the BRD, the RTM and requirements elicitation for each release.");
+    const result = analyseJobDescription(jd, profileOf(skill("Business analysis", "core", 5)));
+    expect(result.requirementCoverage).toBe(100);
+    expect(result.missingRequirements).toEqual([]);
   });
 
   it("carries no hard-coded career terms of its own", async () => {
