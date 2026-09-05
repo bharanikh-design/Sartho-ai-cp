@@ -35,20 +35,18 @@ const dashboardNavigation: NavigationItem = {
   purpose: "See opportunity activity, applications and the next best action.",
 };
 
-const opportunityNavigation: NavigationItem = {
-  label: "Opportunities",
-  shortLabel: "Explore",
-  href: "/jobs",
-  icon: "analyse",
-  purpose: "Review saved opportunities or add a role for Career Profile matching.",
-};
-
+/*
+ * Named "Opportunities", not "Applications", because that is what it holds:
+ * every saved role from the moment you keep it, through analysis, to the
+ * outcome. Calling it Applications hid the roles you had not applied for yet,
+ * and left "how do I get to my opportunities?" with no answer on screen.
+ */
 const applicationNavigation: NavigationItem = {
-  label: "Applications",
-  shortLabel: "Track",
+  label: "Opportunities",
+  shortLabel: "Roles",
   href: "/applications",
   icon: "applications",
-  purpose: "Track every application stage, preparation task and outcome.",
+  purpose: "Every saved role: analyse it, track the stage, record the outcome.",
 };
 
 const profileNavigation: NavigationItem = {
@@ -59,12 +57,16 @@ const profileNavigation: NavigationItem = {
   purpose: "Add your source résumé — Sartho reads it straight into your approved career evidence.",
 };
 
+/*
+ * "Search Brief" described the form, not the outcome. This is the page that
+ * goes and finds live roles, so it is named for that.
+ */
 const strategyNavigation: NavigationItem = {
-  label: "Search Brief",
-  shortLabel: "Brief",
+  label: "Find Roles",
+  shortLabel: "Find",
   href: "/search-plan",
   icon: "resume",
-  purpose: "Save the locations, work model and sources that define a worthwhile opportunity.",
+  purpose: "Set where and how you want to work, then search live listings against your evidence.",
 };
 
 const directionNavigation: NavigationItem = {
@@ -99,10 +101,10 @@ const resumeNavigation: NavigationItem = {
  */
 /**
  * One flat menu, in process order, the same before and after activation:
- * Dashboard, then the five steps of the flow it orients — Upload Résumé →
- * Career Direction → Search Brief → Applications → Résumé Studio. Job analysis
- * now lives inside Applications, so there is no separate Opportunities tab, and
- * the standalone Journey page is retired in favour of the Dashboard.
+ * Dashboard → Career Direction → Find Roles → Opportunities → Résumé Studio.
+ * Five destinations, each named for what it does rather than what it is called
+ * internally. Job analysis lives inside Opportunities, and the standalone
+ * Journey page is retired in favour of the Dashboard.
  */
 export function getPrimaryNavigation(_activated: boolean): NavigationItem[] {
   return [
@@ -116,8 +118,7 @@ export function getPrimaryNavigation(_activated: boolean): NavigationItem[] {
 
 /*
  * Email Alerts is a setting, not a step in the flow, so it lives in the profile
- * menu rather than the rail. Five destinations is the whole product:
- * Dashboard → Career Direction → Search Brief → Applications → Résumé Studio.
+ * menu rather than the rail.
  */
 export const notificationsDestination = notificationsNavigation;
 
@@ -141,7 +142,6 @@ export function getNavigationWithGate(activated: boolean, hasResume: boolean): N
 export const allNavigation: NavigationItem[] = [
   journeyNavigation,
   dashboardNavigation,
-  opportunityNavigation,
   applicationNavigation,
   profileNavigation,
   directionNavigation,
@@ -161,8 +161,14 @@ export function getNavigationForPath(activated: boolean, pathname: string) {
   return [...navigation, current];
 }
 
-/* Legacy and contextual workspaces remain addressable from their parent flow. */
+/*
+ * Legacy and contextual workspaces remain addressable from their parent flow.
+ * /jobs redirects into /applications and a saved role lives at /jobs/[id]; both
+ * belong to Opportunities, so they are labelled as it without being a second
+ * menu entry with the same name.
+ */
 const supportingPageLabels: Array<[prefix: string, label: string]> = [
+  ["/jobs", "Opportunities"],
   ["/interview-prep", "Interview Preparation"],
   ["/diagnostics", "Diagnostics"],
   ["/resume-studio", "Résumé Studio"],

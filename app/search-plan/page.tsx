@@ -38,7 +38,7 @@ export default async function SearchPlanPage() {
     <div className="page-stack product-page">
       <JourneySteps journey={journey} currentId="search" />
       <ProductPageHeader
-        eyebrow="Step 3 of 3 · Search brief"
+        eyebrow="Step 3 of 3 · Find roles"
         title="Roles that match your brief"
         description="Live listings for your target roles, scored against your approved evidence."
         metric={{ value: lanes.length || "—", label: "target roles", href: "/career-direction#priorities" }}

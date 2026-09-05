@@ -241,7 +241,17 @@ export function JobSearchPanel({
           {criteria.companies.length ? <> · companies: {criteria.companies.join(", ")}</> : null}
           {criteria.providers.length ? <> · via {criteria.providers.join(" + ")}</> : null}
           {criteria.countrySource === "default" ? <> · <Link href="#country">choose your country</Link> to search the right market</> : null}
-          {criteria.tooSenior ? <> · {criteria.tooSenior} roles hidden as too senior for your experience</> : null}
+          {criteria.tooSenior ? <> · {criteria.tooSenior} hidden as too senior for your experience</> : null}
+          {/*
+            * Said out loud, because a filter nobody can see is indistinguishable
+            * from a search that found nothing.
+            */}
+          {criteria.offFamily ? (
+            <> · {criteria.offFamily} hidden as a different line of work
+              {criteria.families.length ? <> from {criteria.families.join(", ")}</> : null}
+              {" "}(<Link href="/career-direction#priorities">change your target roles</Link>)
+            </>
+          ) : null}
           {criteria.queriesSkipped > 0 ? <> · {criteria.queriesSkipped} queries skipped (time limit)</> : null}
         </p>
       ) : null}
