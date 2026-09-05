@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 
 /*
@@ -34,7 +34,10 @@ const recTone: Record<SearchResult["recommendation"], string> = {
   skip: "#e5917a",
 };
 
-export function JobSearchPanel() {
+const CACHE_KEY = "sartho:search-results";
+const CACHE_TTL_MS = 30 * 60 * 1000;
+
+export function JobSearchPanel({ autoRun = false }: { autoRun?: boolean }) {
   const [status, setStatus] = useState<"idle" | "loading" | "ready" | "error" | "not_configured" | "no_targets">("idle");
   const [error, setError] = useState<string | null>(null);
   const [results, setResults] = useState<SearchResult[]>([]);
@@ -59,11 +62,41 @@ export function JobSearchPanel() {
       setResults(data.results ?? []);
       setCriteria(data.criteria ?? null);
       setStatus("ready");
+      try {
+        sessionStorage.setItem(CACHE_KEY, JSON.stringify({ at: Date.now(), results: data.results ?? [], criteria: data.criteria ?? null }));
+      } catch {
+        // Storage unavailable (private mode); the search still ran.
+      }
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Search failed.");
       setStatus("error");
     }
   }
+
+  /*
+   * The matches are this page's content, so they load on arrival when the brief
+   * is complete — not behind a button. A recent result set is reused from this
+   * tab's session so coming back to the page does not re-spend provider calls;
+   * "Search again" always runs fresh.
+   */
+  const autoRan = useRef(false);
+  useEffect(() => {
+    if (!autoRun || autoRan.current) return;
+    autoRan.current = true;
+    try {
+      const cached = JSON.parse(sessionStorage.getItem(CACHE_KEY) ?? "null") as { at: number; results: SearchResult[]; criteria: SearchCriteria | null } | null;
+      if (cached && Date.now() - cached.at < CACHE_TTL_MS && Array.isArray(cached.results)) {
+        setResults(cached.results);
+        setCriteria(cached.criteria);
+        setStatus("ready");
+        return;
+      }
+    } catch {
+      // Ignore a bad cache and search fresh.
+    }
+    void runSearch();
+    // runSearch is a stable in-component handler; the ref keeps this to one run.
+  }, [autoRun]);
 
   async function save(result: SearchResult) {
     if (savingUrl) return;
@@ -146,11 +179,11 @@ export function JobSearchPanel() {
     <section className="glass-card content-card" id="find-roles">
       <div className="card-header">
         <div>
-          <h2 className="section-heading">Find matching roles</h2>
-          <p className="section-subtitle">Sartho searches live listings for your target roles and scores each one against your approved evidence.</p>
+          <h2 className="section-heading">Matching roles</h2>
+          <p className="section-subtitle">Live listings for your target roles, each scored against your approved evidence.</p>
         </div>
         <button type="button" className="primary-button" onClick={() => void runSearch()} disabled={status === "loading"}>
-          {status === "loading" ? "Searching…" : "Search now"}
+          {status === "loading" ? "Searching…" : status === "ready" ? "Search again" : "Search now"}
         </button>
       </div>
 
@@ -182,8 +215,18 @@ export function JobSearchPanel() {
         </p>
       ) : null}
 
+      {status === "loading" ? (
+        <div className="application-list" style={{ marginTop: "12px" }} aria-label="Searching live listings">
+          {[1, 2, 3].map((item) => <div key={item} className="search-result-skeleton" />)}
+        </div>
+      ) : null}
+
+      {status === "idle" && !autoRun ? (
+        <div className="empty-inline-state">Choose a country and save your criteria above, then Sartho searches live listings here.</div>
+      ) : null}
+
       {status === "ready" && !results.length ? (
-        <div className="empty-inline-state">No live matches for your brief right now. Try broadening your locations or target roles.</div>
+        <div className="empty-inline-state">No live matches for your brief right now. Try broadening your cities or target roles.</div>
       ) : null}
 
       {saveError ? <div className="inline-error" role="alert">{saveError}</div> : null}

@@ -6,7 +6,8 @@ export type NavigationIconName =
   | "resume"
   | "interview"
   | "applications"
-  | "shield";
+  | "shield"
+  | "bell";
 
 export type NavigationItem = {
   label: string;
@@ -72,6 +73,14 @@ const directionNavigation: NavigationItem = {
   purpose: "Select target roles and set your career positioning.",
 };
 
+const notificationsNavigation: NavigationItem = {
+  label: "Email Alerts",
+  shortLabel: "Alerts",
+  href: "/notifications",
+  icon: "bell",
+  purpose: "Choose what Sartho emails you: daily new matches and the pipeline summary.",
+};
+
 const resumeNavigation: NavigationItem = {
   label: "Résumé Studio",
   shortLabel: "Resumes",
@@ -101,6 +110,7 @@ export function getPrimaryNavigation(_activated: boolean): NavigationItem[] {
     strategyNavigation,
     applicationNavigation,
     resumeNavigation,
+    notificationsNavigation,
   ];
 }
 
@@ -113,6 +123,7 @@ export const allNavigation: NavigationItem[] = [
   directionNavigation,
   strategyNavigation,
   resumeNavigation,
+  notificationsNavigation,
 ];
 
 export function getMobileNavigation(activated: boolean) {

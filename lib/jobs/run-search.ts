@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { getCareerWorkspace } from "@/lib/data/career";
 import { getSearchPreferences } from "@/lib/data/search";
 import { countryName, normaliseCountryCode } from "@/lib/jobs/countries";
+import { splitMisfiledCompanies } from "@/lib/jobs/employers";
 import { scoreOpportunity } from "@/lib/matching/opportunity-score";
 import {
   MAX_COMPANY_QUERIES,
@@ -122,11 +123,14 @@ export async function runBriefSearch(
     };
   }
 
+  // Employers typed into the cities list (before companies had a field) are
+  // treated as companies here too, so an unsaved brief still searches sensibly.
+  const brief = splitMisfiledCompanies(preferences.targetLocations, preferences.targetCompanies);
   const queries = planSearchQueries({
     roles: activeLanes.map((lane) => lane.name),
     country,
-    locations: preferences.targetLocations,
-    companies: preferences.targetCompanies,
+    locations: brief.locations,
+    companies: brief.companies,
     remotePreference: preferences.remotePreference,
   });
 
@@ -205,7 +209,7 @@ export async function runBriefSearch(
   const strongCount = () => Array.from(scoredByUrl.values()).filter((item) => item.recommendation !== "skip").length;
   for (const [url, result] of byUrl) scoredByUrl.set(url, score(result));
 
-  const usedLocations = preferences.targetLocations.slice(0, MAX_LOCATION_QUERIES);
+  const usedLocations = brief.locations.slice(0, MAX_LOCATION_QUERIES);
   let broadened = false;
   if (usedLocations.length && strongCount() < MIN_STRONG_BEFORE_WIDENING && dead.size < providers.length) {
     broadened = true;
@@ -226,7 +230,7 @@ export async function runBriefSearch(
     countrySource: preferences.country ? "brief" : profile?.country ? "resume" : "default",
     locations: usedLocations,
     broadened,
-    companies: preferences.targetCompanies.slice(0, MAX_COMPANY_QUERIES),
+    companies: brief.companies.slice(0, MAX_COMPANY_QUERIES),
     roles: activeLanes.map((lane) => toSearchKeywords(lane.name)),
     remoteOnly: preferences.remotePreference === "Remote",
     providers: Array.from(providersUsed),
