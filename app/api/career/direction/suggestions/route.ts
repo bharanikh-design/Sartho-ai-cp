@@ -23,6 +23,32 @@ const inputSchema = z.object({
   existingLanes: z.array(z.string().trim().min(1).max(180)).max(20).optional().default([]),
 });
 
+/**
+ * Record which suggestions the person dismissed. No model runs and no allowance
+ * is spent — a dismissal is bookkeeping, and it must survive a page reload or
+ * the same rejected roles reappear on every visit.
+ */
+const dismissSchema = z.object({ dismissed: z.array(z.string().trim().min(1).max(180)).max(60) });
+
+export async function PATCH(request: Request) {
+  const { supabase, user } = await getAuthenticatedUser();
+  if (!user) return NextResponse.json({ error: "Sign in again." }, { status: 401 });
+
+  const input = dismissSchema.safeParse(await request.json().catch(() => null));
+  if (!input.success) return NextResponse.json({ error: "Invalid request." }, { status: 400 });
+
+  const { error } = await supabase
+    .from("direction_suggestion_sets")
+    .update({ dismissed: input.data.dismissed })
+    .eq("user_id", user.id);
+  if (error) return NextResponse.json({ error: "Could not save that." }, { status: 500 });
+  return NextResponse.json({ ok: true });
+}
+
+/*
+ * Generating a fresh set. This is the only path that spends allowance, so it
+ * runs only when the person asks — the page itself reads the stored set.
+ */
 export async function POST(request: Request) {
   const { supabase, user } = await getAuthenticatedUser();
   if (!user) return NextResponse.json({ error: "Sign in again." }, { status: 401 });
@@ -41,13 +67,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Sartho could not prepare your Career Profile for suggestions." }, { status: 500 });
   }
   if (!evidenceResult.data?.length) {
-    return NextResponse.json({ error: "Confirm your Career Profile before asking AI for career directions." }, { status: 400 });
+    return NextResponse.json({ error: "Upload your résumé before asking AI for career directions." }, { status: 400 });
   }
 
-  // Direction work is the same bounded quality analysis class as a job deep
-  // analysis, so it deliberately shares that allowance instead of creating an
-  // unmetered model endpoint in the live legacy database.
-  const quota = await checkAiQuota(supabase, "deep_analysis");
+  // One bounded call, so it carries its own small allowance rather than drawing
+  // on the deep-analysis budget that reviewing a real job needs.
+  const quota = await checkAiQuota(supabase, "direction_suggestions");
   if (!quota.allowed) return aiQuotaResponse(quota);
 
   try {
@@ -90,11 +115,24 @@ export async function POST(request: Request) {
     );
     if (!suggestions.length) throw new Error("The suggestions were not grounded in approved Career Profile evidence.");
 
-    return NextResponse.json({
+    const evidenceCount = evidenceResult.data.length;
+    const roleCount = rolesResult.data?.length ?? 0;
+
+    // Stored so the next page visit is a read, not a model call. A fresh set
+    // clears old dismissals: these are different roles, and a stale dismissal
+    // would silently hide them.
+    const { error: cacheError } = await supabase.from("direction_suggestion_sets").upsert({
+      user_id: user.id,
       suggestions,
-      evidenceCount: evidenceResult.data.length,
-      roleCount: rolesResult.data?.length ?? 0,
+      steering: input.data.explorationPrompt,
+      dismissed: [],
+      evidence_count: evidenceCount,
+      role_count: roleCount,
+      generated_at: new Date().toISOString(),
     });
+    if (cacheError) logError(supabase, "direction_suggestions_cache", cacheError);
+
+    return NextResponse.json({ suggestions, evidenceCount, roleCount });
   } catch (caught) {
     logError(supabase, "direction_suggestions_fail", caught);
     return NextResponse.json({

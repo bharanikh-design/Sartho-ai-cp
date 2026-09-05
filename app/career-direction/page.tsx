@@ -9,9 +9,15 @@ export const dynamic = "force-dynamic";
 
 export default async function CareerDirectionPage() {
   const { supabase, user } = await requireUser();
-  const [{ profile, lanes, roles, evidence }, journey] = await Promise.all([
+  const [{ profile, lanes, roles, evidence }, journey, suggestionSet] = await Promise.all([
     getCareerWorkspace(supabase, user.id),
     loadProductJourneyStatus(supabase, user.id),
+    // The stored set: reading it is what stops a page visit spending allowance.
+    supabase
+      .from("direction_suggestion_sets")
+      .select("suggestions,steering,dismissed")
+      .eq("user_id", user.id)
+      .maybeSingle(),
   ]);
   const approvedEvidence = evidence.filter((item) => item.approval_status === "approved");
   const suggestedStrengths = Array.from(new Set(approvedEvidence.flatMap((item) => item.domains))).slice(0, 16);
@@ -31,6 +37,9 @@ export default async function CareerDirectionPage() {
         suggestedStrengths={suggestedStrengths}
         evidenceCount={approvedEvidence.length}
         roleCount={roles.length}
+        initialSuggestions={Array.isArray(suggestionSet.data?.suggestions) ? suggestionSet.data.suggestions : []}
+        initialDismissed={Array.isArray(suggestionSet.data?.dismissed) ? suggestionSet.data.dismissed : []}
+        initialSteering={typeof suggestionSet.data?.steering === "string" ? suggestionSet.data.steering : ""}
       />
     </div>
   );

@@ -39,12 +39,19 @@ export function CareerDirectionEditor({
   suggestedStrengths,
   evidenceCount,
   roleCount,
+  initialSuggestions = [],
+  initialDismissed = [],
+  initialSteering = "",
 }: {
   initialProfile: ProfileRecord | null;
   initialLanes: TargetLaneRecord[];
   suggestedStrengths: string[];
   evidenceCount: number;
   roleCount: number;
+  /** The stored set, read on the server. Present means no model call is needed. */
+  initialSuggestions?: GroundedDirectionSuggestion[];
+  initialDismissed?: string[];
+  initialSteering?: string;
 }) {
   const router = useRouter();
   // Location, work rights and headline are edited on the Career Profile page
@@ -54,12 +61,12 @@ export function CareerDirectionEditor({
   const summary = initialProfile?.summary ?? "";
   const location = initialProfile?.location ?? "";
   const workAuthorisation = initialProfile?.work_authorisation ?? "";
-  const [aiPrompt, setAiPrompt] = useState("");
+  const [aiPrompt, setAiPrompt] = useState(initialSteering);
   const [lanes, setLanes] = useState<LaneDraft[]>(() => balanceByPriority(initialLanes));
   const [laneDraft, setLaneDraft] = useState("");
-  const [suggestions, setSuggestions] = useState<GroundedDirectionSuggestion[]>([]);
-  const [dismissed, setDismissed] = useState<string[]>([]);
-  const [aiStatus, setAiStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [suggestions, setSuggestions] = useState<GroundedDirectionSuggestion[]>(initialSuggestions);
+  const [dismissed, setDismissed] = useState<string[]>(initialDismissed);
+  const [aiStatus, setAiStatus] = useState<"idle" | "loading" | "ready" | "error">(initialSuggestions.length ? "ready" : "idle");
   const [aiError, setAiError] = useState<string | null>(null);
   const [rankings, setRankings] = useState<GroundedRoleRanking[]>([]);
   const [rankStatus, setRankStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
@@ -107,6 +114,19 @@ export function CareerDirectionEditor({
     () => (rankings.length ? [...rankings].sort((a, b) => MATCH_RANK[a.match] - MATCH_RANK[b.match])[0] : null),
     [rankings],
   );
+
+  /* Dismissals persist, or the same rejected roles return on the next visit. */
+  function dismiss(name: string) {
+    const next = [...dismissed, name];
+    setDismissed(next);
+    void fetch("/api/career/direction/suggestions", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ dismissed: next }),
+    }).catch(() => {
+      // Best effort: the card is already gone for this visit.
+    });
+  }
 
   function addLaneName(value: string) {
     const name = value.trim();
@@ -193,20 +213,18 @@ export function CareerDirectionEditor({
   }
 
   /*
-   * The point of this screen is to arrive and immediately see where your résumé
-   * says you can go — not to hunt for a button. So when you land with a
-   * confirmed profile and no priorities chosen yet, Sartho reads the résumé and
-   * lists suggested directions on its own. The ref keeps it to one automatic
-   * run per visit; the "Update suggestions" button drives any further passes.
+   * Arriving should show where your résumé says you can go, without hunting for
+   * a button — but it must not re-run the model to do it. The set is stored, so
+   * a normal visit is a read (initialSuggestions is already on screen) and this
+   * fires only the very first time, when nothing has ever been generated.
+   *
+   * This is the fix for an allowance that emptied itself: every page load used
+   * to spend units, so roughly fifty visits exhausted the month.
    */
   const autoRequested = useRef(false);
   useEffect(() => {
     if (autoRequested.current) return;
-    // Fire once on arrival whenever there is approved evidence and no
-    // suggestions are on screen yet — regardless of whether priorities are
-    // already chosen. Previously this was gated on having zero priorities,
-    // which meant anyone returning with priorities set saw an empty panel and
-    // no AI roles at all.
+    if (initialSuggestions.length) { autoRequested.current = true; return; }
     if (evidenceCount > 0 && aiStatus === "idle" && suggestions.length === 0) {
       autoRequested.current = true;
       // Deferred out of the synchronous effect body so the first setState does
@@ -217,7 +235,7 @@ export function CareerDirectionEditor({
     // generateSuggestions is a stable in-component handler; the ref guard, not
     // the dep list, controls the single automatic run.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [evidenceCount, aiStatus, suggestions.length]);
+  }, [evidenceCount, aiStatus, suggestions.length, initialSuggestions.length]);
 
   useEffect(() => {
     measureRail();
@@ -327,7 +345,7 @@ export function CareerDirectionEditor({
                 <article key={suggestion.name} className={`direction-suggestion-card is-${suggestion.path}`}>
                   <div className="suggestion-card-top">
                     <span>{suggestion.path === "direct" ? "Direct next step" : suggestion.path === "adjacent" ? "Adjacent possibility" : "Stretch possibility"}</span>
-                    <button type="button" aria-label={`Dismiss ${suggestion.name}`} onClick={() => setDismissed((items) => [...items, suggestion.name])}>×</button>
+                    <button type="button" aria-label={`Dismiss ${suggestion.name}`} onClick={() => dismiss(suggestion.name)}>×</button>
                   </div>
                   <h3>{suggestion.name}</h3>
                   <p>{suggestion.rationale}</p>

@@ -5,7 +5,9 @@ import { z } from "zod";
 export type AiOperation =
   | "resume_import"
   | "deep_analysis"
-  | "resume_draft";
+  | "resume_draft"
+  /* One bounded call for career-direction roles; billed apart from deep analysis. */
+  | "direction_suggestions";
 
 const decisionSchema = z.object({
   allowed: z.boolean(),
