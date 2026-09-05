@@ -387,7 +387,49 @@ export async function getStoredSearch(
   if (!data || !Array.isArray(data.results) || !data.results.length) return null;
   return {
     results: data.results as ScoredJobMatch[],
-    criteria: data.criteria as SearchCriteria,
+    criteria: normaliseCriteria(data.criteria),
     searchedAt: typeof data.searched_at === "string" ? data.searched_at : new Date().toISOString(),
+  };
+}
+
+/**
+ * A stored criteria row, brought up to the current shape.
+ *
+ * This used to be `data.criteria as SearchCriteria` — a bare cast over JSON
+ * written by whatever version of this file was deployed at the time. The cast
+ * makes TypeScript agree and changes nothing at runtime, so the day
+ * `employmentHinted` was added, every search stored before it lacked the key,
+ * the panel read `criteria.employmentHinted.length`, and Find Roles died on a
+ * TypeError behind "That page did not load cleanly".
+ *
+ * Every field gets a default here, so adding another one later cannot break a
+ * row that was written before it existed.
+ */
+export function normaliseCriteria(stored: unknown): SearchCriteria {
+  const value = (stored ?? {}) as Partial<SearchCriteria>;
+  const strings = (input: unknown): string[] =>
+    Array.isArray(input) ? input.filter((item): item is string => typeof item === "string") : [];
+  const count = (input: unknown): number => (typeof input === "number" && Number.isFinite(input) ? input : 0);
+
+  return {
+    country: typeof value.country === "string" ? value.country : "",
+    countries: strings(value.countries),
+    employmentTypes: strings(value.employmentTypes),
+    employmentHinted: strings(value.employmentHinted),
+    companiesRequested: count(value.companiesRequested),
+    candidateLevel: count(value.candidateLevel),
+    tooSenior: count(value.tooSenior),
+    offFamily: count(value.offFamily),
+    families: strings(value.families),
+    countryName: typeof value.countryName === "string" ? value.countryName : "",
+    countrySource: value.countrySource === "brief" || value.countrySource === "resume" ? value.countrySource : "default",
+    locations: strings(value.locations),
+    broadened: value.broadened === true,
+    companies: strings(value.companies),
+    roles: strings(value.roles),
+    remoteOnly: value.remoteOnly === true,
+    providers: strings(value.providers),
+    queriesRun: count(value.queriesRun),
+    queriesSkipped: count(value.queriesSkipped),
   };
 }
