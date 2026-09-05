@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { mapAdzunaResult, mapJSearchResult, normaliseAdzunaCountry } from "./search-provider";
+import {
+  adzunaCoversCountry,
+  buildAdzunaUrl,
+  buildJSearchParams,
+  mapAdzunaResult,
+  mapJSearchResult,
+  normaliseAdzunaCountry,
+  providersForCountry,
+} from "./search-provider";
 
 describe("normaliseAdzunaCountry", () => {
   it("takes the first of a comma list and lowercases it", () => {
@@ -90,5 +98,35 @@ describe("mapJSearchResult", () => {
   it("drops a record missing a title, link or description", () => {
     expect(mapJSearchResult({ employer_name: "X", job_description: "d", job_apply_link: "https://x" })).toBeNull();
     expect(mapJSearchResult({ job_title: "T", job_apply_link: "https://x" })).toBeNull();
+  });
+});
+
+describe("country-aware provider selection", () => {
+  it("keeps JSearch for any market and Adzuna only where it has an endpoint", () => {
+    expect(providersForCountry("au", ["jsearch", "adzuna"])).toEqual(["jsearch", "adzuna"]);
+    expect(providersForCountry("ae", ["jsearch", "adzuna"])).toEqual(["jsearch"]);
+    expect(providersForCountry("ae", ["adzuna"])).toEqual([]);
+    expect(adzunaCoversCountry("IN")).toBe(true);
+    expect(adzunaCoversCountry("hk")).toBe(false);
+  });
+});
+
+describe("query → provider request mapping", () => {
+  const credentials = { appId: "id", appKey: "key" };
+
+  it("puts the country in Adzuna's path and the city, employer in its params", () => {
+    const url = new URL(buildAdzunaUrl({ keywords: "Business Analyst", country: "au", location: "Sydney", employer: "PwC" }, credentials));
+    expect(url.pathname).toBe("/v1/api/jobs/au/search/1");
+    expect(url.searchParams.get("what")).toBe("Business Analyst");
+    expect(url.searchParams.get("where")).toBe("Sydney");
+    expect(url.searchParams.get("company")).toBe("PwC");
+  });
+
+  it("embeds employer and city in JSearch's free-text query and scopes by country", () => {
+    const params = buildJSearchParams({ keywords: "Business Analyst", country: "au", location: "Sydney", employer: "PwC", remoteOnly: true });
+    expect(params.get("query")).toBe("Business Analyst at PwC in Sydney");
+    expect(params.get("country")).toBe("au");
+    expect(params.get("work_from_home")).toBe("true");
+    expect(buildJSearchParams({ keywords: "Data Analyst", country: "in" }).get("query")).toBe("Data Analyst");
   });
 });

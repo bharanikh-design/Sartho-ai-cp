@@ -4,9 +4,13 @@
  * This is the one place Sartho reaches out to a third-party jobs source. It is
  * deliberately provider-agnostic and configuration-gated: with no credentials
  * set, isJobSearchConfigured() is false and the product says so honestly rather
- * than inventing results. The only adapter today is Adzuna — a legitimate
- * aggregator across many boards with a documented REST API and a free tier, so
- * it can be validated before any paid plan.
+ * than inventing results. Two adapters exist: JSearch (Google for Jobs via
+ * RapidAPI — broadest coverage, full descriptions, reaches company career
+ * pages) and Adzuna (aggregator with a documented REST API and a free tier).
+ *
+ * Country is part of every query, never a deployment setting. Each person
+ * searches the market they chose on their Search Brief; the environment only
+ * supplies a last-resort default for a brief saved before that existed.
  *
  * Nothing here scrapes a site that forbids it, and no result is trusted as
  * truth: every role a search returns is still scored against the person's own
@@ -26,20 +30,18 @@ export type JobSearchResult = {
 
 export type JobSearchQuery = {
   keywords: string;
+  /** ISO-3166 alpha-2 job market. Falls back to the deployment default when absent. */
+  country?: string;
+  /** A city within the country. Absent means anywhere in the country. */
   location?: string;
+  /** Restrict to one employer — a targeted company search. */
+  employer?: string;
+  /** Only remote / work-from-home listings. */
+  remoteOnly?: boolean;
   limit?: number;
 };
 
 export type JobSearchProviderName = "adzuna" | "jsearch";
-
-function jsearchConfig() {
-  const key = process.env.JSEARCH_RAPIDAPI_KEY?.trim() || process.env.RAPIDAPI_KEY?.trim();
-  if (!key) return null;
-  // JSearch (Google for Jobs) takes a 2-letter country. Reuse the Adzuna market
-  // if a dedicated one is not set, so a single deployment stays consistent.
-  const country = (process.env.JSEARCH_COUNTRY || process.env.ADZUNA_COUNTRY || "us").trim().toLowerCase();
-  return { key, country };
-}
 
 // Adzuna scopes every query to a country in the URL path, so a bad value 404s.
 const ADZUNA_COUNTRIES = new Set([
@@ -58,12 +60,31 @@ export function normaliseAdzunaCountry(raw: string | undefined): string {
   return ADZUNA_COUNTRIES.has(mapped) ? mapped : "gb";
 }
 
+export function adzunaCoversCountry(country: string): boolean {
+  return ADZUNA_COUNTRIES.has(country.toLowerCase());
+}
+
+/**
+ * The market used when a brief carries no country — only briefs saved before
+ * the per-user country existed. Reads the legacy environment settings.
+ */
+export function defaultJobMarket(): string {
+  const raw = (process.env.JSEARCH_COUNTRY || process.env.ADZUNA_COUNTRY || "us")
+    .split(",")[0]?.trim().toLowerCase() ?? "us";
+  return raw === "uk" ? "gb" : raw || "us";
+}
+
+function jsearchConfig() {
+  const key = process.env.JSEARCH_RAPIDAPI_KEY?.trim() || process.env.RAPIDAPI_KEY?.trim();
+  if (!key) return null;
+  return { key };
+}
+
 function adzunaConfig() {
   const appId = process.env.ADZUNA_APP_ID?.trim();
   const appKey = process.env.ADZUNA_APP_KEY?.trim();
-  const country = normaliseAdzunaCountry(process.env.ADZUNA_COUNTRY);
   if (!appId || !appKey) return null;
-  return { appId, appKey, country };
+  return { appId, appKey };
 }
 
 /**
@@ -129,21 +150,38 @@ export class JobSearchNotConfiguredError extends Error {
   }
 }
 
-async function searchAdzuna(query: JobSearchQuery): Promise<JobSearchResult[]> {
-  const config = adzunaConfig();
-  if (!config) throw new JobSearchNotConfiguredError();
+function resolveCountry(query: JobSearchQuery): string {
+  const country = query.country?.trim().toLowerCase();
+  return country && /^[a-z]{2}$/.test(country) ? country : defaultJobMarket();
+}
 
+/** The Adzuna request URL for a query — pure, so the criteria mapping is testable. */
+export function buildAdzunaUrl(query: JobSearchQuery, credentials: { appId: string; appKey: string }): string {
   const params = new URLSearchParams({
-    app_id: config.appId,
-    app_key: config.appKey,
+    app_id: credentials.appId,
+    app_key: credentials.appKey,
     what: query.keywords,
     results_per_page: String(Math.min(Math.max(query.limit ?? 20, 1), 50)),
     "content-type": "application/json",
   });
   if (query.location?.trim()) params.set("where", query.location.trim());
+  if (query.employer?.trim()) params.set("company", query.employer.trim());
+  // Adzuna has no remote flag; "remote" as a location term is the documented
+  // workaround and matches how listings there are labelled.
+  if (query.remoteOnly && !query.location?.trim()) params.set("where", "remote");
+  const country = resolveCountry(query);
+  return `https://api.adzuna.com/v1/api/jobs/${country}/search/1?${params.toString()}`;
+}
 
-  const url = `https://api.adzuna.com/v1/api/jobs/${config.country}/search/1?${params.toString()}`;
-  const response = await fetch(url, { signal: AbortSignal.timeout(20_000) });
+async function searchAdzuna(query: JobSearchQuery): Promise<JobSearchResult[]> {
+  const config = adzunaConfig();
+  if (!config) throw new JobSearchNotConfiguredError();
+  const country = resolveCountry(query);
+  if (!adzunaCoversCountry(country)) {
+    throw new Error(`Adzuna does not cover ${country.toUpperCase()}.`);
+  }
+
+  const response = await fetch(buildAdzunaUrl(query, config), { signal: AbortSignal.timeout(20_000) });
   if (!response.ok) {
     throw new Error(`Adzuna search failed (${response.status}).`);
   }
@@ -189,23 +227,33 @@ export function mapJSearchResult(raw: JSearchResult): JobSearchResult | null {
   };
 }
 
-async function searchJSearch(query: JobSearchQuery): Promise<JobSearchResult[]> {
-  const config = jsearchConfig();
-  if (!config) throw new JobSearchNotConfiguredError();
-
-  // JSearch takes one free-text query; the location rides inside it.
-  const text = query.location?.trim() ? `${query.keywords} in ${query.location.trim()}` : query.keywords;
+/**
+ * The JSearch request parameters for a query — pure, so the criteria mapping
+ * is testable. JSearch takes one free-text query: the employer and city ride
+ * inside it, the way a person would type them into Google.
+ */
+export function buildJSearchParams(query: JobSearchQuery): URLSearchParams {
+  let text = query.keywords.trim();
+  if (query.employer?.trim()) text = `${text} at ${query.employer.trim()}`;
+  if (query.location?.trim()) text = `${text} in ${query.location.trim()}`;
   const params = new URLSearchParams({
     query: text,
     num_pages: "1",
     date_posted: "all",
-    country: config.country,
+    country: resolveCountry(query),
   });
+  if (query.remoteOnly) params.set("work_from_home", "true");
+  return params;
+}
+
+async function searchJSearch(query: JobSearchQuery): Promise<JobSearchResult[]> {
+  const config = jsearchConfig();
+  if (!config) throw new JobSearchNotConfiguredError();
 
   // JSearch v5's endpoint is /search-v2 (the old /search 404s with
   // "endpoint does not exist"). Headers mirror RapidAPI's own snippet; JSearch
   // can take ~25s to answer, so the timeout is generous.
-  const response = await fetch(`https://jsearch.p.rapidapi.com/search-v2?${params.toString()}`, {
+  const response = await fetch(`https://jsearch.p.rapidapi.com/search-v2?${buildJSearchParams(query).toString()}`, {
     method: "GET",
     headers: {
       "x-rapidapi-key": config.key,
@@ -259,6 +307,15 @@ export function configuredJobSearchProviders(): JobSearchProviderName[] {
     return [pin, ...configured.filter((provider) => provider !== pin)];
   }
   return configured;
+}
+
+/**
+ * The configured providers that can actually search a given country. JSearch
+ * covers any market; Adzuna only the countries it has an endpoint for, so it
+ * is dropped rather than sent a request that would 404.
+ */
+export function providersForCountry(country: string, configured = configuredJobSearchProviders()): JobSearchProviderName[] {
+  return configured.filter((provider) => provider !== "adzuna" || adzunaCoversCountry(country));
 }
 
 export async function searchWithProvider(

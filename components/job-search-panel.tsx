@@ -25,6 +25,21 @@ type SearchResult = {
   matchedSkills: string[];
 };
 
+/* What the server actually searched — echoed back so nobody has to guess. */
+type SearchCriteria = {
+  country: string;
+  countryName: string;
+  countrySource: "brief" | "resume" | "default";
+  locations: string[];
+  broadened: boolean;
+  companies: string[];
+  roles: string[];
+  remoteOnly: boolean;
+  providers: string[];
+  queriesRun: number;
+  queriesSkipped: number;
+};
+
 const recTone: Record<SearchResult["recommendation"], string> = {
   apply: "#6bcf93",
   review: "#e0b061",
@@ -35,6 +50,7 @@ export function JobSearchPanel() {
   const [status, setStatus] = useState<"idle" | "loading" | "ready" | "error" | "not_configured" | "no_targets">("idle");
   const [error, setError] = useState<string | null>(null);
   const [results, setResults] = useState<SearchResult[]>([]);
+  const [criteria, setCriteria] = useState<SearchCriteria | null>(null);
   const [savingUrl, setSavingUrl] = useState<string | null>(null);
   const [savedUrls, setSavedUrls] = useState<string[]>([]);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -46,13 +62,14 @@ export function JobSearchPanel() {
     setSaveError(null);
     try {
       const response = await fetch("/api/jobs/search", { method: "POST" });
-      const data = await response.json() as { results?: SearchResult[]; error?: string; code?: string };
+      const data = await response.json() as { results?: SearchResult[]; criteria?: SearchCriteria; error?: string; code?: string };
       if (!response.ok) {
         if (data.code === "not_configured") { setStatus("not_configured"); return; }
         if (data.code === "no_targets") { setStatus("no_targets"); setError(data.error ?? null); return; }
         throw new Error(data.error ?? "Search failed.");
       }
       setResults(data.results ?? []);
+      setCriteria(data.criteria ?? null);
       setStatus("ready");
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Search failed.");
@@ -162,6 +179,20 @@ export function JobSearchPanel() {
       ) : null}
 
       {status === "error" ? <div className="inline-error" role="alert">{error}</div> : null}
+
+      {status === "ready" && criteria ? (
+        <p className="search-field-hint" style={{ marginTop: "12px" }}>
+          Searched <strong>{criteria.countryName}</strong>
+          {criteria.locations.length ? <> · {criteria.locations.join(", ")}</> : <> · nationwide</>}
+          {criteria.broadened ? <> (no city matches, so widened to the whole country)</> : null}
+          {criteria.remoteOnly ? <> · remote only</> : null}
+          <> · roles: {criteria.roles.join(", ")}</>
+          {criteria.companies.length ? <> · companies: {criteria.companies.join(", ")}</> : null}
+          {criteria.providers.length ? <> · via {criteria.providers.join(" + ")}</> : null}
+          {criteria.countrySource === "default" ? <> · <Link href="#country">choose your country</Link> to search the right market</> : null}
+          {criteria.queriesSkipped > 0 ? <> · {criteria.queriesSkipped} queries skipped (time limit)</> : null}
+        </p>
+      ) : null}
 
       {status === "ready" && !results.length ? (
         <div className="empty-inline-state">No live matches for your brief right now. Try broadening your locations or target roles.</div>
