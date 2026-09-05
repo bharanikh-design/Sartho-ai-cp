@@ -2,7 +2,7 @@ import { ProductPageHeader } from "@/components/product-page-header";
 import { ResumeStudio, type StudioDraft, type TailorableRole } from "@/components/resume-studio";
 import { requireUser } from "@/lib/auth";
 import { getJobs } from "@/lib/data/jobs";
-import type { ApplicationRecord } from "@/lib/types";
+import type { ApplicationRecord, ResumeVersionRecord } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +17,7 @@ export const dynamic = "force-dynamic";
  */
 export default async function ResumeStudioPage() {
   const { supabase, user } = await requireUser();
-  const [jobs, applicationsResult, approvedResult] = await Promise.all([
+  const [jobs, applicationsResult, approvedResult, versionsResult] = await Promise.all([
     getJobs(supabase, user.id),
     supabase
       .from("applications")
@@ -31,10 +31,26 @@ export default async function ResumeStudioPage() {
       .eq("user_id", user.id)
       .eq("approval_status", "approved")
       .eq("safe_for_resume", true),
+    supabase
+      .from("resume_versions")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("version_number", { ascending: false }),
   ]);
 
   if (applicationsResult.error) throw applicationsResult.error;
   if (approvedResult.error) throw approvedResult.error;
+  /*
+   * History is additive: if the table is not there yet the page still works,
+   * it just shows the current draft on its own.
+   */
+  const versions = (versionsResult.data ?? []) as ResumeVersionRecord[];
+  const versionsByJob = new Map<string, ResumeVersionRecord[]>();
+  for (const version of versions) {
+    const list = versionsByJob.get(version.job_id) ?? [];
+    list.push(version);
+    versionsByJob.set(version.job_id, list);
+  }
 
   const jobById = new Map(jobs.map((job) => [job.id, job]));
   const applications = (applicationsResult.data ?? []) as ApplicationRecord[];
@@ -48,6 +64,7 @@ export default async function ResumeStudioPage() {
       employer: job?.employer ?? null,
       /* The ATS check reads the advert's own requirement vocabulary from here. */
       analysis: job?.rule_analysis ?? null,
+      history: versionsByJob.get(application.job_id) ?? [],
     };
   });
 

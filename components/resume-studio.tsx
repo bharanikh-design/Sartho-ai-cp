@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { scoreAts } from "@/lib/resume/ats";
-import type { ApplicationRecord, RuleAnalysis } from "@/lib/types";
+import type { ApplicationRecord, ResumeChange, ResumeVersionRecord, RuleAnalysis } from "@/lib/types";
 
 /*
  * Résumé Studio does two things: make a résumé, and check how it will read to
@@ -23,6 +23,8 @@ export type StudioDraft = {
   jobTitle: string;
   employer: string | null;
   analysis: RuleAnalysis | null;
+  /** Every draft ever generated for this role, newest first. */
+  history: ResumeVersionRecord[];
 };
 
 export type TailorableRole = {
@@ -52,6 +54,8 @@ export function ResumeStudio({
 }) {
   const router = useRouter();
   const [openId, setOpenId] = useState<string | null>(drafts[0]?.application.id ?? null);
+  /* Which saved version is being read, by draft id. Absent means the current one. */
+  const [viewing, setViewing] = useState<Record<string, string>>({});
   const [generatingId, setGeneratingId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -72,10 +76,10 @@ export function ResumeStudio({
     }
   }
 
-  async function copy(draft: StudioDraft) {
-    if (!draft.application.resume_draft) return;
-    await navigator.clipboard.writeText(draft.application.resume_draft);
-    setCopiedId(draft.application.id);
+  async function copy(text: string, draftId: string) {
+    if (!text) return;
+    await navigator.clipboard.writeText(text);
+    setCopiedId(draftId);
     window.setTimeout(() => setCopiedId(null), 1800);
   }
 
@@ -87,7 +91,7 @@ export function ResumeStudio({
         <div className="card-header">
           <div>
             <h2 className="section-heading">Your résumés</h2>
-            <p className="section-subtitle">Each draft is built only from evidence you approved, and keeps its change log.</p>
+            <p className="section-subtitle">Each draft is built only from evidence you approved. Every version is kept, so you can compare and go back.</p>
           </div>
           <span className="meta-pill">{drafts.length} draft{drafts.length === 1 ? "" : "s"}</span>
         </div>
@@ -96,7 +100,17 @@ export function ResumeStudio({
           <div className="studio-draft-list">
             {drafts.map((draft) => {
               const open = openId === draft.application.id;
-              const ats = scoreAts(draft.application.resume_draft ?? "", draft.analysis);
+              /*
+               * Every generated draft is kept now, so the reader shows whichever
+               * version is selected — with its own ATS score, which is the only
+               * way to see whether an edit actually made things better.
+               */
+              const chosen = draft.history.find((version) => version.id === viewing[draft.application.id]);
+              const current = draft.history[0];
+              const shownText = chosen?.draft ?? draft.application.resume_draft ?? "";
+              const shownLog: ResumeChange[] = chosen?.change_log ?? draft.application.resume_change_log;
+              const ats = scoreAts(shownText, draft.analysis);
+              const currentAts = scoreAts(draft.application.resume_draft ?? "", draft.analysis);
               return (
                 <article className={`studio-draft${open ? " is-open" : ""}`} key={draft.application.id}>
                   <button
@@ -107,10 +121,14 @@ export function ResumeStudio({
                   >
                     <span className="studio-draft-name">
                       <strong>{draft.application.resume_version ?? draft.jobTitle}</strong>
-                      <small>{draft.employer ?? "Employer not recorded"} · {draft.application.resume_change_log.length} changes logged</small>
+                      <small>
+                        {draft.employer ?? "Employer not recorded"}
+                        {draft.history.length > 1 ? <> · {draft.history.length} versions</> : null}
+                        {" · "}{draft.application.resume_change_log.length} changes logged
+                      </small>
                     </span>
-                    <span className="studio-ats-badge" style={{ color: stateTone[ats.score >= 70 ? "pass" : ats.score >= 40 ? "warn" : "fail"] }}>
-                      {ats.score}<small>ATS</small>
+                    <span className="studio-ats-badge" style={{ color: stateTone[currentAts.score >= 70 ? "pass" : currentAts.score >= 40 ? "warn" : "fail"] }}>
+                      {currentAts.score}<small>ATS</small>
                     </span>
                     <span aria-hidden="true" className="studio-draft-chevron">{open ? "▲" : "▼"}</span>
                   </button>
@@ -118,15 +136,41 @@ export function ResumeStudio({
                   {open ? (
                     <div className="studio-draft-body">
                       <div className="studio-draft-reader">
-                        <div className="resume-draft-label">Draft — review before use</div>
-                        <pre>{draft.application.resume_draft}</pre>
+                        {draft.history.length > 1 ? (
+                          <div className="studio-version-rail" role="group" aria-label="Résumé versions">
+                            {draft.history.map((version) => {
+                              const isShown = version.id === (chosen?.id ?? current?.id);
+                              const versionAts = scoreAts(version.draft, draft.analysis);
+                              return (
+                                <button
+                                  type="button"
+                                  key={version.id}
+                                  className={`studio-version${isShown ? " is-shown" : ""}`}
+                                  aria-pressed={isShown}
+                                  onClick={() => setViewing((state) => ({ ...state, [draft.application.id]: version.id }))}
+                                >
+                                  <strong>v{version.version_number}</strong>
+                                  <small>{versionAts.score} ATS</small>
+                                  <small>{new Date(version.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}</small>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        ) : null}
+                        <div className="resume-draft-label">
+                          {chosen && chosen.id !== current?.id
+                            ? <>Version {chosen.version_number} — an earlier draft, kept for comparison</>
+                            : <>Draft — review before use</>}
+                        </div>
+                        <pre>{shownText}</pre>
                         <div className="studio-draft-actions">
-                          <button type="button" className="secondary-button" onClick={() => void copy(draft)}>
+                          <button type="button" className="secondary-button" onClick={() => void copy(shownText, draft.application.id)}>
                             {copiedId === draft.application.id ? "Copied ✓" : "Copy draft"}
                           </button>
                           <button type="button" className="secondary-button" onClick={() => void generate(draft.jobId)} disabled={generatingId === draft.jobId}>
                             {generatingId === draft.jobId ? "Regenerating…" : "Regenerate"}
                           </button>
+                          <small className="studio-regenerate-note">Regenerating keeps this version — it is added as a new one.</small>
                         </div>
                       </div>
 
@@ -152,11 +196,11 @@ export function ResumeStudio({
                           </div>
                         ) : null}
 
-                        {draft.application.resume_change_log.length ? (
+                        {shownLog.length ? (
                           <details className="studio-change-log">
-                            <summary>What AI changed ({draft.application.resume_change_log.length})</summary>
+                            <summary>What AI changed ({shownLog.length})</summary>
                             <ul>
-                              {draft.application.resume_change_log.map((change, index) => (
+                              {shownLog.map((change, index) => (
                                 <li key={index}><strong>{change.type}</strong> {change.description}</li>
                               ))}
                             </ul>

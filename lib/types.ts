@@ -150,6 +150,22 @@ export type ResumeChange = {
   evidenceIds: string[];
 };
 
+/*
+ * One generated draft, kept forever. `save_resume_draft` used to overwrite the
+ * previous one in place, so Regenerate — the obvious move after reading an ATS
+ * score you want to improve — destroyed the version you already had.
+ */
+export type ResumeVersionRecord = {
+  id: string;
+  job_id: string;
+  version_number: number;
+  version_name: string | null;
+  draft: string;
+  change_log: ResumeChange[];
+  evidence_ids: string[];
+  created_at: string;
+};
+
 export type ApplicationRecord = {
   id: string;
   user_id: string;
