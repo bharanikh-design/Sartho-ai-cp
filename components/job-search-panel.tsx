@@ -23,6 +23,10 @@ type SearchResult = {
   overallMatch: number;
   recommendation: "apply" | "review" | "skip";
   matchedSkills: string[];
+  titleFit?: number;
+  requirementCoverage?: number;
+  closestTitle?: string | null;
+  missingRequirements?: string[];
 };
 
 /* What the server actually searched — echoed back so nobody has to guess. */
@@ -139,12 +143,26 @@ export function JobSearchPanel({ autoRun = false }: { autoRun?: boolean }) {
             {result.salary ? <span style={{ fontSize: "0.8125rem", color: "var(--text-tertiary)" }}>{result.salary}</span> : null}
             <span style={{ fontSize: "0.75rem", color: "var(--text-tertiary)" }}>{result.source}</span>
           </div>
+          {/* The score, in its parts — a bare percentage explains nothing. */}
+          {typeof result.titleFit === "number" ? (
+            <p className="match-reason">
+              {result.titleFit >= 50 && result.closestTitle
+                ? <>Title matches your <strong>{result.closestTitle}</strong> experience ({result.titleFit}%)</>
+                : <>Title is unlike anything in your history</>}
+              {typeof result.requirementCoverage === "number"
+                ? <> · you can evidence <strong>{result.requirementCoverage}%</strong> of what it asks for</>
+                : null}
+            </p>
+          ) : null}
           {result.matchedSkills.length ? (
             <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
               {result.matchedSkills.map((skill) => (
                 <span key={skill} style={{ fontSize: "0.7rem", color: "#6bcf93", background: "rgba(107,207,147,0.1)", border: "1px solid rgba(107,207,147,0.25)", padding: "3px 8px", borderRadius: "4px" }}>{skill}</span>
               ))}
             </div>
+          ) : null}
+          {result.missingRequirements?.length ? (
+            <p className="match-gap">Not yet evidenced: {result.missingRequirements.join(", ")}</p>
           ) : null}
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: "8px", flex: "none" }}>

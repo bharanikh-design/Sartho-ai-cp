@@ -1,6 +1,7 @@
 import type { CareerRoleRecord, EvidenceRecord, TargetLaneRecord } from "@/lib/types";
 import { analyseJobDescription, type JobAnalysis } from "@/lib/matching/analyse-job";
 import { buildSkillProfile } from "@/lib/matching/skill-profile";
+import { scoreTitleFit } from "@/lib/matching/title-fit";
 
 /*
  * Turning a match into a ranked opportunity.
@@ -55,15 +56,48 @@ export function alignToLanes(
   return best;
 }
 
-/**
- * One 0–100 score for ordering opportunities. Evidence backing and skill
- * coverage set the base; a role in a stated priority lane is lifted by up to
- * ~20 points, scaled by that lane's weight and how squarely the role matches.
+/** The parts of a score, kept separate so a number can always explain itself. */
+export type ScoreBreakdown = {
+  /** Having done this job before. */
+  titleFit: number;
+  /** Being able to evidence what this job asks for. */
+  requirementCoverage: number;
+  /** How well corroborated those matched capabilities are. */
+  evidenceDepth: number;
+  /** Lift from a stated priority, 0–10. */
+  priorityLift: number;
+};
+
+/*
+ * The blend. Three independent legs, because any one of them alone misleads:
+ *
+ *   Title alone   — a Business Analyst who has never touched what this
+ *                   particular advert asks for.
+ *   Coverage alone — a broad skill overlap with a job at a level or in a
+ *                   function the person has never worked in.
+ *   Depth alone    — one strong skill mentioned once.
+ *
+ * Requirement coverage carries the most weight: it is the question a person is
+ * actually asking. The priority lift is small and last, because wanting a role
+ * is not evidence of being able to do it.
  */
 export function overallMatchScore(analysis: JobAnalysis, alignment: LaneAlignment | null): number {
-  const base = analysis.evidenceBacking * 0.6 + analysis.coverage * 0.4;
-  const laneBoost = alignment ? alignment.lane.weight * 0.2 * alignment.overlap : 0;
-  return Math.max(0, Math.min(100, Math.round(base + laneBoost)));
+  const breakdown = scoreBreakdown(analysis, alignment);
+  const total =
+    breakdown.titleFit * 0.35
+    + breakdown.requirementCoverage * 0.4
+    + breakdown.evidenceDepth * 0.25
+    + breakdown.priorityLift;
+  return Math.max(0, Math.min(100, Math.round(total)));
+}
+
+export function scoreBreakdown(analysis: JobAnalysis, alignment: LaneAlignment | null): ScoreBreakdown {
+  return {
+    titleFit: analysis.titleFit,
+    requirementCoverage: analysis.requirementCoverage,
+    evidenceDepth: analysis.evidenceBacking,
+    priorityLift: alignment ? Math.round(alignment.lane.weight * 0.1 * alignment.overlap) : 0,
+  };
 }
 
 /**
@@ -87,11 +121,18 @@ export function scoreOpportunity(
   roles: CareerRoleRecord[],
   lanes: TargetLaneRecord[],
 ) {
-  const analysis = analyseJobDescription(description, buildSkillProfile(evidence, roles));
+  // Titles the person has actually held, and the ones they are aiming at.
+  const heldTitles = roles.map((role) => role.title).filter(Boolean);
+  const targetTitles = lanes.filter((lane) => lane.active).map((lane) => lane.name);
+  const titleFit = scoreTitleFit(title, heldTitles, targetTitles);
+
+  const analysis = analyseJobDescription(description, buildSkillProfile(evidence, roles), { titleFit });
   const alignment = alignToLanes(title, description, lanes);
+
   return {
     analysis: withLane(analysis, alignment),
     overallMatch: overallMatchScore(analysis, alignment),
+    breakdown: scoreBreakdown(analysis, alignment),
     evidenceBacking: analysis.evidenceBacking,
     recommendation: analysis.recommendation,
   };

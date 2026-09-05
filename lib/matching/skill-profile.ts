@@ -1,4 +1,5 @@
 import type { CareerRoleRecord, Confidence, EvidenceRecord } from "@/lib/types";
+import { capabilitiesIn, capabilityForLabel } from "@/lib/matching/skill-vocabulary";
 
 /*
  * The skill set, built from approved evidence.
@@ -8,12 +9,26 @@ import type { CareerRoleRecord, Confidence, EvidenceRecord } from "@/lib/types";
  * the difference between a profile and a list of words someone typed about
  * themselves. No model runs, so this costs nothing, returns instantly, and
  * cannot invent a skill that is not in the evidence base.
+ *
+ * Two sources feed it, and until recently only the first did:
+ *
+ *   1. The domain tags on each claim — six or so broad words like "Consulting".
+ *   2. The claim sentences themselves, read through the shared vocabulary.
+ *
+ * Reading only the tags was why matching failed. "Constructed the RTM to track
+ * business requirements" is the evidence that someone can do business analysis,
+ * and that sentence was never looked at — only the word "Consulting" filed
+ * beside it. Both are now resolved to the same canonical capability, so a
+ * résumé and a job advert are finally described in one language.
  */
 
 export type SkillStrength = "core" | "strong" | "supporting" | "emerging";
 
 export type SkillSummary = {
+  /** The person's own wording, kept so the UI never renames their experience. */
   name: string;
+  /** The shared capability this resolves to. Matching compares on this. */
+  capability: string;
   /** Approved evidence items mentioning this skill. */
   evidenceCount: number;
   /** Those items' ids, so a claim can always be traced back. */
@@ -79,6 +94,8 @@ export function buildSkillProfile(
   const roleById = new Map(roles.map((role) => [role.id, role]));
 
   type Bucket = {
+    capability: string;
+    /** Labels the person actually wrote. The display name comes from these. */
     names: string[];
     evidenceIds: string[];
     employers: Set<string>;
@@ -93,7 +110,23 @@ export function buildSkillProfile(
   let unclassified = 0;
 
   for (const item of approved) {
-    if (!item.domains.length) {
+    /*
+     * Tags and prose together. A claim with no tags is no longer invisible —
+     * its own words can still name a capability — so "unclassified" now means
+     * an item from which nothing recognisable could be read at all.
+     */
+    /*
+     * Each contribution carries both the capability it resolves to and the
+     * words it came from. Buckets key on the capability, so "ServiceNow" and
+     * "ITSM" meet; the display name stays whatever the person wrote, so the
+     * screen never renames their experience back at them.
+     */
+    const contributions = [
+      ...item.domains.map((domain) => ({ capability: capabilityForLabel(domain), label: domain.trim() })),
+      ...[...capabilitiesIn(`${item.claim} ${item.context ?? ""}`)].map((capability) => ({ capability, label: null })),
+    ].filter((entry) => entry.capability);
+
+    if (!contributions.length) {
       unclassified += 1;
       continue;
     }
@@ -101,16 +134,16 @@ export function buildSkillProfile(
     const role = item.career_role ?? (item.career_role_id ? roleById.get(item.career_role_id) ?? null : null);
     const weight = confidenceWeight[item.confidence] ?? 2;
 
-    for (const domain of item.domains) {
-      const key = comparisonForm(domain);
+    for (const { capability, label } of contributions) {
+      const key = comparisonForm(capability);
       if (!key) continue;
 
       const bucket = buckets.get(key) ?? {
-        names: [], evidenceIds: [], employers: new Set<string>(), weight: 0,
+        capability, names: [], evidenceIds: [], employers: new Set<string>(), weight: 0,
         earliest: null, latest: null, current: false, best: null,
       };
 
-      bucket.names.push(domain.trim());
+      if (label) bucket.names.push(label);
       if (!bucket.evidenceIds.includes(item.id)) bucket.evidenceIds.push(item.id);
       bucket.weight += weight;
 
@@ -138,7 +171,9 @@ export function buildSkillProfile(
     const employerCount = bucket.employers.size;
 
     return {
-      name: displayName(bucket.names),
+      // Their wording when they gave one; the capability only as a fallback.
+      name: bucket.names.length ? displayName(bucket.names) : bucket.capability,
+      capability: bucket.capability,
       evidenceCount,
       evidenceIds: bucket.evidenceIds,
       employerCount,

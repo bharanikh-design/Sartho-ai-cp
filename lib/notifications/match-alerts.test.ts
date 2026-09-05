@@ -15,6 +15,10 @@ function match(overrides: Partial<ScoredJobMatch>): ScoredJobMatch {
     overallMatch: 60,
     recommendation: "review",
     matchedSkills: ["Stakeholder management"],
+    titleFit: 80,
+    requirementCoverage: 60,
+    closestTitle: "Business Analyst",
+    missingRequirements: [],
     ...overrides,
   };
 }

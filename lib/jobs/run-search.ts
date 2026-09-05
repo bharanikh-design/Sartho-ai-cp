@@ -44,6 +44,11 @@ export type ScoredJobMatch = {
   overallMatch: number;
   recommendation: "apply" | "review" | "skip";
   matchedSkills: string[];
+  /* Why the number is what it is, so a score never arrives unexplained. */
+  titleFit: number;
+  requirementCoverage: number;
+  closestTitle: string | null;
+  missingRequirements: string[];
 };
 
 /* What was actually searched, so the page (or email) can say so. */
@@ -196,6 +201,10 @@ export async function runBriefSearch(
       overallMatch: scored.overallMatch,
       recommendation: scored.recommendation,
       matchedSkills: scored.analysis.matchedSkills?.map((skill) => skill.name).slice(0, 6) ?? [],
+      titleFit: scored.breakdown.titleFit,
+      requirementCoverage: scored.breakdown.requirementCoverage,
+      closestTitle: scored.analysis.closestTitle ?? null,
+      missingRequirements: scored.analysis.missingRequirements?.slice(0, 4) ?? [],
     };
   };
 
