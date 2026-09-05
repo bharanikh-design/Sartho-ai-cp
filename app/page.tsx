@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { DailyDigestSettings } from "@/components/daily-digest-settings";
 import { ProductPageHeader } from "@/components/product-page-header";
 import { JourneyNudgeCard } from "@/components/journey-nudge-card";
 import { requireUser } from "@/lib/auth";
@@ -16,13 +15,8 @@ export const dynamic = "force-dynamic";
 export default async function DashboardPage() {
   const { supabase, user } = await requireUser();
 
-  const [journeyResult, notificationResult, jobsResult, applicationsResult] = await Promise.all([
+  const [journeyResult, jobsResult, applicationsResult] = await Promise.all([
     loadProductJourney(supabase, user.id),
-    supabase
-      .from("notification_preferences")
-      .select("email,daily_digest_enabled")
-      .eq("user_id", user.id)
-      .maybeSingle(),
     withJwtClockSkewRetry(
       () => supabase
         .from("jobs")
@@ -36,7 +30,6 @@ export default async function DashboardPage() {
       .eq("user_id", user.id),
   ]);
 
-  if (notificationResult.error) throw notificationResult.error;
   if (jobsResult.error) throw jobsResult.error;
   if (applicationsResult.error) throw applicationsResult.error;
 
@@ -165,11 +158,6 @@ export default async function DashboardPage() {
         </div>
       </section>
 
-      <DailyDigestSettings
-        initialEmail={notificationResult.data?.email ?? user.email ?? ""}
-        initialEnabled={notificationResult.data?.daily_digest_enabled ?? false}
-        deliveryReady={Boolean(process.env.RESEND_API_KEY && process.env.SARTHO_EMAIL_FROM)}
-      />
     </div>
   );
 }

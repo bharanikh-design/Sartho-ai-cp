@@ -277,7 +277,7 @@ export function CareerDirectionEditor({
               value={laneDraft}
               onChange={(event) => setLaneDraft(event.target.value)}
               onKeyDown={(event) => event.key === "Enter" && (event.preventDefault(), addManualLane())}
-              placeholder="e.g. ServiceNow Senior Engagement Manager"
+              placeholder="Type the role title"
             />
             <button type="button" onClick={addManualLane} disabled={!laneDraft.trim()}>Add role</button>
           </div>

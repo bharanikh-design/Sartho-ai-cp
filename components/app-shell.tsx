@@ -303,14 +303,6 @@ export function AppShell({ children }: { children: ReactNode }) {
           ) : null}
         </div>
 
-        <Link href="/" className="privacy-card journey-summary-card" aria-label="Open your dashboard">
-          <span className="privacy-icon"><Icon name={activated ? "shield" : "home"} /></span>
-          <div>
-            <strong>{activated ? "Setup complete" : `Setup · ${journeyStatus?.progress ?? "—"}%`}</strong>
-            <p>{activated ? "Everything is ready — head to your dashboard." : `Next: ${journeyStatus?.currentLabel ?? "Loading your next step"}`}</p>
-            <span className="journey-card-progress" aria-hidden="true"><i style={{ width: `${journeyStatus?.progress ?? 0}%` }} /></span>
-          </div>
-        </Link>
         <div className="rail-footer"><span className="live-dot" /><span>Secure session</span><span>·</span><span>Profile-grounded</span></div>
       </aside>
 
@@ -440,5 +432,7 @@ function Icon({ name }: { name: NavigationIconName }) {
       return <svg {...common}><rect x="4" y="3.5" width="16" height="17" rx="3" /><path d="M8 8h8M8 12h8M8 16h4" /></svg>;
     case "shield":
       return <svg {...common}><path d="M12 3 5 6v5c0 4.4 2.9 7.4 7 9 4.1-1.6 7-4.6 7-9V6l-7-3Z" /><path d="M9.5 12.2 11 13.7l3.7-4" /></svg>;
+    case "bell":
+      return <svg {...common}><path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15l1.5-2Z" /><path d="M10 20.5a2 2 0 0 0 4 0" /></svg>;
   }
 }

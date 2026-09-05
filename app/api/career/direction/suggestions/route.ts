@@ -64,8 +64,10 @@ export async function POST(request: Request) {
         "Use market-recognisable role families rather than over-specific vacancy titles.",
         "Cite only supplied evidence IDs. Explain why the move is plausible in plain language.",
         "Do not repeat an existing selected priority.",
+        "If `steering` is non-empty it is the person's own instruction about what to change: every suggestion must satisfy it (for example a named function, industry, seniority, location or constraint), drop directions that contradict it, and say in each rationale how the direction fits it. Only when it cannot be satisfied by any evidence-backed direction, return the closest evidence-backed directions and say plainly in the rationale why.",
       ].join(" "),
       prompt: JSON.stringify({
+        steering: input.data.explorationPrompt,
         savedProfile: profileResult.data,
         currentGuidance: {
           headline: input.data.headline,
