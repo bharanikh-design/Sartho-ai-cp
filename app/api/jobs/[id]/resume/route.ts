@@ -4,6 +4,8 @@ import { approvedEvidenceIds, keepGroundedIds } from "@/lib/ai/grounding";
 import { createSafetyIdentifier, generateStructuredJson } from "@/lib/ai/provider";
 import { aiQuotaResponse, checkAiQuota } from "@/lib/ai/quota";
 import { getAuthenticatedUser } from "@/lib/auth";
+import { evidenceIdsIn, renderResumeText, type ResumeContent } from "@/lib/resume/content";
+import { saveResumeDraft } from "@/lib/resume/save";
 
 // Same reasoning as the deep-analysis route: the declared budget has to cover
 // the 90s the provider adapter is allowed to wait, or the host kills the
@@ -151,14 +153,16 @@ export async function POST(
      * the page.
      */
     const sections = parsed.sections
-      .map((section) => ({
+      .map((section, sectionIndex) => ({
+        id: `s${sectionIndex}`,
         heading: section.heading.trim(),
         bullets: section.bullets
           .map((bullet) => ({
             text: bullet.text.trim(),
             evidenceIds: keepGroundedIds(bullet.evidenceIds, approvedIds),
           }))
-          .filter((bullet) => bullet.text && bullet.evidenceIds.length),
+          .filter((bullet) => bullet.text && bullet.evidenceIds.length)
+          .map((bullet, index) => ({ ...bullet, id: `s${sectionIndex}b${index}`, edited: false })),
       }))
       .filter((section) => section.bullets.length);
 
@@ -170,26 +174,33 @@ export async function POST(
       evidenceIds: keepGroundedIds(change.evidenceIds, approvedIds),
     }));
 
-    const evidenceIds = [...new Set(sections.flatMap((section) => section.bullets.flatMap((bullet) => bullet.evidenceIds)))];
-    const draft = [
-      parsed.headline.trim(),
-      "",
-      "PROFESSIONAL SUMMARY",
-      parsed.professionalSummary.trim(),
-      "",
-      ...sections.flatMap((section) => [
-        section.heading.toUpperCase(),
-        ...section.bullets.map((bullet) => `• ${bullet.text}`),
-        "",
-      ]),
-    ].join("\n").trim();
+    /*
+     * The document is what gets saved, and the text is derived from it.
+     *
+     * It used to be the other way round — the structure was joined into a
+     * string here and discarded, taking the per-bullet evidence ids with it.
+     * That one step is why the draft could only be shown in a monospaced
+     * <pre>, why it could not be edited, and why a template was impossible.
+     *
+     * renderResumeText is the single encoder, shared with the editor, so the
+     * text column and the structure beside it cannot describe different
+     * documents.
+     */
+    const content: ResumeContent = {
+      headline: parsed.headline.trim(),
+      summary: parsed.professionalSummary.trim(),
+      sections,
+    };
+    const draft = renderResumeText(content);
+    const evidenceIds = evidenceIdsIn(content);
 
-    const { data: applicationId, error: saveError } = await supabase.rpc("save_resume_draft", {
-      p_job_id: id,
-      p_resume_version: parsed.versionName.trim(),
-      p_resume_draft: draft,
-      p_change_log: changeLog,
-      p_evidence_ids: evidenceIds,
+    const { applicationId, error: saveError } = await saveResumeDraft(supabase, {
+      jobId: id,
+      versionName: parsed.versionName.trim(),
+      draft,
+      changeLog,
+      evidenceIds,
+      content,
     });
     if (saveError) throw saveError;
 

@@ -165,6 +165,14 @@ describe("strength coverage, scaled by how much there was to use", () => {
     const thin = scoreAts(body("Business analysis every day."), analysis([], ["Business analysis"]));
     expect(thin.checks[0].detail).toMatch(/1 of the 1 strength/);
     expect(thin.checks[0].state).not.toBe("pass");
+    /*
+     * And the sentence has to carry the caveat too, not just the score. It
+     * read "2 of the 2 strengths ... appear in the draft" under a warning
+     * icon — both halves true, but the sentence said only the flattering one,
+     * so the icon looked like a bug. A warning over text that reads as success
+     * teaches people to ignore warnings.
+     */
+    expect(thin.checks[0].detail).toMatch(/not yet a confident read/);
 
     const full = scoreAts(
       body("Business analysis, agile delivery, data analysis and stakeholder management."),
@@ -172,6 +180,8 @@ describe("strength coverage, scaled by how much there was to use", () => {
     );
     expect(full.checks[0].detail).toMatch(/4 of the 4 strengths/);
     expect(full.checks[0].state).toBe("pass");
+    /* With enough to judge by, no caveat — a pass should read like one. */
+    expect(full.checks[0].detail).not.toMatch(/confident read/);
   });
 });
 

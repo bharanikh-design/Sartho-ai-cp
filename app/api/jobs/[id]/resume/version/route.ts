@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getAuthenticatedUser } from "@/lib/auth";
+import { evidenceIdsIn, renderResumeText } from "@/lib/resume/content";
+import { saveResumeDraft } from "@/lib/resume/save";
 
 /*
  * Save an improved draft as a new version.
@@ -23,10 +25,38 @@ const changeSchema = z.object({
   evidenceIds: z.array(z.string()).default([]),
 });
 
+/*
+ * The document the editor holds. Bounded at every level, because this is the
+ * one route a person can post arbitrary structure to.
+ */
+const contentSchema = z.object({
+  headline: z.string().trim().max(400).default(""),
+  summary: z.string().trim().max(4_000).default(""),
+  sections: z.array(z.object({
+    id: z.string().trim().max(64).default(""),
+    heading: z.string().trim().max(200).default(""),
+    bullets: z.array(z.object({
+      id: z.string().trim().max(64).default(""),
+      text: z.string().trim().min(1).max(2_000),
+      evidenceIds: z.array(z.string().max(64)).max(40).default([]),
+      edited: z.boolean().default(false),
+    })).max(60).default([]),
+  })).max(20).default([]),
+});
+
+/*
+ * `content` is the document; `draft` is the older text-only path the bullet
+ * rewriter used before the structure was kept. When content arrives the text
+ * is rendered from it here rather than taken from the request, so a client
+ * cannot save a document and a body of text that describe different résumés.
+ */
 const inputSchema = z.object({
-  draft: z.string().trim().min(50).max(40_000),
+  content: contentSchema.optional(),
+  draft: z.string().trim().min(50).max(40_000).optional(),
   versionName: z.string().trim().min(2).max(180).optional(),
   changes: z.array(changeSchema).max(60).default([]),
+}).refine((value) => value.content || value.draft, {
+  message: "Nothing to save.",
 });
 
 export async function POST(
@@ -60,12 +90,31 @@ export async function POST(
     return NextResponse.json({ error: "Sartho could not save this version." }, { status: 500 });
   }
 
-  const { data: applicationId, error } = await supabase.rpc("save_resume_draft", {
-    p_job_id: id,
-    p_resume_version: input.data.versionName ?? existing?.resume_version ?? "Tailored résumé",
-    p_resume_draft: input.data.draft,
-    p_change_log: input.data.changes,
-    p_evidence_ids: existing?.resume_evidence_ids ?? [],
+  const content = input.data.content ?? null;
+  const draft = content ? renderResumeText(content) : input.data.draft;
+  if (!draft || draft.length < 50) {
+    return NextResponse.json({ error: "There is nothing to save." }, { status: 400 });
+  }
+
+  /*
+   * Evidence ids come from the document when it carries any, because editing
+   * can remove a bullet and with it the only line a claim backed.
+   *
+   * When it carries none they are kept from the row instead. That is the case
+   * for a draft recovered from the text column — the old flattener stored one
+   * flat list for the whole document and no per-line mapping — and deriving
+   * from it would silently erase the record of what the résumé was built on.
+   */
+  const derived = content ? evidenceIdsIn(content) : [];
+  const evidenceIds = derived.length ? derived : (existing?.resume_evidence_ids ?? []);
+
+  const { applicationId, error } = await saveResumeDraft(supabase, {
+    jobId: id,
+    versionName: input.data.versionName ?? existing?.resume_version ?? "Tailored résumé",
+    draft,
+    changeLog: input.data.changes,
+    evidenceIds,
+    content,
   });
   if (error) {
     console.error("Unable to save the improved résumé version", error);
