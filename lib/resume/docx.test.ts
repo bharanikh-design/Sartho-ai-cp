@@ -3,6 +3,7 @@ import { resumeDocxBuffer, resumeFileName } from "@/lib/resume/docx";
 import type { ResumeContent } from "@/lib/resume/content";
 
 const document: ResumeContent = {
+  template: "classic",
   headline: "Bharani Kumar K — Business Analyst",
   summary: "Consulting and analytical professional with delivery experience.",
   sections: [
@@ -49,12 +50,13 @@ describe("buildResumeDocx", () => {
   });
 
   it("survives a document with nothing in it rather than throwing", async () => {
-    const buffer = await resumeDocxBuffer({ headline: "", summary: "", sections: [] });
+    const buffer = await resumeDocxBuffer({ template: "classic", headline: "", summary: "", sections: [] });
     expect(buffer.subarray(0, 2).toString()).toBe("PK");
   });
 
   it("does not fall over on a section whose bullets were all removed", async () => {
     const buffer = await resumeDocxBuffer({
+      template: "modern",
       headline: "A",
       summary: "B",
       sections: [{ id: "s0", heading: "Gone", bullets: [] }],

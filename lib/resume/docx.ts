@@ -1,5 +1,6 @@
 import { AlignmentType, Document, HeadingLevel, Packer, Paragraph, TextRun } from "docx";
 import type { ResumeContent } from "@/lib/resume/content";
+import { resumeTemplate } from "@/lib/resume/templates";
 
 /*
  * The résumé as a Word document an applicant tracking system can actually read.
@@ -19,15 +20,24 @@ import type { ResumeContent } from "@/lib/resume/content";
  *     layout is the most common reason a candidate is parsed into nonsense, and
  *     contact details in a header are frequently dropped entirely.
  *
- * Times New Roman at 11pt because it is metrically ordinary and universally
- * present; a missing font substitutes unpredictably and changes the pagination.
+ * The body is 11pt in whichever font the chosen template names, so the file
+ * matches the decision made on screen. Both are metrically ordinary and present
+ * on every machine — a font that has to be substituted changes the pagination
+ * without warning, which is how a one-page résumé becomes two on somebody
+ * else's computer.
  */
 
-const BODY_FONT = "Times New Roman";
 /** docx sizes are half-points, so 22 is 11pt. */
 const BODY_SIZE = 22;
 
 export function buildResumeDocx(content: ResumeContent): Document {
+  /*
+   * The Word file matches the template chosen on screen, so downloading does
+   * not quietly hand back a document that looks like a different decision.
+   * Both fonts are metrically ordinary and present on every machine — a font
+   * that has to be substituted changes the pagination without warning.
+   */
+  const BODY_FONT = resumeTemplate(content.template).docxFont;
   const children: Paragraph[] = [];
 
   if (content.headline.trim()) {
@@ -39,7 +49,7 @@ export function buildResumeDocx(content: ResumeContent): Document {
   }
 
   if (content.summary.trim()) {
-    children.push(sectionHeading("Professional Summary"));
+    children.push(sectionHeading("Professional Summary", BODY_FONT));
     children.push(new Paragraph({
       spacing: { after: 160 },
       children: [new TextRun({ text: content.summary.trim(), size: BODY_SIZE, font: BODY_FONT })],
@@ -51,7 +61,7 @@ export function buildResumeDocx(content: ResumeContent): Document {
     /* A heading with nothing under it reads as a section the person left empty. */
     if (!bullets.length) continue;
 
-    if (section.heading.trim()) children.push(sectionHeading(section.heading.trim()));
+    if (section.heading.trim()) children.push(sectionHeading(section.heading.trim(), BODY_FONT));
     for (const bullet of bullets) {
       children.push(new Paragraph({
         bullet: { level: 0 },
@@ -89,11 +99,11 @@ export function buildResumeDocx(content: ResumeContent): Document {
  * machine-readable structure, a bold run is a formatting accident that happens
  * to look like structure.
  */
-function sectionHeading(text: string): Paragraph {
+function sectionHeading(text: string, font: string): Paragraph {
   return new Paragraph({
     heading: HeadingLevel.HEADING_1,
     spacing: { before: 240, after: 100 },
-    children: [new TextRun({ text: text.toUpperCase(), bold: true, size: 24, font: BODY_FONT })],
+    children: [new TextRun({ text: text.toUpperCase(), bold: true, size: 24, font })],
   });
 }
 

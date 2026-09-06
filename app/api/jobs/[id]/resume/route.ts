@@ -5,6 +5,7 @@ import { createSafetyIdentifier, generateStructuredJson } from "@/lib/ai/provide
 import { aiQuotaResponse, checkAiQuota } from "@/lib/ai/quota";
 import { getAuthenticatedUser } from "@/lib/auth";
 import { evidenceIdsIn, renderResumeText, type ResumeContent } from "@/lib/resume/content";
+import { DEFAULT_TEMPLATE } from "@/lib/resume/templates";
 import { saveResumeDraft } from "@/lib/resume/save";
 
 // Same reasoning as the deep-analysis route: the declared budget has to cover
@@ -187,6 +188,7 @@ export async function POST(
      * documents.
      */
     const content: ResumeContent = {
+      template: DEFAULT_TEMPLATE,
       headline: parsed.headline.trim(),
       summary: parsed.professionalSummary.trim(),
       sections,

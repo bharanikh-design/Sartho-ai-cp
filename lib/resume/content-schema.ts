@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { DEFAULT_TEMPLATE } from "@/lib/resume/templates";
 
 /*
  * The document, as it arrives from a browser.
@@ -26,4 +27,6 @@ export const resumeContentSchema = z.object({
       edited: z.boolean().default(false),
     })).max(60).default([]),
   })).max(20).default([]),
+  /* Unrecognised or absent falls back to Classic rather than being rejected. */
+  template: z.enum(["classic", "modern"]).catch(DEFAULT_TEMPLATE).default(DEFAULT_TEMPLATE),
 });

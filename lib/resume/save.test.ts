@@ -4,6 +4,7 @@ import { saveResumeDraft } from "@/lib/resume/save";
 import type { ResumeContent } from "@/lib/resume/content";
 
 const content: ResumeContent = {
+  template: "classic",
   headline: "A",
   summary: "B",
   sections: [{ id: "s0", heading: "WORK", bullets: [{ id: "s0b0", text: "Did a thing.", evidenceIds: ["e1"], edited: false }] }],

@@ -7,6 +7,7 @@ import { atsVerdict, scoreAts } from "@/lib/resume/ats";
 import { unfilledBlanks } from "@/lib/resume/bullet-rewrite";
 import { renderResumeText, resumeContentOf, type ResumeContent } from "@/lib/resume/content";
 import { ResumeDocument, type BulletCoach } from "@/components/resume-document";
+import { RESUME_TEMPLATES } from "@/lib/resume/templates";
 import { ResumeWorkbench } from "@/components/resume-workbench";
 import type { ApplicationRecord, ResumeChange, ResumeVersionRecord, RuleAnalysis } from "@/lib/types";
 
@@ -408,6 +409,35 @@ export function ResumeStudio({
                   </button>
                 );
               })}
+            </div>
+          ) : null}
+
+          {/*
+            * Two templates, above the document rather than in a column of their
+            * own — a third column would take width from the thing being read.
+            *
+            * Both are one column with real headings and real bullet lists, so
+            * they parse identically; what changes is what a person sees. That
+            * is said here rather than dressed up as an ATS advantage, because
+            * the gallery of ten that every other builder sells is mostly
+            * two-column layouts that get people filtered out.
+            */}
+          {!isOlderVersion ? (
+            <div className="studio-templates" role="radiogroup" aria-label="Résumé template">
+              {RESUME_TEMPLATES.map((template) => (
+                <button
+                  key={template.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={content.template === template.id}
+                  className={content.template === template.id ? "is-selected" : ""}
+                  title={template.description}
+                  onClick={() => setContent({ ...content, template: template.id })}
+                >
+                  {template.name}
+                </button>
+              ))}
+              <small>Both parse the same. The difference is what a person sees.</small>
             </div>
           ) : null}
 
