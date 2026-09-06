@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normaliseCriteria } from "@/lib/jobs/run-search";
+import { normaliseCriteria, normaliseResults } from "@/lib/jobs/run-search";
 
 /*
  * The search_results row is JSON written by whatever version of run-search was
@@ -61,5 +61,73 @@ describe("normaliseCriteria", () => {
     expect(criteria.tooSenior).toBe(0);
     expect(criteria.broadened).toBe(false);
     expect(criteria.countrySource).toBe("default");
+  });
+});
+
+/*
+ * The matches sit in the same row, written by the same deploys, and were still
+ * being read with a bare `as ScoredJobMatch[]`. Two fields on this type —
+ * closestIsHeld and requirementsRead — were added after searches had already
+ * been stored, so rows missing them exist in production right now.
+ */
+describe("normaliseResults", () => {
+  const stored = {
+    title: "Business Analyst",
+    employer: "PwC",
+    location: "Sydney",
+    url: "https://example.com/jobs/1",
+    salary: null,
+    postedAt: "2026-09-01",
+    source: "Adzuna",
+    description: "Analyse things.",
+    overallMatch: 71,
+    recommendation: "apply",
+    matchedSkills: ["stakeholder management"],
+    titleFit: 80,
+    requirementCoverage: 60,
+    closestTitle: "Business Analyst",
+    missingRequirements: ["sql"],
+  };
+
+  it("fills the fields a match stored before them cannot have", () => {
+    const [match] = normaliseResults([stored]);
+    expect(match.closestIsHeld).toBe(false);
+    expect(match.requirementsRead).toBe(0);
+    /* And nothing the row did carry is lost. */
+    expect(match.title).toBe("Business Analyst");
+    expect(match.overallMatch).toBe(71);
+    expect(match.recommendation).toBe("apply");
+    expect(match.matchedSkills).toEqual(["stakeholder management"]);
+    expect(match.salary).toBeNull();
+  });
+
+  it("survives a column that is empty, null, or the wrong shape entirely", () => {
+    for (const value of [null, undefined, {}, "nonsense", 42, [null, 7, "x"]]) {
+      expect(normaliseResults(value)).toEqual([]);
+    }
+  });
+
+  it("drops a match that could not be rendered or clicked", () => {
+    expect(normaliseResults([{ ...stored, title: "" }])).toEqual([]);
+    expect(normaliseResults([{ ...stored, url: undefined }])).toEqual([]);
+    /* A good match beside a broken one still arrives. */
+    expect(normaliseResults([{ ...stored, url: "" }, stored])).toHaveLength(1);
+  });
+
+  it("falls back to review for a recommendation it does not recognise", () => {
+    expect(normaliseResults([{ ...stored, recommendation: "maybe" }])[0].recommendation).toBe("review");
+    expect(normaliseResults([{ ...stored, recommendation: "skip" }])[0].recommendation).toBe("skip");
+  });
+
+  it("drops values of the wrong type rather than passing them through", () => {
+    const [match] = normaliseResults([{
+      ...stored,
+      overallMatch: "high",
+      matchedSkills: ["sql", 7, null],
+      employer: 12,
+    }]);
+    expect(match.overallMatch).toBe(0);
+    expect(match.matchedSkills).toEqual(["sql"]);
+    expect(match.employer).toBeNull();
   });
 });

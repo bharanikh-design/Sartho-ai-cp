@@ -385,11 +385,68 @@ export async function getStoredSearch(
     .maybeSingle();
 
   if (!data || !Array.isArray(data.results) || !data.results.length) return null;
+  const results = normaliseResults(data.results);
+  if (!results.length) return null;
   return {
-    results: data.results as ScoredJobMatch[],
+    results,
     criteria: normaliseCriteria(data.criteria),
     searchedAt: typeof data.searched_at === "string" ? data.searched_at : new Date().toISOString(),
   };
+}
+
+/*
+ * The other half of the same row.
+ *
+ * `criteria` was normalised after a bare cast over it crashed Find Roles, and
+ * `results` — the same JSON column family, written by the same deploys, read on
+ * the same line — was left as `data.results as ScoredJobMatch[]`. It carries the
+ * identical risk and two live examples of it: `closestIsHeld` and
+ * `requirementsRead` were both added to this type recently, so every match
+ * stored before that deploy is missing them, and a card reading
+ * `requirementsRead` on one of those rows gets undefined.
+ *
+ * A stored match that has lost its title or its url is not a card that can be
+ * rendered or clicked, so it is dropped rather than defaulted into a row that
+ * links nowhere. Everything else defaults: a missing number reads as 0 and a
+ * missing list as empty, which shows a weak match rather than crashing.
+ */
+export function normaliseResults(stored: unknown): ScoredJobMatch[] {
+  if (!Array.isArray(stored)) return [];
+
+  const text = (input: unknown): string => (typeof input === "string" ? input : "");
+  const nullableText = (input: unknown): string | null => (typeof input === "string" && input ? input : null);
+  const count = (input: unknown): number => (typeof input === "number" && Number.isFinite(input) ? input : 0);
+  const strings = (input: unknown): string[] =>
+    Array.isArray(input) ? input.filter((item): item is string => typeof item === "string") : [];
+
+  return stored.flatMap((entry) => {
+    if (!entry || typeof entry !== "object") return [];
+    const value = entry as Partial<ScoredJobMatch>;
+    const title = text(value.title);
+    const url = text(value.url);
+    if (!title || !url) return [];
+
+    return [{
+      title,
+      url,
+      employer: nullableText(value.employer),
+      location: nullableText(value.location),
+      salary: nullableText(value.salary),
+      postedAt: nullableText(value.postedAt),
+      source: text(value.source),
+      description: text(value.description),
+      overallMatch: count(value.overallMatch),
+      recommendation:
+        value.recommendation === "apply" || value.recommendation === "skip" ? value.recommendation : "review",
+      matchedSkills: strings(value.matchedSkills),
+      titleFit: count(value.titleFit),
+      requirementCoverage: count(value.requirementCoverage),
+      closestTitle: nullableText(value.closestTitle),
+      closestIsHeld: value.closestIsHeld === true,
+      requirementsRead: count(value.requirementsRead),
+      missingRequirements: strings(value.missingRequirements),
+    }];
+  });
 }
 
 /**

@@ -159,9 +159,24 @@ export function scoreAts(draft: string, analysis: RuleAnalysis | null): AtsScore
     {
       label: "Evidence you can back, used",
       state: strengthCoverage >= 80 ? "pass" : strengthCoverage >= 50 ? "warn" : "fail",
-      detail: evidenced.length
-        ? `${evidenced.length - unusedStrengths.length} of the ${evidenced.length} strength${evidenced.length === 1 ? "" : "s"} this role wants — and that your evidence supports — appear in the draft.`
-        : "Run the role analysis first: without it there is nothing to check the draft against.",
+      /*
+       * The caveat has to be in the sentence, not only in the score.
+       *
+       * This read "2 of the 2 strengths this role wants appear in the draft"
+       * under a warning icon. Both statements were true — every matched
+       * strength was used, and two signals is too thin to be confident about —
+       * but the sentence only carried the first, so the icon looked like a
+       * mistake. A warning over text that reads as a perfect score teaches
+       * people to ignore the warnings.
+       */
+      detail: !evidenced.length
+        ? "Run the role analysis first: without it there is nothing to check the draft against."
+        : [
+            `${evidenced.length - unusedStrengths.length} of the ${evidenced.length} strength${evidenced.length === 1 ? "" : "s"} this role wants — and that your evidence supports — appear${evidenced.length - unusedStrengths.length === 1 ? "s" : ""} in the draft.`,
+            evidenced.length < MIN_STRENGTHS_FOR_CONFIDENCE
+              ? `That is only ${evidenced.length} signal${evidenced.length === 1 ? "" : "s"} to judge by, so this is not yet a confident read — the score is held back until there are ${MIN_STRENGTHS_FOR_CONFIDENCE}.`
+              : "",
+          ].filter(Boolean).join(" "),
     },
     {
       label: "Quantified achievement",

@@ -4,7 +4,7 @@ import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
-import { SITE_CONFIG } from "@/lib/config/site";
+import { AUTH_ORIGIN } from "@/lib/site";
 import sarthoIcon from "@/sartho.png";
 
 /*
@@ -722,7 +722,7 @@ export default function LoginPage() {
     const { error: failure } = await supabase.auth.signInWithOAuth({
       provider,
       options: { 
-        redirectTo: `${SITE_CONFIG.defaultAppUrl}/auth/callback?next=/`,
+        redirectTo: `${AUTH_ORIGIN}/auth/callback?next=/`,
         queryParams: provider === "google" ? { prompt: "select_account" } : undefined,
       },
     });
@@ -741,7 +741,7 @@ export default function LoginPage() {
     if (mode === "reset") {
       setBusy("reset");
       const { error: failure } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${SITE_CONFIG.defaultAppUrl}/auth/callback?next=/update-password`,
+        redirectTo: `${AUTH_ORIGIN}/auth/callback?next=/update-password`,
       });
       setBusy(null);
       if (failure) setError(friendlyAuthMessage(failure.message));

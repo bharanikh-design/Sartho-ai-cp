@@ -161,6 +161,12 @@ export type ResumeVersionRecord = {
   version_number: number;
   version_name: string | null;
   draft: string;
+  /**
+   * The version as a structured document, read with parseResumeContent — never
+   * cast. Null on versions saved before the structure was kept; those are
+   * recovered from `draft` instead.
+   */
+  content: unknown;
   change_log: ResumeChange[];
   evidence_ids: string[];
   created_at: string;
@@ -173,6 +179,8 @@ export type ApplicationRecord = {
   status: JobStatus;
   resume_version: string | null;
   resume_draft: string | null;
+  /** The current draft as a structured document. See ResumeVersionRecord.content. */
+  resume_content: unknown;
   resume_change_log: ResumeChange[];
   resume_evidence_ids: string[];
   resume_generated_at: string | null;

@@ -5,6 +5,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { scoreAts } from "@/lib/resume/ats";
 import { unfilledBlanks } from "@/lib/resume/bullet-rewrite";
+import { renderResumeText, resumeContentOf, type ResumeContent } from "@/lib/resume/content";
+import { ResumeDocument } from "@/components/resume-document";
 import { ResumeWorkbench } from "@/components/resume-workbench";
 import type { ApplicationRecord, ResumeChange, ResumeVersionRecord, RuleAnalysis } from "@/lib/types";
 
@@ -66,11 +68,15 @@ export function ResumeStudio({
   const [error, setError] = useState<string | null>(null);
 
   /*
-   * The improvement loop, per draft. `facts` is what the person typed for a
-   * bullet, `rewrites` is what came back and has not been accepted yet, and
-   * `accepted` is what will be written when they save. Nothing is persisted
-   * until Save, so abandoning a half-finished edit costs nothing.
+   * The document being edited, keyed by draft and version.
+   *
+   * Absent means "unchanged from what was saved", so an untouched draft costs
+   * nothing and switching versions cannot leak one document's edits onto
+   * another. Nothing is persisted until Save, so abandoning a half-finished
+   * edit costs nothing either.
    */
+  const [documents, setDocuments] = useState<Record<string, ResumeContent>>({});
+
   const [openBullet, setOpenBullet] = useState<string | null>(null);
   /*
    * Sartho drafts first, and the person edits. `proposals` holds the editable
@@ -79,7 +85,8 @@ export function ResumeStudio({
    */
   const [proposals, setProposals] = useState<Record<string, string>>({});
   const [asked, setAsked] = useState<Record<string, string[]>>({});
-  const [accepted, setAccepted] = useState<Record<string, Record<number, string>>>({});
+  /* Why a proposal failed, kept per bullet so it is shown at the line it belongs to. */
+  const [proposalError, setProposalError] = useState<Record<string, string>>({});
   const [busyBullet, setBusyBullet] = useState<string | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
   /*
@@ -89,32 +96,24 @@ export function ResumeStudio({
    */
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  /** The draft as it stands with every accepted rewrite applied. */
-  function withAccepted(draft: StudioDraft, text: string) {
-    const edits = accepted[draft.application.id];
-    if (!edits) return text;
-    let seen = -1;
-    return text
-      .split("\n")
-      .map((line) => {
-        if (!line.trim().startsWith("•")) return line;
-        seen += 1;
-        const replacement = edits[seen];
-        return replacement ? `• ${replacement}` : line;
-      })
-      .join("\n");
-  }
-
   /*
-   * Fired when a line is opened, not behind another button: a suggestion you
-   * have to ask for twice is not a suggestion. Every figure the model cannot
-   * know comes back as a labelled blank, so it goes first without inventing.
+   * A proposal is fetched when a line is opened, not behind another button: a
+   * suggestion you have to ask for twice is not a suggestion. Every figure the
+   * model cannot know comes back as a labelled blank, so it goes first without
+   * inventing.
+   *
+   * The guard used to include `|| busyBullet`, which meant opening a second
+   * line while the first was still in flight silently did nothing at all — and
+   * a failed request left the panel reading "Nothing drafted yet." forever,
+   * with the reason in a banner at the top of the page and no way to retry.
+   * A dead end that says nothing is worse than an error.
    */
-  async function propose(draft: StudioDraft, bullet: { index: number; text: string }) {
-    const key = `${draft.application.id}:${bullet.index}`;
-    if (proposals[key] !== undefined || busyBullet) return;
+  async function propose(draft: StudioDraft, bullet: { id: string; text: string }, force = false) {
+    const key = `${draft.application.id}:${bullet.id}`;
+    if (busyBullet === key) return;
+    if (proposals[key] !== undefined && !force) return;
     setBusyBullet(key);
-    setError(null);
+    setProposalError((state) => { const next = { ...state }; delete next[key]; return next; });
     try {
       const response = await fetch(`/api/jobs/${draft.jobId}/resume/improve`, {
         method: "POST",
@@ -126,43 +125,40 @@ export function ResumeStudio({
       setProposals((state) => ({ ...state, [key]: result.rewritten as string }));
       setAsked((state) => ({ ...state, [key]: result.questions ?? [] }));
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Sartho could not draft this line.");
+      setProposalError((state) => ({
+        ...state,
+        [key]: caught instanceof Error ? caught.message : "Sartho could not draft this line.",
+      }));
     } finally {
       setBusyBullet(null);
     }
   }
 
-  function openBulletAt(draft: StudioDraft, bullet: { index: number; text: string }) {
-    const key = `${draft.application.id}:${bullet.index}`;
+  function openBulletAt(draft: StudioDraft, bullet: { id: string; text: string }) {
+    const key = `${draft.application.id}:${bullet.id}`;
     const next = openBullet === key ? null : key;
     setOpenBullet(next);
     if (next) void propose(draft, bullet);
   }
 
-  async function saveVersion(draft: StudioDraft, text: string) {
-    const edits = accepted[draft.application.id];
-    if (!edits || savingId) return;
+  async function saveVersion(draft: StudioDraft, documentKey: string, content: ResumeContent, changes: ResumeChange[]) {
+    if (savingId) return;
     setSavingId(draft.application.id);
     setError(null);
     try {
       const response = await fetch(`/api/jobs/${draft.jobId}/resume/version`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          draft: withAccepted(draft, text),
-          changes: Object.values(edits).map((line) => ({
-            type: "reworded" as const,
-            description: `Quantified from a figure you supplied: ${line.slice(0, 160)}`,
-            evidenceIds: [],
-          })),
-        }),
+        body: JSON.stringify({ content, changes }),
       });
       const result = await response.json() as { error?: string };
       if (!response.ok) throw new Error(result.error ?? "Sartho could not save this version.");
-      setAccepted((state) => ({ ...state, [draft.application.id]: {} }));
+      setDocuments((state) => { const next = { ...state }; delete next[documentKey]; return next; });
       setProposals({});
       setAsked({});
+      setProposalError({});
       setOpenBullet(null);
+      setViewing((state) => { const next = { ...state }; delete next[draft.application.id]; return next; });
       router.refresh();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Sartho could not save this version.");
@@ -213,197 +209,286 @@ export function ResumeStudio({
    * differently because of how much room it has.
    */
   function renderWorkspace(draft: StudioDraft) {
-      const chosen = draft.history.find((version) => version.id === viewing[draft.application.id]);
-      const current = draft.history[0];
-      const shownText = chosen?.draft ?? draft.application.resume_draft ?? "";
-      const shownLog: ResumeChange[] = chosen?.change_log ?? draft.application.resume_change_log;
-      const edited = withAccepted(draft, shownText);
-      const ats = scoreAts(edited, draft.analysis);
-        /* Weak lines are read from the unedited text so indexes stay stable. */
-      const atsWeak = scoreAts(shownText, draft.analysis).weakBullets;
-      const acceptedCount = Object.keys(accepted[draft.application.id] ?? {}).length;
+    const chosen = draft.history.find((version) => version.id === viewing[draft.application.id]);
+    const current = draft.history[0];
+    const isOlderVersion = Boolean(chosen && chosen.id !== current?.id);
+
+    const storedText = chosen?.draft ?? draft.application.resume_draft ?? "";
+    const storedContent = chosen ? chosen.content : draft.application.resume_content;
+    const shownLog: ResumeChange[] = chosen?.change_log ?? draft.application.resume_change_log;
+
+    /*
+     * Structure when it was stored, and the text column read back into
+     * structure when it was not — so a draft generated before any of this
+     * existed opens in the same editor as one generated today.
+     */
+    const documentKey = `${draft.application.id}:${chosen?.id ?? "current"}`;
+    const saved = resumeContentOf(storedContent, storedText);
+    const edits = documents[documentKey];
+    const content = edits ?? saved;
+
+    if (!content) {
+      return (
+        <div className="studio-draft-body">
+          <div className="empty-inline-state">This draft is empty. Regenerate it to start again.</div>
+        </div>
+      );
+    }
+
+    const text = renderResumeText(content);
+    const dirty = Boolean(edits) && text !== storedText;
+    const ats = scoreAts(text, draft.analysis);
+
+    /*
+     * The ATS reader works on text and reports positions. renderResumeText
+     * emits bullets in document order, so the nth bullet it counted is the nth
+     * bullet here — which is what lets a flagged line be marked in the document
+     * and opened from the rail.
+     */
+    const flatBullets = content.sections.flatMap((section) => section.bullets);
+    const weak = ats.weakBullets
+      .map((bullet) => ({ bullet: flatBullets[bullet.index], text: bullet.text }))
+      .filter((entry): entry is { bullet: typeof flatBullets[number]; text: string } => Boolean(entry.bullet));
+    const weakBulletIds = new Set(weak.map((entry) => entry.bullet.id));
+
+    function setContent(next: ResumeContent) {
+      setDocuments((state) => ({ ...state, [documentKey]: next }));
+    }
+
+    /* Written from the document itself, so the log records what actually changed. */
+    function changesFor(next: ResumeContent): ResumeChange[] {
+      const before = new Map((saved?.sections ?? []).flatMap((section) => section.bullets).map((bullet) => [bullet.id, bullet.text]));
+      return next.sections
+        .flatMap((section) => section.bullets)
+        .filter((bullet) => before.has(bullet.id) && before.get(bullet.id) !== bullet.text)
+        .slice(0, 60)
+        .map((bullet) => ({
+          type: "reworded" as const,
+          description: `Edited in Résumé Studio: ${bullet.text.slice(0, 160)}`,
+          evidenceIds: bullet.evidenceIds,
+        }));
+    }
 
     return (
-        <div className="studio-draft-body">
-          <div className="studio-draft-reader">
-            {draft.history.length > 1 ? (
-              <div className="studio-version-rail" role="group" aria-label="Résumé versions">
-                {draft.history.map((version) => {
-                  const isShown = version.id === (chosen?.id ?? current?.id);
-                  const versionAts = scoreAts(version.draft, draft.analysis);
-                  return (
-                    <button
-                      type="button"
-                      key={version.id}
-                      className={`studio-version${isShown ? " is-shown" : ""}`}
-                      aria-pressed={isShown}
-                      onClick={() => setViewing((state) => ({ ...state, [draft.application.id]: version.id }))}
-                    >
-                      <strong>v{version.version_number}</strong>
-                      <small>{versionAts.score} ATS</small>
-                      <small>{new Date(version.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}</small>
-                    </button>
-                  );
-                })}
-              </div>
-            ) : null}
-            <div className="resume-draft-label">
-              {chosen && chosen.id !== current?.id
-                ? <>Version {chosen.version_number} — an earlier draft, kept for comparison</>
-                : <>Draft — review before use</>}
+      <div className="studio-draft-body">
+        <div className="studio-draft-reader">
+          {draft.history.length > 1 ? (
+            <div className="studio-version-rail" role="group" aria-label="Résumé versions">
+              {draft.history.map((version) => {
+                const isShown = version.id === (chosen?.id ?? current?.id);
+                const versionAts = scoreAts(version.draft, draft.analysis);
+                return (
+                  <button
+                    type="button"
+                    key={version.id}
+                    className={`studio-version${isShown ? " is-shown" : ""}`}
+                    aria-pressed={isShown}
+                    onClick={() => setViewing((state) => ({ ...state, [draft.application.id]: version.id }))}
+                  >
+                    <strong>v{version.version_number}</strong>
+                    <small>{versionAts.score} ATS</small>
+                    <small>{new Date(version.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}</small>
+                  </button>
+                );
+              })}
             </div>
-            <pre>{withAccepted(draft, shownText)}</pre>
-            <div className="studio-draft-actions">
-              <button type="button" className="secondary-button" onClick={() => void copy(shownText, draft.application.id)}>
-                {copiedId === draft.application.id ? "Copied ✓" : "Copy draft"}
-              </button>
-              <button type="button" className="secondary-button" onClick={() => void generate(draft.jobId)} disabled={generatingId === draft.jobId}>
-                {generatingId === draft.jobId ? "Regenerating…" : "Regenerate"}
-              </button>
-              <small className="studio-regenerate-note">Regenerating keeps this version — it is added as a new one.</small>
-            </div>
+          ) : null}
+
+          <div className="resume-draft-label">
+            {isOlderVersion
+              ? <>Version {chosen?.version_number} — an earlier draft, kept for comparison</>
+              : dirty
+                ? <>Editing — not saved yet</>
+                : <>Draft — click any line to edit it</>}
           </div>
 
-          <aside className="studio-ats">
-            <h3>ATS check</h3>
-            <ul className="studio-ats-checks">
-              {ats.checks.map((check) => (
-                <li key={check.label}>
-                  <span style={{ color: stateTone[check.state] }} aria-hidden="true">
-                    {check.state === "pass" ? "✓" : check.state === "warn" ? "!" : "×"}
-                  </span>
-                  <div><strong>{check.label}</strong><small>{check.detail}</small></div>
-                </li>
-              ))}
-            </ul>
-            {ats.unusedStrengths.length ? (
-              <div className="studio-ats-missing">
-                <strong>Strengths you can back that the draft never names</strong>
-                <div className="chip-row">
-                  {ats.unusedStrengths.slice(0, 8).map((term) => <span className="signal-chip" key={term}>{term}</span>)}
-                </div>
-                <small>Your approved evidence supports every one of these. Regenerate, or work them into a line yourself.</small>
-              </div>
+          {/*
+            * An older version is history and stays readable rather than
+            * editable: editing one would make the record of what you sent
+            * somewhere a worse record than no record at all.
+            */}
+          <ResumeDocument
+            content={content}
+            onChange={setContent}
+            weakBulletIds={weakBulletIds}
+            readOnly={isOlderVersion}
+          />
+
+          <div className="studio-draft-actions">
+            {dirty ? (
+              <button
+                type="button"
+                className="primary-button"
+                disabled={savingId === draft.application.id}
+                onClick={() => void saveVersion(draft, documentKey, content, changesFor(content))}
+              >
+                {savingId === draft.application.id ? "Saving…" : "Save as a new version"}
+              </button>
             ) : null}
-
-            {/*
-              * Stated, never suggested. These are things the role
-              * wants that the evidence cannot back — putting one in
-              * the draft would be a lie that survives the filter and
-              * fails the interview.
-              */}
-            {ats.unbackedRequirements.length ? (
-              <div className="studio-ats-unbacked">
-                <strong>What this role wants that you cannot evidence</strong>
-                <div className="chip-row">
-                  {ats.unbackedRequirements.slice(0, 8).map((term) => <span className="signal-chip is-caution" key={term}>{term}</span>)}
-                </div>
-                <small>Do not add these to the draft. They are the honest reason this role is a stretch, not a gap to write over.</small>
-              </div>
+            <button type="button" className="secondary-button" onClick={() => void copy(text, draft.application.id)}>
+              {copiedId === draft.application.id ? "Copied ✓" : "Copy draft"}
+            </button>
+            <button type="button" className="secondary-button" onClick={() => void generate(draft.jobId)} disabled={generatingId === draft.jobId}>
+              {generatingId === draft.jobId ? "Regenerating…" : "Regenerate"}
+            </button>
+            {dirty ? (
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() => setDocuments((state) => { const next = { ...state }; delete next[documentKey]; return next; })}
+              >
+                Discard edits
+              </button>
             ) : null}
+            <small className="studio-regenerate-note">
+              {dirty
+                ? "Your edits are not saved until you save them. Regenerating would replace them."
+                : "Regenerating keeps this version — it is added as a new one."}
+            </small>
+          </div>
+        </div>
 
-            {atsWeak.length ? (
-              <div className="studio-fixes">
-                <strong>Lines worth a number</strong>
-                <small>Sartho drafts the stronger version first, leaving a blank where it would otherwise have to guess. Fill those in, edit anything, then use it.</small>
-                {atsWeak.map((bullet) => {
-                  const key = `${draft.application.id}:${bullet.index}`;
-                  const isOpen = openBullet === key;
-                  const proposal = proposals[key];
-                  const blanks = proposal ? unfilledBlanks(proposal) : [];
-                  const questions = asked[key] ?? [];
-                  const isAccepted = Boolean(accepted[draft.application.id]?.[bullet.index]);
-                  return (
-                    <div className={`studio-fix${isAccepted ? " is-accepted" : ""}`} key={key}>
-                      <button
-                        type="button"
-                        className="studio-fix-line"
-                        onClick={() => openBulletAt(draft, bullet)}
-                        aria-expanded={isOpen}
-                      >
-                        {isAccepted ? "✓ " : ""}{bullet.text}
-                      </button>
-                      {isOpen && !isAccepted ? (
-                        <div className="studio-fix-form">
-                          {proposal === undefined ? (
-                            <p className="studio-fix-pending">
-                              {busyBullet === key ? "Sartho is drafting a stronger version…" : "Nothing drafted yet."}
-                            </p>
-                          ) : (
-                            <>
-                              <label htmlFor={`draft-${key}`}>
-                                Sartho&rsquo;s version. Replace anything in [brackets] — it will not guess a figure for you.
-                              </label>
-                              <textarea
-                                id={`draft-${key}`}
-                                rows={3}
-                                value={proposal}
-                                onChange={(event) => setProposals((state) => ({ ...state, [key]: event.target.value }))}
-                              />
-                              {questions.length ? (
-                                <ul className="studio-fix-questions">
-                                  {questions.map((question) => <li key={question}>{question}</li>)}
-                                </ul>
-                              ) : null}
-                              <div className="studio-fix-actions">
-                                <button
-                                  type="button"
-                                  className="primary-button"
-                                  disabled={blanks.length > 0 || !proposal.trim()}
-                                  onClick={() => {
-                                    setAccepted((state) => ({
-                                      ...state,
-                                      [draft.application.id]: {
-                                        ...(state[draft.application.id] ?? {}),
-                                        [bullet.index]: proposal.trim(),
-                                      },
-                                    }));
-                                    setOpenBullet(null);
-                                  }}
-                                >
-                                  Use this line
-                                </button>
-                                <button type="button" className="secondary-button" onClick={() => setOpenBullet(null)}>
-                                  Leave it
-                                </button>
-                                {blanks.length ? <small>Still to fill: {blanks.join(", ")}</small> : null}
-                              </div>
-                            </>
-                          )}
-                        </div>
-                      ) : null}
-                    </div>
-                  );
-                })}
+        <aside className="studio-ats">
+          <h3>ATS check</h3>
+          <ul className="studio-ats-checks">
+            {ats.checks.map((check) => (
+              <li key={check.label}>
+                <span style={{ color: stateTone[check.state] }} aria-hidden="true">
+                  {check.state === "pass" ? "✓" : check.state === "warn" ? "!" : "×"}
+                </span>
+                <div><strong>{check.label}</strong><small>{check.detail}</small></div>
+              </li>
+            ))}
+          </ul>
 
-                {acceptedCount ? (
-                  <div className="studio-fix-save">
-                    <span>{acceptedCount} line{acceptedCount === 1 ? "" : "s"} rewritten, not yet saved.</span>
+          {ats.unusedStrengths.length ? (
+            <div className="studio-ats-missing">
+              <strong>Strengths you can back that the draft never names</strong>
+              <div className="chip-row">
+                {ats.unusedStrengths.slice(0, 8).map((term) => <span className="signal-chip" key={term}>{term}</span>)}
+              </div>
+              <small>Your approved evidence supports every one of these. Regenerate, or work them into a line yourself.</small>
+            </div>
+          ) : null}
+
+          {/*
+            * Stated, never suggested. These are things the role wants that the
+            * evidence cannot back — putting one in the draft would be a lie
+            * that survives the filter and fails the interview.
+            */}
+          {ats.unbackedRequirements.length ? (
+            <div className="studio-ats-unbacked">
+              <strong>What this role wants that you cannot evidence</strong>
+              <div className="chip-row">
+                {ats.unbackedRequirements.slice(0, 8).map((term) => <span className="signal-chip is-caution" key={term}>{term}</span>)}
+              </div>
+              <small>Do not add these to the draft. They are the honest reason this role is a stretch, not a gap to write over.</small>
+            </div>
+          ) : null}
+
+          {weak.length && !isOlderVersion ? (
+            <div className="studio-fixes">
+              <strong>Lines worth a number</strong>
+              <small>Sartho drafts the stronger version first, leaving a blank where it would otherwise have to guess. Fill those in, edit anything, then use it.</small>
+              {weak.map(({ bullet }) => {
+                const key = `${draft.application.id}:${bullet.id}`;
+                const isOpen = openBullet === key;
+                const proposal = proposals[key];
+                const failed = proposalError[key];
+                const blanks = proposal ? unfilledBlanks(proposal) : [];
+                const questions = asked[key] ?? [];
+                return (
+                  <div className="studio-fix" key={key}>
                     <button
                       type="button"
-                      className="primary-button"
-                      disabled={savingId === draft.application.id}
-                      onClick={() => void saveVersion(draft, shownText)}
+                      className="studio-fix-line"
+                      onClick={() => openBulletAt(draft, bullet)}
+                      aria-expanded={isOpen}
                     >
-                      {savingId === draft.application.id ? "Saving…" : "Save as a new version"}
+                      {bullet.text}
                     </button>
+                    {isOpen ? (
+                      <div className="studio-fix-form">
+                        {failed ? (
+                          /*
+                            * The reason, at the line it happened to, with a way
+                            * forward. This used to read "Nothing drafted yet."
+                            * and stay that way — the error was in a banner at
+                            * the top of the page and there was no retry.
+                            */
+                          <div className="studio-fix-failed" role="alert">
+                            <p>{failed}</p>
+                            <button type="button" className="secondary-button" onClick={() => void propose(draft, bullet, true)}>
+                              Try again
+                            </button>
+                          </div>
+                        ) : proposal === undefined ? (
+                          <p className="studio-fix-pending">Sartho is drafting a stronger version…</p>
+                        ) : (
+                          <>
+                            <label htmlFor={`draft-${key}`}>
+                              Sartho&rsquo;s version. Replace anything in [brackets] — it will not guess a figure for you.
+                            </label>
+                            <textarea
+                              id={`draft-${key}`}
+                              rows={3}
+                              value={proposal}
+                              onChange={(event) => setProposals((state) => ({ ...state, [key]: event.target.value }))}
+                            />
+                            {questions.length ? (
+                              <ul className="studio-fix-questions">
+                                {questions.map((question) => <li key={question}>{question}</li>)}
+                              </ul>
+                            ) : null}
+                            <div className="studio-fix-actions">
+                              <button
+                                type="button"
+                                className="primary-button"
+                                disabled={blanks.length > 0 || !proposal.trim()}
+                                onClick={() => {
+                                  setContent({
+                                    ...content,
+                                    sections: content.sections.map((section) => ({
+                                      ...section,
+                                      bullets: section.bullets.map((entry) =>
+                                        entry.id === bullet.id
+                                          ? { ...entry, text: proposal.trim(), edited: true }
+                                          : entry,
+                                      ),
+                                    })),
+                                  });
+                                  setOpenBullet(null);
+                                }}
+                              >
+                                Use this line
+                              </button>
+                              <button type="button" className="secondary-button" onClick={() => setOpenBullet(null)}>
+                                Leave it
+                              </button>
+                              {blanks.length ? <small>Still to fill: {blanks.join(", ")}</small> : null}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    ) : null}
                   </div>
-                ) : null}
-              </div>
-            ) : null}
+                );
+              })}
+            </div>
+          ) : null}
 
-            {shownLog.length ? (
-              <details className="studio-change-log">
-                <summary>What AI changed ({shownLog.length})</summary>
-                <ul>
-                  {shownLog.map((change, index) => (
-                    <li key={index}><strong>{change.type}</strong> {change.description}</li>
-                  ))}
-                </ul>
-              </details>
-            ) : null}
-          </aside>
-        </div>
+          {shownLog.length ? (
+            <details className="studio-change-log">
+              <summary>What AI changed ({shownLog.length})</summary>
+              <ul>
+                {shownLog.map((change, index) => (
+                  <li key={index}><strong>{change.type}</strong> {change.description}</li>
+                ))}
+              </ul>
+            </details>
+          ) : null}
+        </aside>
+      </div>
     );
   }
 
@@ -426,49 +511,54 @@ export function ResumeStudio({
           <div className="studio-draft-list">
             {drafts.map((draft) => {
               const open = openId === draft.application.id;
-              /*
-               * Every generated draft is kept now, so the reader shows whichever
-               * version is selected — with its own ATS score, which is the only
-               * way to see whether an edit actually made things better.
-               */
               /* The collapsed row shows the current version's score, never a draft edit. */
               const currentAts = scoreAts(draft.application.resume_draft ?? "", draft.analysis);
               return (
                 <article className={`studio-draft${open ? " is-open" : ""}`} key={draft.application.id}>
-                  <button
-                    type="button"
-                    className="studio-draft-head"
-                    onClick={() => setOpenId(open ? null : draft.application.id)}
-                    aria-expanded={open}
-                  >
-                    <span className="studio-draft-name">
-                      <strong>{draft.application.resume_version ?? draft.jobTitle}</strong>
-                      <small>
-                        {draft.employer ?? "Employer not recorded"}
-                        {draft.history.length > 1 ? <> · {draft.history.length} versions</> : null}
-                        {" · "}{draft.application.resume_change_log.length} changes logged
-                      </small>
-                    </span>
-                    <span className="studio-ats-badge" style={{ color: stateTone[currentAts.score >= 70 ? "pass" : currentAts.score >= 40 ? "warn" : "fail"] }}>
-                      {currentAts.score}<small>ATS</small>
-                    </span>
-                    <span aria-hidden="true" className="studio-draft-chevron">{open ? "▲" : "▼"}</span>
-                  </button>
-                  {/*
-                    * An icon, sitting in its own lane at the end of the row.
-                    * It was a text button positioned on top of the score, which
-                    * covered it. Outside the row button because a button inside
-                    * a button is invalid and the browser stops firing one.
-                    */}
-                  <button
-                    type="button"
-                    className="studio-expand"
-                    title="Open editor"
-                    aria-label={`Open the editor for ${draft.application.resume_version ?? draft.jobTitle}`}
-                    onClick={() => { setOpenId(draft.application.id); setExpandedId(draft.application.id); }}
-                  >
-                    <span aria-hidden="true">⤢</span>
-                  </button>
+                  <div className="studio-draft-row">
+                    <button
+                      type="button"
+                      className="studio-draft-head"
+                      onClick={() => setOpenId(open ? null : draft.application.id)}
+                      aria-expanded={open}
+                    >
+                      <span className="studio-draft-name">
+                        <strong>{draft.application.resume_version ?? draft.jobTitle}</strong>
+                        <small>
+                          {draft.employer ?? "Employer not recorded"}
+                          {draft.history.length > 1 ? <> · {draft.history.length} versions</> : null}
+                          {" · "}{draft.application.resume_change_log.length} changes logged
+                        </small>
+                      </span>
+                      <span className="studio-ats-badge" style={{ color: stateTone[currentAts.score >= 70 ? "pass" : currentAts.score >= 40 ? "warn" : "fail"] }}>
+                        {currentAts.score}<small>ATS</small>
+                      </span>
+                    </button>
+
+                    {/*
+                      * Beside the score, where the eye already is after reading
+                      * it — and outside the row button, because a button inside
+                      * a button is invalid and the browser stops firing one.
+                      */}
+                    <button
+                      type="button"
+                      className="studio-expand"
+                      title="Open the full-width editor"
+                      aria-label={`Open the full-width editor for ${draft.application.resume_version ?? draft.jobTitle}`}
+                      onClick={() => { setOpenId(draft.application.id); setExpandedId(draft.application.id); }}
+                    >
+                      <span aria-hidden="true">⤢</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      className="studio-draft-chevron"
+                      aria-label={open ? "Collapse this draft" : "Expand this draft"}
+                      onClick={() => setOpenId(open ? null : draft.application.id)}
+                    >
+                      <span aria-hidden="true">{open ? "▲" : "▼"}</span>
+                    </button>
+                  </div>
 
                   {open ? renderWorkspace(draft) : null}
                 </article>

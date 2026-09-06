@@ -10,7 +10,13 @@ jobs:
   test-and-lint:
     name: Typecheck, Lint, and Test
     runs-on: ubuntu-latest
-    
+
+    # Supplied so `next build` can construct its clients. Placeholders, not
+    # secrets: the build renders pages, it never reaches this project.
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_ci_placeholder
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -32,3 +38,10 @@ jobs:
         
       - name: Run unit tests
         run: npm run test
+
+      # The gate the other three cannot be: `export const metadata` in a file
+      # carrying "use client" typechecks, lints and tests clean, and fails the
+      # production build outright. That exact mistake shipped from main once and
+      # broke every deploy until it was found by hand.
+      - name: Build
+        run: npm run build
