@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createSafetyIdentifier, generateStructuredJson } from "@/lib/ai/provider";
+import { classifyAiFailure, describeAiFailure, REWRITE_SUBJECT } from "@/lib/ai/failure";
 import { aiQuotaResponse, checkAiQuota } from "@/lib/ai/quota";
 import { getAuthenticatedUser } from "@/lib/auth";
 import { BULLET_PROPOSE_RULES, BULLET_REWRITE_RULES, inventedNumbersIn } from "@/lib/resume/bullet-rewrite";
@@ -34,16 +35,28 @@ const inputSchema = z.object({
   fact: z.string().trim().min(1).max(400).optional(),
 });
 
-const outputSchema = z.object({
-  rewritten: z.string().trim().min(10).max(600),
-  usedFact: z.boolean(),
+/*
+ * Strict about truth, forgiving about shape.
+ *
+ * These used to be `z.string().min(10).max(600)` and
+ * `z.array(z.string().min(4).max(160)).max(4)`, parsed with `.parse()`. So a
+ * model that returned five questions instead of four, or one question a little
+ * over the cap, threw — and a perfectly good rewritten line was thrown away
+ * with it, behind a generic 500 that named none of this.
+ *
+ * None of those bounds protect anybody. The bound that matters is
+ * inventedNumbersIn below, which refuses a figure the person never gave, and
+ * that one stays absolute. Everything else is presentation: take what came
+ * back, trim it to what fits, and say so plainly when there is nothing usable.
+ */
+const looseOutputSchema = z.object({
+  rewritten: z.string(),
+  questions: z.array(z.string()).optional(),
+  usedFact: z.boolean().optional(),
 });
 
-/* Propose mode also names what would make the line strongest. */
-const proposeSchema = z.object({
-  rewritten: z.string().trim().min(10).max(600),
-  questions: z.array(z.string().trim().min(4).max(160)).max(4).default([]),
-});
+/** The longest a résumé bullet can plausibly be before it is not one. */
+const MAX_BULLET_LENGTH = 600;
 
 const jsonSchema = {
   type: "object",
@@ -112,8 +125,27 @@ export async function POST(
       }),
     });
 
-    const parsed = proposing ? proposeSchema.parse(raw) : outputSchema.parse(raw);
+    const parsed = looseOutputSchema.parse(raw);
     const rewritten = parsed.rewritten.replace(/^[•\-*]\s*/, "").trim();
+
+    if (rewritten.length < 10) {
+      console.error("Bullet rewrite came back empty", { length: rewritten.length });
+      return NextResponse.json({
+        error: "Sartho's AI provider returned an empty line, so your draft is unchanged. Try again.",
+      }, { status: 502 });
+    }
+    if (rewritten.length > MAX_BULLET_LENGTH) {
+      console.error("Bullet rewrite came back too long", { length: rewritten.length });
+      return NextResponse.json({
+        error: "Sartho drafted a paragraph rather than a bullet, so it was discarded. Your draft is unchanged.",
+      }, { status: 502 });
+    }
+
+    /* Four at most, empties dropped. A long question is still a usable question. */
+    const questions = (parsed.questions ?? [])
+      .map((question) => question.trim())
+      .filter((question) => question.length >= 4)
+      .slice(0, 4);
 
     /*
      * The same guard both ways. Proposing, the only permitted figures are the
@@ -131,14 +163,38 @@ export async function POST(
     return NextResponse.json({
       rewritten,
       proposed: proposing,
-      questions: proposing ? (parsed as z.infer<typeof proposeSchema>).questions : [],
-      usedFact: proposing ? false : (parsed as z.infer<typeof outputSchema>).usedFact,
+      questions: proposing ? questions : [],
+      usedFact: proposing ? false : (parsed.usedFact ?? false),
       unchanged: rewritten === input.data.bullet.trim(),
     });
   } catch (caught) {
     console.error("Bullet rewrite failed", caught);
-    return NextResponse.json({
-      error: "Sartho could not rewrite this line. Your draft is unchanged.",
-    }, { status: 500 });
+
+    /*
+     * Say which of the things that can go wrong went wrong.
+     *
+     * This returned "Sartho could not rewrite this line. Your draft is
+     * unchanged." for every failure — out of credit, wrong key, retired model,
+     * rate limit, malformed output, all of it. The provider had already
+     * classified the failure into a sentence naming the lever somebody could
+     * pull, and this threw that away, leaving a Try again button that would
+     * fail the same way for ever with nothing on screen to explain it.
+     *
+     * The draft route uses the quality model and this one uses the fast model,
+     * so "the résumé generated fine but the rewrite fails" is a real and
+     * likely state — and one nobody could diagnose from the old message.
+     */
+    if (caught instanceof z.ZodError) {
+      return NextResponse.json({
+        error: "Sartho's AI provider answered in a shape Sartho could not read, so your draft is unchanged. Try again.",
+      }, { status: 502 });
+    }
+
+    const raw = caught instanceof Error ? caught.message : "";
+    const kind = classifyAiFailure(raw);
+    return NextResponse.json(
+      { error: describeAiFailure(raw, REWRITE_SUBJECT) },
+      { status: kind === "rate-limit" ? 429 : 502 },
+    );
   }
 }

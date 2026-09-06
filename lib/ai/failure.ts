@@ -43,26 +43,58 @@ export function classifyAiFailure(message: string): AiFailureKind {
 }
 
 /*
+ * What the provider was being asked to do, so the sentence fits where it is
+ * shown.
+ *
+ * This wording was written for the résumé upload and said so — "could not read
+ * the document", "nothing is wrong with your résumé". Shown beside a single
+ * bullet in the Studio, that is about a different thing entirely, which is part
+ * of why the rewrite route stopped using it and invented its own dead-end
+ * message instead. The classification is the reusable part; the noun is not.
+ */
+export type AiFailureSubject = {
+  /** What the provider could not do: "read the document", "rewrite that line". */
+  action: string;
+  /** What is definitely not at fault: "your résumé", "your draft". */
+  reassurance: string;
+  /** What the person should do again: "upload it again", "try it again". */
+  retry: string;
+};
+
+export const DOCUMENT_SUBJECT: AiFailureSubject = {
+  action: "read the document",
+  reassurance: "your résumé",
+  retry: "upload it again",
+};
+
+export const REWRITE_SUBJECT: AiFailureSubject = {
+  action: "rewrite that line",
+  reassurance: "your draft",
+  retry: "try it again",
+};
+
+/*
  * The reader is the person who owns the deployment, so the message names the
  * lever they actually have rather than apologising in the abstract.
  */
-export function describeAiFailure(message: string): string {
+export function describeAiFailure(message: string, subject: AiFailureSubject = DOCUMENT_SUBJECT): string {
+  const { action, reassurance, retry } = subject;
   switch (classifyAiFailure(message)) {
     case "credit":
-      return "Sartho's selected AI provider has run out of credit, so it could not read the document. Nothing is wrong with your résumé. Top up the provider account and upload it again.";
+      return `Sartho's selected AI provider has run out of credit, so it could not ${action}. Nothing is wrong with ${reassurance}. Top up the provider account and ${retry}.`;
     case "auth":
-      return "Sartho's AI provider rejected its key, so it could not read the document. The key needs correcting in the deployment's environment variables.";
+      return `Sartho's AI provider rejected its key, so it could not ${action}. The key needs correcting in the deployment's environment variables.`;
     case "rate-limit":
-      return "Sartho's AI provider is refusing requests for the moment. Nothing is wrong with your résumé — wait a minute and upload it again.";
+      return `Sartho's AI provider is refusing requests for the moment. Nothing is wrong with ${reassurance} — wait a minute and ${retry}.`;
     case "timeout":
-      return "Reading the document took longer than Sartho waits. Try it again, and if it keeps happening the document may be unusually long.";
+      return `Sartho waited as long as it waits and the provider did not answer, so it could not ${action}. Nothing is wrong with ${reassurance} — ${retry}.`;
     case "model":
-      return "Sartho's selected AI model is no longer available, so it could not read the document. Nothing is wrong with your résumé. The administrator needs to set a current model name in the deployment's environment variables.";
+      return `Sartho's selected AI model is no longer available, so it could not ${action}. Nothing is wrong with ${reassurance}. The administrator needs to set a current model name in the deployment's environment variables.`;
     default:
       // The raw provider message is logged server-side for diagnostics; it must
-      // never be printed to the person uploading a résumé — it reads as a Sartho
+      // never be printed to the person using the product — it reads as a Sartho
       // bug and can leak internal request IDs and provider URLs.
-      return "Sartho's AI provider could not read the document. Nothing is wrong with your résumé. Try again, and if it continues ask the Sartho administrator to check the provider.";
+      return `Sartho's AI provider could not ${action}. Nothing is wrong with ${reassurance}. Try again, and if it continues ask the Sartho administrator to check the provider.`;
   }
 }
 
