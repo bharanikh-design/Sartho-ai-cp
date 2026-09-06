@@ -27,6 +27,8 @@
  */
 
 /** The literal heading the encoder writes above the summary paragraph. */
+import { DEFAULT_TEMPLATE, normaliseTemplate, type ResumeTemplateId } from "@/lib/resume/templates";
+
 export const SUMMARY_HEADING = "PROFESSIONAL SUMMARY";
 
 /*
@@ -63,6 +65,12 @@ export type ResumeContent = {
   headline: string;
   summary: string;
   sections: ResumeSection[];
+  /**
+   * How it is set on the page. Part of the document because it is a decision
+   * about this résumé, not a preference about the app — two drafts for two
+   * different employers can reasonably want different typography.
+   */
+  template: ResumeTemplateId;
 };
 
 function bulletId(sectionIndex: number, bulletIndex: number) {
@@ -74,7 +82,7 @@ function sectionId(sectionIndex: number) {
 }
 
 export function emptyContent(): ResumeContent {
-  return { headline: "", summary: "", sections: [] };
+  return { headline: "", summary: "", sections: [], template: DEFAULT_TEMPLATE };
 }
 
 /** Whether a document carries anything worth rendering. */
@@ -244,6 +252,7 @@ export function parseResumeContent(stored: unknown): ResumeContent | null {
     headline: text(value.headline).trim(),
     summary: text(value.summary).trim(),
     sections,
+    template: normaliseTemplate(value.template),
   };
   return hasContent(content) ? content : null;
 }

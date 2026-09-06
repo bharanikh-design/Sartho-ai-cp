@@ -210,6 +210,31 @@
  * of an applicant tracking system failing to parse a candidate, so the layout
  * that scores well here is the layout that survives out there.
  */
+/*
+ * The template picker, above the document rather than beside it. A third column
+ * would take width from the thing being read, and reading is what this page is
+ * for.
+ */
+.studio-templates { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 10px; }
+.studio-templates button { border: 1px solid var(--line); border-radius: 999px; padding: 5px 13px; color: var(--text-secondary); background: rgba(255,255,255,.03); font-family: var(--font-sans); font-size: var(--text-2xs); font-weight: 650; cursor: pointer; }
+.studio-templates button:hover { border-color: #79a58f; color: var(--text); }
+.studio-templates button.is-selected { border-color: rgba(107,207,147,.55); color: var(--text); background: rgba(107,207,147,.12); }
+.studio-templates small { flex-basis: 100%; color: var(--text-tertiary); font-size: var(--text-2xs); }
+
+/*
+ * What each template actually is.
+ *
+ * Both are one column with real headings and real bullet lists — they parse
+ * identically, and the difference is typographic. Anything more (a sidebar, a
+ * skills column, a photo) would look like a richer choice and would be the
+ * thing that gets a candidate filtered out before a person reads a word.
+ */
+.resume-doc[data-template="modern"] { font-family: var(--font-sans); font-size: 13.5px; line-height: 1.5; }
+.resume-doc[data-template="modern"] .resume-doc-headline { font-size: 23px; letter-spacing: -.02em; }
+.resume-doc[data-template="modern"] .resume-doc-heading { margin-top: 20px; padding-bottom: 4px; border-bottom: 0; color: #8fdcb2; font-size: 11px; letter-spacing: .08em; }
+.resume-doc[data-template="modern"] .resume-doc-heading::after { content: ""; display: block; width: 34px; height: 2px; margin-top: 5px; border-radius: 2px; background: rgba(107,207,147,.55); }
+.resume-doc[data-template="modern"] .resume-doc-bullets { gap: 0; }
+
 .resume-doc { max-height: 620px; margin: 10px 0 0; overflow: auto; border: 1px solid var(--line); border-radius: 12px; padding: 26px 28px; background: rgba(255,255,255,.035); color: var(--text); font-family: var(--font-serif, Charter, "Bitstream Charter", Georgia, serif); font-size: 14px; line-height: 1.55; }
 .studio-overlay-body .resume-doc { max-height: none; }
 
@@ -556,3 +581,74 @@ h2.resume-doc-heading.resume-doc-field { margin-bottom: 0; border-bottom: 1px so
 :root:not([data-theme="light"]) .rank-badge.rank-moderate { color: #e6c079; background: rgba(180,128,42,.2); }
 :root:not([data-theme="light"]) .rank-badge.rank-stretch { color: #bcaef0; background: rgba(120,100,220,.2); }
 :root:not([data-theme="light"]) .rank-badge.rank-unclear { color: #a2b1a9; background: rgba(255,255,255,.07); }
+
+
+/*
+ * What goes on the paper.
+ *
+ * PDF is produced by the browser's own print pipeline rather than a library,
+ * and that is a deliberate choice about the machine that reads it first: every
+ * client-side shortcut (html2canvas and its relatives) rasterises the page, and
+ * a picture of a résumé scores zero with every applicant tracking system that
+ * opens it. Printing keeps the text selectable, keeps real headings and real
+ * list items, and uses the person's own paper size.
+ *
+ * The cost is that the page must be told what a résumé is and what is app. On
+ * screen the document is a grid of textareas — which print with borders,
+ * scrollbars and clipped overflow — so a clean read-only copy is put on the
+ * page instead, and everything else is removed rather than hidden: display
+ * none, so nothing reserves space or drags a stray page break with it.
+ */
+.resume-print { display: none; }
+
+@media print {
+  /* Black on white, whatever the viewer's theme. Ink is expensive and grey text photocopies badly. */
+  :root, body { background: #fff !important; color: #000 !important; }
+
+  body * { visibility: hidden; }
+  .resume-print, .resume-print * { visibility: visible; }
+
+  .resume-print {
+    display: block;
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
+  .resume-print .resume-doc {
+    max-height: none;
+    overflow: visible;
+    border: 0;
+    border-radius: 0;
+    padding: 0;
+    background: transparent;
+    color: #000;
+    font-size: 11pt;
+    line-height: 1.4;
+  }
+
+  .resume-print .resume-doc-headline { font-size: 17pt; text-align: center; }
+
+  /* Modern: name to the left, sans body, a short rule rather than a full one. */
+  .resume-print .resume-doc[data-template="modern"] { font-family: Calibri, Carlito, "Helvetica Neue", Arial, sans-serif; font-size: 10.5pt; line-height: 1.35; }
+  .resume-print .resume-doc[data-template="modern"] .resume-doc-headline { text-align: left; }
+  .resume-print .resume-doc[data-template="modern"] .resume-doc-heading { border-bottom: 0; }
+  .resume-print .resume-doc[data-template="modern"] .resume-doc-heading::after { content: ""; display: block; width: 28pt; height: 1pt; margin-top: 3pt; background: #000; }
+  .resume-print .resume-doc-heading {
+    margin: 16pt 0 4pt;
+    border-bottom: 0.5pt solid #000;
+    color: #000;
+    font-size: 10pt;
+  }
+  .resume-print .resume-doc-summary { color: #000; }
+  .resume-print .resume-doc-bullets li { color: #000; }
+
+  /* A heading orphaned at the foot of a page, or a bullet split across two, reads as a mistake. */
+  .resume-print .resume-doc-heading { break-after: avoid; page-break-after: avoid; }
+  .resume-print .resume-doc-bullets li { break-inside: avoid; page-break-inside: avoid; }
+
+  /* One inch, the margin every reviewer expects — and the same as the Word file. */
+  @page { margin: 1in; }
+}

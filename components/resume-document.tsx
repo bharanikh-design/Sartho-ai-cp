@@ -206,7 +206,7 @@ export function ResumeDocument({
 
   if (readOnly) {
     return (
-      <article className="resume-doc is-readonly" aria-label="Résumé draft">
+      <article className="resume-doc is-readonly" data-template={content.template} aria-label="Résumé draft">
         <h1 className="resume-doc-headline">{content.headline}</h1>
         {content.summary ? (
           <>
@@ -227,7 +227,7 @@ export function ResumeDocument({
   }
 
   return (
-    <article className="resume-doc" aria-label="Résumé draft, editable">
+    <article className="resume-doc" data-template={content.template} aria-label="Résumé draft, editable">
       <AutoTextarea
         className="resume-doc-headline resume-doc-field"
         ariaLabel="Headline"

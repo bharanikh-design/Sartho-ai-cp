@@ -7,6 +7,7 @@ import { atsVerdict, scoreAts } from "@/lib/resume/ats";
 import { unfilledBlanks } from "@/lib/resume/bullet-rewrite";
 import { renderResumeText, resumeContentOf, type ResumeContent } from "@/lib/resume/content";
 import { ResumeDocument, type BulletCoach } from "@/components/resume-document";
+import { RESUME_TEMPLATES } from "@/lib/resume/templates";
 import { ResumeWorkbench } from "@/components/resume-workbench";
 import type { ApplicationRecord, ResumeChange, ResumeVersionRecord, RuleAnalysis } from "@/lib/types";
 
@@ -89,6 +90,9 @@ export function ResumeStudio({
   const [proposalError, setProposalError] = useState<Record<string, string>>({});
   const [busyBullet, setBusyBullet] = useState<string | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  /* The draft being printed, so only that one is put on the page. */
+  const [printingId, setPrintingId] = useState<string | null>(null);
   /*
    * The expanded editor. The inline panel is a squeezed two-column strip; a
    * résumé is a document and wants the width. Same workspace either way — the
@@ -165,6 +169,66 @@ export function ResumeStudio({
     } finally {
       setSavingId(null);
     }
+  }
+
+  /*
+   * Word, built on the server from the document on screen.
+   *
+   * The content is posted rather than read from the row, because what somebody
+   * wants to download is what they are looking at — including edits they have
+   * not saved. Downloading the saved version while the editor shows something
+   * else is a mismatch nobody notices until after the file has been sent.
+   */
+  async function downloadDocx(draft: StudioDraft, content: ResumeContent) {
+    if (downloadingId) return;
+    setDownloadingId(draft.application.id);
+    setError(null);
+    try {
+      const response = await fetch("/api/resume/download", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          content,
+          versionName: draft.application.resume_version ?? draft.jobTitle,
+          employer: draft.employer,
+        }),
+      });
+      if (!response.ok) {
+        const result = await response.json().catch(() => ({})) as { error?: string };
+        throw new Error(result.error ?? "Sartho could not build the Word file.");
+      }
+      const blob = await response.blob();
+      const name = response.headers.get("Content-Disposition")?.match(/filename="([^"]+)"/)?.[1] ?? "Resume.docx";
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = name;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Sartho could not build the Word file.");
+    } finally {
+      setDownloadingId(null);
+    }
+  }
+
+  /*
+   * PDF through the browser's own print dialog, on purpose.
+   *
+   * Every shortcut here rasterises the page — html2canvas and friends produce a
+   * picture of a résumé, and a picture scores zero with every applicant tracking
+   * system that opens it. Printing keeps the text as text, gets the person's own
+   * paper size and margins, and costs no dependency. The print stylesheet puts
+   * a clean read-only copy of the document on the page and hides everything
+   * else, so what prints is the résumé and not the editor around it.
+   */
+  function downloadPdf(draft: StudioDraft) {
+    setPrintingId(draft.application.id);
+    /* One frame, so the print-only copy is in the DOM before the dialog opens. */
+    window.requestAnimationFrame(() => {
+      window.print();
+      setPrintingId(null);
+    });
   }
 
   async function generate(jobId: string) {
@@ -348,6 +412,35 @@ export function ResumeStudio({
             </div>
           ) : null}
 
+          {/*
+            * Two templates, above the document rather than in a column of their
+            * own — a third column would take width from the thing being read.
+            *
+            * Both are one column with real headings and real bullet lists, so
+            * they parse identically; what changes is what a person sees. That
+            * is said here rather than dressed up as an ATS advantage, because
+            * the gallery of ten that every other builder sells is mostly
+            * two-column layouts that get people filtered out.
+            */}
+          {!isOlderVersion ? (
+            <div className="studio-templates" role="radiogroup" aria-label="Résumé template">
+              {RESUME_TEMPLATES.map((template) => (
+                <button
+                  key={template.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={content.template === template.id}
+                  className={content.template === template.id ? "is-selected" : ""}
+                  title={template.description}
+                  onClick={() => setContent({ ...content, template: template.id })}
+                >
+                  {template.name}
+                </button>
+              ))}
+              <small>Both parse the same. The difference is what a person sees.</small>
+            </div>
+          ) : null}
+
           <div className="resume-draft-label">
             {isOlderVersion
               ? <>Version {chosen?.version_number} — an earlier draft, kept for comparison</>
@@ -369,6 +462,20 @@ export function ResumeStudio({
             readOnly={isOlderVersion}
           />
 
+          {/*
+            * What actually goes on the paper.
+            *
+            * The same read-only render the version history uses, so the printed
+            * file cannot drift from what the editor shows — and it is plain
+            * headings and list items rather than the textareas on screen, which
+            * print with borders, scrollbars and clipped text.
+            */}
+          {printingId === draft.application.id ? (
+            <div className="resume-print" aria-hidden="true">
+              <ResumeDocument content={content} onChange={() => {}} weakBulletIds={new Set()} readOnly />
+            </div>
+          ) : null}
+
           <div className="studio-draft-actions">
             {dirty ? (
               <button
@@ -380,6 +487,22 @@ export function ResumeStudio({
                 {savingId === draft.application.id ? "Saving…" : "Save as a new version"}
               </button>
             ) : null}
+            {/*
+              * Two formats, because employers ask for two. Word is what an
+              * applicant tracking system parses most reliably; PDF is what a
+              * person opens without it reflowing on them.
+              */}
+            <button type="button" className="secondary-button" onClick={() => downloadPdf(draft)}>
+              Download PDF
+            </button>
+            <button
+              type="button"
+              className="secondary-button"
+              disabled={downloadingId === draft.application.id}
+              onClick={() => void downloadDocx(draft, content)}
+            >
+              {downloadingId === draft.application.id ? "Building…" : "Download Word"}
+            </button>
             <button type="button" className="secondary-button" onClick={() => void copy(text, draft.application.id)}>
               {copiedId === draft.application.id ? "Copied ✓" : "Copy draft"}
             </button>

@@ -11,6 +11,7 @@ import {
 } from "@/lib/resume/content";
 
 const document: ResumeContent = {
+  template: "classic",
   headline: "Bharani Kumar K — Business Analyst",
   summary: "Analyst with consulting delivery experience across retail and financial services.",
   sections: [
@@ -58,6 +59,7 @@ describe("renderResumeText", () => {
 
   it("upper-cases headings and marks every bullet, whatever was typed in", () => {
     const text = renderResumeText({
+      template: "classic",
       headline: "A",
       summary: "B",
       sections: [{ id: "s0", heading: "Client work", bullets: [{ id: "s0b0", text: "  Did a thing.  ", evidenceIds: [], edited: false }] }],
