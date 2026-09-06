@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bulletsIn, scoreAts } from "./ats";
+import { atsVerdict, bulletsIn, scoreAts } from "./ats";
 import type { RuleAnalysis } from "@/lib/types";
 
 const analysis = (missing: string[], matched: string[]): RuleAnalysis => ({
@@ -209,5 +209,69 @@ describe("bullet markers as people actually write them", () => {
 
   it("does not mistake a sentence containing a dash for a bullet", () => {
     expect(bulletsIn("Analysed data — and reported on it.")).toEqual([]);
+  });
+});
+
+/*
+ * A number on its own is a grade, and a grade is not advice. What somebody
+ * editing a résumé wants to know is which of the three things wrong with it is
+ * worth fixing first — and that is arithmetic, not opinion: the score is a
+ * weighted sum, so the biggest lever is the check with the largest remaining
+ * gain once its weight is applied.
+ */
+describe("atsVerdict", () => {
+  const body = (text: string) => text.padEnd(2400, " delivery experience requirement");
+
+  it("names the score in words a person reads at a glance", () => {
+    const strong = scoreAts(
+      body("• Business analysis across 4 teams.\n• Agile delivery of 12 releases.\n• Data analysis on 3 datasets.\n• Stakeholder management for 9 partners."),
+      analysis([], ["Business analysis", "Agile delivery", "Data analysis", "Stakeholder management"]),
+    );
+    expect(["Strong", "Ready to send"]).toContain(atsVerdict(strong).headline);
+    expect(atsVerdict(scoreAts("", null)).headline).toBe("Needs work");
+  });
+
+  /*
+   * Vocabulary carries 0.6 of the score and length carries 0.15, so a draft
+   * missing strengths hears about those first however loud the length warning
+   * looks. Getting this backwards is how a tool sends somebody off to pad word
+   * count while the thing that actually gates them goes unmentioned.
+   */
+  it("points at vocabulary before length, because that is where the points are", () => {
+    const missingStrengths = scoreAts(
+      body("• Ran a project with 6 people."),
+      analysis([], ["Business analysis", "Agile delivery", "Data analysis", "Stakeholder management"]),
+    );
+    expect(atsVerdict(missingStrengths).lever).toMatch(/strengths your evidence already backs/);
+  });
+
+  it("counts the lines that need a figure when vocabulary is already covered", () => {
+    const unquantified = scoreAts(
+      body("• Business analysis every day.\n• Agile delivery throughout.\n• Data analysis regularly.\n• Stakeholder management always."),
+      analysis([], ["Business analysis", "Agile delivery", "Data analysis", "Stakeholder management"]),
+    );
+    expect(atsVerdict(unquantified).lever).toMatch(/Put a figure in 4 lines/);
+  });
+
+  it("says how many words short, rather than that the length is wrong", () => {
+    const short = scoreAts(
+      "• Business analysis across 4 teams.\n• Agile delivery of 12 releases.\n• Data analysis on 3 sets.\n• Stakeholder management for 9.",
+      analysis([], ["Business analysis", "Agile delivery", "Data analysis", "Stakeholder management"]),
+    );
+    expect(short.wordCount).toBeLessThan(350);
+    expect(atsVerdict(short).lever).toMatch(/Add about \d+ more words/);
+  });
+
+  it("offers no lever when there is under a point left in it", () => {
+    const perfect = scoreAts(
+      body("• Business analysis across 4 teams.\n• Agile delivery of 12 releases.\n• Data analysis on 3 datasets.\n• Stakeholder management for 9 partners."),
+      analysis([], ["Business analysis", "Agile delivery", "Data analysis", "Stakeholder management"]),
+    );
+    if (perfect.score === 100) expect(atsVerdict(perfect).lever).toBeNull();
+  });
+
+  it("asks for the analysis rather than blaming the draft when there is nothing to check against", () => {
+    const noAnalysis = scoreAts(body("• Did a thing with 3 people."), null);
+    expect(atsVerdict(noAnalysis).lever).toMatch(/Run the role analysis/);
   });
 });

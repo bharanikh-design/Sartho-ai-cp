@@ -3,10 +3,10 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { scoreAts } from "@/lib/resume/ats";
+import { atsVerdict, scoreAts } from "@/lib/resume/ats";
 import { unfilledBlanks } from "@/lib/resume/bullet-rewrite";
 import { renderResumeText, resumeContentOf, type ResumeContent } from "@/lib/resume/content";
-import { ResumeDocument } from "@/components/resume-document";
+import { ResumeDocument, type BulletCoach } from "@/components/resume-document";
 import { ResumeWorkbench } from "@/components/resume-workbench";
 import type { ApplicationRecord, ResumeChange, ResumeVersionRecord, RuleAnalysis } from "@/lib/types";
 
@@ -238,6 +238,16 @@ export function ResumeStudio({
     const text = renderResumeText(content);
     const dirty = Boolean(edits) && text !== storedText;
     const ats = scoreAts(text, draft.analysis);
+    const verdict = atsVerdict(ats);
+    const scoreTone = ats.score >= 70 ? "pass" : ats.score >= 40 ? "warn" : "fail";
+
+    /*
+     * How far the edits in front of you have moved the number. Sartho keeps
+     * every version, so this is a real comparison against what is saved rather
+     * than a guess — and it is the thing that makes editing feel like progress
+     * instead of typing into a void.
+     */
+    const delta = ats.score - scoreAts(storedText, draft.analysis).score;
 
     /*
      * The ATS reader works on text and reports positions. renderResumeText
@@ -250,6 +260,50 @@ export function ResumeStudio({
       .map((bullet) => ({ bullet: flatBullets[bullet.index], text: bullet.text }))
       .filter((entry): entry is { bullet: typeof flatBullets[number]; text: string } => Boolean(entry.bullet));
     const weakBulletIds = new Set(weak.map((entry) => entry.bullet.id));
+
+    /*
+     * The rewrite loop, handed to the document so the proposal opens under the
+     * line it rewrites. The rail used to reprint every weak bullet in full,
+     * which is a column of small text restating the page beside it — most of
+     * why it read as noise rather than help.
+     */
+    const activeKey = openBullet && openBullet.startsWith(`${draft.application.id}:`) ? openBullet : null;
+    const activeId = activeKey ? activeKey.slice(draft.application.id.length + 1) : null;
+    const activeProposal = activeKey ? proposals[activeKey] : undefined;
+
+    /* Accepting advances to the next line still missing a figure, so the loop keeps moving. */
+    function acceptProposal(bulletId: string) {
+      const accepted = (activeProposal ?? "").trim();
+      if (!accepted) return;
+      const next = {
+        ...content,
+        sections: content.sections.map((section) => ({
+          ...section,
+          bullets: section.bullets.map((entry) =>
+            entry.id === bulletId ? { ...entry, text: accepted, edited: true } : entry,
+          ),
+        })),
+      };
+      setContent(next);
+      const remaining = weak.filter((entry) => entry.bullet.id !== bulletId);
+      const following = remaining[0];
+      if (following) openBulletAt(draft, { id: following.bullet.id, text: following.bullet.text });
+      else setOpenBullet(null);
+    }
+
+    const coach: BulletCoach = {
+      activeId,
+      proposal: activeProposal,
+      questions: activeKey ? asked[activeKey] ?? [] : [],
+      blanks: activeProposal ? unfilledBlanks(activeProposal) : [],
+      error: activeKey ? proposalError[activeKey] ?? null : null,
+      busy: busyBullet === activeKey,
+      onOpen: (bulletId, bulletText) => openBulletAt(draft, { id: bulletId, text: bulletText }),
+      onRetry: (bulletId, bulletText) => void propose(draft, { id: bulletId, text: bulletText }, true),
+      onChange: (next) => { if (activeKey) setProposals((state) => ({ ...state, [activeKey]: next })); },
+      onAccept: acceptProposal,
+      onClose: () => setOpenBullet(null),
+    };
 
     function setContent(next: ResumeContent) {
       setDocuments((state) => ({ ...state, [documentKey]: next }));
@@ -311,6 +365,7 @@ export function ResumeStudio({
             content={content}
             onChange={setContent}
             weakBulletIds={weakBulletIds}
+            coach={isOlderVersion ? undefined : coach}
             readOnly={isOlderVersion}
           />
 
@@ -349,131 +404,88 @@ export function ResumeStudio({
         </div>
 
         <aside className="studio-ats">
-          <h3>ATS check</h3>
+          {/*
+            * The score, first and large.
+            *
+            * It was computed on every keystroke and shown nowhere — the only
+            * number on the page was on the collapsed row outside the editor,
+            * and that one was the *saved* score. So the panel could tell you
+            * three things were wrong without ever telling you how wrong, and
+            * editing gave no feedback at all.
+            *
+            * No "run the check" button: it already recalculates as you type,
+            * and a button would only make a live number look stale.
+            */}
+          <div className={`studio-score is-${scoreTone}`}>
+            <strong>{ats.score}</strong>
+            <div>
+              <b>{verdict.headline}</b>
+              <small>
+                {delta === 0
+                  ? <>Unchanged since the saved version</>
+                  : <>{delta > 0 ? "+" : ""}{delta} since the saved version</>}
+              </small>
+            </div>
+          </div>
+
+          {/* The single largest gain still available, as one thing to do. */}
+          {verdict.lever ? <p className="studio-score-lever">{verdict.lever}</p> : null}
+
+          {weak.length ? (
+            <button
+              type="button"
+              className="studio-fix-start"
+              onClick={() => {
+                const first = weak[0];
+                openBulletAt(draft, { id: first.bullet.id, text: first.bullet.text });
+                document.getElementById(`bullet-${first.bullet.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+              }}
+            >
+              Fix {weak.length} line{weak.length === 1 ? "" : "s"} with no figure →
+            </button>
+          ) : null}
+
+          {/*
+            * One line each, not a paragraph each. The detail is still there for
+            * anyone who wants it, behind the row rather than in front of it.
+            */}
           <ul className="studio-ats-checks">
             {ats.checks.map((check) => (
               <li key={check.label}>
-                <span style={{ color: stateTone[check.state] }} aria-hidden="true">
-                  {check.state === "pass" ? "✓" : check.state === "warn" ? "!" : "×"}
-                </span>
-                <div><strong>{check.label}</strong><small>{check.detail}</small></div>
+                <details>
+                  <summary>
+                    <span style={{ color: stateTone[check.state] }} aria-hidden="true">
+                      {check.state === "pass" ? "✓" : check.state === "warn" ? "!" : "×"}
+                    </span>
+                    {check.label}
+                  </summary>
+                  <small>{check.detail}</small>
+                </details>
               </li>
             ))}
           </ul>
 
           {ats.unusedStrengths.length ? (
             <div className="studio-ats-missing">
-              <strong>Strengths you can back that the draft never names</strong>
+              <strong>Strengths you can back, unused</strong>
               <div className="chip-row">
                 {ats.unusedStrengths.slice(0, 8).map((term) => <span className="signal-chip" key={term}>{term}</span>)}
               </div>
-              <small>Your approved evidence supports every one of these. Regenerate, or work them into a line yourself.</small>
             </div>
           ) : null}
 
           {/*
-            * Stated, never suggested. These are things the role wants that the
-            * evidence cannot back — putting one in the draft would be a lie
-            * that survives the filter and fails the interview.
+            * Stated, never suggested — these are things the role wants that the
+            * evidence cannot back. The warning is now a phrase rather than the
+            * two sentences it was: a rail is not the place for a paragraph.
             */}
           {ats.unbackedRequirements.length ? (
             <div className="studio-ats-unbacked">
-              <strong>What this role wants that you cannot evidence</strong>
+              <strong>Wanted, but you cannot evidence it</strong>
               <div className="chip-row">
                 {ats.unbackedRequirements.slice(0, 8).map((term) => <span className="signal-chip is-caution" key={term}>{term}</span>)}
               </div>
-              <small>Do not add these to the draft. They are the honest reason this role is a stretch, not a gap to write over.</small>
-            </div>
-          ) : null}
-
-          {weak.length && !isOlderVersion ? (
-            <div className="studio-fixes">
-              <strong>Lines worth a number</strong>
-              <small>Sartho drafts the stronger version first, leaving a blank where it would otherwise have to guess. Fill those in, edit anything, then use it.</small>
-              {weak.map(({ bullet }) => {
-                const key = `${draft.application.id}:${bullet.id}`;
-                const isOpen = openBullet === key;
-                const proposal = proposals[key];
-                const failed = proposalError[key];
-                const blanks = proposal ? unfilledBlanks(proposal) : [];
-                const questions = asked[key] ?? [];
-                return (
-                  <div className="studio-fix" key={key}>
-                    <button
-                      type="button"
-                      className="studio-fix-line"
-                      onClick={() => openBulletAt(draft, bullet)}
-                      aria-expanded={isOpen}
-                    >
-                      {bullet.text}
-                    </button>
-                    {isOpen ? (
-                      <div className="studio-fix-form">
-                        {failed ? (
-                          /*
-                            * The reason, at the line it happened to, with a way
-                            * forward. This used to read "Nothing drafted yet."
-                            * and stay that way — the error was in a banner at
-                            * the top of the page and there was no retry.
-                            */
-                          <div className="studio-fix-failed" role="alert">
-                            <p>{failed}</p>
-                            <button type="button" className="secondary-button" onClick={() => void propose(draft, bullet, true)}>
-                              Try again
-                            </button>
-                          </div>
-                        ) : proposal === undefined ? (
-                          <p className="studio-fix-pending">Sartho is drafting a stronger version…</p>
-                        ) : (
-                          <>
-                            <label htmlFor={`draft-${key}`}>
-                              Sartho&rsquo;s version. Replace anything in [brackets] — it will not guess a figure for you.
-                            </label>
-                            <textarea
-                              id={`draft-${key}`}
-                              rows={3}
-                              value={proposal}
-                              onChange={(event) => setProposals((state) => ({ ...state, [key]: event.target.value }))}
-                            />
-                            {questions.length ? (
-                              <ul className="studio-fix-questions">
-                                {questions.map((question) => <li key={question}>{question}</li>)}
-                              </ul>
-                            ) : null}
-                            <div className="studio-fix-actions">
-                              <button
-                                type="button"
-                                className="primary-button"
-                                disabled={blanks.length > 0 || !proposal.trim()}
-                                onClick={() => {
-                                  setContent({
-                                    ...content,
-                                    sections: content.sections.map((section) => ({
-                                      ...section,
-                                      bullets: section.bullets.map((entry) =>
-                                        entry.id === bullet.id
-                                          ? { ...entry, text: proposal.trim(), edited: true }
-                                          : entry,
-                                      ),
-                                    })),
-                                  });
-                                  setOpenBullet(null);
-                                }}
-                              >
-                                Use this line
-                              </button>
-                              <button type="button" className="secondary-button" onClick={() => setOpenBullet(null)}>
-                                Leave it
-                              </button>
-                              {blanks.length ? <small>Still to fill: {blanks.join(", ")}</small> : null}
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    ) : null}
-                  </div>
-                );
-              })}
+              <small>Do not add these. They are why this role is a stretch.</small>
             </div>
           ) : null}
 

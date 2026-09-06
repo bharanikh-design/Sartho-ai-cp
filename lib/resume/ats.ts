@@ -66,7 +66,21 @@ export type AtsScore = {
   bulletCount: number;
   metricsFound: number;
   wordCount: number;
+  /**
+   * The vocabulary component, 0–100, before weighting. Exposed because it is
+   * the heaviest term in the score and the verdict has to know how much of the
+   * shortfall lives there.
+   */
+  strengthCoverage: number;
   checks: AtsCheck[];
+};
+
+/** What the number means, and the one change that would move it most. */
+export type AtsVerdict = {
+  /** A few words a person can read at a glance. */
+  headline: string;
+  /** The largest gain still available, as something to do. Null when there is none. */
+  lever: string | null;
 };
 
 /*
@@ -207,5 +221,59 @@ export function scoreAts(draft: string, analysis: RuleAnalysis | null): AtsScore
     + stateScore(checks[2].state) * 0.15,
   );
 
-  return { score, unusedStrengths, unbackedRequirements, weakBullets, bulletCount: bullets.length, metricsFound, wordCount, checks };
+  return { score, unusedStrengths, unbackedRequirements, weakBullets, bulletCount: bullets.length, metricsFound, wordCount, strengthCoverage, checks };
+}
+
+/*
+ * The score, said as a sentence, with the biggest lever named.
+ *
+ * A number on its own is a grade, and a grade is not advice. What somebody
+ * editing a résumé wants to know is which of the three things wrong with it is
+ * worth fixing first — and that is not a matter of opinion, because the score
+ * is a weighted sum and the answer is arithmetic: the check with the largest
+ * remaining gain, weight included.
+ *
+ * So this never guesses and never flatters. Vocabulary is weighted at 0.6, so
+ * a draft missing two strengths is told about those before it is told its
+ * length is off by forty words, however loud the length warning looks.
+ */
+export function atsVerdict(ats: AtsScore): AtsVerdict {
+  const headline = ats.score >= 85
+    ? "Ready to send"
+    : ats.score >= 70
+      ? "Strong"
+      : ats.score >= 40
+        ? "Getting there"
+        : "Needs work";
+
+  const stateScore = (state: AtsCheck["state"]) => (state === "pass" ? 100 : state === "warn" ? 55 : 0);
+
+  const gains: Array<{ gain: number; lever: string }> = [
+    {
+      gain: (100 - ats.strengthCoverage) * 0.6,
+      lever: ats.unusedStrengths.length
+        ? `Work in ${ats.unusedStrengths.length} strength${ats.unusedStrengths.length === 1 ? "" : "s"} your evidence already backs`
+        : "Run the role analysis so there is something to check the draft against",
+    },
+    {
+      gain: (100 - stateScore(ats.checks[1].state)) * 0.25,
+      lever: ats.bulletCount
+        ? `Put a figure in ${ats.weakBullets.length} line${ats.weakBullets.length === 1 ? "" : "s"} that carry none`
+        : "Break the draft into bullet points",
+    },
+    {
+      gain: (100 - stateScore(ats.checks[2].state)) * 0.15,
+      lever: !ats.wordCount
+        ? "Write something to score"
+        : ats.wordCount < 350
+          ? `Add about ${350 - ats.wordCount} more words`
+          : ats.wordCount > 900
+            ? `Cut about ${ats.wordCount - 900} words`
+            : "Length is fine",
+    },
+  ];
+
+  const best = gains.reduce((worst, entry) => (entry.gain > worst.gain ? entry : worst));
+  /* Under a point of gain is not a lever, it is a nag. */
+  return { headline, lever: best.gain >= 1 ? best.lever : null };
 }
