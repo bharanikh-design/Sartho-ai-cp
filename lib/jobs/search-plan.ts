@@ -69,6 +69,11 @@ export function planSearchQueries(input: {
   companies: string[];
   remotePreference: string | null;
   employmentTypes?: string[];
+  /**
+   * This market's words for a graduate role, when the person is early enough in
+   * their career for those postings to be worth a pass of their own.
+   */
+  entryLevelTerms?: string[];
 }): JobSearchQuery[] {
   const remoteOnly = input.remotePreference === "Remote";
   const employmentTypes = input.employmentTypes?.length ? input.employmentTypes : undefined;
@@ -102,9 +107,16 @@ export function planSearchQueries(input: {
    * filter, and the full-time and permanent flags selected alongside them would
    * exclude exactly what they are looking for, so this pass drops those flags
    * and carries the words in the query text instead.
+   *
+   * Somebody in their first year gets the same pass whether or not they thought
+   * to tick "Internship" under type of work. Those two questions are not the
+   * same — one is a contract, the other is where you are in your career — and
+   * requiring the first to get graduate postings is a trap for exactly the
+   * person who most needs them.
    */
   const earlyCareer = earlyCareerSelections(input.employmentTypes ?? []);
-  if (earlyCareer.length) {
+  const entryLevelTerms = input.entryLevelTerms?.filter((term) => term.trim()) ?? [];
+  if (earlyCareer.length || entryLevelTerms.length) {
     for (const keywords of roles.slice(0, COMPANY_ROLE_DEPTH)) {
       queries.push({
         keywords,
@@ -113,6 +125,7 @@ export function planSearchQueries(input: {
         remoteOnly,
         employmentTypes,
         earlyCareerOnly: true,
+        entryLevelTerms: entryLevelTerms.length ? entryLevelTerms : undefined,
         limit: 20,
       });
     }

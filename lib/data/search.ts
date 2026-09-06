@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { normaliseExperienceBand, type ExperienceBandId } from "@/lib/jobs/experience";
 
 export type SearchSourcePreference = {
   id: string;
@@ -20,6 +21,11 @@ export type SearchPreferences = {
   targetLocations: string[];
   /** Employers to search directly, on top of the role queries. */
   targetCompanies: string[];
+  /**
+   * Years of experience, as the person's own answer. Null means they have not
+   * said — which is not zero, and falls back to the résumé-derived total.
+   */
+  experienceLevel: ExperienceBandId | null;
   remotePreference: string | null;
   sources: SearchSourcePreference[];
 };
@@ -40,7 +46,7 @@ function stringList(value: unknown): string[] {
 export async function getSearchPreferences(supabase: SupabaseClient, userId: string): Promise<SearchPreferences> {
   const { data, error } = await supabase
     .from("search_preferences")
-    .select("country,countries,employment_types,target_locations,target_companies,remote_preference,sources")
+    .select("country,countries,employment_types,target_locations,target_companies,experience_level,remote_preference,sources")
     .eq("user_id", userId)
     .maybeSingle();
 
@@ -52,6 +58,7 @@ export async function getSearchPreferences(supabase: SupabaseClient, userId: str
     employmentTypes: stringList(data?.employment_types),
     targetLocations: stringList(data?.target_locations),
     targetCompanies: stringList(data?.target_companies),
+    experienceLevel: normaliseExperienceBand(data?.experience_level),
     remotePreference: typeof data?.remote_preference === "string" ? data.remote_preference : null,
     sources: Array.isArray(data?.sources) ? data.sources.filter(isSearchSource) : [],
   };
