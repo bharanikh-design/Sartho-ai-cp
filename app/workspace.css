@@ -351,3 +351,44 @@ textarea:focus-visible,
 .outcome-capture input { min-height: 40px; padding: 0 12px; font-size: var(--text-sm); }
 .outcome-capture-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 2px; }
 .outcome-recorded-meta { margin-top: 8px; color: var(--text-tertiary); font-size: var(--text-2xs); }
+
+/*
+ * The operator's people table.
+ *
+ * Seven columns is more than fits a phone, so it scrolls inside its own box
+ * rather than making the whole page scroll sideways — a horizontally scrolling
+ * page is how a table breaks every other layout on the screen.
+ */
+.user-table-scroll { overflow-x: auto; margin-top: 14px; }
+.user-table { width: 100%; min-width: 860px; border-collapse: collapse; font-size: var(--text-sm); }
+.user-table th {
+  padding: 10px 12px; border-bottom: 1px solid var(--line); text-align: left;
+  color: var(--text-tertiary); font-size: var(--text-2xs); font-weight: 650;
+  letter-spacing: .07em; text-transform: uppercase; white-space: nowrap;
+}
+.user-table td { padding: 12px; border-bottom: 1px solid rgba(255,255,255,.04); color: var(--text-secondary); vertical-align: top; }
+.user-table tr:last-child td { border-bottom: none; }
+.user-table td strong { display: block; color: var(--text); }
+.user-table td small { display: block; margin-top: 2px; color: var(--text-tertiary); font-size: var(--text-2xs); }
+
+.user-table-funnel { display: flex; flex-wrap: wrap; gap: 4px; }
+.user-table-step {
+  padding: 3px 7px; border: 1px solid rgba(255,255,255,.08); border-radius: 6px;
+  color: var(--text-tertiary); font-size: var(--text-2xs); white-space: nowrap;
+}
+.user-table-step.is-done { border-color: rgba(114,230,189,.3); color: #baf3df; background: rgba(114,230,189,.09); }
+
+.admin-summary-grid { grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
+
+.admin-funnel { display: grid; gap: 10px; margin: 14px 0 0; padding: 0; list-style: none; }
+.admin-funnel-row { display: grid; grid-template-columns: minmax(160px, 220px) minmax(0, 1fr) 92px; align-items: center; gap: 14px; }
+.admin-funnel-row > span:first-child { color: var(--text-secondary); font-size: var(--text-sm); }
+.admin-funnel-row strong { color: var(--text); font-size: var(--text-base); text-align: right; }
+.admin-funnel-row strong small { color: var(--text-tertiary); font-size: var(--text-2xs); font-weight: 400; }
+.admin-funnel-bar { display: block; height: 8px; border-radius: 999px; background: rgba(255,255,255,.05); overflow: hidden; }
+.admin-funnel-bar > span { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, rgba(120,157,255,.75), rgba(114,230,189,.75)); }
+
+@media (max-width: 760px) {
+  .admin-funnel-row { grid-template-columns: minmax(0,1fr) 84px; }
+  .admin-funnel-bar { grid-column: 1 / -1; }
+}

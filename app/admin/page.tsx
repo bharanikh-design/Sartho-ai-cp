@@ -1,72 +1,123 @@
 import { redirect } from "next/navigation";
 import { ProductPageHeader } from "@/components/product-page-header";
+import { UserActivityTable } from "@/components/user-activity-table";
 import { requireUser, isOperationsAdmin } from "@/lib/auth";
+import { loadUserTable } from "@/lib/analytics/load-user-table";
+import { summariseUserTable } from "@/lib/analytics/user-table";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 30;
+
+/*
+ * Who is using Sartho, and how far they get.
+ *
+ * The page used to show four totals and two panels that could not answer a
+ * question about anybody in particular. One of those panels reported "Supabase
+ * ● Healthy, OpenAI ● Healthy, Vercel ● Healthy" as three hardcoded strings —
+ * it had no connection to any of them and would have said the same thing during
+ * a total outage. The other pointed at the Vercel dashboard for time-on-site,
+ * which measures a different thing and attributes it to nobody.
+ *
+ * Both are gone. Provider health is genuinely checked, by asking the provider,
+ * on /diagnostics; time spent is genuinely measured, per person, and shown here.
+ */
 
 export default async function AdminDashboardPage() {
-  const { supabase, user } = await requireUser();
+  const { user } = await requireUser();
+  if (!isOperationsAdmin(user)) redirect("/");
 
-  if (!isOperationsAdmin(user)) {
-    redirect("/");
+  let rows: Awaited<ReturnType<typeof loadUserTable>>["rows"] = [];
+  let truncated = false;
+  let loadError: string | null = null;
+
+  try {
+    const loaded = await loadUserTable();
+    rows = loaded.rows;
+    truncated = loaded.truncated;
+  } catch (caught) {
+    /*
+     * The one likely failure is a missing service-role key, and it needs to say
+     * so. An empty table would read as "nobody has signed up", which is a very
+     * different and much more alarming thing than a missing variable.
+     */
+    console.error("Unable to load the user table", caught);
+    loadError = caught instanceof Error && /administrator configuration/i.test(caught.message)
+      ? "SUPABASE_SERVICE_ROLE_KEY is not set on this deployment, so accounts cannot be read. Add it in the deployment settings and redeploy."
+      : "Sartho could not read the account list.";
   }
 
-  // 1. Fetch Business Metrics
-  const [
-    { count: totalUsers },
-    { count: totalJobs },
-    { count: totalApplications },
-    { count: totalResumes },
-  ] = await Promise.all([
-    supabase.from("profiles").select("*", { count: "exact", head: true }),
-    supabase.from("jobs").select("*", { count: "exact", head: true }),
-    supabase.from("applications").select("*", { count: "exact", head: true }),
-    supabase.from("applications").select("*", { count: "exact", head: true }).not("resume_draft", "is", null),
-  ]);
+  const summary = summariseUserTable(rows);
 
   return (
-    <div className="page-stack command-centre-page">
+    <div className="page-stack product-page">
       <ProductPageHeader
-        eyebrow="Operations & Telemetry"
-        title="Admin Command Centre"
-        description="Global platform observability. Track system-wide usage, active pipelines, and user adoption. Only visible to platform administrators."
-        metric={{ value: totalUsers ?? 0, label: "total active users" }}
+        eyebrow="Operations · People"
+        title="Who is using Sartho"
+        description="Every account, how far through the product they got, and when they were last actually here. Visible only to platform administrators."
+        metric={{ value: summary.total, label: "accounts" }}
       />
 
-      <section className="summary-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))" }}>
-        <SummaryCard label="Total Users Onboarded" value={String(totalUsers ?? 0)} />
-        <SummaryCard label="Jobs Analyzed" value={String(totalJobs ?? 0)} />
-        <SummaryCard label="Applications Tracked" value={String(totalApplications ?? 0)} />
-        <SummaryCard label="Tailored Resumes Built" value={String(totalResumes ?? 0)} />
-      </section>
-      
-      <div style={{ marginTop: "32px", display: "grid", gap: "24px", gridTemplateColumns: "1fr 1fr" }}>
-        <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "16px", padding: "24px" }}>
-          <h3 style={{ color: "#fff", margin: "0 0 16px 0", fontSize: "1.1rem" }}>Vercel Observability Data</h3>
-          <p style={{ color: "#aaa", fontSize: "0.9rem", lineHeight: 1.5, marginBottom: "16px" }}>
-            To view &quot;Active Minutes Spent&quot;, &quot;Live Visitors&quot;, and Core Web Vitals, navigate to your <strong>Vercel Dashboard</strong>. Vercel Web Analytics automatically captures session lengths and active minutes natively via the edge network, avoiding heavy DB queries on our end.
-          </p>
-          <a href="https://vercel.com/dashboard" target="_blank" rel="noreferrer" style={{ display: "inline-block", background: "#333", color: "#fff", padding: "8px 16px", borderRadius: "8px", textDecoration: "none", fontSize: "0.85rem", fontWeight: 600 }}>Open Vercel Dashboard ↗</a>
-        </div>
+      {loadError ? <div className="inline-error" role="alert">{loadError}</div> : null}
 
-        <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "16px", padding: "24px" }}>
-          <h3 style={{ color: "#fff", margin: "0 0 16px 0", fontSize: "1.1rem" }}>Infrastructure Health</h3>
-          <ul style={{ listStyle: "none", padding: 0, margin: 0, color: "#aaa", fontSize: "0.9rem", display: "flex", flexDirection: "column", gap: "12px" }}>
-            <li style={{ display: "flex", justifyContent: "space-between" }}><span>Supabase DB Status</span><span style={{ color: "#6bcf93" }}>● Healthy</span></li>
-            <li style={{ display: "flex", justifyContent: "space-between" }}><span>OpenAI Agent Gateway</span><span style={{ color: "#6bcf93" }}>● Healthy</span></li>
-            <li style={{ display: "flex", justifyContent: "space-between" }}><span>Vercel Edge Network</span><span style={{ color: "#6bcf93" }}>● Healthy</span></li>
-          </ul>
+      <section className="summary-grid admin-summary-grid">
+        <SummaryCard label="Active in the last 7 days" value={summary.activeLast7Days} of={summary.total} />
+        <SummaryCard label="Active in the last 30 days" value={summary.activeLast30Days} of={summary.total} />
+        <SummaryCard label="Uploaded a résumé" value={summary.resumeUploaded} of={summary.total} />
+        <SummaryCard label="Completed all four steps" value={summary.fullyActivated} of={summary.total} />
+      </section>
+
+      <section className="glass-card content-card">
+        <div className="card-header">
+          <div>
+            <h2 className="section-heading">The funnel, step by step</h2>
+            <p className="section-subtitle">
+              Where people stop is more useful than how many arrived. Each of these is derived from
+              whether the work exists, not from a flag somebody remembered to set.
+            </p>
+          </div>
         </div>
-      </div>
+        <ul className="admin-funnel">
+          <FunnelRow label="Signed up" value={summary.total} of={summary.total} />
+          <FunnelRow label="Uploaded a résumé" value={summary.resumeUploaded} of={summary.total} />
+          <FunnelRow label="Completed Career Direction" value={summary.directionComplete} of={summary.total} />
+          <FunnelRow label="Started a job search" value={summary.searchStarted} of={summary.total} />
+          <FunnelRow label="Turned on email alerts" value={summary.notificationsOn} of={summary.total} />
+        </ul>
+      </section>
+
+      <section className="glass-card content-card">
+        <div className="card-header">
+          <div>
+            <h2 className="section-heading">Every account</h2>
+            <p className="section-subtitle">Most recently active first.</p>
+          </div>
+        </div>
+        <UserActivityTable rows={rows} truncated={truncated} />
+      </section>
     </div>
   );
 }
 
-function SummaryCard({ label, value }: { label: string; value: string }) {
+function SummaryCard({ label, value, of }: { label: string; value: number; of: number }) {
   return (
-    <div className="summary-tile" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}>
-      <span style={{ fontSize: "0.85rem", color: "#aaa" }}>{label}</span>
-      <strong style={{ fontSize: "2rem", color: "#fff", marginTop: "8px", display: "block" }}>{value}</strong>
+    <div className="summary-tile">
+      <span>{label}</span>
+      <strong>{value}</strong>
+      {/* A count without its denominator is not a finding. */}
+      <small>{of ? `of ${of}` : "no accounts yet"}</small>
     </div>
+  );
+}
+
+function FunnelRow({ label, value, of }: { label: string; value: number; of: number }) {
+  const share = of ? Math.round((value / of) * 100) : 0;
+  return (
+    <li className="admin-funnel-row">
+      <span>{label}</span>
+      <span className="admin-funnel-bar" aria-hidden="true">
+        <span style={{ width: `${share}%` }} />
+      </span>
+      <strong>{value}<small>{of ? ` · ${share}%` : ""}</small></strong>
+    </li>
   );
 }
