@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getAuthenticatedUser } from "@/lib/auth";
-import { SITE_CONFIG } from "@/lib/config/site";
+import { APP_URL } from "@/lib/site";
 import { runBriefSearch } from "@/lib/jobs/run-search";
 import { renderMatchAlertEmail, selectNewMatches } from "@/lib/notifications/match-alerts";
 import { isEmailDeliveryConfigured, sendEmail } from "@/lib/notifications/send-email";
@@ -80,7 +80,7 @@ export async function POST(request: Request) {
     firstName,
     matches,
     criteria: outcome.criteria,
-    appUrl: process.env.NEXT_PUBLIC_APP_URL || SITE_CONFIG.defaultAppUrl,
+    appUrl: APP_URL,
     isTest: true,
   });
 
