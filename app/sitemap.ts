@@ -14,6 +14,13 @@ export default function sitemap(): MetadataRoute.Sitemap {
       lastModified: new Date(),
       changeFrequency: "monthly",
       priority: 0.8,
-    }
+    },
+    /* Public, and the page anyone sent the extension link needs to reach. */
+    {
+      url: `${SITE_URL}/extension`,
+      lastModified: new Date(),
+      changeFrequency: "monthly",
+      priority: 0.6,
+    },
   ];
 }

@@ -1,196 +1,133 @@
-let parsedData = null;
-let sourceUrl = '';
-let isAtsPage = false;
+/*
+ * What the popup is for: show what was read off this page, and hand it to
+ * Sartho in one click.
+ *
+ * It deliberately does not show a match score. Scoring needs the person's
+ * approved evidence, which lives behind their Sartho session, and the honest
+ * ways to reach it from here all depend on a Sartho tab already being open.
+ * A score that appears only sometimes is worse than one that appears in a
+ * consistent place — so the number lives in Sartho, and this window's job is to
+ * prove it read the right advert before anything is saved.
+ *
+ * The scrape runs the moment the popup opens. Clicking the icon is the intent;
+ * asking the person to then press "Analyse this page" was a button that only
+ * ever had one answer.
+ */
 
-// Check if we are on an ATS page when the popup opens
-chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-  const url = tabs[0].url || "";
-  if (url.includes('greenhouse.io') || url.includes('lever.co') || url.includes('workday.com') || url.includes('myworkdayjobs.com')) {
-    isAtsPage = true;
-    document.getElementById('analyzeBtn').style.display = 'none';
-    
-    const atsContainer = document.createElement('div');
-    atsContainer.innerHTML = `
-      <div style="padding: 12px; background: rgba(107, 207, 147, 0.1); border: 1px solid rgba(107, 207, 147, 0.2); border-radius: 8px; margin-bottom: 12px;">
-        <h4 style="margin: 0 0 4px 0; color: #6bcf93; font-size: 13px;">ATS Detected</h4>
-        <p style="margin: 0; font-size: 11px; color: #ccc;">Sartho can auto-fill this application using your Career Profile.</p>
-      </div>
-      <button id="autofillBtn" style="background: #174b3a; border: 1px solid #6bcf93; color: white; font-weight: bold;">Auto-fill Application ✦</button>
-    `;
-    document.getElementById('result').appendChild(atsContainer);
+const body = document.getElementById("body");
 
-    document.getElementById('autofillBtn').addEventListener('click', async () => {
-      document.getElementById('autofillBtn').innerText = "Filling...";
-      
-      // Tell background script to get profile from Sartho and inject autofill
-      chrome.runtime.sendMessage({ type: "TRIGGER_AUTOFILL", tabId: tabs[0].id }, (response) => {
-        if (response && response.success) {
-          document.getElementById('autofillBtn').innerText = "✓ Filled";
-          document.getElementById('autofillBtn').style.background = "#0d402b";
-        } else {
-          document.getElementById('autofillBtn').innerText = "Error (Ensure Sartho is open)";
-          document.getElementById('autofillBtn').style.background = "#ff6b6b";
-        }
-      });
-    });
-  }
-});
-
-
-document.getElementById('analyzeBtn').addEventListener('click', async () => {
-  const resultDiv = document.getElementById('result');
-  const btn = document.getElementById('analyzeBtn');
-  
-  btn.disabled = true;
-  btn.innerText = "Analyzing page...";
-  resultDiv.innerHTML = "<p>Reading job description...</p>";
-
-  try {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    sourceUrl = tab.url;
-    
-    // Inject the content script to scrape the page
-    const results = await chrome.scripting.executeScript({
-      target: { tabId: tab.id },
-      func: scrapeJobData
-    });
-
-    const data = results[0].result;
-    parsedData = data;
-    
-    // Check if we got anything usable at all
-    if (!data.title || !data.description || data.description.length < 50) {
-      resultDiv.innerHTML = `
-        <p style='color: #ff6b6b; font-weight: bold;'>Scraping failed.</p>
-        <p style='font-size: 12px; color: #ccc;'>We found title: "${data.title}" but the description was too short (${data.description?.length} chars).</p>
-        <p style='font-size: 12px; color: #ccc;'>LinkedIn may have changed their layout. Please click inside the job description box to ensure it is loaded.</p>
-      `;
-      btn.disabled = false;
-      btn.innerText = "Analyze Job on this Page";
-      return;
-    }
-
-    resultDiv.innerHTML = `
-      <div style="margin-bottom: 12px">
-        <strong>${data.title}</strong><br>
-        <span style="color: #aaa; font-size: 12px">${data.company}</span>
-      </div>
-      <p style="color: #6bcf93; margin-bottom: 8px;">✓ Job successfully parsed (${data.description.length} chars)</p>
-      ${data.applicants && !data.applicants.includes('hidden') ? `<div class="stat" style="font-size: 11px; margin-bottom: 4px;"><strong>👥 Applicants:</strong> ${data.applicants}</div>` : ''}
-      ${data.postedDate ? `<div class="stat" style="font-size: 11px; margin-bottom: 4px;"><strong>🗓 Posted:</strong> ${data.postedDate}</div>` : ''}
-      ${data.hiringManager ? `<div class="stat" style="font-size: 11px; margin-bottom: 4px;"><strong>👤 Hiring Manager:</strong> ${data.hiringManager}</div>` : ''}
-      <button id="sendToSartho" style="background: #111; border: 1px solid #333; margin-top: 12px; color: #6bcf93;">Send to Sartho Dashboard ↗</button>
-    `;
-
-    document.getElementById('sendToSartho').addEventListener('click', () => {
-      document.getElementById('sendToSartho').innerText = "Sending...";
-      chrome.runtime.sendMessage({
-        type: "SEND_TO_SARTHO",
-        payload: {
-          title: parsedData.title,
-          company: parsedData.company,
-          description: parsedData.description,
-          url: sourceUrl,
-          applicants: parsedData.applicants,
-          postedDate: parsedData.postedDate,
-          hiringManager: parsedData.hiringManager
-        }
-      }, () => {
-        window.close();
-      });
-    });
-
-  } catch (err) {
-    resultDiv.innerHTML = `<p style="color: #ff6b6b">Error: ${err.message}</p>`;
-  } finally {
-    btn.disabled = false;
-    btn.innerText = "Analyze Job on this Page";
-  }
-});
-
-function scrapeJobData() {
-  const url = window.location.href;
-  let title = '';
-  let company = '';
-  let description = '';
-  let applicants = '';
-  let postedDate = '';
-  let hiringManager = '';
-
-  try {
-    if (url.includes('linkedin.com')) {
-      const titleEl = document.querySelector('.job-details-jobs-unified-top-card__job-title') 
-                   || document.querySelector('h1') 
-                   || document.querySelector('.topcard__title');
-      title = titleEl ? titleEl.innerText.trim() : document.title.split(' | ')[0];
-      
-      const companyEl = document.querySelector('.job-details-jobs-unified-top-card__company-name') 
-                     || document.querySelector('a[href*="/company/"]')
-                     || document.querySelector('.topcard__org-name-link');
-      company = companyEl ? companyEl.innerText.trim() : 'Unknown Company';
-      
-      // Look for the specific job description container
-      let descEl = document.getElementById('job-details') 
-                || document.querySelector('.jobs-description__content') 
-                || document.querySelector('.jobs-description') 
-                || document.querySelector('article')
-                || document.querySelector('.job-view-layout');
-      
-      if (descEl) {
-        description = descEl.innerText.trim();
-      } else {
-        // Ultimate fallback
-        const mainNode = document.querySelector('main') || document.body;
-        description = mainNode.innerText.trim();
-      }
-      
-      // Applicants
-      const applicantEl = Array.from(document.querySelectorAll('span, li')).find(el => el.innerText.toLowerCase().includes('applicant'));
-      if (applicantEl) applicants = applicantEl.innerText.trim();
-      
-      // Posted Date
-      const postedEl = Array.from(document.querySelectorAll('span, li')).find(el => {
-        const text = el.innerText.toLowerCase();
-        return text.includes('ago') || text.includes('posted');
-      });
-      if (postedEl) postedDate = postedEl.innerText.trim();
-      
-      // Hiring Manager
-      const hmEl = document.querySelector('.hirer-card__hirer-information span:first-child')
-                || document.querySelector('.jobs-poster__name')
-                || document.querySelector('.job-details-jobs-unified-top-card__hirer-name');
-      if (hmEl) hiringManager = hmEl.innerText.trim();
-      else {
-        // Look for the "Meet the hiring team" block
-        const profileLink = document.querySelector('a[href*="/in/"] h3') || document.querySelector('.app-aware-link:has(strong)');
-        if (profileLink) hiringManager = profileLink.innerText.trim();
-      }
-      
-    } else if (url.includes('indeed.com')) {
-      const titleEl = document.querySelector('h1');
-      title = titleEl ? titleEl.innerText.trim() : document.title.split(' - ')[0];
-      const companyEl = document.querySelector('[data-testid="inlineHeader-companyName"]');
-      company = companyEl ? companyEl.innerText.trim() : 'Unknown Company';
-      const descEl = document.getElementById('jobDescriptionText') || document.body;
-      description = descEl.innerText.trim();
-      // Indeed meta
-      const postedEl = document.querySelector('[data-testid="jobSearch-jobMetadata-posted"]');
-      if (postedEl) postedDate = postedEl.innerText.trim();
-    } else {
-      title = document.title;
-      description = document.body.innerText;
-    }
-  } catch (e) {
-    title = document.title;
-    description = document.body.innerText;
-  }
-
-  return { 
-    title: title || 'Unknown Title', 
-    company, 
-    description: description.slice(0, 15000), 
-    applicants,
-    postedDate,
-    hiringManager
-  };
+/* Text, never markup: a job title is somebody else's HTML. */
+function render(nodes) {
+  body.replaceChildren(...nodes);
 }
+
+function element(tag, className, text) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text !== undefined) node.textContent = text;
+  return node;
+}
+
+function message(className, text) {
+  render([element("p", `warn ${className}`, text)]);
+}
+
+const MIN_DESCRIPTION = 120;
+
+(async () => {
+  let tab;
+  try {
+    [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  } catch {
+    message("error", "Sartho could not read this window.");
+    return;
+  }
+
+  /*
+   * Chrome refuses injection into its own pages, the Web Store, and PDFs. Said
+   * plainly rather than surfacing the raw extension error, which reads like a
+   * fault in Sartho.
+   */
+  if (!tab?.id || !/^https?:/i.test(tab.url || "")) {
+    message("", "Open a job advert in a normal browser tab, then click Sartho again.");
+    return;
+  }
+
+  let job;
+  try {
+    const [result] = await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["scrape.js"] });
+    job = result?.result;
+  } catch (caught) {
+    message("error", `Sartho could not read this page. ${caught?.message ?? ""}`.trim());
+    return;
+  }
+
+  if (!job) {
+    message("error", "Sartho could not read this page.");
+    return;
+  }
+
+  /*
+   * Too little text is not a job advert. Saying how much was found, and where
+   * it was read from, turns "it didn't work" into something a person can act
+   * on — usually by scrolling the description into view first.
+   */
+  if (!job.description || job.description.length < MIN_DESCRIPTION) {
+    render([
+      element("p", "warn", "There is no job description on this page yet."),
+      element("p", "note", job.description
+        ? `Sartho found only ${job.description.length} characters. If the advert is behind a “See more” link, open it and click Sartho again.`
+        : "Open the advert itself — not the results list — and click Sartho again."),
+    ]);
+    return;
+  }
+
+  const card = element("div", "job");
+  card.append(element("strong", null, job.title || "Untitled role"));
+  card.append(element("span", "where", [job.company, job.location].filter(Boolean).join(" · ") || "Employer not named on the page"));
+
+  const facts = element("div", "facts");
+  facts.append(element("span", "fact", `${job.description.length.toLocaleString()} characters`));
+  if (job.postedDate) facts.append(element("span", "fact", job.postedDate));
+  if (job.applicants) facts.append(element("span", "fact", job.applicants));
+  if (job.hiringManager) facts.append(element("span", "fact", `Hiring: ${job.hiringManager}`));
+  card.append(facts);
+
+  const send = element("button", null, "Send to Sartho →");
+  const readBy = element("p", "read-by", `Read from ${job.readBy}. You can correct any of it in Sartho.`);
+  const note = element("p", "note", "");
+
+  render([card, send, readBy, note]);
+
+  send.addEventListener("click", () => {
+    send.disabled = true;
+    send.textContent = "Sending…";
+    note.textContent = "";
+
+    chrome.runtime.sendMessage({ type: "SEND_TO_SARTHO", payload: job }, (response) => {
+      /*
+       * The window is not closed on success any more.
+       *
+       * It used to close the instant the message was handed off, which meant
+       * every failure past that point — no Sartho tab, a lost message, a signed
+       * out session — looked exactly like success. The popup now waits to be
+       * told what happened, and says so.
+       */
+      const failure = chrome.runtime.lastError?.message || response?.error;
+      if (failure) {
+        send.disabled = false;
+        send.textContent = "Send to Sartho →";
+        note.textContent = failure;
+        note.className = "warn error";
+        return;
+      }
+
+      send.textContent = "✓ Sent";
+      note.className = "warn ok";
+      note.textContent = response?.opened
+        ? "Sartho is opening in a new tab — the role lands in your pipeline there."
+        : "Waiting for Sartho — the role appears in your pipeline as soon as that tab is open and signed in.";
+      setTimeout(() => window.close(), 2200);
+    });
+  });
+})();

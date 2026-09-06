@@ -220,8 +220,30 @@ textarea:focus-visible,
 .recommendation-review { color: #ffe2a6; border-color: rgba(255,211,122,.2); background: rgba(255,211,122,.07); }
 .recommendation-skip { color: #ffc0cc; border-color: rgba(255,142,163,.18); background: rgba(255,142,163,.06); }
 
-.live-pipeline-grid { grid-template-columns: repeat(5, minmax(0,1fr)); }
 .pipeline-stage.has-items { border-color: rgba(134,174,255,.18); background: linear-gradient(160deg, rgba(120,157,255,.09), rgba(255,255,255,.02)); }
+
+/*
+ * A role arriving from the browser extension announces itself at the top of
+ * the page. It is the only confirmation the person gets that the click they
+ * made on LinkedIn did anything, so it says what was saved and what it scored
+ * rather than a bare "done".
+ */
+.import-banner {
+  display: flex; align-items: center; justify-content: space-between; gap: 18px;
+  padding: 16px 20px; border-color: rgba(134,174,255,.22);
+}
+.import-banner strong { display: block; font-size: var(--text-sm); }
+.import-banner .section-subtitle { margin: 4px 0 0; }
+.import-banner.is-saved { border-color: rgba(114,230,189,.28); background: linear-gradient(150deg, rgba(114,230,189,.09), rgba(255,255,255,.015)); }
+.import-banner.is-failed { border-color: rgba(255,142,163,.28); background: linear-gradient(150deg, rgba(255,142,163,.08), rgba(255,255,255,.015)); }
+.import-banner__intel { display: flex; flex-wrap: wrap; gap: 12px; }
+.import-banner__intel-note { color: var(--text-tertiary); font-style: italic; }
+.import-banner__spinner {
+  flex: 0 0 auto; width: 17px; height: 17px; border-radius: 999px;
+  border: 2px solid rgba(255,255,255,.14); border-top-color: rgba(134,174,255,.9);
+  animation: importSpin .8s linear infinite;
+}
+@keyframes importSpin { to { transform: rotate(360deg); } }
 .application-row { grid-template-columns: minmax(0,1fr) 170px 34px; }
 .application-main-link { min-width: 0; }
 .status-control { display: grid; gap: 6px; }
@@ -271,7 +293,6 @@ textarea:focus-visible,
 @keyframes skeletonSweep { to { transform: translateX(100%); } }
 
 @media (max-width: 1050px) {
-  .live-pipeline-grid { grid-template-columns: repeat(3, minmax(0,1fr)); }
   .profile-facts-grid { grid-template-columns: 1fr; }
   .profile-review-grid { grid-template-columns: 1fr; }
   .profile-summary-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -303,7 +324,6 @@ textarea:focus-visible,
 }
 
 @media (max-width: 520px) {
-  .live-pipeline-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
   .application-row { grid-template-columns: 1fr; }
   .status-control { margin-top: 8px; }
 }

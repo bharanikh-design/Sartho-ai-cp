@@ -1,6 +1,7 @@
 import { ApplicationLedger } from "@/components/application-ledger";
 import { JobAnalyser } from "@/components/job-analyser";
 import { ChromeExtensionBanner } from "@/components/chrome-extension-banner";
+import { JobImportBridge } from "@/components/job-import-bridge";
 import { ProductPageHeader } from "@/components/product-page-header";
 import { requireUser } from "@/lib/auth";
 import { getCareerWorkspace } from "@/lib/data/career";
@@ -24,6 +25,11 @@ export default async function ApplicationsPage() {
   return (
     <div className="page-stack">
       <ChromeExtensionBanner />
+      {/*
+        * Above the header, because a role sent from a job board is the reason
+        * this page just opened, and the person needs to see it landed.
+        */}
+      <JobImportBridge />
       <ProductPageHeader
         eyebrow="Opportunities"
         title="Every role you have kept"

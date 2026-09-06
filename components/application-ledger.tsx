@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { JobRecord, JobStatus } from "@/lib/types";
 
 const statusOrder: Array<{ id: JobStatus; label: string; description: string }> = [
@@ -18,11 +18,73 @@ const statusOrder: Array<{ id: JobStatus; label: string; description: string }> 
 
 export function ApplicationLedger({ initialJobs }: { initialJobs: JobRecord[] }) {
   const [jobs, setJobs] = useState(initialJobs);
+
+  /*
+   * The server's list wins whenever it changes.
+   *
+   * This list was seeded from props once and never looked at them again, so a
+   * role saved elsewhere on the page — by the analyser, or by one sent from the
+   * browser extension — called router.refresh(), the server re-rendered with
+   * the new row, and this component went on showing the old array. The role was
+   * genuinely saved and simply not on screen until a full reload, which reads
+   * exactly like the save having failed.
+   *
+   * Adjusted during render rather than in an effect. React re-runs this
+   * component immediately with the new state and commits once, where an effect
+   * would paint the stale list first and then correct it.
+   */
+  const [renderedFrom, setRenderedFrom] = useState(initialJobs);
+  if (renderedFrom !== initialJobs) {
+    setRenderedFrom(initialJobs);
+    setJobs(initialJobs);
+  }
+
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [undo, setUndo] = useState<{ id: string; previous: JobStatus; label: string } | null>(null);
   /* Set by clicking a pipeline tile; clicking the same tile again clears it. */
   const [filter, setFilter] = useState<JobStatus | null>(null);
+
+  /*
+   * The pipeline is one row that scrolls, not a nine-tile block.
+   *
+   * Nine stages wrapped across two rows took most of a screen above the list
+   * they filter, and eight of those nine are usually zero — a lot of height
+   * spent on counts of nothing. One row keeps the whole funnel in its real
+   * order, left to right, which is also how people describe it.
+   *
+   * A scroller nobody can tell is scrollable is a scroller nobody scrolls, so
+   * the arrows appear only when there is something past the edge, and the
+   * track is measured rather than assumed: on a wide screen all nine fit and no
+   * arrow ever shows.
+   */
+  const track = useRef<HTMLDivElement>(null);
+  const [overflow, setOverflow] = useState({ start: false, end: false });
+
+  const measure = useCallback(() => {
+    const node = track.current;
+    if (!node) return;
+    /* A pixel of slack: sub-pixel widths otherwise leave an arrow permanently on. */
+    setOverflow({
+      start: node.scrollLeft > 1,
+      end: node.scrollLeft + node.clientWidth < node.scrollWidth - 1,
+    });
+  }, []);
+
+  useEffect(() => {
+    measure();
+    const node = track.current;
+    if (!node || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [measure]);
+
+  function nudge(direction: 1 | -1) {
+    const node = track.current;
+    if (!node) return;
+    node.scrollBy({ left: direction * Math.max(node.clientWidth * 0.8, 180), behavior: "smooth" });
+  }
 
   const visibleJobs = useMemo(
     () => (filter ? jobs.filter((job) => job.status === filter) : jobs),
@@ -96,22 +158,52 @@ export function ApplicationLedger({ initialJobs }: { initialJobs: JobRecord[] })
           <span className="meta-pill"><span className="live-dot" /> {jobs.length} opportunities</span>
         </div>
 
-        <div className="pipeline-grid live-pipeline-grid">
-          {/* Each tile is a filter on the list below — a count you cannot act
-              on is only decoration. */}
-          {statusOrder.map((status) => (
-            <Link
-              href={`#applications-${status.id}`}
-              key={status.id}
-              className={`pipeline-stage${counts.get(status.id) ? " has-items" : ""}${filter === status.id ? " is-filtered" : ""}`}
-              onClick={() => setFilter((current) => (current === status.id ? null : status.id))}
-              aria-pressed={filter === status.id}
-            >
-              <span>{status.label}</span>
-              <strong>{counts.get(status.id) ?? 0}</strong>
-              <p className="section-subtitle">{status.description}</p>
-            </Link>
-          ))}
+        <div className="pipeline-rail">
+          <button
+            type="button"
+            className="pipeline-rail__nav"
+            onClick={() => nudge(-1)}
+            hidden={!overflow.start}
+            aria-label="Show earlier stages"
+          >
+            ‹
+          </button>
+
+          <div className="pipeline-track" ref={track} onScroll={measure}>
+            {/*
+              * Each tile is a filter on the list below — a count you cannot act
+              * on is only decoration.
+              *
+              * The stage's meaning moved off the tile face and into its
+              * accessible name. "Roles worth considering" under "SAVED" is read
+              * once and then costs vertical space on every visit afterwards,
+              * and it was the single biggest reason this card was so tall.
+              */}
+            {statusOrder.map((status) => (
+              <Link
+                href={`#applications-list`}
+                key={status.id}
+                className={`pipeline-stage${counts.get(status.id) ? " has-items" : ""}${filter === status.id ? " is-filtered" : ""}`}
+                onClick={() => setFilter((current) => (current === status.id ? null : status.id))}
+                aria-pressed={filter === status.id}
+                title={status.description}
+                aria-label={`${status.label} — ${status.description}. ${counts.get(status.id) ?? 0} ${counts.get(status.id) === 1 ? "role" : "roles"}. Filter the list.`}
+              >
+                <span>{status.label}</span>
+                <strong>{counts.get(status.id) ?? 0}</strong>
+              </Link>
+            ))}
+          </div>
+
+          <button
+            type="button"
+            className="pipeline-rail__nav"
+            onClick={() => nudge(1)}
+            hidden={!overflow.end}
+            aria-label="Show later stages"
+          >
+            ›
+          </button>
         </div>
       </section>
 
