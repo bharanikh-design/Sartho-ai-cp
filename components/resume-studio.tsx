@@ -494,6 +494,27 @@ export function ResumeStudio({
 
   const expanded = drafts.find((draft) => draft.application.id === expandedId) ?? null;
 
+  /* Whether there is a role a truthful draft could be written for right now. */
+  const canBuild = evidenceReady && tailorable.length > 0;
+
+  /*
+   * Why not, in one sentence, when there is nothing to build — said once, in
+   * the place somebody notices the absence, rather than in a card of its own.
+   *
+   * Four situations and not one. The old copy told somebody with two finished
+   * résumés that none of their roles had been analysed, and told somebody with
+   * no approved evidence to go and analyse a role that would refuse to draft.
+   */
+  const blockedReason = canBuild
+    ? null
+    : !evidenceReady
+      ? <>There are no approved career facts to write from yet. Upload your résumé in <Link href="/career-truth">Career Truth</Link> first.</>
+      : !hasAnyJobs
+        ? <>Save a role in <Link href="/applications">Opportunities</Link> first — a résumé is tailored to one real advert, not written in the abstract.</>
+        : analysedCount === 0
+          ? <>None of your saved roles have been analysed yet. Run the analysis on one in <Link href="/applications">Opportunities</Link>, then come back.</>
+          : <>Every analysed role already has a résumé. Analyse another one in <Link href="/applications">Opportunities</Link> to build a new draft.</>;
+
   return (
     <>
       {error ? <div className="inline-error" role="alert">{error}</div> : null}
@@ -566,8 +587,12 @@ export function ResumeStudio({
             })}
           </div>
         ) : (
+          /*
+           * The guidance lives here, where the absence is, rather than in a
+           * card of its own further down the page.
+           */
           <div className="empty-inline-state">
-            No résumés yet. Build one from an analysed role below.
+            {blockedReason ?? <>No résumés yet. Pick a role below to build your first draft.</>}
           </div>
         )}
       </section>
@@ -590,23 +615,33 @@ export function ResumeStudio({
         <ResumeWorkbench />
       </section>
 
-      <section className="glass-card content-card" id="create">
-        <div className="card-header">
-          <div>
-            <h2 className="section-heading">Build a new résumé</h2>
-            <p className="section-subtitle">Pick a role whose requirements Sartho has already read. The draft uses only approved evidence.</p>
+      {/*
+        * Only when there is something to build from.
+        *
+        * This was a permanent card, and most of the time its entire content was
+        * a sentence saying the work is somewhere else: "Every analysed role
+        * already has a résumé. Analyse another one in Opportunities." A card
+        * that exists to tell you it has nothing for you is worse than no card —
+        * it takes the space, the scroll and the attention of a real one.
+        *
+        * It is not a duplicate of the workbench above, which is why it is
+        * hidden rather than deleted. The workbench improves a CV you already
+        * wrote; this drafts a new one tailored to a specific advert from
+        * approved evidence. Both are real, and neither can do the other's job.
+        *
+        * When there is nothing to build, the reason now appears once — in the
+        * empty state of "Your résumés", where somebody is actually looking for
+        * a résumé and not finding one.
+        */}
+      {canBuild ? (
+        <section className="glass-card content-card" id="create">
+          <div className="card-header">
+            <div>
+              <h2 className="section-heading">Build a new résumé</h2>
+              <p className="section-subtitle">Pick a role whose requirements Sartho has already read. The draft uses only approved evidence.</p>
+            </div>
           </div>
-        </div>
 
-        {!evidenceReady ? (
-          /*
-           * The drafting route refuses without approved, résumé-safe evidence.
-           * Say so here rather than letting the button fail.
-           */
-          <div className="empty-inline-state">
-            There are no approved career facts to write from yet. Upload your résumé in <Link href="/career-truth">Career Truth</Link> first.
-          </div>
-        ) : tailorable.length ? (
           <div className="studio-role-list">
             {tailorable.map((role) => (
               <article key={role.id}>
@@ -617,24 +652,8 @@ export function ResumeStudio({
               </article>
             ))}
           </div>
-        ) : (
-          /*
-           * One sentence and one link, not a queue of unfinished work — chasing
-           * role analysis belongs in Opportunities, which is where this points.
-           *
-           * And three situations, not one. This said the same thing for all of
-           * them, telling somebody with two finished résumés that none of their
-           * roles had been analysed.
-           */
-          <div className="empty-inline-state">
-            {!hasAnyJobs
-              ? <>Save a role in <Link href="/applications">Opportunities</Link> first — a résumé is tailored to one real advert, not written in the abstract.</>
-              : analysedCount === 0
-                ? <>None of your saved roles have been analysed yet. Run the analysis on one in <Link href="/applications">Opportunities</Link>, then come back.</>
-                : <>Every analysed role already has a résumé. Analyse another one in <Link href="/applications">Opportunities</Link> to build a new draft.</>}
-          </div>
-        )}
-      </section>
+        </section>
+      ) : null}
 
       {/*
         * The expanded editor. Same workspace, given the room a document needs:
