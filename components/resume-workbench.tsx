@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRef, useState } from "react";
 import { BULLET_MARKER, bulletsIn, scoreAts } from "@/lib/resume/ats";
+import { unfilledBlanks } from "@/lib/resume/bullet-rewrite";
 import { RESUME_ACCEPT } from "@/lib/resume/upload";
 
 /*
@@ -30,8 +31,13 @@ export function ResumeWorkbench() {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [openBullet, setOpenBullet] = useState<number | null>(null);
-  const [facts, setFacts] = useState<Record<number, string>>({});
-  const [rewrites, setRewrites] = useState<Record<number, string>>({});
+  /*
+   * The proposal, and what the person has made of it. `drafts` holds an
+   * editable line; `asked` holds the questions the model says would make it
+   * strongest. Both are cached per bullet so reopening one never spends again.
+   */
+  const [drafts, setDrafts] = useState<Record<number, string>>({});
+  const [asked, setAsked] = useState<Record<number, string[]>>({});
   const [copied, setCopied] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
 
@@ -49,8 +55,8 @@ export function ResumeWorkbench() {
       const result = await response.json() as { text?: string; error?: string };
       if (!response.ok || !result.text) throw new Error(result.error ?? "Sartho could not read that file.");
       setText(result.text);
-      setRewrites({});
-      setFacts({});
+      setDrafts({});
+      setAsked({});
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Sartho could not read that file.");
     } finally {
@@ -58,25 +64,41 @@ export function ResumeWorkbench() {
     }
   }
 
-  async function improve(index: number, bullet: string) {
-    const fact = (facts[index] ?? "").trim();
-    if (!fact || busy) return;
+  /*
+   * Sartho drafts first. Opening a line asks for the stronger version of it,
+   * with every figure the model cannot know left as a labelled blank — so
+   * there is something to react to rather than an empty box and a demand.
+   *
+   * Fired on open rather than on a button, because a suggestion you have to
+   * ask for twice is not a suggestion. Cached per bullet, so reopening one is
+   * free; the earlier mistake with Career Direction was spending on every page
+   * load, and this only spends when a specific line is deliberately opened.
+   */
+  async function propose(index: number, bullet: string) {
+    if (drafts[index] !== undefined || busy) return;
     setBusy(`bullet-${index}`);
     setError(null);
     try {
       const response = await fetch("/api/resume/improve", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bullet, fact }),
+        body: JSON.stringify({ bullet }),
       });
-      const result = await response.json() as { rewritten?: string; error?: string };
-      if (!response.ok || !result.rewritten) throw new Error(result.error ?? "Sartho could not rewrite this line.");
-      setRewrites((state) => ({ ...state, [index]: result.rewritten as string }));
+      const result = await response.json() as { rewritten?: string; questions?: string[]; error?: string };
+      if (!response.ok || !result.rewritten) throw new Error(result.error ?? "Sartho could not draft this line.");
+      setDrafts((state) => ({ ...state, [index]: result.rewritten as string }));
+      setAsked((state) => ({ ...state, [index]: result.questions ?? [] }));
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Sartho could not rewrite this line.");
+      setError(caught instanceof Error ? caught.message : "Sartho could not draft this line.");
     } finally {
       setBusy(null);
     }
+  }
+
+  function openBulletAt(index: number, bullet: string) {
+    const next = openBullet === index ? null : index;
+    setOpenBullet(next);
+    if (next !== null) void propose(next, bullet);
   }
 
   /** Replace one bullet in the text, leaving everything around it alone. */
@@ -95,7 +117,6 @@ export function ResumeWorkbench() {
         return `${indent}${marker} ${replacement}`;
       })
       .join("\n"));
-    setRewrites((state) => { const next = { ...state }; delete next[index]; return next; });
     setOpenBullet(null);
   }
 
@@ -110,7 +131,7 @@ export function ResumeWorkbench() {
           rows={text ? 14 : 6}
           placeholder="Paste the text of your current résumé here…"
           value={text}
-          onChange={(event) => { setText(event.target.value); setRewrites({}); }}
+          onChange={(event) => { setText(event.target.value); setDrafts({}); setAsked({}); }}
         />
         <div className="workbench-intake-actions">
           <input
@@ -128,7 +149,7 @@ export function ResumeWorkbench() {
             {busy === "file" ? "Reading…" : "Read from a file"}
           </button>
           {text ? (
-            <button type="button" className="secondary-button" onClick={() => { setText(""); setRewrites({}); setFacts({}); }}>
+            <button type="button" className="secondary-button" onClick={() => { setText(""); setDrafts({}); setAsked({}); }}>
               Clear
             </button>
           ) : null}
@@ -167,55 +188,66 @@ export function ResumeWorkbench() {
           {ats.weakBullets.length ? (
             <div className="studio-fixes">
               <strong>Lines worth a number</strong>
-              <small>Sartho will not invent a figure. Tell it what actually happened and it rewrites the line around your words.</small>
+              <small>Sartho drafts the stronger version first, leaving a blank where it would otherwise have to guess. Fill those in, edit anything, then use it.</small>
               {ats.weakBullets.map((bullet) => {
                 const isOpen = openBullet === bullet.index;
-                const rewritten = rewrites[bullet.index];
+                const draft = drafts[bullet.index];
+                const blanks = draft ? unfilledBlanks(draft) : [];
+                const questions = asked[bullet.index] ?? [];
                 return (
                   <div className="studio-fix" key={bullet.index}>
                     <button
                       type="button"
                       className="studio-fix-line"
-                      onClick={() => setOpenBullet(isOpen ? null : bullet.index)}
+                      onClick={() => openBulletAt(bullet.index, bullet.text)}
                       aria-expanded={isOpen}
                     >
                       {bullet.text}
                     </button>
                     {isOpen ? (
                       <div className="studio-fix-form">
-                        <label htmlFor={`wb-fact-${bullet.index}`}>What was the number, scale or result?</label>
-                        <textarea
-                          id={`wb-fact-${bullet.index}`}
-                          rows={2}
-                          placeholder="about 40,000 rows, over six weeks, for a team of 3"
-                          value={facts[bullet.index] ?? ""}
-                          onChange={(event) => setFacts((state) => ({ ...state, [bullet.index]: event.target.value }))}
-                        />
-                        <button
-                          type="button"
-                          className="secondary-button"
-                          disabled={!(facts[bullet.index] ?? "").trim() || busy === `bullet-${bullet.index}`}
-                          onClick={() => void improve(bullet.index, bullet.text)}
-                        >
-                          {busy === `bullet-${bullet.index}` ? "Rewriting…" : "Rewrite this line"}
-                        </button>
-                        {rewritten ? (
-                          <div className="studio-fix-result">
-                            <p>{rewritten}</p>
-                            <div>
-                              <button type="button" className="primary-button" onClick={() => accept(bullet.index, rewritten)}>
-                                Use this
+                        {draft === undefined ? (
+                          <p className="studio-fix-pending">
+                            {busy === `bullet-${bullet.index}` ? "Sartho is drafting a stronger version…" : "Nothing drafted yet."}
+                          </p>
+                        ) : (
+                          <>
+                            <label htmlFor={`wb-draft-${bullet.index}`}>
+                              Sartho&rsquo;s version. Replace anything in [brackets] — it will not guess a figure for you.
+                            </label>
+                            <textarea
+                              id={`wb-draft-${bullet.index}`}
+                              rows={3}
+                              value={draft}
+                              onChange={(event) => setDrafts((state) => ({ ...state, [bullet.index]: event.target.value }))}
+                            />
+                            {questions.length ? (
+                              <ul className="studio-fix-questions">
+                                {questions.map((question) => <li key={question}>{question}</li>)}
+                              </ul>
+                            ) : null}
+                            <div className="studio-fix-actions">
+                              <button
+                                type="button"
+                                className="primary-button"
+                                disabled={blanks.length > 0 || !draft.trim()}
+                                onClick={() => accept(bullet.index, draft.trim())}
+                              >
+                                Use this line
                               </button>
                               <button
                                 type="button"
                                 className="secondary-button"
-                                onClick={() => setRewrites((state) => { const next = { ...state }; delete next[bullet.index]; return next; })}
+                                onClick={() => setOpenBullet(null)}
                               >
-                                Discard
+                                Leave it
                               </button>
+                              {blanks.length ? (
+                                <small>Still to fill: {blanks.join(", ")}</small>
+                              ) : null}
                             </div>
-                          </div>
-                        ) : null}
+                          </>
+                        )}
                       </div>
                     ) : null}
                   </div>

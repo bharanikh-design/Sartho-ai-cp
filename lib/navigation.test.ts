@@ -74,3 +74,27 @@ describe("résumé gate", () => {
     expect(getNavigationWithGate(true, true).map((item) => item.href)).not.toContain("/career-truth");
   });
 });
+
+/*
+ * Opening a saved role lit nothing in the rail. /jobs/[id] is where a role
+ * lives, the /jobs menu entry went away when Opportunities took that name, and
+ * nothing was left claiming the route — so the product forgot where you were.
+ */
+describe("routes a menu item owns without living at", () => {
+  it("lights Opportunities on a saved role", () => {
+    expect(isNavigationItemActive("/jobs/6f1c-not-a-real-id", "/applications")).toBe(true);
+    expect(isNavigationItemActive("/jobs", "/applications")).toBe(true);
+    expect(isNavigationItemActive("/applications", "/applications")).toBe(true);
+  });
+
+  it("lights exactly one item", () => {
+    const lit = getPrimaryNavigation(true).filter((item) => isNavigationItemActive("/jobs/abc", item.href));
+    expect(lit.map((item) => item.label)).toEqual(["Opportunities"]);
+  });
+
+  it("does not light Opportunities elsewhere", () => {
+    for (const path of ["/", "/resume-studio", "/career-direction", "/search-plan"]) {
+      expect(isNavigationItemActive(path, "/applications")).toBe(false);
+    }
+  });
+})

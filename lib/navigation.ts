@@ -171,8 +171,24 @@ const supportingPageLabels: Array<[prefix: string, label: string]> = [
   ["/resume-studio", "Résumé Studio"],
 ];
 
+/*
+ * Routes a menu item owns without living at.
+ *
+ * A saved role is at /jobs/[id] and belongs to Opportunities, but the /jobs
+ * menu entry was removed when Opportunities took that name — so opening a role
+ * lit nothing at all in the rail, and the product forgot where you were.
+ */
+const OWNED_PREFIXES: Record<string, string[]> = {
+  "/applications": ["/jobs"],
+};
+
+function underPrefix(pathname: string, prefix: string) {
+  return prefix === "/" ? pathname === "/" : pathname === prefix || pathname.startsWith(`${prefix}/`);
+}
+
 export function isNavigationItemActive(pathname: string, href: string) {
-  return href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`);
+  if (underPrefix(pathname, href)) return true;
+  return (OWNED_PREFIXES[href] ?? []).some((prefix) => underPrefix(pathname, prefix));
 }
 
 export function getPageLabel(pathname: string) {

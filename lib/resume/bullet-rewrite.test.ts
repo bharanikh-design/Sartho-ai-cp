@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BULLET_REWRITE_RULES, inventedNumbersIn } from "./bullet-rewrite";
+import { BULLET_PROPOSE_RULES, BULLET_REWRITE_RULES, inventedNumbersIn, unfilledBlanks } from "./bullet-rewrite";
 
 /*
  * The one rule separating this from every résumé tool that will turn "analysed
@@ -43,5 +43,33 @@ describe("BULLET_REWRITE_RULES", () => {
   it("forbids inventing, and forbids inflating what was given", () => {
     expect(BULLET_REWRITE_RULES).toMatch(/ONLY the supplied bullet and the supplied fact/);
     expect(BULLET_REWRITE_RULES).toMatch(/Do not exaggerate/);
+  });
+});
+
+/*
+ * Propose-first has to stay honest: the model goes first, but a quantity it
+ * cannot know is a visible blank, never a plausible guess.
+ */
+describe("unfilledBlanks", () => {
+  it("finds the blanks a proposal left for the person", () => {
+    expect(unfilledBlanks("Delivered a [how many phases]-phase roadmap over [how many weeks]."))
+      .toEqual(["[how many phases]", "[how many weeks]"]);
+  });
+
+  it("is empty once they are filled in", () => {
+    expect(unfilledBlanks("Delivered a four-phase roadmap over six weeks.")).toEqual([]);
+  });
+
+  it("does not mistake ordinary brackets in prose for a blank", () => {
+    expect(unfilledBlanks("Ran the workshop series.")).toEqual([]);
+    expect(unfilledBlanks("Delivered a roadmap [\nacross lines]")).toEqual([]);
+  });
+});
+
+describe("BULLET_PROPOSE_RULES", () => {
+  it("forbids guessing and caps how much homework a draft may hand back", () => {
+    expect(BULLET_PROPOSE_RULES).toMatch(/must never guess/);
+    expect(BULLET_PROPOSE_RULES).toMatch(/square-bracketed blank/);
+    expect(BULLET_PROPOSE_RULES).toMatch(/at most three blanks/);
   });
 });
