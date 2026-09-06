@@ -93,7 +93,18 @@ const resumeNavigation: NavigationItem = {
   purpose: "Write a tailored résumé draft and check how it reads to an applicant tracking system.",
 };
 
-
+/*
+ * The browser extension is not a destination yet.
+ *
+ * It had a menu entry and an install page describing a download that does not
+ * exist: no packaged build, no store listing, no icons, and instructions whose
+ * first step was "download the source from our repository" with no link. So the
+ * one thing a person could do from that page was fail.
+ *
+ * It is off the rail until there is something to install. The "coming soon"
+ * pill on Opportunities is the honest placeholder in the meantime, because it
+ * promises nothing and links nowhere.
+ */
 export function getPrimaryNavigation(_activated: boolean): NavigationItem[] {
   return [
     dashboardNavigation,

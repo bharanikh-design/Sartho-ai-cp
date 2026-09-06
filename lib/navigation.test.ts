@@ -27,6 +27,17 @@ describe("primary navigation", () => {
     expect(isNavigationItemActive("/journey", "/")).toBe(false);
   });
 
+  /*
+   * The install page described a download that did not exist, and the autofill
+   * it advertised filled in a hardcoded identity. It is off the rail until
+   * there is a packaged, published extension to point at.
+   */
+  it("does not offer the browser extension as a destination", () => {
+    expect(primaryNavigation.some((item) => item.href === "/extension")).toBe(false);
+    expect(getPrimaryNavigation(true).some((item) => item.href === "/extension")).toBe(false);
+    expect(getNavigationWithGate(true, true).some((item) => item.href === "/extension")).toBe(false);
+  });
+
   it("labels supporting workflow pages without adding them to primary navigation", () => {
     expect(getPageLabel("/diagnostics")).toBe("Diagnostics");
     expect(primaryNavigation.some((item) => item.href === "/diagnostics")).toBe(false);
