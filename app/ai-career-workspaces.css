@@ -556,3 +556,68 @@ h2.resume-doc-heading.resume-doc-field { margin-bottom: 0; border-bottom: 1px so
 :root:not([data-theme="light"]) .rank-badge.rank-moderate { color: #e6c079; background: rgba(180,128,42,.2); }
 :root:not([data-theme="light"]) .rank-badge.rank-stretch { color: #bcaef0; background: rgba(120,100,220,.2); }
 :root:not([data-theme="light"]) .rank-badge.rank-unclear { color: #a2b1a9; background: rgba(255,255,255,.07); }
+
+
+/*
+ * What goes on the paper.
+ *
+ * PDF is produced by the browser's own print pipeline rather than a library,
+ * and that is a deliberate choice about the machine that reads it first: every
+ * client-side shortcut (html2canvas and its relatives) rasterises the page, and
+ * a picture of a résumé scores zero with every applicant tracking system that
+ * opens it. Printing keeps the text selectable, keeps real headings and real
+ * list items, and uses the person's own paper size.
+ *
+ * The cost is that the page must be told what a résumé is and what is app. On
+ * screen the document is a grid of textareas — which print with borders,
+ * scrollbars and clipped overflow — so a clean read-only copy is put on the
+ * page instead, and everything else is removed rather than hidden: display
+ * none, so nothing reserves space or drags a stray page break with it.
+ */
+.resume-print { display: none; }
+
+@media print {
+  /* Black on white, whatever the viewer's theme. Ink is expensive and grey text photocopies badly. */
+  :root, body { background: #fff !important; color: #000 !important; }
+
+  body * { visibility: hidden; }
+  .resume-print, .resume-print * { visibility: visible; }
+
+  .resume-print {
+    display: block;
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
+  .resume-print .resume-doc {
+    max-height: none;
+    overflow: visible;
+    border: 0;
+    border-radius: 0;
+    padding: 0;
+    background: transparent;
+    color: #000;
+    font-size: 11pt;
+    line-height: 1.4;
+  }
+
+  .resume-print .resume-doc-headline { font-size: 17pt; text-align: center; }
+  .resume-print .resume-doc-heading {
+    margin: 16pt 0 4pt;
+    border-bottom: 0.5pt solid #000;
+    color: #000;
+    font-size: 10pt;
+  }
+  .resume-print .resume-doc-summary { color: #000; }
+  .resume-print .resume-doc-bullets li { color: #000; }
+
+  /* A heading orphaned at the foot of a page, or a bullet split across two, reads as a mistake. */
+  .resume-print .resume-doc-heading { break-after: avoid; page-break-after: avoid; }
+  .resume-print .resume-doc-bullets li { break-inside: avoid; page-break-inside: avoid; }
+
+  /* One inch, the margin every reviewer expects — and the same as the Word file. */
+  @page { margin: 1in; }
+}

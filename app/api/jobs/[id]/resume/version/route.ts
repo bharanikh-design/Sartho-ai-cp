@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getAuthenticatedUser } from "@/lib/auth";
 import { evidenceIdsIn, renderResumeText } from "@/lib/resume/content";
+import { resumeContentSchema } from "@/lib/resume/content-schema";
 import { saveResumeDraft } from "@/lib/resume/save";
 
 /*
@@ -26,32 +27,13 @@ const changeSchema = z.object({
 });
 
 /*
- * The document the editor holds. Bounded at every level, because this is the
- * one route a person can post arbitrary structure to.
- */
-const contentSchema = z.object({
-  headline: z.string().trim().max(400).default(""),
-  summary: z.string().trim().max(4_000).default(""),
-  sections: z.array(z.object({
-    id: z.string().trim().max(64).default(""),
-    heading: z.string().trim().max(200).default(""),
-    bullets: z.array(z.object({
-      id: z.string().trim().max(64).default(""),
-      text: z.string().trim().min(1).max(2_000),
-      evidenceIds: z.array(z.string().max(64)).max(40).default([]),
-      edited: z.boolean().default(false),
-    })).max(60).default([]),
-  })).max(20).default([]),
-});
-
-/*
  * `content` is the document; `draft` is the older text-only path the bullet
  * rewriter used before the structure was kept. When content arrives the text
  * is rendered from it here rather than taken from the request, so a client
  * cannot save a document and a body of text that describe different résumés.
  */
 const inputSchema = z.object({
-  content: contentSchema.optional(),
+  content: resumeContentSchema.optional(),
   draft: z.string().trim().min(50).max(40_000).optional(),
   versionName: z.string().trim().min(2).max(180).optional(),
   changes: z.array(changeSchema).max(60).default([]),
