@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { scoreAts } from "@/lib/resume/ats";
+import { unfilledBlanks } from "@/lib/resume/bullet-rewrite";
 import { ResumeWorkbench } from "@/components/resume-workbench";
 import type { ApplicationRecord, ResumeChange, ResumeVersionRecord, RuleAnalysis } from "@/lib/types";
 
@@ -71,8 +72,13 @@ export function ResumeStudio({
    * until Save, so abandoning a half-finished edit costs nothing.
    */
   const [openBullet, setOpenBullet] = useState<string | null>(null);
-  const [facts, setFacts] = useState<Record<string, string>>({});
-  const [rewrites, setRewrites] = useState<Record<string, string>>({});
+  /*
+   * Sartho drafts first, and the person edits. `proposals` holds the editable
+   * line, `asked` the questions that would strengthen it. Both cached per
+   * bullet, so reopening one never spends again.
+   */
+  const [proposals, setProposals] = useState<Record<string, string>>({});
+  const [asked, setAsked] = useState<Record<string, string[]>>({});
   const [accepted, setAccepted] = useState<Record<string, Record<number, string>>>({});
   const [busyBullet, setBusyBullet] = useState<string | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
@@ -99,26 +105,38 @@ export function ResumeStudio({
       .join("\n");
   }
 
-  async function improve(draft: StudioDraft, bullet: { index: number; text: string }) {
+  /*
+   * Fired when a line is opened, not behind another button: a suggestion you
+   * have to ask for twice is not a suggestion. Every figure the model cannot
+   * know comes back as a labelled blank, so it goes first without inventing.
+   */
+  async function propose(draft: StudioDraft, bullet: { index: number; text: string }) {
     const key = `${draft.application.id}:${bullet.index}`;
-    const fact = (facts[key] ?? "").trim();
-    if (!fact || busyBullet) return;
+    if (proposals[key] !== undefined || busyBullet) return;
     setBusyBullet(key);
     setError(null);
     try {
       const response = await fetch(`/api/jobs/${draft.jobId}/resume/improve`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bullet: bullet.text, fact }),
+        body: JSON.stringify({ bullet: bullet.text }),
       });
-      const result = await response.json() as { rewritten?: string; error?: string };
-      if (!response.ok || !result.rewritten) throw new Error(result.error ?? "Sartho could not rewrite this line.");
-      setRewrites((state) => ({ ...state, [key]: result.rewritten as string }));
+      const result = await response.json() as { rewritten?: string; questions?: string[]; error?: string };
+      if (!response.ok || !result.rewritten) throw new Error(result.error ?? "Sartho could not draft this line.");
+      setProposals((state) => ({ ...state, [key]: result.rewritten as string }));
+      setAsked((state) => ({ ...state, [key]: result.questions ?? [] }));
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Sartho could not rewrite this line.");
+      setError(caught instanceof Error ? caught.message : "Sartho could not draft this line.");
     } finally {
       setBusyBullet(null);
     }
+  }
+
+  function openBulletAt(draft: StudioDraft, bullet: { index: number; text: string }) {
+    const key = `${draft.application.id}:${bullet.index}`;
+    const next = openBullet === key ? null : key;
+    setOpenBullet(next);
+    if (next) void propose(draft, bullet);
   }
 
   async function saveVersion(draft: StudioDraft, text: string) {
@@ -142,8 +160,8 @@ export function ResumeStudio({
       const result = await response.json() as { error?: string };
       if (!response.ok) throw new Error(result.error ?? "Sartho could not save this version.");
       setAccepted((state) => ({ ...state, [draft.application.id]: {} }));
-      setRewrites({});
-      setFacts({});
+      setProposals({});
+      setAsked({});
       setOpenBullet(null);
       router.refresh();
     } catch (caught) {
@@ -287,72 +305,71 @@ export function ResumeStudio({
             {atsWeak.length ? (
               <div className="studio-fixes">
                 <strong>Lines worth a number</strong>
-                <small>Sartho will not invent a figure. Tell it what actually happened and it rewrites the line around your words.</small>
+                <small>Sartho drafts the stronger version first, leaving a blank where it would otherwise have to guess. Fill those in, edit anything, then use it.</small>
                 {atsWeak.map((bullet) => {
                   const key = `${draft.application.id}:${bullet.index}`;
                   const isOpen = openBullet === key;
-                  const rewritten = rewrites[key];
+                  const proposal = proposals[key];
+                  const blanks = proposal ? unfilledBlanks(proposal) : [];
+                  const questions = asked[key] ?? [];
                   const isAccepted = Boolean(accepted[draft.application.id]?.[bullet.index]);
                   return (
                     <div className={`studio-fix${isAccepted ? " is-accepted" : ""}`} key={key}>
                       <button
                         type="button"
                         className="studio-fix-line"
-                        onClick={() => setOpenBullet(isOpen ? null : key)}
+                        onClick={() => openBulletAt(draft, bullet)}
                         aria-expanded={isOpen}
                       >
                         {isAccepted ? "✓ " : ""}{bullet.text}
                       </button>
                       {isOpen && !isAccepted ? (
                         <div className="studio-fix-form">
-                          <label htmlFor={`fact-${key}`}>
-                            What was the number, scale or result? Plain words are fine.
-                          </label>
-                          <textarea
-                            id={`fact-${key}`}
-                            rows={2}
-                            placeholder="about 40,000 rows, over six weeks, for a team of 3"
-                            value={facts[key] ?? ""}
-                            onChange={(event) => setFacts((state) => ({ ...state, [key]: event.target.value }))}
-                          />
-                          <button
-                            type="button"
-                            className="secondary-button"
-                            disabled={!(facts[key] ?? "").trim() || busyBullet === key}
-                            onClick={() => void improve(draft, bullet)}
-                          >
-                            {busyBullet === key ? "Rewriting…" : "Rewrite this line"}
-                          </button>
-                          {rewritten ? (
-                            <div className="studio-fix-result">
-                              <p>{rewritten}</p>
-                              <div>
+                          {proposal === undefined ? (
+                            <p className="studio-fix-pending">
+                              {busyBullet === key ? "Sartho is drafting a stronger version…" : "Nothing drafted yet."}
+                            </p>
+                          ) : (
+                            <>
+                              <label htmlFor={`draft-${key}`}>
+                                Sartho&rsquo;s version. Replace anything in [brackets] — it will not guess a figure for you.
+                              </label>
+                              <textarea
+                                id={`draft-${key}`}
+                                rows={3}
+                                value={proposal}
+                                onChange={(event) => setProposals((state) => ({ ...state, [key]: event.target.value }))}
+                              />
+                              {questions.length ? (
+                                <ul className="studio-fix-questions">
+                                  {questions.map((question) => <li key={question}>{question}</li>)}
+                                </ul>
+                              ) : null}
+                              <div className="studio-fix-actions">
                                 <button
                                   type="button"
                                   className="primary-button"
+                                  disabled={blanks.length > 0 || !proposal.trim()}
                                   onClick={() => {
                                     setAccepted((state) => ({
                                       ...state,
                                       [draft.application.id]: {
                                         ...(state[draft.application.id] ?? {}),
-                                        [bullet.index]: rewritten,
+                                        [bullet.index]: proposal.trim(),
                                       },
                                     }));
                                     setOpenBullet(null);
                                   }}
                                 >
-                                  Use this
+                                  Use this line
                                 </button>
-                                <button
-                                  type="button"
-                                  className="secondary-button"
-                                  onClick={() => setRewrites((state) => ({ ...state, [key]: "" }))}
-                                >
-                                  Discard
+                                <button type="button" className="secondary-button" onClick={() => setOpenBullet(null)}>
+                                  Leave it
                                 </button>
+                                {blanks.length ? <small>Still to fill: {blanks.join(", ")}</small> : null}
                               </div>
-                            </div>
-                          ) : null}
+                            </>
+                          )}
                         </div>
                       ) : null}
                     </div>
@@ -438,15 +455,19 @@ export function ResumeStudio({
                     <span aria-hidden="true" className="studio-draft-chevron">{open ? "▲" : "▼"}</span>
                   </button>
                   {/*
-                    * Outside the row button, because a button inside a button is
-                    * invalid and the browser stops firing one of them.
+                    * An icon, sitting in its own lane at the end of the row.
+                    * It was a text button positioned on top of the score, which
+                    * covered it. Outside the row button because a button inside
+                    * a button is invalid and the browser stops firing one.
                     */}
                   <button
                     type="button"
                     className="studio-expand"
+                    title="Open editor"
+                    aria-label={`Open the editor for ${draft.application.resume_version ?? draft.jobTitle}`}
                     onClick={() => { setOpenId(draft.application.id); setExpandedId(draft.application.id); }}
                   >
-                    Open editor <span aria-hidden="true">⤢</span>
+                    <span aria-hidden="true">⤢</span>
                   </button>
 
                   {open ? renderWorkspace(draft) : null}
