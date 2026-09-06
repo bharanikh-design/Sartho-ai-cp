@@ -93,13 +93,6 @@ const resumeNavigation: NavigationItem = {
   purpose: "Write a tailored résumé draft and check how it reads to an applicant tracking system.",
 };
 
-const extensionNavigation: NavigationItem = {
-  label: "Browser Extension",
-  shortLabel: "Extension",
-  href: "/extension",
-  icon: "applications",
-  purpose: "Download and install the Sartho extension for Chrome, Safari, or Edge.",
-};
 
 export function getPrimaryNavigation(_activated: boolean): NavigationItem[] {
   return [
@@ -108,7 +101,6 @@ export function getPrimaryNavigation(_activated: boolean): NavigationItem[] {
     strategyNavigation,
     applicationNavigation,
     resumeNavigation,
-    extensionNavigation,
   ];
 }
 
@@ -144,7 +136,6 @@ export const allNavigation: NavigationItem[] = [
   strategyNavigation,
   resumeNavigation,
   notificationsNavigation,
-  extensionNavigation,
 ];
 
 export function getMobileNavigation(activated: boolean) {

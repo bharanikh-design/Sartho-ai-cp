@@ -5,7 +5,7 @@
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "REQUEST_PROFILE") {
     // We send a message to the React window asking for the profile
-    window.postMessage({ type: "SARTHO_GET_PROFILE" }, "*");
+    window.postMessage({ type: "SARTHO_GET_PROFILE" }, window.location.origin);
     
     // We need to wait for the React app to respond via window message
     const listener = (event) => {
@@ -16,20 +16,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     };
     window.addEventListener("message", listener);
     
-    // Fallback if React doesn't respond
+    // Timeout if React doesn't respond
     setTimeout(() => {
       window.removeEventListener("message", listener);
-      // Hardcoded fallback for the prototype just in case React isn't listening yet
-      sendResponse({ 
-        profileData: {
-          firstName: "Bharani",
-          lastName: "K",
-          email: "bharani@sartho.tech",
-          phone: "+1 234 567 8900",
-          linkedinUrl: "https://linkedin.com/in/bharani",
-          portfolioUrl: "https://sartho.tech"
-        }
-      });
+      // Fails gracefully instead of injecting hardcoded PII
+      sendResponse({ error: "Sartho profile not ready. Please open Sartho dashboard to sync your profile." });
     }, 1500);
     return true; // Keep channel open for async response
   }
@@ -40,7 +31,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       source: "sartho-extension",
       type: "IMPORT_JOB",
       payload: message.payload
-    }, "*");
+    }, window.location.origin);
     sendResponse({ success: true });
   }
 });
