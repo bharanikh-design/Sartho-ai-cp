@@ -424,3 +424,11 @@
 .stage-guidance-exact strong { font-size: var(--text-xs); }
 .stage-guidance-exact p { font-size: var(--text-2xs); line-height: var(--leading-snug); }
 .journey-continue-button { font-size: var(--text-sm); font-weight: var(--weight-semibold); }
+
+/*
+ * What the advert asks for in years. Amber rather than grey: it is the line
+ * that decides whether an application is worth an hour, so it should not read
+ * as another piece of supporting detail.
+ */
+.match-requirement { margin: 6px 0 0; color: #ffcf94; font-size: var(--text-2xs); line-height: 1.5; }
+.match-requirement strong { color: #ffd37a; }

@@ -69,6 +69,24 @@ const strategyNavigation: NavigationItem = {
   purpose: "Set where and how you want to work, then search live listings against your evidence.",
 };
 
+/*
+ * Analysing a role is its own job, not a preamble to the pipeline.
+ *
+ * It lived as a card at the top of Opportunities, which put a form nobody had
+ * asked for above the list everybody came to read — the pipeline was below the
+ * fold, so a person could visit Opportunities and never learn they had one. And
+ * "paste an advert, see whether it fits your evidence" is a complete thing on
+ * its own: it needs a résumé and nothing else, and it is the fastest way to
+ * show somebody what Sartho does.
+ */
+const analyseNavigation: NavigationItem = {
+  label: "Analyse a Role",
+  shortLabel: "Analyse",
+  href: "/analyse",
+  icon: "analyse",
+  purpose: "Paste any job advert and see how it reads against your approved evidence.",
+};
+
 const directionNavigation: NavigationItem = {
   label: "Career Direction",
   shortLabel: "Direction",
@@ -94,16 +112,13 @@ const resumeNavigation: NavigationItem = {
 };
 
 /*
- * The browser extension is not a destination yet.
+ * The browser extension is a setup task, not a destination.
  *
- * It had a menu entry and an install page describing a download that does not
- * exist: no packaged build, no store listing, no icons, and instructions whose
- * first step was "download the source from our repository" with no link. So the
- * one thing a person could do from that page was fail.
- *
- * It is off the rail until there is something to install. The "coming soon"
- * pill on Opportunities is the honest placeholder in the meantime, because it
- * promises nothing and links nowhere.
+ * There is a real page and a real build now — /extension explains how to
+ * install it and `npm run extension:zip` packages it — so the old "coming
+ * soon" placeholder is gone. It still does not earn a place on the rail: you
+ * install it once and then never visit the page again. The pill on
+ * Opportunities links to it, and only for people who do not have it.
  */
 export function getPrimaryNavigation(_activated: boolean): NavigationItem[] {
   return [
@@ -111,6 +126,13 @@ export function getPrimaryNavigation(_activated: boolean): NavigationItem[] {
     directionNavigation,
     strategyNavigation,
     applicationNavigation,
+    /*
+     * After Opportunities, not before it, because the mobile bar shows the
+     * first four. Ordering Analyse ahead of the pipeline pushed the pipeline
+     * off the bar entirely on a phone — the page people open most, gone, to
+     * promote the side entrance to it.
+     */
+    analyseNavigation,
     resumeNavigation,
   ];
 }
@@ -141,6 +163,7 @@ export function getNavigationWithGate(activated: boolean, hasResume: boolean): N
 export const allNavigation: NavigationItem[] = [
   journeyNavigation,
   dashboardNavigation,
+  analyseNavigation,
   applicationNavigation,
   profileNavigation,
   directionNavigation,

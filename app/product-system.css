@@ -25,7 +25,12 @@
   display: flex;
   gap: 48px;
   justify-content: space-between;
-  padding: 18px 4px 28px;
+  /*
+   * Almost nothing above the eyebrow. The space over a page title was doing no
+   * work — the sticky bar already separates it from the window — and it cost
+   * every page a slice of its first screen.
+   */
+  padding: 2px 4px 18px;
 }
 
 .product-system-header__copy {

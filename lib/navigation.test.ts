@@ -49,11 +49,17 @@ describe("primary navigation", () => {
       "Career Direction",
       "Find Roles",
       "Opportunities",
+      "Analyse a Role",
       "Résumé Studio",
     ];
     expect(getPrimaryNavigation(false).map((item) => item.label)).toEqual(flow);
     expect(getPrimaryNavigation(true).map((item) => item.label)).toEqual(flow);
     expect(getMobileNavigation(true)).toHaveLength(4);
+    /*
+     * The phone bar is the first four, so the order above is load-bearing:
+     * Opportunities is the page people open most and must survive the cut.
+     */
+    expect(getMobileNavigation(true).map((item) => item.label)).toContain("Opportunities");
   });
 
   it("leaves a primary destination in place when opened directly", () => {
@@ -63,6 +69,7 @@ describe("primary navigation", () => {
       "Career Direction",
       "Find Roles",
       "Opportunities",
+      "Analyse a Role",
       "Résumé Studio",
     ]);
   });
