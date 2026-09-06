@@ -28,6 +28,7 @@ type Scraped = {
   applicants: string;
   hiringManager: string;
   readBy: string;
+  confidence: "high" | "medium" | "low";
   url: string;
 };
 
@@ -200,6 +201,45 @@ describe("the shipped scraper", () => {
       "https://www.linkedin.com/jobs/view/4012345678/",
     );
     expect(page.applicants).toBe("Over 200 applicants");
+  });
+
+  /*
+   * A LinkedIn feed post reported "successfully parsed (9790 chars)" and
+   * offered to send somebody's personal story to the pipeline. It had parsed
+   * perfectly; it was simply not a job. Length is not evidence of an advert.
+   */
+  describe("telling an advert from a page that merely has words on it", () => {
+    const story = "<p>" + "Months ago I found myself torn between accepting a counteroffer and taking an external opportunity. ".repeat(40) + "</p>";
+
+    it("refuses to call a LinkedIn feed post a job", () => {
+      const page_ = scrape(`<html><body><main><h1>Feed</h1>${story}</main></body></html>`, "https://www.linkedin.com/feed/");
+      expect(page_.confidence).toBe("low");
+    });
+
+    it("trusts structured data wherever it is found", () => {
+      const page_ = scrape(
+        `<html><head><script type="application/ld+json">${jobPosting()}</script></head><body>${story}</body></html>`,
+        "https://example.com/anything",
+      );
+      expect(page_.confidence).toBe("high");
+    });
+
+    it("trusts a known board's own job markup", () => {
+      const page_ = scrape(
+        `<html><body><h1 data-testid="jobsearch-JobInfoHeader-title">Data Analyst</h1>`
+        + `<div id="jobDescriptionText">You will build dashboards and work with stakeholders across the business every day.</div></body></html>`,
+        "https://au.indeed.com/viewjob?jk=abc123",
+      );
+      expect(page_.confidence).toBe("high");
+    });
+
+    it("is cautious, not refusing, when the address looks like a job but the text came off the page", () => {
+      const page_ = scrape(
+        `<html><body><main><h1>Graduate Analyst</h1><p>We are hiring a graduate analyst to join our reporting team in Sydney this year.</p></main></body></html>`,
+        "https://tiny-startup.example/careers/graduate-analyst",
+      );
+      expect(page_.confidence).toBe("medium");
+    });
   });
 
   it("caps a runaway description instead of posting a whole site into the pipeline", () => {

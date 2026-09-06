@@ -189,9 +189,31 @@
     for (const key of ["title", "company", "location", "postedDate"]) {
       if (!merged[key] && extra[key]) merged[key] = extra[key];
     }
-    if (!merged.description && extra.description) merged.description = extra.description;
+    if (!merged.description && extra.description) {
+      merged.description = extra.description;
+      /*
+       * Where the body came from, not where the title came from. Without this
+       * a LinkedIn feed post reported "read from the LinkedIn page" — the
+       * selectors matched an h1 and nothing else, and the actual text was
+       * scraped off the page as a last resort. Saying which is the difference
+       * between a confident read and a guess.
+       */
+      merged.readBy = extra.readBy;
+    }
     return merged;
   };
+
+  /*
+   * Is this a job advert at all?
+   *
+   * A LinkedIn feed post is nine thousand characters of somebody's personal
+   * story, and the last-resort strategy will happily hand it over as a job. It
+   * parsed cleanly, reported "successfully parsed", and was nonsense. Anything
+   * read off the page rather than out of structured data or a known board's
+   * markup is only trusted when the address looks like an advert.
+   */
+  const JOB_URL = /\/jobs?\/|\/viewjob|\/job-|\/vacanc|\/career|\/position|\/opening|greenhouse\.io|lever\.co|myworkdayjobs|smartrecruiters|workable|jobs?\./i;
+  const addressLooksLikeAJob = JOB_URL.test(location.href);
 
   let job = null;
   try {
@@ -211,6 +233,15 @@
   else job = merge(job, selectors);
 
   if (!job.description) job = merge(job, fromPage());
+
+  /*
+   * Structured data and a board's own job markup are the advert by definition.
+   * The page-text fallback is a guess, and the address is the only other
+   * evidence available about whether the guess is a reasonable one.
+   */
+  const confidence = job.readBy !== "the page text"
+    ? "high"
+    : addressLooksLikeAJob ? "medium" : "low";
 
   /*
    * LinkedIn's applicant count and hiring contact, when the page shows them.
@@ -257,6 +288,7 @@
     applicants,
     hiringManager,
     readBy: job.readBy || "the page text",
+    confidence,
     url: location.href,
   };
 })();
