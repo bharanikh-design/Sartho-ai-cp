@@ -1,0 +1,110 @@
+name: Review
+
+# Codex reviewed nothing for six consecutive pull requests — it was out of
+# credits every time — so the only thing standing between a change and main was
+# the `verify` job and one pair of eyes. This is the replacement, and it costs
+# nothing beyond the Claude subscription that is already being paid for:
+# claude_code_oauth_token is the Pro/Max path, not a metered API key.
+#
+# What makes it worth more than a generic "review this diff" is the prompt.
+# Every rule below is a bug that actually shipped from this repository, so the
+# reviewer is looking for the things that have really gone wrong here rather
+# than the things that go wrong in general.
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+# One review per push. A superseded run has nothing useful to say.
+concurrency:
+  group: review-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+
+    # Never on a fork: a pull_request from one must not reach the token.
+    # And skipped cleanly, not failed, when no token is configured — a red X on
+    # every PR for a missing optional secret trains people to ignore red Xs.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check the review token is configured
+        id: token
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        run: |
+          if [ -n "$CLAUDE_CODE_OAUTH_TOKEN" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::No CLAUDE_CODE_OAUTH_TOKEN secret, so no automated review ran." \
+                 "Generate one with 'claude setup-token' and add it under Settings → Secrets → Actions."
+          fi
+
+      - name: Review the diff
+        if: steps.token.outputs.present == 'true'
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: |
+            --model claude-sonnet-5
+            --allowedTools Read,Grep,Glob,Bash(npm run typecheck),Bash(npm test),Bash(git diff:*),Bash(git log:*)
+            --max-turns 12
+          prompt: |
+            Review this pull request against the diff only. Sartho is a Next.js 16
+            App Router app on Supabase; the product promise is that it never states
+            anything it cannot evidence.
+
+            Report only findings you can point at a line for. If the diff is sound,
+            say so in one sentence — a review that manufactures concerns to look
+            thorough is worse than no review.
+
+            These are bugs that have actually shipped from this repository. Check
+            each one specifically:
+
+            1. A type widened without its stored data. SearchCriteria, RuleAnalysis
+               and the resume records are persisted as JSON. A field added to the
+               type does NOT exist on rows written earlier, so any read must
+               normalise rather than cast. `x as SomeType` over a database or API
+               payload is the exact shape of a crash that reached production here:
+               it satisfies the compiler and does nothing at runtime.
+
+            2. `export const metadata` in a file carrying "use client". Next refuses
+               it and the production build fails outright. This broke every deploy
+               from main once already.
+
+            3. A test asserting the behaviour being replaced. When a rule changes,
+               the fixture must be corrected to the new contract, never the rule
+               weakened to keep an old assertion green. Say which one this PR did.
+
+            4. Scoring and matching logic changed with no test covering the new
+               behaviour — lib/matching/**, lib/resume/**, lib/jobs/**. Every rule
+               in there decides what a real person is shown or told about their own
+               career.
+
+            5. UI copy the data cannot support. A percentage with no denominator, a
+               figure the code never populates, a green tick beside text saying the
+               opposite, or a keyword suggestion the person's evidence cannot back.
+               All four have shipped from here.
+
+            6. A /g regex reused across `.test()` calls. lastIndex persists between
+               them and silently skips every other input.
+
+            7. AI output trusted without a deterministic guard. Anything a model
+               returns that becomes user-visible must be checked in code — the
+               bullet rewriter refuses figures absent from both its inputs, and new
+               generative paths need an equivalent.
+
+            Then read the diff on its own terms for correctness, and for anything
+            that would fail `npm run typecheck`, `npm test` or `npm run build`.
