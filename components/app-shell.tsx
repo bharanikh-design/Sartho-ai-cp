@@ -8,7 +8,9 @@ import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase";
+import { ActivityHeartbeat } from "@/components/activity-heartbeat";
 import { OnboardingCarousel } from "@/components/onboarding-carousel";
+import { isPublicPath } from "@/lib/public-paths";
 import {
   getPageLabel,
   getMobileNavigation,
@@ -125,7 +127,13 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, [refreshJourneyStatus]);
 
   useEffect(() => {
-    if (!loading && !session && pathname !== "/login") router.replace("/login");
+    /*
+     * A public page is not a page to be bounced off. /extension is the link you
+     * send somebody so they can install the thing that sends roles into Sartho;
+     * the request proxy lets it through, and this used to redirect it to /login
+     * anyway, which made a deliberately public page unreachable.
+     */
+    if (!loading && !session && !isPublicPath(pathname)) router.replace("/login");
   }, [loading, pathname, router, session]);
 
   useEffect(() => {
@@ -157,6 +165,13 @@ export function AppShell({ children }: { children: ReactNode }) {
   if (pathname === "/login") return <>{children}</>;
 
   if (loading || !session) {
+    /*
+     * Signed out on a public page: show the page, not a spinner waiting for a
+     * session that is not coming. Signed in, it renders inside the shell like
+     * anything else.
+     */
+    if (!loading && isPublicPath(pathname)) return <>{children}</>;
+
     return (
       <main className="auth-loading" aria-live="polite">
         <Image className="brand-mark" src={sarthoIcon} alt="" width={176} height={176} quality={95} priority />
@@ -231,6 +246,11 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="app-shell">
+      {/*
+        * Only past the session gate above, so it never beats for a signed-out
+        * visitor on a public page.
+        */}
+      <ActivityHeartbeat />
       <div className="ambient ambient-one" aria-hidden="true" />
       <div className="ambient ambient-two" aria-hidden="true" />
 

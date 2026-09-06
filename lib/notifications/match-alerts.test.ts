@@ -21,6 +21,8 @@ function match(overrides: Partial<ScoredJobMatch>): ScoredJobMatch {
     closestIsHeld: true,
     requirementsRead: 6,
     missingRequirements: [],
+    requiredYears: null,
+    requiredEvidence: null,
     ...overrides,
   };
 }
@@ -37,6 +39,7 @@ const criteria: SearchCriteria = {
   experienceSource: "unknown",
   tooMuchExperience: 0,
   earlyCareerPass: false,
+  advertsRead: 0,
   offFamily: 0,
   families: [],
   countryName: "Australia",

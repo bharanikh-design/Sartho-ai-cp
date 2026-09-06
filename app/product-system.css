@@ -25,7 +25,12 @@
   display: flex;
   gap: 48px;
   justify-content: space-between;
-  padding: 18px 4px 28px;
+  /*
+   * Almost nothing above the eyebrow. The space over a page title was doing no
+   * work — the sticky bar already separates it from the window — and it cost
+   * every page a slice of its first screen.
+   */
+  padding: 2px 4px 18px;
 }
 
 .product-system-header__copy {
@@ -869,6 +874,15 @@
 .dashboard-digest h2 { margin: 10px 0 0; font: 650 clamp(24px, 3vw, 38px)/1.08 var(--font-sans); letter-spacing: -.04em; }
 .dashboard-digest > div > p:not(.product-system-eyebrow) { max-width: 700px; margin: 14px 0 0; color: var(--text-secondary); font-size: var(--text-base); line-height: 1.65; }
 .digest-setup-note { display: inline-flex; margin-top: 16px; padding: 8px 10px; border-radius: 10px; color: #8c5a11; background: #fff3d6; font-size: var(--text-xs); font-weight: 650; }
+/*
+ * Whether the schedule is running. Neutral by default, because most of what it
+ * says is good news — an amber "the schedule is running" would teach people to
+ * ignore the one time it says something is wrong.
+ */
+.digest-status-note { display: inline-flex; margin-top: 12px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; color: var(--text-secondary); font-size: var(--text-xs); line-height: 1.5; }
+.digest-status-note.is-concerning { border-color: rgba(255,142,163,.32); color: #ffc0cc; background: rgba(255,142,163,.08); font-weight: 600; }
+
+.digest-actions { display: flex; flex-wrap: wrap; gap: 10px; }
 .digest-controls { display: grid; gap: 12px; }
 .digest-controls label:not(.digest-toggle) { display: grid; gap: 7px; }
 .digest-controls label > span { color: var(--text-secondary); font-size: var(--text-xs); font-weight: 650; }

@@ -21,10 +21,40 @@ export const metadata = constructMetadata(
  * read it before they have an account.
  */
 
+/*
+ * Which browsers, and what each would actually take.
+ *
+ * Asked as one question — "how do other people install this?" — with three
+ * very different answers, and the difference is worth stating rather than
+ * discovering. Chromium browsers all run the same extension. Firefox needs a
+ * small change. Safari is not an install at all: it is a native app wrapper, a
+ * paid developer account and an App Store review.
+ */
+const BROWSERS: Array<{ name: string; today: string; toPublish: string; ready: boolean }> = [
+  {
+    name: "Chrome, Edge, Brave, Arc, Opera",
+    today: "Works now, unpacked, using the steps below. They are all Chromium, so it is one extension and one set of instructions.",
+    toPublish: "The Chrome Web Store — a one-off developer registration and a review of a few days. Edge can install from it directly, though a first-class Edge listing is a separate free submission.",
+    ready: true,
+  },
+  {
+    name: "Firefox",
+    today: "Not yet. Firefox runs the same extension format but wires the background script differently, so the manifest needs a variant.",
+    toPublish: "addons.mozilla.org, which is free and reviews quickly. A small change and a second build.",
+    ready: false,
+  },
+  {
+    name: "Safari",
+    today: "Not yet, and not a small step.",
+    toPublish: "Safari extensions ship inside a native app: an Xcode conversion, an Apple Developer membership, notarisation and App Store review. It is a project in its own right, worth doing only if people ask for it.",
+    ready: false,
+  },
+];
+
 const STEPS: Array<{ title: string; detail: string }> = [
   {
     title: "Download the folder",
-    detail: "Get sartho-extension.zip from the Sartho repository and unzip it somewhere you will not delete by accident — the browser loads it from that folder every time it starts, so Downloads is a poor choice.",
+    detail: "Get sartho-extension.zip from the Sartho repository and unzip it somewhere you will not delete by accident — the browser loads it from that folder every time it starts, so Downloads is a poor choice. Take it from the current main branch: an unpacked extension never updates itself, so an old copy stays old for ever.",
   },
   {
     title: "Open your browser's extensions page",
@@ -76,6 +106,26 @@ export default function ExtensionPage() {
       <section className="glass-card content-card">
         <div className="card-header">
           <div>
+            <h2 className="section-heading">Which browsers</h2>
+            <p className="section-subtitle">
+              One question with three quite different answers, so here they are separately.
+            </p>
+          </div>
+        </div>
+        <ul className="extension-facts">
+          {BROWSERS.map((browser) => (
+            <li key={browser.name}>
+              <strong>{browser.name}{browser.ready ? "" : " — not yet"}</strong>
+              <p className="section-subtitle">{browser.today}</p>
+              <p className="section-subtitle"><em>To publish properly:</em> {browser.toPublish}</p>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <section className="glass-card content-card">
+        <div className="card-header">
+          <div>
             <h2 className="section-heading">Installing it</h2>
             <p className="section-subtitle">
               Sartho is not in the Chrome Web Store yet, so this is the manual route. It takes about a minute and works in Chrome, Edge, Brave and Arc.
@@ -111,6 +161,12 @@ export default function ExtensionPage() {
           </li>
           <li>
             <strong>Nothing is lost if a save fails.</strong> A captured role stays queued in the extension until Sartho confirms it saved, so signing in, reloading, or closing the tab does not cost you the advert.
+          </li>
+          <li>
+            <strong>It says when a page is not a job.</strong> A feed post or a search results list has plenty of text and none of it is an advert. Sartho reads the page&apos;s job data where a board publishes it, falls back to the page itself, and tells you which — refusing outright rather than filling your pipeline with somebody&apos;s status update.
+          </li>
+          <li>
+            <strong>The version is on the popup.</strong> An unpacked extension never updates itself, so a build from last week stays there silently. If something behaves oddly, check that number first.
           </li>
         </ul>
       </section>

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { isOperationsAdmin, requireUser } from "@/lib/auth";
 import { getCachedProviderHealth } from "@/lib/ai/diagnostics";
+import { deliveryDiagnostics } from "@/lib/notifications/delivery-diagnostics";
 import { ProductPageHeader } from "@/components/product-page-header";
 
 /*
@@ -25,6 +26,7 @@ export default async function DiagnosticsPage() {
 
   const { checkedAt, providers } = await getCachedProviderHealth();
   const usable = providers.find((provider) => provider.selected && provider.reachable);
+  const delivery = deliveryDiagnostics();
 
   return (
     <div className="page-stack">
@@ -102,6 +104,68 @@ export default async function DiagnosticsPage() {
         <p className="diagnostic-note">
           A dash means a provider is absent or intentionally untested. Adding another key does not
           activate it: AI_PROVIDER is the single routing decision, and changing it requires a new deployment.
+        </p>
+      </section>
+
+      {/*
+        * Scheduled email is the one feature that gives no sign when it breaks:
+        * no error, no email, and an email that does not arrive is exactly what
+        * a quiet day looks like. So the chain is laid out rather than left to
+        * be inferred from an absence nobody investigates.
+        */}
+      <section className={`glass-card content-card diagnostic-verdict ${delivery.ready ? "is-good" : "is-bad"}`}>
+        <strong>
+          {delivery.ready
+            ? "Scheduled email can run — every part of the chain is configured."
+            : "Scheduled email cannot run on this deployment."}
+        </strong>
+        <p>
+          {delivery.remedy
+            ?? "The daily summary and match alerts will send on their schedules. Whether a given person receives one is shown on their own notifications page."}
+        </p>
+      </section>
+
+      <section className="glass-card content-card">
+        <div className="card-header">
+          <div>
+            <h2 className="section-heading">Scheduled email</h2>
+            <p className="section-subtitle">
+              Every one of these must be set. Missing any of them produces the same symptom — nothing arrives — which is why they are listed separately rather than as one verdict.
+            </p>
+          </div>
+        </div>
+
+        <ul className="diagnostic-list">
+          {delivery.requirements.map((requirement) => (
+            <li key={requirement.envVar} className={`diagnostic-row ${requirement.present ? "is-ok" : "is-failed"}`}>
+              <span className="diagnostic-mark" aria-hidden="true">{requirement.present ? "✓" : "✕"}</span>
+              <span className="diagnostic-body">
+                <strong>{requirement.present ? "Set" : "Not set"}</strong>
+                <small>{requirement.purpose}</small>
+              </span>
+              <code className="diagnostic-env">{requirement.envVar}</code>
+            </li>
+          ))}
+        </ul>
+
+        <ul className="diagnostic-list">
+          {delivery.jobs.map((job) => (
+            <li key={job.path} className="diagnostic-row is-absent">
+              <span className="diagnostic-mark" aria-hidden="true">◷</span>
+              <span className="diagnostic-body">
+                <strong>{job.name}</strong>
+                <small>{job.plainEnglish}</small>
+                <small>{job.path}</small>
+              </span>
+              <code className="diagnostic-env">{job.schedule}</code>
+            </li>
+          ))}
+        </ul>
+
+        <p className="diagnostic-note">
+          A schedule being listed here means it is deployed, not that it ran. Whether it actually
+          reached somebody is recorded per person, and stated on their notifications page — that
+          timestamp is the only real evidence, and the reason it is now shown.
         </p>
       </section>
     </div>

@@ -29,6 +29,9 @@ type SearchResult = {
   closestIsHeld?: boolean;
   requirementsRead?: number;
   missingRequirements?: string[];
+  /** What the advert asks for in years, when it says so, and the phrase it said it in. */
+  requiredYears?: number | null;
+  requiredEvidence?: string | null;
 };
 
 /* What the server actually searched — echoed back so nobody has to guess. */
@@ -183,6 +186,18 @@ export function JobSearchPanel({
           {result.missingRequirements?.length ? (
             <p className="match-gap">Not yet evidenced: {result.missingRequirements.join(", ")}</p>
           ) : null}
+          {/*
+            * The requirement that decides whether an application is worth an
+            * hour. Roles asking for clearly more than you have are filtered out
+            * entirely; this is for the ones near the line, which are exactly
+            * the ones worth a considered decision rather than a guess.
+            */}
+          {typeof result.requiredYears === "number" ? (
+            <p className="match-requirement">
+              Asks for <strong>{result.requiredYears} year{result.requiredYears === 1 ? "" : "s"}</strong> of experience
+              {result.requiredEvidence ? <> — &ldquo;{result.requiredEvidence}&rdquo;</> : null}
+            </p>
+          ) : null}
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: "8px", flex: "none" }}>
           {saved ? (
@@ -283,6 +298,15 @@ export function JobSearchPanel({
               <Link href="#experience">{criteria.experienceLevel ?? "stated"} experience</Link>
             </>
           ) : null}
+          {/*
+            * How much of each advert could actually be read.
+            *
+            * The provider returns a truncated snippet and no advert states its
+            * experience requirement there, so the full listings are opened for
+            * the roles that get this far. Saying how many were opened is the
+            * difference between "we checked" and "we checked what we could".
+            */}
+          {criteria.advertsRead ? <> · {criteria.advertsRead} full adverts opened to read their requirements</> : null}
           {criteria.earlyCareerPass ? <> · graduate and entry-level postings searched separately</> : null}
           {/*
             * The band drives both the seniority filter and the years filter, so

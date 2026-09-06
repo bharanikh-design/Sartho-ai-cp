@@ -15,6 +15,7 @@ import {
 } from "@/lib/jobs/experience";
 import { familyFit, reachFrom } from "@/lib/matching/job-family";
 import { demandsMoreExperience, requiredExperienceIn } from "@/lib/matching/required-experience";
+import { fetchAdvertText } from "@/lib/jobs/advert-text";
 import { scoreOpportunity } from "@/lib/matching/opportunity-score";
 import { candidateSeniority } from "@/lib/matching/title-fit";
 import { seniorityReach } from "@/lib/matching/seniority-reach";
@@ -67,6 +68,13 @@ export type ScoredJobMatch = {
   /** How many capabilities were legible in the advert, so a % has a denominator. */
   requirementsRead: number;
   missingRequirements: string[];
+  /**
+   * The fewest years the advert asks for, when it says so, and the phrase it
+   * was read from. Shown on the card: a person deciding whether to spend an
+   * hour on an application deserves to see the requirement that decides it.
+   */
+  requiredYears: number | null;
+  requiredEvidence: string | null;
 };
 
 /* What was actually searched, so the page (or email) can say so. */
@@ -109,6 +117,14 @@ export type SearchCriteria = {
   tooMuchExperience: number;
   /** True when graduate and entry-level postings got their own search pass. */
   earlyCareerPass: boolean;
+  /**
+   * How many full adverts were opened and read.
+   *
+   * The provider returns a truncated snippet, and the stated requirement is
+   * almost never in it. This number is the honest measure of how much the
+   * years filter could actually see.
+   */
+  advertsRead: number;
   /** Roles dropped as a different line of work, and the families kept. */
   offFamily: number;
   families: string[];
@@ -135,6 +151,25 @@ export type BriefSearchOutcome =
 
 /** Fewer strong matches than this from the cities alone triggers a country-wide pass. */
 export const MIN_STRONG_BEFORE_WIDENING = 3;
+
+/*
+ * How many full adverts one search may open.
+ *
+ * Only ever the roles that already survived the free filters, and never more
+ * than are about to be shown — reading the twenty-first advert to decide
+ * whether to hide it from a list of twenty is work for nobody.
+ */
+const MAX_ADVERTS_READ = 24;
+const ADVERT_CONCURRENCY = 6;
+const ADVERT_BUDGET_MS = 12_000;
+
+function readRequirement(text: string): { requiredYears: number | null; requiredEvidence: string | null } {
+  const required = requiredExperienceIn(text);
+  return {
+    requiredYears: required.entryFriendly ? null : required.minYears,
+    requiredEvidence: required.entryFriendly ? null : required.evidence,
+  };
+}
 
 export const NOT_CONFIGURED_MESSAGE =
   "Jobs search isn't connected yet. Add a provider key (JSEARCH_RAPIDAPI_KEY for Google for Jobs, or ADZUNA_APP_ID / ADZUNA_APP_KEY) to turn on real search.";
@@ -324,6 +359,13 @@ export async function runBriefSearch(
       closestIsHeld: scored.analysis.closestIsHeld ?? false,
       requirementsRead: scored.analysis.requirementsRead ?? 0,
       missingRequirements: scored.analysis.missingRequirements?.slice(0, 4) ?? [],
+      /*
+       * Read from the snippet for now. The full advert is opened below for the
+       * roles that survive the free filters, which is where this usually gets
+       * its answer — the snippet is the marketing paragraph, and no advert
+       * states its experience requirement there.
+       */
+      ...readRequirement(`${result.title}. ${result.description}`),
     };
   };
 
@@ -390,19 +432,70 @@ export async function runBriefSearch(
    * right direction to fail in, and the count says how many it caught rather
    * than implying it caught them all.
    */
+  /*
+   * The free filters first, so nothing is fetched for a role already out on
+   * seniority or line of work.
+   */
+  const survivors: ScoredJobMatch[] = [];
   for (const match of scoredByUrl.values()) {
     if (!seniorityReach(match.title, heldTitles, seniorityYears).withinReach) { tooSenior += 1; continue; }
     if (!familyFit(match.title, heldTitles, roleNames).withinReach) { offFamily += 1; continue; }
-    if (filterYears !== null) {
-      const required = requiredExperienceIn(`${match.title}. ${match.description}`);
+    survivors.push(match);
+  }
+  survivors.sort((a, b) => b.overallMatch - a.overallMatch);
+
+  /*
+   * Then open the adverts, because the snippet does not contain the answer.
+   *
+   * This is the fix for the failure that made the whole feature a joke: a
+   * graduate set their experience to 0–1 and was shown a finance role asking
+   * for three, because the only text Sartho ever received was the opening
+   * paragraph. Every advert puts "SKILLS & EXPERIENCE: at least 3 years"
+   * further down, so the filter was reading the one part of the page
+   * guaranteed not to hold the requirement.
+   *
+   * Best effort throughout. A page that will not load leaves the role exactly
+   * as the snippet described it, and the criteria report how many were
+   * actually read rather than implying every one was.
+   */
+  let advertsRead = 0;
+  if (filterYears !== null && Number.isFinite(filterYears)) {
+    const candidates = survivors.slice(0, MAX_ADVERTS_READ).filter((match) => match.url);
+    const deadline = Date.now() + Math.min(ADVERT_BUDGET_MS, Math.max(0, budgetMs + 15_000 - (Date.now() - startedAt)));
+
+    let cursor = 0;
+    const worker = async () => {
+      while (cursor < candidates.length && Date.now() < deadline) {
+        const match = candidates[cursor];
+        cursor += 1;
+        const text = await fetchAdvertText(match.url);
+        if (!text) continue;
+        advertsRead += 1;
+        const read = readRequirement(`${match.title}. ${text}`);
+        /*
+         * The fuller reading replaces the snippet's only when it found
+         * something. A page that mentions no requirement does not erase one
+         * the snippet happened to state.
+         */
+        if (read.requiredYears !== null) {
+          match.requiredYears = read.requiredYears;
+          match.requiredEvidence = read.requiredEvidence;
+        }
+      }
+    };
+
+    await Promise.all(Array.from({ length: Math.min(ADVERT_CONCURRENCY, candidates.length) }, worker));
+  }
+
+  for (const match of survivors) {
+    if (filterYears !== null && match.requiredYears !== null) {
+      const required = { minYears: match.requiredYears, evidence: match.requiredEvidence, entryFriendly: false };
       if (demandsMoreExperience(required, filterYears)) { tooMuchExperience += 1; continue; }
     }
     withinReach.push(match);
   }
 
-  const results: ScoredJobMatch[] = withinReach
-    .sort((a, b) => b.overallMatch - a.overallMatch)
-    .slice(0, options.maxResults ?? 20);
+  const results: ScoredJobMatch[] = withinReach.slice(0, options.maxResults ?? 20);
 
   const criteria: SearchCriteria = {
     country,
@@ -426,6 +519,7 @@ export async function runBriefSearch(
     experienceSource,
     tooMuchExperience,
     earlyCareerPass,
+    advertsRead,
     offFamily,
     families: reachFrom(heldTitles, roleNames),
     countryName: countryLabel,
@@ -528,6 +622,8 @@ export function normaliseResults(stored: unknown): ScoredJobMatch[] {
       closestIsHeld: value.closestIsHeld === true,
       requirementsRead: count(value.requirementsRead),
       missingRequirements: strings(value.missingRequirements),
+      requiredYears: typeof value.requiredYears === "number" && Number.isFinite(value.requiredYears) ? value.requiredYears : null,
+      requiredEvidence: nullableText(value.requiredEvidence),
     }];
   });
 }
@@ -564,6 +660,7 @@ export function normaliseCriteria(stored: unknown): SearchCriteria {
       value.experienceSource === "brief" || value.experienceSource === "resume" ? value.experienceSource : "unknown",
     tooMuchExperience: count(value.tooMuchExperience),
     earlyCareerPass: value.earlyCareerPass === true,
+    advertsRead: count(value.advertsRead),
     offFamily: count(value.offFamily),
     families: strings(value.families),
     countryName: typeof value.countryName === "string" ? value.countryName : "",

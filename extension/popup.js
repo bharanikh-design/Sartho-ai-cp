@@ -16,6 +16,25 @@
 
 const body = document.getElementById("body");
 
+/*
+ * The installed version, on screen.
+ *
+ * An unpacked extension does not update itself, so somebody can be looking at
+ * a build from before a fix and have no way to tell — which is exactly what
+ * happened: a bug reported against a version that no longer existed, and an
+ * afternoon spent looking for it in code that was already correct.
+ */
+try {
+  const version = chrome.runtime.getManifest().version;
+  const stamp = document.createElement("p");
+  stamp.className = "sub";
+  stamp.style.cssText = "margin:-10px 0 14px;font-size:11px;color:#6a6a6a";
+  stamp.textContent = `v${version}`;
+  document.querySelector(".sub")?.after(stamp);
+} catch {
+  /* Version is a convenience; never let it stop the popup rendering. */
+}
+
 /* Text, never markup: a job title is somebody else's HTML. */
 function render(nodes) {
   body.replaceChildren(...nodes);
@@ -82,6 +101,24 @@ const MIN_DESCRIPTION = 120;
     return;
   }
 
+  /*
+   * A page that is not an advert must say so before anything is sent.
+   *
+   * A LinkedIn feed post reported "Job successfully parsed (9790 chars)" and
+   * offered to send somebody's personal story to the pipeline. It had parsed
+   * perfectly; it was simply not a job. Nine thousand characters of prose is
+   * not evidence of an advert, so the confidence the scraper reports is shown
+   * rather than swallowed — and on a page that looks like neither an advert nor
+   * a job address, sending is refused outright.
+   */
+  if (job.confidence === "low") {
+    render([
+      element("p", "warn", "This does not look like a job advert."),
+      element("p", "note", "Sartho could only read the page's text, and the address is not a job posting — a feed, a search results list or a profile will read as nonsense in your pipeline. Open the advert itself and click Sartho again."),
+    ]);
+    return;
+  }
+
   const card = element("div", "job");
   card.append(element("strong", null, job.title || "Untitled role"));
   card.append(element("span", "where", [job.company, job.location].filter(Boolean).join(" · ") || "Employer not named on the page"));
@@ -95,9 +132,17 @@ const MIN_DESCRIPTION = 120;
 
   const send = element("button", null, "Send to Sartho →");
   const readBy = element("p", "read-by", `Read from ${job.readBy}. You can correct any of it in Sartho.`);
+
+  /*
+   * Medium confidence: the address looks like a job, but the text came off the
+   * page rather than out of structured data. Worth sending, worth checking.
+   */
+  const caution = job.confidence === "medium"
+    ? element("p", "warn", "Sartho read this off the page rather than from job data, so check the title and employer above before sending.")
+    : null;
   const note = element("p", "note", "");
 
-  render([card, send, readBy, note]);
+  render(caution ? [caution, card, send, readBy, note] : [card, send, readBy, note]);
 
   send.addEventListener("click", () => {
     send.disabled = true;

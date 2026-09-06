@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Sartho — send a role to your pipeline",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Capture a job advert from LinkedIn, Indeed, Seek or any careers page and score it against the evidence you approved in Sartho.",
   "permissions": [
     "activeTab",
@@ -14,9 +14,20 @@
     "https://sartho.tech/*",
     "https://www.sartho.tech/*"
   ],
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
   "action": {
     "default_popup": "popup.html",
-    "default_title": "Send this role to Sartho"
+    "default_title": "Send this role to Sartho",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png",
+      "48": "icons/icon-48.png"
+    }
   },
   "background": {
     "service_worker": "background.js"
