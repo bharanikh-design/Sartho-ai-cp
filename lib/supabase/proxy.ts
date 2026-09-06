@@ -1,7 +1,12 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PUBLIC_PATHS = new Set(["/login", "/auth/callback"]);
+/*
+ * /extension is public because the person who most needs it does not have an
+ * account yet: it is the page you send somebody so they can install the thing
+ * that sends roles into Sartho. It holds no user data.
+ */
+const PUBLIC_PATHS = new Set(["/login", "/auth/callback", "/extension"]);
 
 /*
  * Supabase normally returns an OAuth authorization code to /auth/callback.

@@ -16,6 +16,9 @@ supabase/seed.sql
 supabase/seed.private.sql
 supabase/*private*seed*.sql
 
+# The packaged browser extension — rebuilt by `npm run extension:zip`.
+sartho-extension.zip
+
 # TypeScript incremental build cache — regenerated on every build.
 tsconfig.tsbuildinfo
 .gemini-probe/

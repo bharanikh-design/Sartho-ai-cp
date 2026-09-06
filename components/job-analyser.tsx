@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { JobAnalysis } from "@/lib/matching/analyse-job";
 import type { SkillProfile } from "@/lib/matching/skill-profile";
@@ -29,39 +29,19 @@ export function JobAnalyser({ initialJobs, skillProfile }: { initialJobs: JobRec
   const [saving, setSaving] = useState(false);
   const [savedJobId, setSavedJobId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [extensionIntel, setExtensionIntel] = useState<{ applicants?: string; postedDate?: string; hiringManager?: string } | null>(null);
 
-  useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-      if (event.data?.source === "sartho-extension" && event.data?.type === "IMPORT_JOB") {
-        const payload = event.data.payload;
-        setTitle(payload.title || "");
-        setEmployer(payload.company || "");
-        setSourceUrl(payload.url || "");
-        setDescription(payload.description || "");
-        
-        // Save Extension Intel
-        if (payload.applicants || payload.postedDate || payload.hiringManager) {
-          setExtensionIntel({
-            applicants: payload.applicants,
-            postedDate: payload.postedDate,
-            hiringManager: payload.hiringManager
-          });
-        }
-        
-        // Auto trigger analyze if there is a description
-        if (payload.description) {
-          setTimeout(() => {
-            const analyzeBtn = document.getElementById("analyze-fit-btn");
-            if (analyzeBtn) analyzeBtn.click();
-          }, 500);
-        }
-      }
-    };
-    window.addEventListener("message", handleMessage);
-    return () => window.removeEventListener("message", handleMessage);
-  }, []);
-
+  /*
+   * A role sent from the browser extension no longer arrives here.
+   *
+   * It used to fill these fields and then reach into the DOM to click the
+   * analyse button after a 500ms delay, which meant the import worked only if
+   * React had finished mounting by an arbitrary deadline — and when it had not,
+   * nothing happened and nothing said so. JobImportBridge handles it now: it
+   * announces when it is actually listening, saves the role straight to the
+   * pipeline, and tells the extension only once the save has come back.
+   *
+   * This card keeps its own job, which is the manual paste.
+   */
 
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysis, setAnalysis] = useState<PreviewAnalysis | null>(null);
@@ -147,24 +127,7 @@ export function JobAnalyser({ initialJobs, skillProfile }: { initialJobs: JobRec
             <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem", fontSize: "0.875rem" }}>Link to Job (Optional)<input className="sartho-input" style={{ padding: "0.8rem", background: "rgba(0,0,0,0.2)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "6px", color: "white" }} value={sourceUrl} onChange={(event) => setSourceUrl(event.target.value)} placeholder="https://..." inputMode="url" /></label>
           </div>
 
-          
-  {extensionIntel && (
-    <div style={{ marginBottom: "1.5rem", padding: "12px 16px", background: "rgba(107, 207, 147, 0.05)", border: "1px solid rgba(107, 207, 147, 0.2)", borderRadius: "8px" }}>
-      <h4 style={{ margin: "0 0 8px 0", fontSize: "0.75rem", color: "#6bcf93", textTransform: "uppercase", letterSpacing: "0.05em" }}>LinkedIn Opportunity Details</h4>
-      <div style={{ display: "flex", gap: "16px", flexWrap: "wrap" }}>
-        {extensionIntel.applicants && extensionIntel.applicants !== "hidden" && (
-          <span style={{ fontSize: "0.8125rem", color: "#ccc" }}>👥 {extensionIntel.applicants}</span>
-        )}
-        {extensionIntel.postedDate && (
-          <span style={{ fontSize: "0.8125rem", color: "#ccc" }}>🗓 {extensionIntel.postedDate}</span>
-        )}
-        {extensionIntel.hiringManager && (
-          <span style={{ fontSize: "0.8125rem", color: "#ccc" }}>👤 <strong>Hiring Manager:</strong> {extensionIntel.hiringManager}</span>
-        )}
-      </div>
-    </div>
-  )}
-  <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem", fontSize: "0.875rem", marginBottom: "1.5rem" }}>
+          <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem", fontSize: "0.875rem", marginBottom: "1.5rem" }}>
             Full Job Description
             <textarea
               value={description}

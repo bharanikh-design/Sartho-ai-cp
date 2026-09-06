@@ -1,26 +1,46 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>Sartho AI</title>
+  <title>Sartho</title>
   <style>
-    body { width: 320px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 16px; margin: 0; background: #0a0a0a; color: white; }
-    h2 { font-size: 16px; margin: 0 0 12px; color: #fff; }
-    button { background: #0d402b; color: white; border: none; padding: 10px 16px; border-radius: 8px; width: 100%; cursor: pointer; font-weight: bold; margin-bottom: 12px; }
-    button:disabled { opacity: 0.5; cursor: not-allowed; }
-    #result { font-size: 14px; color: #ccc; line-height: 1.5; }
-    .score { font-size: 24px; font-weight: bold; color: #6bcf93; margin-bottom: 8px; }
-    .stat { background: rgba(255,255,255,0.1); padding: 8px; border-radius: 6px; margin-bottom: 8px; font-size: 12px; }
+    :root { color-scheme: dark; }
+    body {
+      width: 340px; margin: 0; padding: 16px;
+      font: 13px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #0a0a0a; color: #e8e8e8;
+    }
+    h1 { font-size: 13px; margin: 0 0 2px; letter-spacing: .04em; text-transform: uppercase; color: #6bcf93; }
+    .sub { margin: 0 0 14px; font-size: 12px; color: #8a8a8a; }
+
+    .job { border: 1px solid rgba(255,255,255,.08); border-radius: 10px; padding: 12px; background: rgba(255,255,255,.02); }
+    .job strong { display: block; font-size: 14px; color: #fff; margin-bottom: 2px; }
+    .job .where { font-size: 12px; color: #9a9a9a; }
+    .facts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+    .fact { font-size: 11px; color: #b9b9b9; background: rgba(255,255,255,.05); border-radius: 5px; padding: 3px 7px; }
+
+    .read-by { margin: 10px 0 0; font-size: 11px; color: #7a7a7a; }
+
+    button {
+      width: 100%; margin-top: 12px; padding: 11px 14px;
+      background: #174b3a; color: #fff; border: 1px solid #2e7f5f; border-radius: 8px;
+      font-size: 13px; font-weight: 600; cursor: pointer;
+    }
+    button:hover:not(:disabled) { background: #1c5c46; }
+    button:disabled { opacity: .45; cursor: not-allowed; }
+
+    .note { margin: 12px 0 0; font-size: 12px; color: #9a9a9a; }
+    .warn { margin: 0; padding: 11px 12px; border-radius: 9px; font-size: 12px; line-height: 1.5;
+            background: rgba(255,176,84,.08); border: 1px solid rgba(255,176,84,.25); color: #ffcf94; }
+    .error { background: rgba(255,107,107,.08); border-color: rgba(255,107,107,.3); color: #ff9d9d; }
+    .ok { background: rgba(107,207,147,.08); border-color: rgba(107,207,147,.3); color: #9fe4bd; }
+    .muted { color: #7a7a7a; font-size: 12px; }
   </style>
 </head>
 <body>
-  <h2>Sartho AI Career Agent</h2>
-  <div id="controls">
-    <button id="analyzeBtn">Analyze Job on this Page</button>
-  </div>
-  <div id="result">
-    <p style="color: #888; font-size: 13px;">Open a LinkedIn or Indeed job posting and click Analyze to see your fit.</p>
-  </div>
+  <h1>Sartho</h1>
+  <p class="sub">Send this role to your pipeline.</p>
+  <div id="body"><p class="muted">Reading this page…</p></div>
   <script src="popup.js"></script>
 </body>
 </html>
