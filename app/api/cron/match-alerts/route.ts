@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { SITE_CONFIG } from "@/lib/config/site";
+import { APP_URL } from "@/lib/site";
 import { runBriefSearch } from "@/lib/jobs/run-search";
 import { isJobSearchConfigured } from "@/lib/jobs/search-provider";
 import { renderMatchAlertEmail, selectNewMatches } from "@/lib/notifications/match-alerts";
@@ -20,9 +20,39 @@ import { isEmailDeliveryConfigured, sendEmail } from "@/lib/notifications/send-e
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
+/*
+ * What this run can actually get through, and why it is not 25.
+ *
+ * The cap said 25 people. The budgets said otherwise: 270 seconds of wall
+ * clock divided by a 30-second per-person search is nine. The time budget bit
+ * first every night, so the cap was decoration and the real throughput was
+ * nine people a day — at a thousand opted-in users, a full cycle takes about
+ * four months. The ordering meant nobody starved permanently, which is the
+ * only reason this was survivable, but a "daily" alert arriving three times a
+ * year is not the promise on the notifications page.
+ *
+ * The per-person search budget is what buys throughput back. Thirty seconds
+ * was inherited from the interactive search, where a person is watching a
+ * spinner and every extra query is another role they might see. A scheduled
+ * run has different economics: it is looking for anything new since last
+ * night, it will run again tomorrow, and a query skipped now is picked up in
+ * the morning. Twelve seconds still covers the highest-value queries — the
+ * search plan orders them that way — and triples the number of people served.
+ *
+ * 270 / 12 ≈ 22, so the cap and the budget now agree on roughly the same
+ * number instead of contradicting each other. Both are env-overridable, so
+ * throughput can be raised without a deploy once the provider's rate limits
+ * are known, and running the cron more than once a day is the other lever:
+ * MIN_HOURS_BETWEEN_RUNS keeps anyone from being emailed twice, so a more
+ * frequent schedule adds reach rather than noise.
+ */
 const RUN_BUDGET_MS = 270_000;
-const PER_USER_SEARCH_BUDGET_MS = 30_000;
 const MIN_HOURS_BETWEEN_RUNS = 20;
+
+function perUserSearchBudgetMs(): number {
+  const raw = Number(process.env.MATCH_ALERTS_SEARCH_BUDGET_MS ?? "12000");
+  return Number.isFinite(raw) && raw >= 5_000 ? Math.floor(raw) : 12_000;
+}
 
 function maxUsersPerRun(): number {
   const raw = Number(process.env.MATCH_ALERTS_MAX_USERS ?? "25");
@@ -54,7 +84,8 @@ export async function GET(request: Request) {
   }
 
   const startedAt = Date.now();
-  const origin = process.env.NEXT_PUBLIC_APP_URL || SITE_CONFIG.defaultAppUrl;
+  const searchBudgetMs = perUserSearchBudgetMs();
+  const origin = APP_URL;
   const cutoff = Date.now() - MIN_HOURS_BETWEEN_RUNS * 60 * 60 * 1000;
   const summary = { processed: 0, emailed: 0, quiet: 0, failed: 0, deferred: 0, skipped: 0 };
   const failures: string[] = [];
@@ -70,7 +101,7 @@ export async function GET(request: Request) {
     const ranAt = new Date().toISOString();
 
     try {
-      const outcome = await runBriefSearch(admin, userId, { budgetMs: PER_USER_SEARCH_BUDGET_MS, maxResults: 40 });
+      const outcome = await runBriefSearch(admin, userId, { budgetMs: searchBudgetMs, maxResults: 40 });
       if (!outcome.ok) {
         // A brief that cannot run (no target roles, provider down) is not
         // retried in a loop; it is recorded and the person is picked up next run.
