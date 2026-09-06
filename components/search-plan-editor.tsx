@@ -1,12 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { TargetLaneRecord } from "@/lib/types";
 import type { SearchSourcePreference } from "@/lib/data/search";
 import { JOB_MARKETS, cityOptions, countryName, regionLabel, regionOptions } from "@/lib/jobs/countries";
-import { EMPLOYMENT_TYPES } from "@/lib/jobs/employment-types";
+import { EMPLOYMENT_TYPES, earlyCareerSelections } from "@/lib/jobs/employment-types";
 import { KNOWN_EMPLOYERS } from "@/lib/jobs/employers";
 import { ChipCombobox } from "@/components/chip-combobox";
 import { MAX_LOCATION_QUERIES } from "@/lib/jobs/search-plan";
@@ -160,6 +160,25 @@ export function SearchPlanEditor({
     [cities, regionGroups],
   );
 
+  /*
+   * A reload must not be how you find out the change was never saved.
+   *
+   * The save bar sits at the foot of a long form. Add an employer at the top
+   * and the button is off screen, so it is entirely possible — and it happened
+   * — to add four, navigate away, and come back to five. Nothing said anything.
+   * The bar is sticky now so it cannot be out of view while there is something
+   * to save, and this is the backstop for leaving the page entirely.
+   */
+  useEffect(() => {
+    if (!hasChanges) return;
+    const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [hasChanges]);
+
+  /* The selections that are a hint rather than a filter, named as such. */
+  const earlyCareerChosen = useMemo(() => earlyCareerSelections(employmentTypes), [employmentTypes]);
+
   function toggleEmployment(id: string) {
     setEmploymentTypes((current) =>
       current.includes(id) ? current.filter((item) => item !== id) : [...current, id],
@@ -282,7 +301,32 @@ export function SearchPlanEditor({
           <div className="search-criteria-row" id="employment-type">
             <label>
               <strong>What type of work?</strong>
-              <small>Sent to the job boards as a filter. Choose none for any type.</small>
+              {/*
+                * Which of these is a filter and which is a wish.
+                *
+                * This said "sent to the job boards as a filter" about all six,
+                * and that is only true of four. Adzuna — the provider actually
+                * running — has boolean parameters for full time, part time,
+                * contract and permanent, and nothing at all for internship or
+                * graduate programme. Those two are words folded into the query
+                * text, which is a weaker thing, and they get their own pass
+                * because the full-time flag selected alongside them would
+                * otherwise exclude exactly what they are asking for.
+                *
+                * The engine has always handled that correctly. The label just
+                * claimed more than it does, which is the kind of small
+                * overstatement that makes somebody stop believing the rest.
+                */}
+              <small>
+                Full-time, Part-time, Contract and Permanent are sent as a real filter. Choose none for any type.
+                {earlyCareerChosen.length ? (
+                  <>
+                    {" "}<strong>{earlyCareerChosen.join(" and ")}</strong>{" "}
+                    {earlyCareerChosen.length === 1 ? "has" : "have"} no filter on the job boards, so Sartho searches for the words in
+                    {earlyCareerChosen.length === 1 ? " its" : " their"} own extra pass instead — weaker, but not silently dropped.
+                  </>
+                ) : null}
+              </small>
             </label>
             <div className="employment-type-options" role="group" aria-label="Type of work">
               {EMPLOYMENT_TYPES.map((type) => (
@@ -322,7 +366,7 @@ export function SearchPlanEditor({
         * been answered has nothing worth collapsing into a summary.
         */}
       {expanded ? (
-        <div className="search-criteria-save">
+        <div className={`search-criteria-save${hasChanges ? " is-dirty" : ""}`}>
           {status === "error"
             ? <span className="direction-save-status is-error" role="alert">Could not save — please try again</span>
             : hasChanges

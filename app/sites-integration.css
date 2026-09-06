@@ -196,6 +196,19 @@
 .search-criteria-save { display: flex; align-items: center; justify-content: flex-end; gap: 14px; margin-top: 12px; padding-top: 14px; border-top: 1px solid var(--line); }
 
 /*
+ * Sticky the moment there is something to lose.
+ *
+ * The bar sits at the foot of a form tall enough to scroll, so adding an
+ * employer at the top left the Save button off screen with nothing on screen
+ * saying anything was pending. Four employers were added, the page was
+ * reloaded, and they were simply gone.
+ *
+ * Only when dirty: a permanently pinned bar with nothing to press is furniture.
+ */
+.search-criteria-save.is-dirty { position: sticky; bottom: 0; z-index: 2; margin-inline: -18px; padding: 14px 18px; border-top: 1px solid rgba(107,207,147,.35); border-radius: 0 0 16px 16px; background: rgba(16,22,19,.94); backdrop-filter: blur(8px); box-shadow: 0 -10px 24px rgba(0,0,0,.35); }
+.search-criteria-save.is-dirty .direction-save-status { color: #e0b061; font-weight: 700; }
+
+/*
  * Answered, and out of the way.
  *
  * Six labelled questions is most of a screen, and this is a form you fill in
