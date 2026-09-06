@@ -418,27 +418,64 @@ export async function generateStructuredJson(request: StructuredRequest) {
       }
     } catch (retryFailure) {
       const msg = retryFailure instanceof Error ? retryFailure.message : "fallback failed";
-      if (route.provider === "gemini") {
-        let availableModels = "";
-        try {
-          const available = await listGeminiModels(process.env.GEMINI_API_KEY || "");
-          availableModels = available.join(", ");
-        } catch (e) {}
-        throw new Error(describeAiFailure(msg) + " [DIAGNOSTIC: Available models for your key: " + availableModels + "]");
-      }
-      throw new Error(describeAiFailure(msg));
+      throw new Error(await spokenFailure(route, msg));
     }
 
-    if (route.provider === "gemini") {
-      let availableModels = "";
-      try {
-        const available = await listGeminiModels(process.env.GEMINI_API_KEY || "");
-        availableModels = available.join(", ");
-      } catch (e) {}
-      throw new Error(describeAiFailure(caught.message) + " [DIAGNOSTIC: Available models for your key: " + availableModels + "]");
-    }
-    throw new Error(describeAiFailure(caught.message));
+    throw new Error(await spokenFailure(route, caught.message));
   }
+}
+
+/*
+ * The failure, said to a person — with the engineering detail logged, not
+ * printed.
+ *
+ * This used to append " [DIAGNOSTIC: Available models for your key: ...]" to
+ * the message it returned, which is how a bracketed list of Gemini model names
+ * came to be rendered inside a red box on the opportunity page. Worse, when the
+ * key could list nothing the bracket was simply empty — so the one thing on
+ * screen that looked like a clue was a dangling label with nothing after it.
+ *
+ * describeAiFailure exists precisely to keep provider internals out of the
+ * product. Appending diagnostics to its output defeated the whole point of it.
+ * The list still gets fetched, because it is genuinely the most useful thing to
+ * know when Gemini fails — it just goes to the server log where the person who
+ * can act on it will look.
+ *
+ * And an empty list is itself the signal. A key that can list no models at all
+ * is not a key with a retired model on it; it is a key that is invalid, or
+ * whose Google Cloud project does not have the Generative Language API turned
+ * on. That is said plainly rather than left as a blank bracket.
+ */
+async function spokenFailure(route: ProviderRoute, rawMessage: string): Promise<string> {
+  if (route.provider !== "gemini") {
+    console.error("AI provider failed", { provider: route.provider, message: rawMessage });
+    return describeAiFailure(rawMessage);
+  }
+
+  let models: string[] = [];
+  let listFailed: string | null = null;
+  try {
+    models = await listGeminiModels(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || "");
+  } catch (caught) {
+    listFailed = caught instanceof Error ? caught.message : "could not list models";
+  }
+
+  console.error("AI provider failed", {
+    provider: "gemini",
+    message: rawMessage,
+    availableModels: models.length ? models.join(", ") : "(none)",
+    listModelsError: listFailed,
+  });
+
+  /*
+   * Only when nothing else already explains it. A recognised failure — no
+   * credit, a rejected key, a rate limit — has its own sentence naming the
+   * lever, and that is more useful than this one.
+   */
+  if (!models.length && classifyAiFailure(rawMessage) === "unknown") {
+    return "Sartho's AI provider rejected the request and its key can list no models at all, which means the key is not valid or the Generative Language API is not enabled for its Google Cloud project. Nothing is wrong with your résumé. The administrator needs to check GEMINI_API_KEY and that the API is enabled for that project.";
+  }
+  return describeAiFailure(rawMessage);
 }
 
 /*
