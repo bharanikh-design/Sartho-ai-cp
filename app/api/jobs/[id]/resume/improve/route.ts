@@ -68,13 +68,26 @@ const jsonSchema = {
   },
 };
 
+/*
+ * No array bound in the schema, because the code above enforces it anyway.
+ *
+ * This carried `maxItems: 4`, and callOpenAI sends every schema with
+ * `strict: true`. Strict structured output accepts a restricted subset of JSON
+ * Schema and rejects the whole request — a 400, not a retryable model error, so
+ * no fallback covers it — when it meets a keyword outside that subset. Which
+ * keywords are inside it has changed more than once.
+ *
+ * The cap is not worth that risk when `.slice(0, 4)` already guarantees it on
+ * output. A constraint enforced in two places, one of which can fail the
+ * request outright, is a constraint enforced in the wrong place.
+ */
 const proposeJsonSchema = {
   type: "object",
   additionalProperties: false,
   required: ["rewritten", "questions"],
   properties: {
     rewritten: { type: "string" },
-    questions: { type: "array", maxItems: 4, items: { type: "string" } },
+    questions: { type: "array", items: { type: "string" } },
   },
 };
 
