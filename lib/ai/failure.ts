@@ -26,8 +26,21 @@ export function classifyAiFailure(message: string): AiFailureKind {
   if (/insufficient_quota|no credits|no credit left|run out of credit|credit balance|purchase credits|top up|exceeded your current quota|billing|payment|check your plan/.test(text)) {
     return "credit";
   }
-  if (/rate.?limit|too many requests|429|overloaded|capacity|exhausted/.test(text)) return "rate-limit";
-  if (/invalid.*api key|api key not valid|api_key_invalid|incorrect api key|unauthorized|permission_denied|401|authentication/.test(text)) return "auth";
+  /*
+   * \b429\b, not a bare 429. Google's refusals carry a numeric project id, and
+   * "Generative Language API has not been used in project 429174" was being
+   * read as a rate limit because those three digits appear inside it — so a
+   * misconfigured project told the user to wait a minute and try again, for
+   * ever. Same reason 401 below is bounded.
+   */
+  if (/rate.?limit|too many requests|\b429\b|overloaded|capacity|exhausted/.test(text)) return "rate-limit";
+  /*
+   * An API that was never switched on for the key's project is an
+   * authentication problem in every way that matters: the request is refused,
+   * no model will help, and the person who can fix it is the one holding the
+   * deployment's environment variables.
+   */
+  if (/invalid.*api key|api key not valid|api_key_invalid|incorrect api key|unauthorized|permission_denied|\b401\b|authentication|has not been used in project|api has not been enabled|accessnotconfigured|api_key_service_blocked/.test(text)) return "auth";
   if (/timed? ?out|timeout|aborted|abort/.test(text)) return "timeout";
   /*
    * Google's retired-model reply is "models/gemini-1.5-pro is not found for
@@ -83,7 +96,7 @@ export function describeAiFailure(message: string, subject: AiFailureSubject = D
     case "credit":
       return `Sartho's selected AI provider has run out of credit, so it could not ${action}. Nothing is wrong with ${reassurance}. Top up the provider account and ${retry}.`;
     case "auth":
-      return `Sartho's AI provider rejected its key, so it could not ${action}. The key needs correcting in the deployment's environment variables.`;
+      return `Sartho's AI provider refused the request because of its key, so it could not ${action}. Either the key is wrong or the provider's API is not enabled for its project; both are fixed in the deployment's environment variables and provider console.`;
     case "rate-limit":
       return `Sartho's AI provider is refusing requests for the moment. Nothing is wrong with ${reassurance} — wait a minute and ${retry}.`;
     case "timeout":

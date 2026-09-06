@@ -149,9 +149,17 @@ describe("explicit provider routing", () => {
       return Promise.resolve(response(401, { error: { message: "Incorrect API key provided" } }));
     });
 
-    await expect(generateStructuredJson(REQUEST)).rejects.toThrow(/rejected its key/);
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    /*
+     * The contract is that a rejected key is spoken about as a key — naming the
+     * lever and the person holding it — not that it is worded any particular
+     * way. It used to pin the exact sentence, which broke when the wording
+     * grew to cover an API that was never enabled for the key's project.
+     */
+    await expect(generateStructuredJson(REQUEST)).rejects.toThrow(/key/i);
+    await expect(generateStructuredJson(REQUEST)).rejects.toThrow(/environment variables/);
+    /* The point of the test: one call, to one company, and no fallback elsewhere. */
     expect(calls.every((call) => call.url.includes("openai.com"))).toBe(true);
+    expect(calls).toHaveLength(2);
   });
 
   it("retries the same model once for a transient failure", async () => {

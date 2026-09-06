@@ -131,3 +131,43 @@ describe("describeAiFailure, said about a line rather than a document", () => {
     expect(describeAiFailure(OUT_OF_CREDIT)).toContain("Nothing is wrong with your résumé");
   });
 });
+
+/*
+ * The bracket that reached a real screen.
+ *
+ * generateStructuredJson appended " [DIAGNOSTIC: Available models for your key:
+ * ...]" to the message it threw, so a red box on the opportunity page ended
+ * with a dangling label and nothing after it — the key could list no models, so
+ * the one thing that looked like a clue was empty. describeAiFailure exists to
+ * keep provider internals out of the product; appending to its output defeated
+ * that entirely.
+ */
+describe("what a person is allowed to see", () => {
+  it("never names a model, a request id or a host, whatever the provider said", () => {
+    const raw = [
+      "models/gemini-2.0-flash is not found for API version v1beta",
+      "request 7f3a-91 failed at https://generativelanguage.googleapis.com/v1beta/models",
+      "Generative Language API has not been used in project 429174 before or it is disabled",
+    ];
+    for (const message of raw) {
+      const spoken = describeAiFailure(message);
+      expect(spoken).not.toContain("DIAGNOSTIC");
+      expect(spoken).not.toMatch(/gemini-\d/);
+      expect(spoken).not.toContain("googleapis.com");
+      expect(spoken).not.toContain("7f3a-91");
+      expect(spoken).not.toContain("429174");
+    }
+  });
+
+  it("classifies Google's disabled-API refusal as something a person can act on", () => {
+    /*
+     * This is the shape behind the empty bracket: the project never had the
+     * API switched on, so every call is refused and ListModels returns nothing.
+     * It used to fall through to the generic "ask the administrator", which is
+     * true but names no lever.
+     */
+    const message = "Generative Language API has not been used in project 429174 before or it is disabled.";
+    expect(classifyAiFailure(message)).toBe("auth");
+    expect(describeAiFailure(message)).toContain("environment variables");
+  });
+});
