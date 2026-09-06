@@ -21,10 +21,18 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         
+      # Read from .nvmrc rather than pinned here, because it had drifted: the
+      # repo declares Node 24 in .nvmrc and in package.json engines, which is
+      # what Vercel builds with, while CI quietly tested on 20. Every run also
+      # carried a supabase-js warning that Node 20 support is ending.
+      #
+      # A gate running a different runtime from production is a gate that can
+      # pass on code that cannot deploy — and, as here, fail on code that works
+      # everywhere else. One file names the version now, so it cannot drift again.
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version-file: '.nvmrc'
           cache: 'npm'
           
       - name: Install dependencies
