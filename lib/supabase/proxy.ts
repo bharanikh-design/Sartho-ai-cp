@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PUBLIC_PATHS = new Set(["/login", "/auth/callback"]);
+const PUBLIC_PATHS = new Set(["/login", "/auth/callback", "/googlef6d047ff9985d3df.html"]);
 
 /*
  * Supabase normally returns an OAuth authorization code to /auth/callback.
