@@ -2,6 +2,7 @@ import { DailyDigestSettings } from "@/components/daily-digest-settings";
 import { MatchAlertSettings } from "@/components/match-alert-settings";
 import { ProductPageHeader } from "@/components/product-page-header";
 import { requireUser } from "@/lib/auth";
+import { digestHealth } from "@/lib/notifications/digest-health";
 import { isEmailDeliveryConfigured } from "@/lib/notifications/send-email";
 
 export const dynamic = "force-dynamic";
@@ -15,7 +16,7 @@ export default async function NotificationsPage() {
   const { supabase, user } = await requireUser();
   const { data } = await supabase
     .from("notification_preferences")
-    .select("email,daily_digest_enabled,match_alerts_enabled,match_alerts_last_run_at")
+    .select("email,daily_digest_enabled,last_sent_at,updated_at,match_alerts_enabled,match_alerts_last_run_at")
     .eq("user_id", user.id)
     .maybeSingle();
 
@@ -39,6 +40,18 @@ export default async function NotificationsPage() {
         initialEmail={email}
         initialEnabled={Boolean(data?.daily_digest_enabled)}
         deliveryReady={deliveryReady}
+        health={digestHealth({
+          enabled: Boolean(data?.daily_digest_enabled),
+          /* The only real evidence that the schedule is running. */
+          lastSentAt: typeof data?.last_sent_at === "string" ? data.last_sent_at : null,
+          /*
+           * The closest thing to "when was this switched on". It is the row's
+           * last change of any kind, so it can only ever make the check more
+           * forgiving — the right direction for a claim that the deployment
+           * is broken.
+           */
+          enabledSince: typeof data?.updated_at === "string" ? data.updated_at : null,
+        })}
       />
     </div>
   );
