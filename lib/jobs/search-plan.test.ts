@@ -84,6 +84,28 @@ describe("planSearchQueries", () => {
     expect(withoutEarly.some((query) => query.earlyCareerOnly)).toBe(false);
   });
 
+  /*
+   * Type of work and years of experience are different questions, and requiring
+   * the first to get graduate postings is a trap for exactly the person who
+   * most needs them. Somebody in their first year gets the pass either way.
+   */
+  it("adds the early-career pass for a graduate who ticked no employment type", () => {
+    const queries = planSearchQueries({
+      ...brief,
+      companies: [],
+      employmentTypes: [],
+      entryLevelTerms: ["graduate program", "entry level"],
+    });
+    const early = queries.filter((query) => query.earlyCareerOnly);
+    expect(early.map((query) => query.keywords)).toEqual(["Business Analyst", "Data Analyst"]);
+    expect(early[0].entryLevelTerms).toEqual(["graduate program", "entry level"]);
+  });
+
+  it("does not add the pass for somebody who is not early career", () => {
+    const queries = planSearchQueries({ ...brief, companies: [], employmentTypes: [], entryLevelTerms: [] });
+    expect(queries.some((query) => query.earlyCareerOnly)).toBe(false);
+  });
+
   it("searches the whole country when no city is set", () => {
     const queries = planSearchQueries({ ...brief, locations: [], companies: [] });
     expect(queries).toHaveLength(3);

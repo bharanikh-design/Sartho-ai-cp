@@ -273,6 +273,26 @@ export function JobSearchPanel({
           {criteria.countrySource === "default" ? <> · <Link href="#country">choose your country</Link> to search the right market</> : null}
           {criteria.tooSenior ? <> · {criteria.tooSenior} hidden as too senior for your experience</> : null}
           {/*
+            * Separate from "too senior", because it is a different finding: this
+            * one was read off a requirement the advert wrote down, not off its
+            * title. A role called "Analyst" that opens with "8+ years" is caught
+            * only here, and a person deserves to know that is why it went.
+            */}
+          {criteria.tooMuchExperience ? (
+            <> · {criteria.tooMuchExperience} hidden for asking more years than your{" "}
+              <Link href="#experience">{criteria.experienceLevel ?? "stated"} experience</Link>
+            </>
+          ) : null}
+          {criteria.earlyCareerPass ? <> · graduate and entry-level postings searched separately</> : null}
+          {/*
+            * The band drives both the seniority filter and the years filter, so
+            * when it was only ever inferred from a résumé, say so and offer the
+            * one click that replaces a guess with an answer.
+            */}
+          {criteria.experienceSource === "unknown" ? (
+            <> · <Link href="#experience">add your years of experience</Link> to filter out roles asking for more</>
+          ) : null}
+          {/*
             * Said out loud, because a filter nobody can see is indistinguishable
             * from a search that found nothing.
             */}

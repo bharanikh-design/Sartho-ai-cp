@@ -7,6 +7,7 @@ import type { TargetLaneRecord } from "@/lib/types";
 import type { SearchSourcePreference } from "@/lib/data/search";
 import { JOB_MARKETS, cityOptions, countryName, regionLabel, regionOptions } from "@/lib/jobs/countries";
 import { EMPLOYMENT_TYPES, earlyCareerSelections } from "@/lib/jobs/employment-types";
+import { EXPERIENCE_BANDS, bandForYears, experienceBand, type ExperienceBandId } from "@/lib/jobs/experience";
 import { KNOWN_EMPLOYERS } from "@/lib/jobs/employers";
 import { ChipCombobox } from "@/components/chip-combobox";
 import { MAX_LOCATION_QUERIES } from "@/lib/jobs/search-plan";
@@ -33,6 +34,8 @@ export function SearchPlanEditor({
   initialSources,
   initialCountries,
   inferredCountry,
+  initialExperience,
+  resumeYears,
   initialEmploymentTypes,
   initialLocations,
   initialCompanies,
@@ -45,6 +48,10 @@ export function SearchPlanEditor({
   initialCountries: string[];
   /** The résumé-inferred market, offered when nothing is saved. */
   inferredCountry: string | null;
+  /** The band this person chose, or null if they never have. */
+  initialExperience: ExperienceBandId | null;
+  /** The total read off their résumé, offered when they have not answered. */
+  resumeYears: number | null;
   initialEmploymentTypes: string[];
   initialLocations: string[];
   initialCompanies: string[];
@@ -63,6 +70,17 @@ export function SearchPlanEditor({
   const [countryNames, setCountryNames] = useState<string[]>(
     startingCountries.map((code) => countryName(code)).filter((name): name is string => Boolean(name)),
   );
+  /*
+   * The résumé's total is a suggestion, not the answer.
+   *
+   * It is pre-selected because a filled-in form beats an empty one, and it is
+   * labelled with where it came from because it is frequently wrong — this
+   * number decides which roles are hidden, and somebody whose document parsed
+   * badly had no way to say so. It stays a suggestion until saved: the person
+   * confirming a pre-filled band is the point at which Sartho stops guessing.
+   */
+  const suggestedExperience = bandForYears(resumeYears);
+  const [experience, setExperience] = useState<ExperienceBandId | null>(initialExperience ?? suggestedExperience);
   const [employmentTypes, setEmploymentTypes] = useState(initialEmploymentTypes);
   const [locations, setLocations] = useState(initialLocations);
   const [companies, setCompanies] = useState(initialCompanies);
@@ -98,11 +116,13 @@ export function SearchPlanEditor({
     if (!sameList(codes, initialCountries)) return true;
     if (movedCompanies > 0) return true;
     if (remote !== initialRemote) return true;
+    /* A band suggested from the résumé but never saved is a change too. */
+    if (experience !== initialExperience) return true;
     if (!sameList(employmentTypes, initialEmploymentTypes)) return true;
     if (!sameList(locations, initialLocations)) return true;
     if (!sameList(companies, initialCompanies)) return true;
     return false;
-  }, [codes, movedCompanies, remote, employmentTypes, locations, companies, initialCountries, initialRemote, initialEmploymentTypes, initialLocations, initialCompanies]);
+  }, [codes, movedCompanies, remote, experience, employmentTypes, locations, companies, initialCountries, initialRemote, initialExperience, initialEmploymentTypes, initialLocations, initialCompanies]);
 
   async function save() {
     if (!hasChanges) return;
@@ -113,6 +133,7 @@ export function SearchPlanEditor({
       body: JSON.stringify({
         country: primary,
         countries: codes,
+        experienceLevel: experience,
         employmentTypes,
         sources: sources.some((source) => source.active) ? sources : DEFAULT_JOB_SOURCES,
         targetLocations: locations,
@@ -195,6 +216,7 @@ export function SearchPlanEditor({
   const summary = [
     countryNames.join(" · "),
     locations.length ? locations.join(" · ") : primaryName ? `Anywhere in ${primaryName}` : "",
+    experience ? experienceBand(experience)?.label ?? "" : "",
     companies.length ? `${companies.length} employer${companies.length === 1 ? "" : "s"}` : "",
     employmentTypes.join(" · "),
     remote,
@@ -280,6 +302,51 @@ export function SearchPlanEditor({
               }
               emptyHint={`Anywhere in ${primaryName}`}
             />
+          </div>
+
+          {/*
+            * Asked here, not on the profile, because this is where its effect
+            * is visible. It is the only question on this card about the person
+            * rather than the search, and it earns its place by doing two things
+            * nothing else can: it decides which titles are out of reach, and it
+            * removes adverts that demand more years than the person has.
+            *
+            * The bands say what each one does rather than only what it is. "0–1
+            * years" alone is a fact about you; "graduate postings get their own
+            * search pass" is the reason to answer honestly instead of rounding
+            * yourself up.
+            */}
+          <div className="search-criteria-row" id="experience">
+            <label>
+              <strong>How much experience do you have?</strong>
+              <small>
+                {experience
+                  ? experienceBand(experience)?.note
+                  : "Roles asking for far more years than this are left out of your results."}
+                {/*
+                  * Where a pre-filled answer came from. A number read off a
+                  * document and used silently is the same failure as a country
+                  * guessed silently — it decides what you are shown, so it is
+                  * said out loud and can be corrected in one click.
+                  */}
+                {!initialExperience && suggestedExperience ? (
+                  <> Read as <strong>{resumeYears} year{resumeYears === 1 ? "" : "s"}</strong> from your résumé — change it if that is wrong, then save.</>
+                ) : null}
+              </small>
+            </label>
+            <div className="work-model-options" role="group" aria-label="Years of experience" style={{ marginTop: 0 }}>
+              {EXPERIENCE_BANDS.map((band) => (
+                <button
+                  key={band.id}
+                  type="button"
+                  aria-pressed={experience === band.id}
+                  className={experience === band.id ? "is-selected" : ""}
+                  onClick={() => setExperience(experience === band.id ? null : band.id)}
+                >
+                  {band.label}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="search-criteria-row" id="companies">

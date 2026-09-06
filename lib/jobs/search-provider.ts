@@ -44,6 +44,13 @@ export type JobSearchQuery = {
   employmentTypes?: string[];
   /** This query chases internships and graduate programmes; skip conflicting flags. */
   earlyCareerOnly?: boolean;
+  /**
+   * Ways this market says "just graduated" — "graduate scheme", "fresher",
+   * "new grad". Sent as alternatives the provider ORs together, never as extra
+   * required words: a term a provider ignores then costs nothing, where an
+   * extra required word would empty the page.
+   */
+  entryLevelTerms?: string[];
   limit?: number;
 };
 
@@ -178,6 +185,17 @@ export function buildAdzunaUrl(query: JobSearchQuery, credentials: { appId: stri
   if (query.earlyCareerOnly) {
     const hints = employmentQueryHints(query.employmentTypes ?? [], "adzuna");
     if (hints.length) params.set("what", `${query.keywords} ${hints.join(" ")}`.trim());
+    /*
+     * The market's own words for a graduate role go in `what_or`, not `what`.
+     *
+     * `what` ANDs its terms, so appending "graduate scheme fresher new grad"
+     * there would demand an advert containing all of them, which is no advert
+     * at all. `what_or` narrows to postings carrying any one of them, on top of
+     * the role in `what` — and if Adzuna ever stops honouring the parameter,
+     * the query degrades to the plain role search rather than to nothing.
+     */
+    const terms = query.entryLevelTerms?.filter((term) => term.trim()) ?? [];
+    if (terms.length) params.set("what_or", terms.join(" "));
   }
   if (query.location?.trim()) params.set("where", query.location.trim());
   if (query.employer?.trim()) params.set("company", query.employer.trim());

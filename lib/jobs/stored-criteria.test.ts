@@ -34,6 +34,11 @@ describe("normaliseCriteria", () => {
     expect(criteria.companiesRequested).toBe(0);
     expect(criteria.offFamily).toBe(0);
     expect(criteria.families).toEqual([]);
+    /* The experience band arrived after these rows were written, too. */
+    expect(criteria.experienceLevel).toBeNull();
+    expect(criteria.experienceSource).toBe("unknown");
+    expect(criteria.tooMuchExperience).toBe(0);
+    expect(criteria.earlyCareerPass).toBe(false);
     /* And nothing the row did carry is lost. */
     expect(criteria.tooSenior).toBe(17);
     expect(criteria.companies).toEqual(["PwC"]);
@@ -56,9 +61,13 @@ describe("normaliseCriteria", () => {
       tooSenior: "many",
       broadened: "yes",
       countrySource: "invented",
+      experienceLevel: "3-4",
+      experienceSource: "guessed",
     });
     expect(criteria.roles).toEqual(["Business Analyst"]);
     expect(criteria.tooSenior).toBe(0);
+    expect(criteria.experienceLevel).toBeNull();
+    expect(criteria.experienceSource).toBe("unknown");
     expect(criteria.broadened).toBe(false);
     expect(criteria.countrySource).toBe("default");
   });

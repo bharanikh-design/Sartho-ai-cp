@@ -4,7 +4,17 @@ import { getSearchPreferences } from "@/lib/data/search";
 import { countryName, normaliseCountryCode } from "@/lib/jobs/countries";
 import { splitMisfiledCompanies } from "@/lib/jobs/employers";
 import { filterableSelections } from "@/lib/jobs/employment-types";
+import {
+  bandForYears,
+  entryLevelTermsFor,
+  experienceBand,
+  normaliseExperienceBand,
+  yearsForExperienceFilter,
+  yearsForSeniority,
+  type ExperienceBandId,
+} from "@/lib/jobs/experience";
 import { familyFit, reachFrom } from "@/lib/matching/job-family";
+import { demandsMoreExperience, requiredExperienceIn } from "@/lib/matching/required-experience";
 import { scoreOpportunity } from "@/lib/matching/opportunity-score";
 import { candidateSeniority } from "@/lib/matching/title-fit";
 import { seniorityReach } from "@/lib/matching/seniority-reach";
@@ -85,6 +95,20 @@ export type SearchCriteria = {
   /** The level the person is at, and how many roles were dropped as too senior. */
   candidateLevel: number;
   tooSenior: number;
+  /** The experience band searched against, and where that answer came from. */
+  experienceLevel: ExperienceBandId | null;
+  experienceSource: "brief" | "resume" | "unknown";
+  /**
+   * Roles dropped for demanding more years than the person has.
+   *
+   * Counted separately from tooSenior because they are different findings: one
+   * is read off a title, the other off a stated requirement in the advert. A
+   * role titled "Analyst" that opens with "8+ years' experience" is caught only
+   * by this one.
+   */
+  tooMuchExperience: number;
+  /** True when graduate and entry-level postings got their own search pass. */
+  earlyCareerPass: boolean;
   /** Roles dropped as a different line of work, and the families kept. */
   offFamily: number;
   families: string[];
@@ -175,6 +199,37 @@ export async function runBriefSearch(
   const roleNames = activeLanes.map((lane) => lane.name);
 
   /*
+   * Experience, most deliberate signal first: the band the person chose, then
+   * the band their résumé's total falls into, then nothing.
+   *
+   * "Nothing" is deliberately not zero. Treating an unanswered question as no
+   * experience would filter a director's search down to graduate roles, so when
+   * neither source says anything the years filter is simply not applied and the
+   * criteria say the question is unanswered.
+   */
+  const chosenBand = experienceBand(preferences.experienceLevel);
+  const resumeBand = experienceBand(bandForYears(profile?.total_experience_years ?? null));
+  const band = chosenBand ?? resumeBand;
+  const experienceSource: SearchCriteria["experienceSource"] =
+    chosenBand ? "brief" : resumeBand ? "resume" : "unknown";
+
+  /*
+   * Two numbers from one band, and they are not interchangeable. Seniority
+   * takes the bottom, so an inflated title is tempered by the least the person
+   * claimed; the years filter takes the top, because it removes roles from the
+   * page and should remove fewer when the band is ambiguous.
+   */
+  const seniorityYears = band ? yearsForSeniority(band) : profile?.total_experience_years ?? null;
+  const filterYears = band ? yearsForExperienceFilter(band) : null;
+
+  /*
+   * A graduate gets a pass of their own, in the words their market uses. This
+   * is where the supply of genuinely reachable roles comes from — the filters
+   * below only take things away.
+   */
+  const earlyCareerPass = band?.earlyCareer === true;
+
+  /*
    * The primary market gets the full plan. Each additional market gets the top
    * role only — someone with work rights in three countries should see all
    * three, without tripling the provider calls for every role and employer.
@@ -187,6 +242,7 @@ export async function runBriefSearch(
       companies: brief.companies,
       remotePreference: preferences.remotePreference,
       employmentTypes: preferences.employmentTypes,
+      entryLevelTerms: earlyCareerPass ? entryLevelTermsFor(country) : undefined,
     }),
     ...markets.slice(1).flatMap((market) => planSearchQueries({
       roles: roleNames.slice(0, 1),
@@ -195,6 +251,8 @@ export async function runBriefSearch(
       companies: [],
       remotePreference: preferences.remotePreference,
       employmentTypes: preferences.employmentTypes,
+      /* Each market gets its own vocabulary; "graduate scheme" finds nothing in Sydney. */
+      entryLevelTerms: earlyCareerPass ? entryLevelTermsFor(market) : undefined,
     })),
   ];
 
@@ -300,10 +358,11 @@ export async function runBriefSearch(
    * reported so the filtering is visible rather than silent.
    */
   const heldTitles = roles.map((role) => role.title).filter(Boolean);
-  const level = candidateSeniority(heldTitles, profile?.total_experience_years ?? null);
+  const level = candidateSeniority(heldTitles, seniorityYears);
   const withinReach: ScoredJobMatch[] = [];
   let tooSenior = 0;
   let offFamily = 0;
+  let tooMuchExperience = 0;
 
   /*
    * Job family is the second hard filter, and the one a recruiter applies first.
@@ -315,9 +374,29 @@ export async function runBriefSearch(
    * in a different function is not a weak match, it is the wrong job, and it
    * pushes the right ones off the page.
    */
+  /*
+   * Stated years are the third filter, and the only one that reads the advert
+   * rather than its title.
+   *
+   * "Analyst", "Consultant" and "Engineer" carry no seniority word, so the
+   * title filter passes them, and plenty of them open with "6+ years required".
+   * For somebody fresh out of university those are most of the page, and after
+   * the third screen of them the conclusion is that the tool does not work.
+   *
+   * It only ever fires on a requirement the advert actually wrote down, which
+   * means its reach depends on how much of the advert the provider returned —
+   * Adzuna sends a truncated snippet, so a requirement buried on page two of
+   * the posting is not visible here and the role stays. Under-removing is the
+   * right direction to fail in, and the count says how many it caught rather
+   * than implying it caught them all.
+   */
   for (const match of scoredByUrl.values()) {
-    if (!seniorityReach(match.title, heldTitles, profile?.total_experience_years ?? null).withinReach) { tooSenior += 1; continue; }
+    if (!seniorityReach(match.title, heldTitles, seniorityYears).withinReach) { tooSenior += 1; continue; }
     if (!familyFit(match.title, heldTitles, roleNames).withinReach) { offFamily += 1; continue; }
+    if (filterYears !== null) {
+      const required = requiredExperienceIn(`${match.title}. ${match.description}`);
+      if (demandsMoreExperience(required, filterYears)) { tooMuchExperience += 1; continue; }
+    }
     withinReach.push(match);
   }
 
@@ -343,6 +422,10 @@ export async function runBriefSearch(
     companiesRequested: brief.companies.length,
     candidateLevel: level,
     tooSenior,
+    experienceLevel: band?.id ?? null,
+    experienceSource,
+    tooMuchExperience,
+    earlyCareerPass,
     offFamily,
     families: reachFrom(heldTitles, roleNames),
     countryName: countryLabel,
@@ -476,6 +559,11 @@ export function normaliseCriteria(stored: unknown): SearchCriteria {
     companiesRequested: count(value.companiesRequested),
     candidateLevel: count(value.candidateLevel),
     tooSenior: count(value.tooSenior),
+    experienceLevel: normaliseExperienceBand(value.experienceLevel),
+    experienceSource:
+      value.experienceSource === "brief" || value.experienceSource === "resume" ? value.experienceSource : "unknown",
+    tooMuchExperience: count(value.tooMuchExperience),
+    earlyCareerPass: value.earlyCareerPass === true,
     offFamily: count(value.offFamily),
     families: strings(value.families),
     countryName: typeof value.countryName === "string" ? value.countryName : "",

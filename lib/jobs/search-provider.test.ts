@@ -122,6 +122,32 @@ describe("query → provider request mapping", () => {
     expect(url.searchParams.get("company")).toBe("PwC");
   });
 
+  /*
+   * `what` ANDs its terms. Appending "graduate scheme fresher new grad" there
+   * would demand an advert containing all of them, which is no advert at all —
+   * so the market's words for a graduate role go in `what_or`, and the role
+   * stays in `what`.
+   */
+  it("sends entry-level wording as alternatives, not as extra required words", () => {
+    const url = new URL(buildAdzunaUrl({
+      keywords: "Business Analyst",
+      country: "au",
+      earlyCareerOnly: true,
+      entryLevelTerms: ["graduate program", "entry level"],
+    }, credentials));
+    expect(url.searchParams.get("what")).toBe("Business Analyst");
+    expect(url.searchParams.get("what_or")).toBe("graduate program entry level");
+  });
+
+  it("does not colour an ordinary search with entry-level wording", () => {
+    const url = new URL(buildAdzunaUrl({
+      keywords: "Business Analyst",
+      country: "au",
+      entryLevelTerms: ["graduate program"],
+    }, credentials));
+    expect(url.searchParams.get("what_or")).toBeNull();
+  });
+
   it("embeds employer and city in JSearch's free-text query and scopes by country", () => {
     const params = buildJSearchParams({ keywords: "Business Analyst", country: "au", location: "Sydney", employer: "PwC", remoteOnly: true });
     expect(params.get("query")).toBe("Business Analyst at PwC in Sydney");

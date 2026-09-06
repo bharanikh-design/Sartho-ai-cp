@@ -27,13 +27,22 @@ export default async function SearchPlanPage() {
     getTargetLanes(supabase, user.id),
     getSearchPreferences(supabase, user.id),
     loadProductJourneyStatus(supabase, user.id),
-    supabase.from("profiles").select("country").eq("id", user.id).maybeSingle(),
+    supabase.from("profiles").select("country,total_experience_years").eq("id", user.id).maybeSingle(),
     // The last search, so arriving here shows matches without re-querying.
     getStoredSearch(supabase, user.id),
   ]);
   const inferredCountry = normaliseCountryCode(
     typeof profileResult.data?.country === "string" ? profileResult.data.country : null,
   );
+  /*
+   * The résumé's own total, offered as a starting answer rather than used as
+   * one. It is read off an imported document and is often wrong or missing, and
+   * it decides which roles are hidden — so the person gets to see the number,
+   * see where it came from, and correct it.
+   */
+  const resumeYears = typeof profileResult.data?.total_experience_years === "number"
+    ? profileResult.data.total_experience_years
+    : null;
   const country = normaliseCountryCode(preferences.country);
   const split = splitMisfiledCompanies(preferences.targetLocations, preferences.targetCompanies);
   const briefReady = Boolean(country ?? inferredCountry) && lanes.length > 0 && isJobSearchConfigured();
@@ -51,6 +60,8 @@ export default async function SearchPlanPage() {
         initialSources={preferences.sources}
         initialCountries={preferences.countries.length ? preferences.countries : country ? [country] : []}
         inferredCountry={inferredCountry}
+        initialExperience={preferences.experienceLevel}
+        resumeYears={resumeYears}
         initialEmploymentTypes={preferences.employmentTypes}
         initialLocations={split.locations}
         initialCompanies={split.companies}
