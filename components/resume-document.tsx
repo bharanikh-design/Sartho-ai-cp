@@ -101,16 +101,48 @@ const EVIDENCE_LABEL: Record<"backed" | "edited" | "untracked", string> = {
   untracked: "Saved before Sartho recorded evidence line by line",
 };
 
+/*
+ * The rewrite loop, where the sentence is.
+ *
+ * It used to live in the right-hand rail, which reprinted the full text of
+ * every weak bullet — the same sentences sitting a few inches to the left. That
+ * duplication was most of what made the panel unreadable: a column of dense
+ * small text restating the document you were already looking at.
+ *
+ * So the proposal opens underneath the line it rewrites. You read the original
+ * and the suggestion in one place, in the same typography, with the rest of the
+ * résumé around them for context — which is the only way to judge whether a
+ * line actually fits.
+ */
+export type BulletCoach = {
+  /** The bullet whose rewrite panel is open, if any. */
+  activeId: string | null;
+  /** Sartho's draft of the active line. Undefined while it is still being written. */
+  proposal: string | undefined;
+  questions: string[];
+  /** Square-bracketed blanks still to fill; Accept stays shut while any remain. */
+  blanks: string[];
+  error: string | null;
+  busy: boolean;
+  onOpen: (bulletId: string, text: string) => void;
+  onRetry: (bulletId: string, text: string) => void;
+  onChange: (text: string) => void;
+  onAccept: (bulletId: string) => void;
+  onClose: () => void;
+};
+
 export function ResumeDocument({
   content,
   onChange,
   weakBulletIds,
+  coach,
   readOnly = false,
 }: {
   content: ResumeContent;
   onChange: (next: ResumeContent) => void;
   /** Bullets the ATS reader found no figure in, so the page can mark them. */
   weakBulletIds: Set<string>;
+  coach?: BulletCoach;
   readOnly?: boolean;
 }) {
   /*
@@ -230,7 +262,8 @@ export function ResumeDocument({
               return (
                 <li
                   key={bullet.id}
-                  className={`resume-doc-bullet${weakBulletIds.has(bullet.id) ? " is-weak" : ""}`}
+                  id={`bullet-${bullet.id}`}
+                  className={`resume-doc-bullet${weakBulletIds.has(bullet.id) ? " is-weak" : ""}${coach?.activeId === bullet.id ? " is-coaching" : ""}`}
                 >
                   <span
                     className={`resume-doc-evidence is-${state}`}
@@ -267,6 +300,65 @@ export function ResumeDocument({
                       onClick={() => removeBullet(sectionIndex, bulletIndex)}
                     >✕</button>
                   </span>
+
+                  {/*
+                    * The one control on a line that has no number in it. Offered
+                    * here as well as from the rail, because the moment you
+                    * notice a weak line is while you are reading it.
+                    */}
+                  {coach && weakBulletIds.has(bullet.id) && coach.activeId !== bullet.id ? (
+                    <button
+                      type="button"
+                      className="resume-doc-coach-open"
+                      onClick={() => coach.onOpen(bullet.id, bullet.text)}
+                    >
+                      Add a figure
+                    </button>
+                  ) : null}
+
+                  {coach && coach.activeId === bullet.id ? (
+                    <div className="resume-doc-coach">
+                      {coach.error ? (
+                        <div className="resume-doc-coach-failed" role="alert">
+                          <p>{coach.error}</p>
+                          <button type="button" className="secondary-button" onClick={() => coach.onRetry(bullet.id, bullet.text)}>
+                            Try again
+                          </button>
+                        </div>
+                      ) : coach.proposal === undefined ? (
+                        <p className="resume-doc-coach-pending">Sartho is drafting a stronger version…</p>
+                      ) : (
+                        <>
+                          <label htmlFor={`coach-${bullet.id}`}>
+                            Sartho&rsquo;s version — replace anything in [brackets]. It will not guess a figure for you.
+                          </label>
+                          <textarea
+                            id={`coach-${bullet.id}`}
+                            rows={3}
+                            value={coach.proposal}
+                            onChange={(event) => coach.onChange(event.target.value)}
+                          />
+                          {coach.questions.length ? (
+                            <ul className="resume-doc-coach-questions">
+                              {coach.questions.map((question) => <li key={question}>{question}</li>)}
+                            </ul>
+                          ) : null}
+                          <div className="resume-doc-coach-actions">
+                            <button
+                              type="button"
+                              className="primary-button"
+                              disabled={coach.blanks.length > 0 || !coach.proposal.trim()}
+                              onClick={() => coach.onAccept(bullet.id)}
+                            >
+                              Use this line
+                            </button>
+                            <button type="button" className="secondary-button" onClick={coach.onClose}>Leave it</button>
+                            {coach.blanks.length ? <small>Still to fill: {coach.blanks.join(", ")}</small> : null}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  ) : null}
                 </li>
               );
             })}
