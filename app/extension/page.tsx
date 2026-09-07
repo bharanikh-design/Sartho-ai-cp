@@ -1,6 +1,6 @@
-import Link from "next/link";
 import { ProductPageHeader } from "@/components/product-page-header";
 import { constructMetadata } from "@/lib/seo";
+import { EXTENSION_DOWNLOAD_PATH, EXTENSION_VERSION } from "@/lib/extension";
 
 export const metadata = constructMetadata(
   "Browser extension",
@@ -9,68 +9,40 @@ export const metadata = constructMetadata(
 );
 
 /*
- * How to actually get the extension.
+ * How to actually get the extension — a download and four steps.
  *
- * It is not in the Chrome Web Store, and that is said here in the first line
- * rather than discovered at step four. A store listing needs a developer
- * account and a review, and until that exists the honest instruction is the
- * unpacked one — which works today, on every Chromium browser, and is exactly
- * what the people testing Sartho need.
+ * What was here was five sections and about forty sentences: what it does, a
+ * three-row table of browsers with a "to publish properly" column for each, a
+ * five-step install, and six paragraphs on permissions. Step one said "get
+ * sartho-extension.zip from the Sartho repository", which asks somebody who
+ * wants a browser extension to go and find a git repository — and there was no
+ * download link on the page at all, because the zip was gitignored and outside
+ * public/, so nothing was ever downloadable.
+ *
+ * Somebody arriving here wants the file and the four things to click. The
+ * roadmap for Firefox and Safari was interesting to exactly one person, and it
+ * is not the visitor.
  *
  * No sign-in required: somebody sent this link by a friend should be able to
- * read it before they have an account.
+ * read it, and download from it, before they have an account.
  */
 
-/*
- * Which browsers, and what each would actually take.
- *
- * Asked as one question — "how do other people install this?" — with three
- * very different answers, and the difference is worth stating rather than
- * discovering. Chromium browsers all run the same extension. Firefox needs a
- * small change. Safari is not an install at all: it is a native app wrapper, a
- * paid developer account and an App Store review.
- */
-const BROWSERS: Array<{ name: string; today: string; toPublish: string; ready: boolean }> = [
+const STEPS: Array<{ do: string; note: string }> = [
   {
-    name: "Chrome, Edge, Brave, Arc, Opera",
-    today: "Works now, unpacked, using the steps below. They are all Chromium, so it is one extension and one set of instructions.",
-    toPublish: "The Chrome Web Store — a one-off developer registration and a review of a few days. Edge can install from it directly, though a first-class Edge listing is a separate free submission.",
-    ready: true,
+    do: "Unzip it, somewhere you will keep.",
+    note: "The browser loads the extension from that folder every time it starts, so Downloads is a poor choice.",
   },
   {
-    name: "Firefox",
-    today: "Not yet. Firefox runs the same extension format but wires the background script differently, so the manifest needs a variant.",
-    toPublish: "addons.mozilla.org, which is free and reviews quickly. A small change and a second build.",
-    ready: false,
+    do: "Open chrome://extensions",
+    note: "Paste it into the address bar. Edge is edge://extensions, Brave is brave://extensions.",
   },
   {
-    name: "Safari",
-    today: "Not yet, and not a small step.",
-    toPublish: "Safari extensions ship inside a native app: an Xcode conversion, an Apple Developer membership, notarisation and App Store review. It is a project in its own right, worth doing only if people ask for it.",
-    ready: false,
-  },
-];
-
-const STEPS: Array<{ title: string; detail: string }> = [
-  {
-    title: "Download the folder",
-    detail: "Get sartho-extension.zip from the Sartho repository and unzip it somewhere you will not delete by accident — the browser loads it from that folder every time it starts, so Downloads is a poor choice. Take it from the current main branch: an unpacked extension never updates itself, so an old copy stays old for ever.",
+    do: "Turn on Developer mode.",
+    note: "Top-right corner. It allows an extension that did not come from the store, and changes nothing else.",
   },
   {
-    title: "Open your browser's extensions page",
-    detail: "chrome://extensions in Chrome, edge://extensions in Edge, brave://extensions in Brave. Paste it into the address bar; the menu route is buried.",
-  },
-  {
-    title: "Turn on Developer mode",
-    detail: "The switch is in the top-right corner. It is what allows an extension that did not come from the store, and it changes nothing else about your browser.",
-  },
-  {
-    title: "Click “Load unpacked” and choose the folder",
-    detail: "Pick the folder containing manifest.json — not the zip, and not the folder above it. Sartho appears in your extensions list straight away.",
-  },
-  {
-    title: "Pin it to the toolbar",
-    detail: "Click the puzzle-piece icon, then the pin beside Sartho. The whole point is one click from a job advert, which needs the icon to be visible.",
+    do: "Click Load unpacked, choose the sartho-extension folder.",
+    note: "Then click the puzzle-piece icon in the toolbar and pin Sartho, so it is one click from an advert.",
   },
 ];
 
@@ -80,93 +52,47 @@ export default function ExtensionPage() {
       <ProductPageHeader
         eyebrow="Browser extension"
         title="Send a role straight from the job board"
-        description="Open an advert on LinkedIn, Indeed, Seek or a company careers page, click Sartho, and the role lands in your pipeline scored against the evidence you approved."
+        description="Open an advert on LinkedIn, Indeed, Seek or a company careers page, click Sartho, and the role lands in your pipeline scored against your evidence."
       />
 
-      <section className="glass-card content-card">
-        <div className="card-header">
-          <div>
-            <h2 className="section-heading">What it does</h2>
-            <p className="section-subtitle">Three steps, one click.</p>
-          </div>
-        </div>
-        <ol className="extension-flow">
-          <li>
-            <strong>Reads the advert off the page.</strong> It looks first for the structured job data most boards publish, and falls back to the page itself — so it works well beyond LinkedIn and Indeed.
-          </li>
-          <li>
-            <strong>Shows you what it read.</strong> Title, employer, location and how much of the description it found, before anything is sent. If it has the wrong thing, you will see that here rather than in your pipeline.
-          </li>
-          <li>
-            <strong>Saves it and scores it.</strong> The role appears in your <Link href="/applications" className="direction-inline-link">applications pipeline</Link> with a match against your approved evidence. Sending the same advert twice updates it instead of adding a second copy.
-          </li>
-        </ol>
-      </section>
+      <section className="glass-card extension-install">
+        <a className="primary-button extension-download" href={EXTENSION_DOWNLOAD_PATH} download>
+          Download for Chrome<span aria-hidden="true"> →</span>
+        </a>
+        <p className="extension-meta">
+          Version {EXTENSION_VERSION} · Works in Chrome, Edge, Brave, Arc and Opera. Firefox and Safari are not supported yet.
+        </p>
 
-      <section className="glass-card content-card">
-        <div className="card-header">
-          <div>
-            <h2 className="section-heading">Which browsers</h2>
-            <p className="section-subtitle">
-              One question with three quite different answers, so here they are separately.
-            </p>
-          </div>
-        </div>
-        <ul className="extension-facts">
-          {BROWSERS.map((browser) => (
-            <li key={browser.name}>
-              <strong>{browser.name}{browser.ready ? "" : " — not yet"}</strong>
-              <p className="section-subtitle">{browser.today}</p>
-              <p className="section-subtitle"><em>To publish properly:</em> {browser.toPublish}</p>
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      <section className="glass-card content-card">
-        <div className="card-header">
-          <div>
-            <h2 className="section-heading">Installing it</h2>
-            <p className="section-subtitle">
-              Sartho is not in the Chrome Web Store yet, so this is the manual route. It takes about a minute and works in Chrome, Edge, Brave and Arc.
-            </p>
-          </div>
-        </div>
         <ol className="extension-steps">
           {STEPS.map((step) => (
-            <li key={step.title}>
-              <strong>{step.title}</strong>
-              <p className="section-subtitle">{step.detail}</p>
+            <li key={step.do}>
+              <strong>{step.do}</strong>
+              <span>{step.note}</span>
             </li>
           ))}
         </ol>
+
+        <p className="extension-meta">
+          Sartho is not in the Chrome Web Store yet, so this is the manual route. It takes about a minute.
+        </p>
       </section>
 
       <section className="glass-card content-card">
         <div className="card-header">
           <div>
-            <h2 className="section-heading">What it can and cannot see</h2>
-            <p className="section-subtitle">Worth reading before you install anything into your browser.</p>
+            <h2 className="section-heading">What it can see</h2>
+            <p className="section-subtitle">Worth knowing before you install anything into your browser.</p>
           </div>
         </div>
         <ul className="extension-facts">
           <li>
-            <strong>It reads a page only when you click it.</strong> There is no standing permission on LinkedIn, Indeed or anywhere else — clicking the icon is what grants access, to that one tab, for that one moment.
+            <strong>It reads a page only when you click it.</strong> There is no standing permission on LinkedIn, Indeed or anywhere else — clicking the icon grants access to that one tab, for that one moment.
           </li>
           <li>
-            <strong>It talks to Sartho and nowhere else.</strong> The only sites it is permitted to run on by itself are sartho.tech and your own machine during development.
+            <strong>It talks to Sartho and nowhere else.</strong> The only site it may run on by itself is sartho.tech.
           </li>
           <li>
-            <strong>It never fills in an application for you.</strong> An earlier version had a button for that. It could not work — Sartho holds no name, email or phone number to type — and a button that can only fail is worse than no button, so it is gone.
-          </li>
-          <li>
-            <strong>Nothing is lost if a save fails.</strong> A captured role stays queued in the extension until Sartho confirms it saved, so signing in, reloading, or closing the tab does not cost you the advert.
-          </li>
-          <li>
-            <strong>It says when a page is not a job.</strong> A feed post or a search results list has plenty of text and none of it is an advert. Sartho reads the page&apos;s job data where a board publishes it, falls back to the page itself, and tells you which — refusing outright rather than filling your pipeline with somebody&apos;s status update.
-          </li>
-          <li>
-            <strong>The version is on the popup.</strong> An unpacked extension never updates itself, so a build from last week stays there silently. If something behaves oddly, check that number first.
+            <strong>Nothing is lost if a save fails.</strong> A captured role stays queued in the extension until Sartho confirms it saved, so signing in or closing the tab does not cost you the advert.
           </li>
         </ul>
       </section>

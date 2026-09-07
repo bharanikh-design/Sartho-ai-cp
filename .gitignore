@@ -17,7 +17,14 @@ supabase/seed.private.sql
 supabase/*private*seed*.sql
 
 # The packaged browser extension — rebuilt by `npm run extension:zip`.
-sartho-extension.zip
+# Anchored to the repository root: the served copy at public/sartho-extension.zip
+# Built into public/ by the same script on every build, never committed.
+public/sartho-extension.zip
+# is built by the same script and must reach the deployment, and an unanchored
+# pattern here silently swallowed it.
+/sartho-extension.zip
+# Built into public/ by the same script on every build, never committed.
+public/sartho-extension.zip
 
 # TypeScript incremental build cache — regenerated on every build.
 tsconfig.tsbuildinfo

@@ -224,16 +224,73 @@
 /*
  * What each template actually is.
  *
- * Both are one column with real headings and real bullet lists — they parse
- * identically, and the difference is typographic. Anything more (a sidebar, a
- * skills column, a photo) would look like a richer choice and would be the
- * thing that gets a candidate filtered out before a person reads a word.
+ * Every one is a single column with real headings and real bullet lists, so
+ * they parse identically and the difference is typographic. Anything more (a
+ * sidebar, a skills column, a photo) would look like a richer choice and would
+ * be the thing that gets a candidate filtered out before a person reads a word.
+ *
+ * That constraint is not the same as having no design. The weight and tracking
+ * of the name, whether a heading sits on a rule or against a bar, and how much
+ * air a section gets all happen inside one column and change how a page reads
+ * enormously — which is the whole of the difference below.
  */
+
+/* Modern — sans, name left, a short accent rule instead of a full one. */
 .resume-doc[data-template="modern"] { font-family: var(--font-sans); font-size: 13.5px; line-height: 1.5; }
 .resume-doc[data-template="modern"] .resume-doc-headline { font-size: 23px; letter-spacing: -.02em; }
 .resume-doc[data-template="modern"] .resume-doc-heading { margin-top: 20px; padding-bottom: 4px; border-bottom: 0; color: #8fdcb2; font-size: 11px; letter-spacing: .08em; }
 .resume-doc[data-template="modern"] .resume-doc-heading::after { content: ""; display: block; width: 34px; height: 2px; margin-top: 5px; border-radius: 2px; background: rgba(107,207,147,.55); }
 .resume-doc[data-template="modern"] .resume-doc-bullets { gap: 0; }
+
+/*
+ * Executive — the name set large in letterspaced capitals over a double rule.
+ * No colour anywhere: at this level restraint is the signal, and a green
+ * heading on a board application reads as a template somebody downloaded.
+ */
+.resume-doc[data-template="executive"] { font-family: Georgia, "Times New Roman", serif; font-size: 13.5px; line-height: 1.6; }
+/* 4px, not 3: a 3px double border renders as one hairline and the second rule vanishes. */
+.resume-doc[data-template="executive"] .resume-doc-headline { padding-bottom: 12px; border-bottom: 4px double rgba(255,255,255,.34); font-size: 21px; font-weight: 600; letter-spacing: .13em; text-align: center; text-transform: uppercase; }
+.resume-doc[data-template="executive"] .resume-doc-summary { text-align: justify; }
+.resume-doc[data-template="executive"] .resume-doc-heading { margin-top: 24px; padding-bottom: 3px; border-bottom: 1px solid var(--line-bright); color: var(--text); font-family: Georgia, serif; font-size: 11.5px; font-weight: 600; letter-spacing: .18em; text-transform: uppercase; }
+
+/*
+ * Impact — a very large name over a solid bar. The look every commercial
+ * builder sells, done in one column: the weight is in the type, not in a
+ * sidebar, so it survives the parser that the originals do not.
+ */
+.resume-doc[data-template="impact"] { font-family: "Helvetica Neue", Helvetica, Arial, var(--font-sans), sans-serif; font-size: 13px; line-height: 1.5; }
+.resume-doc[data-template="impact"] .resume-doc-headline { font-size: 30px; font-weight: 800; line-height: 1.1; letter-spacing: -.025em; }
+/*
+ * The bar is the headline's own bottom border, not a pseudo-element on the
+ * article. In the editor the headline is a <textarea> and the article's
+ * ::before would land above the name rather than under it — and a textarea
+ * renders no pseudo-elements of its own, so there is nowhere else to put it.
+ */
+.resume-doc[data-template="impact"] .resume-doc-headline { padding-bottom: 10px; border-bottom: 4px solid #6bcf93; }
+.resume-doc[data-template="impact"] .resume-doc-heading { margin-top: 22px; padding: 0 0 5px; border-bottom: 2px solid var(--line-bright); color: var(--text); font-size: 11px; font-weight: 800; letter-spacing: .14em; }
+.resume-doc[data-template="impact"] .resume-doc-bullets { gap: 3px; }
+
+/*
+ * Editorial — serif body, sans headings against a coloured bar rather than on
+ * a rule. For roles where the writing is the work, so it is set to be read:
+ * a wider measure and more leading than anything else here.
+ */
+.resume-doc[data-template="editorial"] { font-family: Cambria, Charter, Georgia, serif; font-size: 14px; line-height: 1.72; }
+.resume-doc[data-template="editorial"] .resume-doc-headline { font-size: 25px; font-weight: 600; letter-spacing: -.015em; }
+.resume-doc[data-template="editorial"] .resume-doc-heading { margin-top: 26px; padding: 1px 0 1px 12px; border-bottom: 0; border-left: 3px solid #6bcf93; color: var(--text); font-family: var(--font-sans); font-size: 11.5px; font-weight: 700; letter-spacing: .06em; text-transform: none; }
+.resume-doc[data-template="editorial"] .resume-doc-summary { font-size: 14px; }
+.resume-doc[data-template="editorial"] .resume-doc-bullets { gap: 5px; }
+
+/*
+ * Compact — for fifteen years of history that has to fit. Smaller type, tight
+ * leading, and a heading whose rule runs on past the words to the right edge,
+ * which reads as deliberate rather than cramped.
+ */
+.resume-doc[data-template="compact"] { font-family: var(--font-sans); font-size: 12px; line-height: 1.38; }
+.resume-doc[data-template="compact"] .resume-doc-headline { font-size: 19px; letter-spacing: -.02em; }
+.resume-doc[data-template="compact"] .resume-doc-heading { margin-top: 15px; padding-bottom: 2px; border-bottom: 1px solid var(--line-bright); color: #8fdcb2; font-size: 10px; letter-spacing: .1em; }
+.resume-doc[data-template="compact"] .resume-doc-summary { margin-top: 5px; }
+.resume-doc[data-template="compact"] .resume-doc-bullets { gap: 0; margin-top: 5px; }
 
 .resume-doc { max-height: 620px; margin: 10px 0 0; overflow: auto; border: 1px solid var(--line); border-radius: 12px; padding: 26px 28px; background: rgba(255,255,255,.035); color: var(--text); font-family: var(--font-serif, Charter, "Bitstream Charter", Georgia, serif); font-size: 14px; line-height: 1.55; }
 .studio-overlay-body .resume-doc { max-height: none; }
@@ -631,11 +688,44 @@ h2.resume-doc-heading.resume-doc-field { margin-bottom: 0; border-bottom: 1px so
 
   .resume-print .resume-doc-headline { font-size: 17pt; text-align: center; }
 
+  /*
+   * On paper the templates keep their shape and lose their colour, with two
+   * deliberate exceptions below. Grey text photocopies badly and a coloured
+   * heading is the first thing a cheap office printer turns to mud, so the
+   * default is black — the design has to survive in one ink.
+   */
+
   /* Modern: name to the left, sans body, a short rule rather than a full one. */
   .resume-print .resume-doc[data-template="modern"] { font-family: Calibri, Carlito, "Helvetica Neue", Arial, sans-serif; font-size: 10.5pt; line-height: 1.35; }
   .resume-print .resume-doc[data-template="modern"] .resume-doc-headline { text-align: left; }
   .resume-print .resume-doc[data-template="modern"] .resume-doc-heading { border-bottom: 0; }
   .resume-print .resume-doc[data-template="modern"] .resume-doc-heading::after { content: ""; display: block; width: 28pt; height: 1pt; margin-top: 3pt; background: #000; }
+
+  /* Executive: letterspaced caps over a double rule, and no colour at all. */
+  .resume-print .resume-doc[data-template="executive"] { font-family: Georgia, "Times New Roman", serif; font-size: 11pt; line-height: 1.45; }
+  .resume-print .resume-doc[data-template="executive"] .resume-doc-headline { padding-bottom: 7pt; border-bottom: 3.5pt double #000; font-size: 15pt; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; }
+  .resume-print .resume-doc[data-template="executive"] .resume-doc-summary { text-align: justify; }
+  .resume-print .resume-doc[data-template="executive"] .resume-doc-heading { margin-top: 15pt; border-bottom: 0.5pt solid #000; font-family: Georgia, serif; font-size: 10pt; letter-spacing: .16em; }
+
+  /*
+   * Impact: the bar is the whole point of the template, so it prints — forced
+   * on with print-color-adjust, since browsers drop backgrounds and borders
+   * like this by default and the page would arrive as a plain sans résumé.
+   */
+  .resume-print .resume-doc[data-template="impact"] { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10.5pt; line-height: 1.34; }
+  .resume-print .resume-doc[data-template="impact"] .resume-doc-headline { padding-bottom: 6pt; border-bottom: 3pt solid #1f6f4a; font-size: 21pt; font-weight: 800; letter-spacing: -.02em; text-align: left; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .resume-print .resume-doc[data-template="impact"] .resume-doc-heading { margin-top: 13pt; border-bottom: 1.5pt solid #000; font-size: 10pt; font-weight: 800; letter-spacing: .12em; }
+
+  /* Editorial: the left bar carries the heading, so it prints too. */
+  .resume-print .resume-doc[data-template="editorial"] { font-family: Cambria, Charter, Georgia, serif; font-size: 11pt; line-height: 1.5; }
+  .resume-print .resume-doc[data-template="editorial"] .resume-doc-headline { font-size: 17pt; font-weight: 600; text-align: left; }
+  .resume-print .resume-doc[data-template="editorial"] .resume-doc-heading { margin-top: 15pt; padding: 1pt 0 1pt 8pt; border-bottom: 0; border-left: 2.5pt solid #1f6f4a; font-family: Calibri, Carlito, Arial, sans-serif; font-size: 10.5pt; letter-spacing: .05em; text-transform: none; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+  /* Compact: the one that has to fit, so everything tightens. */
+  .resume-print .resume-doc[data-template="compact"] { font-family: Calibri, Carlito, "Helvetica Neue", Arial, sans-serif; font-size: 9.5pt; line-height: 1.26; }
+  .resume-print .resume-doc[data-template="compact"] .resume-doc-headline { font-size: 14pt; text-align: left; }
+  .resume-print .resume-doc[data-template="compact"] .resume-doc-heading { margin: 10pt 0 3pt; padding-bottom: 1pt; border-bottom: 0.5pt solid #000; font-size: 9pt; letter-spacing: .1em; }
+  .resume-print .resume-doc[data-template="compact"] .resume-doc-bullets li { margin-bottom: 1pt; }
   .resume-print .resume-doc-heading {
     margin: 16pt 0 4pt;
     border-bottom: 0.5pt solid #000;

@@ -1,6 +1,6 @@
-import { AlignmentType, Document, HeadingLevel, Packer, Paragraph, TextRun } from "docx";
+import { AlignmentType, BorderStyle, Document, HeadingLevel, Packer, Paragraph, TextRun } from "docx";
 import type { ResumeContent } from "@/lib/resume/content";
-import { resumeTemplate } from "@/lib/resume/templates";
+import { resumeTemplate, type ResumeDocxStyle } from "@/lib/resume/templates";
 
 /*
  * The résumé as a Word document an applicant tracking system can actually read.
@@ -20,39 +20,34 @@ import { resumeTemplate } from "@/lib/resume/templates";
  *     layout is the most common reason a candidate is parsed into nonsense, and
  *     contact details in a header are frequently dropped entirely.
  *
- * The body is 11pt in whichever font the chosen template names, so the file
- * matches the decision made on screen. Both are metrically ordinary and present
- * on every machine — a font that has to be substituted changes the pagination
- * without warning, which is how a one-page résumé becomes two on somebody
- * else's computer.
+ * The template decides the font, the size and weight of the name, whether it
+ * is centred, and how section headings are set. Only the font used to travel,
+ * so somebody who chose a template on screen and downloaded .docx received the
+ * same document in a different typeface — the choice discarded at the one
+ * moment it mattered, since the Word file is what actually gets sent.
+ *
+ * Every font named is metrically ordinary and present on every machine. A font
+ * that has to be substituted changes the pagination without warning, which is
+ * how a one-page résumé becomes two on somebody else's computer.
  */
 
-/** docx sizes are half-points, so 22 is 11pt. */
-const BODY_SIZE = 22;
-
 export function buildResumeDocx(content: ResumeContent): Document {
-  /*
-   * The Word file matches the template chosen on screen, so downloading does
-   * not quietly hand back a document that looks like a different decision.
-   * Both fonts are metrically ordinary and present on every machine — a font
-   * that has to be substituted changes the pagination without warning.
-   */
-  const BODY_FONT = resumeTemplate(content.template).docxFont;
+  const style = resumeTemplate(content.template).docx;
   const children: Paragraph[] = [];
 
   if (content.headline.trim()) {
     children.push(new Paragraph({
-      alignment: AlignmentType.CENTER,
+      alignment: style.nameAlign === "center" ? AlignmentType.CENTER : AlignmentType.LEFT,
       spacing: { after: 160 },
-      children: [new TextRun({ text: content.headline.trim(), bold: true, size: 32, font: BODY_FONT })],
+      children: [new TextRun({ text: content.headline.trim(), bold: true, size: style.nameSize, font: style.font })],
     }));
   }
 
   if (content.summary.trim()) {
-    children.push(sectionHeading("Professional Summary", BODY_FONT));
+    children.push(sectionHeading("Professional Summary", style));
     children.push(new Paragraph({
       spacing: { after: 160 },
-      children: [new TextRun({ text: content.summary.trim(), size: BODY_SIZE, font: BODY_FONT })],
+      children: [new TextRun({ text: content.summary.trim(), size: style.bodySize, font: style.font })],
     }));
   }
 
@@ -61,12 +56,12 @@ export function buildResumeDocx(content: ResumeContent): Document {
     /* A heading with nothing under it reads as a section the person left empty. */
     if (!bullets.length) continue;
 
-    if (section.heading.trim()) children.push(sectionHeading(section.heading.trim(), BODY_FONT));
+    if (section.heading.trim()) children.push(sectionHeading(section.heading.trim(), style));
     for (const bullet of bullets) {
       children.push(new Paragraph({
         bullet: { level: 0 },
         spacing: { after: 60 },
-        children: [new TextRun({ text: bullet.text.trim(), size: BODY_SIZE, font: BODY_FONT })],
+        children: [new TextRun({ text: bullet.text.trim(), size: style.bodySize, font: style.font })],
       }));
     }
   }
@@ -77,7 +72,7 @@ export function buildResumeDocx(content: ResumeContent): Document {
     title: content.headline.trim() || "Résumé",
     styles: {
       default: {
-        document: { run: { font: BODY_FONT, size: BODY_SIZE } },
+        document: { run: { font: style.font, size: style.bodySize } },
       },
     },
     sections: [{
@@ -98,12 +93,24 @@ export function buildResumeDocx(content: ResumeContent): Document {
  * The distinction is invisible on screen and decisive to a parser: a style is
  * machine-readable structure, a bold run is a formatting accident that happens
  * to look like structure.
+ *
+ * The rule under it is a paragraph border, not a table and not a drawn line —
+ * so the heading remains one paragraph carrying one style, and the parser sees
+ * exactly what it saw before.
  */
-function sectionHeading(text: string, font: string): Paragraph {
+function sectionHeading(text: string, style: ResumeDocxStyle): Paragraph {
   return new Paragraph({
     heading: HeadingLevel.HEADING_1,
     spacing: { before: 240, after: 100 },
-    children: [new TextRun({ text: text.toUpperCase(), bold: true, size: 24, font })],
+    border: style.headingRule
+      ? { bottom: { style: BorderStyle.SINGLE, size: 4, space: 2, color: "000000" } }
+      : undefined,
+    children: [new TextRun({
+      text: style.headingUpper ? text.toUpperCase() : text,
+      bold: true,
+      size: style.headingSize,
+      font: style.font,
+    })],
   });
 }
 

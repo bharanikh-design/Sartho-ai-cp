@@ -85,3 +85,42 @@ describe("digestHealth", () => {
     expect(health.message).toContain("less than an hour");
   });
 });
+
+/*
+ * Match alerts run on their own daily schedule and go silent in exactly the
+ * same way, so they get the same reasoning. Only the noun changes: telling
+ * somebody "no summary has been sent" about an alert sends them to the wrong
+ * switch.
+ */
+describe("the email it is talking about", () => {
+  const now = new Date("2026-09-07T12:00:00Z");
+  const hoursBefore = (hours: number) => new Date(now.getTime() - hours * 60 * 60 * 1000).toISOString();
+
+  it("says summary when nothing else is asked for", () => {
+    expect(digestHealth({ enabled: true, lastSentAt: null, now }).message).toContain("No summary has been sent yet");
+    expect(digestHealth({ enabled: false, lastSentAt: null, now }).message).toContain("The daily summary is off");
+  });
+
+  it("names the alert instead when it is asked to", () => {
+    const noun = "match alert";
+    expect(digestHealth({ enabled: true, lastSentAt: null, noun, now }).message).toContain("No match alert has been sent yet");
+    expect(digestHealth({ enabled: false, lastSentAt: null, noun, now }).message).toContain("The daily match alert is off");
+    expect(digestHealth({ enabled: true, lastSentAt: hoursBefore(3), noun, now }).message).toContain("The last match alert was sent");
+    expect(digestHealth({ enabled: true, lastSentAt: hoursBefore(30), noun, now }).message).toContain("The last match alert was sent");
+  });
+
+  /* The one message that accuses the deployment has to name it correctly too. */
+  it("keeps the noun in the sentence that reports a fault", () => {
+    const overdue = digestHealth({ enabled: true, lastSentAt: hoursBefore(90), noun: "match alert", now });
+    expect(overdue.state).toBe("overdue");
+    expect(overdue.message).toContain("The last match alert was sent");
+
+    const never = digestHealth({ enabled: true, lastSentAt: null, enabledSince: hoursBefore(90), noun: "match alert", now });
+    expect(never.state).toBe("overdue");
+    expect(never.message).toContain("No match alert has ever been sent");
+  });
+
+  it("falls back to summary for a blank noun rather than printing a gap", () => {
+    expect(digestHealth({ enabled: true, lastSentAt: null, noun: "   ", now }).message).toContain("No summary has been sent yet");
+  });
+});

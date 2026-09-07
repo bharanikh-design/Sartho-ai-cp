@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { DEFAULT_TEMPLATE } from "@/lib/resume/templates";
+import { DEFAULT_TEMPLATE, RESUME_TEMPLATE_IDS } from "@/lib/resume/templates";
 
 /*
  * The document, as it arrives from a browser.
@@ -27,6 +27,14 @@ export const resumeContentSchema = z.object({
       edited: z.boolean().default(false),
     })).max(60).default([]),
   })).max(20).default([]),
-  /* Unrecognised or absent falls back to Classic rather than being rejected. */
-  template: z.enum(["classic", "modern"]).catch(DEFAULT_TEMPLATE).default(DEFAULT_TEMPLATE),
+  /*
+   * Unrecognised or absent falls back to Classic rather than being rejected.
+   *
+   * Read from the template list rather than spelled out again. Written out, it
+   * was a second list that had to be remembered: adding a template without
+   * touching this line would have let somebody pick it on screen, watch it save
+   * successfully, and find Classic waiting for them on reload — with no error
+   * anywhere, because `.catch()` is doing exactly what it was asked to.
+   */
+  template: z.enum(RESUME_TEMPLATE_IDS).catch(DEFAULT_TEMPLATE).default(DEFAULT_TEMPLATE),
 });

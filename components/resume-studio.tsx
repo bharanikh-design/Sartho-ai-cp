@@ -7,7 +7,7 @@ import { atsVerdict, scoreAts } from "@/lib/resume/ats";
 import { unfilledBlanks } from "@/lib/resume/bullet-rewrite";
 import { renderResumeText, resumeContentOf, type ResumeContent } from "@/lib/resume/content";
 import { ResumeDocument, type BulletCoach } from "@/components/resume-document";
-import { RESUME_TEMPLATES } from "@/lib/resume/templates";
+import { RESUME_TEMPLATES, resumeTemplate } from "@/lib/resume/templates";
 import { ResumeWorkbench } from "@/components/resume-workbench";
 import type { ApplicationRecord, ResumeChange, ResumeVersionRecord, RuleAnalysis } from "@/lib/types";
 
@@ -431,13 +431,22 @@ export function ResumeStudio({
                   role="radio"
                   aria-checked={content.template === template.id}
                   className={content.template === template.id ? "is-selected" : ""}
-                  title={template.description}
+                  title={`${template.description} ${template.bestFor}`}
                   onClick={() => setContent({ ...content, template: template.id })}
                 >
                   {template.name}
                 </button>
               ))}
-              <small>Both parse the same. The difference is what a person sees.</small>
+              {/*
+                * The chosen one described in full, under the row. A tooltip is
+                * the wrong place for the only sentence that says who a
+                * template is for: it needs a hover to find, and on a phone
+                * there is no hover at all.
+                */}
+              <small>
+                <strong>{resumeTemplate(content.template).description}</strong>{" "}
+                {resumeTemplate(content.template).bestFor} All six are one column and parse the same.
+              </small>
             </div>
           ) : null}
 
