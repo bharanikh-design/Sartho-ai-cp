@@ -10,6 +10,7 @@ import type { Session } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase";
 import { ActivityHeartbeat } from "@/components/activity-heartbeat";
 import { OnboardingCarousel } from "@/components/onboarding-carousel";
+import { StepCelebration } from "@/components/step-celebration";
 import { isPublicPath } from "@/lib/public-paths";
 import {
   getPageLabel,
@@ -27,6 +28,8 @@ type JourneyStatus = {
   currentHref: string;
   currentLabel: string;
   hasResume: boolean;
+  /* Per step, so a finished one can be congratulated the moment it lands. */
+  steps?: Array<{ id: string; label: string; complete: boolean }>;
 };
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -352,6 +355,12 @@ export function AppShell({ children }: { children: ReactNode }) {
       </nav>
 
       <OnboardingCarousel user={session.user} />
+      {/*
+        * Beside the page, never over it: the shell already refetches the
+        * journey whenever something changes, so a step finishing anywhere in
+        * the product reaches this without the page having to know about it.
+        */}
+      <StepCelebration steps={journeyStatus?.steps ?? null} />
 
       {accountPanelOpen ? (
         <div className="profile-protection-layer" role="dialog" aria-modal="true" aria-labelledby="account-panel-title">

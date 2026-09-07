@@ -350,3 +350,207 @@
   .onboarding-visual,
   .onboarding-copy { animation: none; }
 }
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * Finishing a step.
+ *
+ * Beside the page, never over it. Somebody who has just uploaded a résumé is
+ * mid-flow, and a modal would make them dismiss a congratulation before they
+ * could continue — which turns a reward into a toll. It slides in from the
+ * corner, holds, and leaves on its own.
+ * ───────────────────────────────────────────────────────────────────────── */
+.celebration {
+  position: fixed;
+  right: 22px;
+  bottom: 22px;
+  z-index: 60;
+  width: min(390px, calc(100vw - 32px));
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 20px 20px 18px;
+  border: 1px solid rgba(114, 230, 189, .28);
+  border-radius: 22px;
+  overflow: hidden;
+  isolation: isolate;
+  color: var(--text);
+  background:
+    linear-gradient(160deg, rgba(114, 230, 189, .13), rgba(120, 157, 255, .07) 46%, rgba(16, 20, 29, .93)),
+    rgba(12, 16, 23, .96);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, .5), inset 0 1px 0 rgba(255, 255, 255, .07);
+  backdrop-filter: blur(22px) saturate(150%);
+  -webkit-backdrop-filter: blur(22px) saturate(150%);
+  animation: celebrationIn .62s cubic-bezier(.16, .9, .24, 1) both;
+}
+.celebration.is-leaving { animation: celebrationOut .3s ease both; }
+
+/*
+ * The light that stays. The sweep below is a moment and then it is gone, which
+ * left the resting card flat — and the resting state is the one somebody
+ * actually reads. This is the corner glow it settles into.
+ */
+.celebration::before {
+  content: "";
+  position: absolute;
+  inset: -30% 40% 30% -30%;
+  z-index: -2;
+  pointer-events: none;
+  background: radial-gradient(closest-side, rgba(114, 230, 189, .3), transparent 72%);
+}
+/* A lit top edge, so the card reads as raised rather than painted on. */
+.celebration::after {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 1px;
+  z-index: -1;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgba(160, 245, 215, .55) 22%, rgba(255, 255, 255, .28) 55%, transparent);
+}
+
+/* A slow sweep of light across the card, once, as it settles. */
+.celebration-glow {
+  position: absolute;
+  inset: -40% -10%;
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(42% 44% at 22% 18%, rgba(114, 230, 189, .5), transparent 70%);
+  opacity: 0;
+  animation: celebrationGlow 2.4s ease-out .12s both;
+}
+
+.celebration-sparks { position: absolute; inset: 0; z-index: -1; pointer-events: none; }
+/*
+ * Anchored to the tick, which is where the eye already is.
+ *
+ * They started in the middle of the card at five pixels across and were, in
+ * practice, invisible: clipped by the card's own overflow and too dim to read
+ * as anything. A decoration nobody can see is not restraint, it is dead weight
+ * — so they burst from the check mark, at a size that registers, and travel
+ * only as far as the card can show.
+ */
+.celebration-sparks i {
+  position: absolute;
+  top: 31px;
+  left: 33px;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: #bdf7de;
+  box-shadow: 0 0 10px rgba(140, 240, 200, .95);
+  opacity: 0;
+  animation: celebrationSpark 1.1s cubic-bezier(.15, .75, .3, 1) both;
+  animation-delay: calc(.26s + var(--i) * .035s);
+  transform-origin: center;
+  --angle: calc(var(--i) * 51deg - 20deg);
+}
+
+.celebration-body { flex: 1; min-width: 0; }
+
+.celebration-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 9px;
+  padding: 4px 11px 4px 5px;
+  border: 1px solid rgba(114, 230, 189, .3);
+  border-radius: 999px;
+  background: rgba(114, 230, 189, .12);
+  color: #9fe9c8;
+  font-size: var(--text-2xs);
+  font-weight: 650;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+.celebration-tick {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: linear-gradient(150deg, #72e6bd, #46b98f);
+  color: #06231a;
+  font-size: 11px;
+  font-weight: 800;
+  animation: celebrationTick .5s cubic-bezier(.2, 1.5, .4, 1) .18s both;
+}
+
+.celebration-headline {
+  display: block;
+  margin-bottom: 7px;
+  font-size: var(--text-md);
+  font-weight: 700;
+  letter-spacing: -.02em;
+  line-height: 1.25;
+}
+.celebration-detail {
+  margin: 0 0 14px;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  line-height: 1.55;
+}
+
+.celebration-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.celebration-actions .primary-button { min-height: 38px; padding: 0 15px; font-size: var(--text-sm); }
+.celebration-later {
+  border: 0;
+  background: none;
+  color: var(--text-tertiary);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+.celebration-later:hover { color: var(--text-secondary); }
+
+.celebration-close {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, .05);
+  color: var(--text-tertiary);
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
+}
+.celebration-close:hover { background: rgba(255, 255, 255, .1); color: var(--text); }
+
+@keyframes celebrationIn {
+  from { opacity: 0; transform: translate3d(0, 26px, 0) scale(.96); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes celebrationOut {
+  to { opacity: 0; transform: translate3d(0, 12px, 0) scale(.98); }
+}
+@keyframes celebrationGlow {
+  0% { opacity: 0; transform: translate3d(-14%, 8%, 0); }
+  38% { opacity: .95; }
+  100% { opacity: 0; transform: translate3d(14%, -6%, 0); }
+}
+@keyframes celebrationTick {
+  from { transform: scale(.3); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+@keyframes celebrationSpark {
+  0% { opacity: 0; transform: rotate(var(--angle)) translateX(0) scale(.4); }
+  18% { opacity: 1; transform: rotate(var(--angle)) translateX(18px) scale(1); }
+  100% { opacity: 0; transform: rotate(var(--angle)) translateX(74px) scale(.2); }
+}
+
+@media (max-width: 560px) {
+  .celebration { right: 12px; left: 12px; bottom: 84px; width: auto; }
+}
+
+/*
+ * Motion is decoration here, and somebody who has asked their system to reduce
+ * it has asked for a reason. The card still appears and still says everything;
+ * it simply stops moving.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .celebration,
+  .celebration.is-leaving,
+  .celebration-glow,
+  .celebration-tick { animation: none; opacity: 1; transform: none; }
+  .celebration-sparks { display: none; }
+}

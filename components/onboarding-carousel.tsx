@@ -5,7 +5,14 @@ import { usePathname, useRouter } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase";
 
-type PreviewKind = "discover" | "align" | "resume" | "prepare" | "land";
+/*
+ * Three, matching the three steps somebody actually completes. The tour was
+ * five — it also covered interview preparation and outcome tracking, which are
+ * true but are things you meet weeks later, and a person who has uploaded
+ * nothing yet is being sold a chapter they cannot open. A first run should
+ * describe the first run.
+ */
+type PreviewKind = "resume" | "discover" | "align";
 
 type Slide = {
   stage: string;
@@ -19,39 +26,25 @@ const SESSION_DISMISS_KEY = "sartho-onboarding-dismissed-this-session";
 
 const slides: Slide[] = [
   {
-    stage: "Discover",
-    title: "Find opportunities worthy of your experience.",
-    description: "Move beyond vacancy lists. Focus on roles that match your leadership, transformation experience and career direction.",
-    outcome: "The right opportunities, not more noise.",
-    preview: "discover",
-  },
-  {
-    stage: "Align",
-    title: "See what the role is really asking for.",
-    description: "Understand mandatory requirements, recruiter priorities, your strongest alignment and the gaps that need an honest decision.",
-    outcome: "A clear, evidence-backed fit decision.",
-    preview: "align",
-  },
-  {
-    stage: "Stand out",
-    title: "Tell the career story the role deserves.",
-    description: "Shape a focused résumé that brings forward the most relevant achievements without inventing skills, metrics or responsibilities.",
-    outcome: "A stronger résumé that remains completely true.",
+    stage: "Your evidence",
+    title: "It starts with what you have actually done.",
+    description: "Upload your résumé once. Sartho reads it into approved career evidence — the roles you held, the work you did, the results you can stand behind.",
+    outcome: "Nothing invented. Ever.",
     preview: "resume",
   },
   {
-    stage: "Prepare",
-    title: "Walk into the conversation ready.",
-    description: "Turn the role and your real experience into likely questions, stronger answers and the stories worth carrying into the interview.",
-    outcome: "Confidence built from your own evidence.",
-    preview: "prepare",
+    stage: "The right roles",
+    title: "See the roles that fit, not the whole job board.",
+    description: "Sartho searches live listings in your markets and scores each one against your evidence — and leaves out the roles asking for years you do not yet have.",
+    outcome: "A shortlist, not a feed.",
+    preview: "discover",
   },
   {
-    stage: "Land",
-    title: "Keep every opportunity moving.",
-    description: "Connect recruiter conversations, résumé versions, interviews, follow-ups and outcomes in one purposeful journey.",
-    outcome: "Nothing falls through the cracks.",
-    preview: "land",
+    stage: "Apply with proof",
+    title: "Walk in with the evidence behind you.",
+    description: "See exactly which requirements your experience meets and which it does not, then tailor a résumé that stays completely true to your record.",
+    outcome: "An honest case, made well.",
+    preview: "align",
   },
 ];
 
@@ -234,51 +227,24 @@ function FeaturePreview({ kind }: { kind: PreviewKind }) {
     );
   }
 
-  if (kind === "resume") {
-    return (
-      <div className="onboarding-product-preview" aria-hidden="true">
-        <div className="preview-window-bar"><i /><i /><i /></div>
-        <div className="preview-resume-card">
-          <strong>Résumé Delta</strong>
-          <small>Every change linked to approved evidence</small>
-          <div className="preview-change">
-            <del>Managed transformation activities</del>
-            <ins>Led a multi-tower transition and transformation programme through operational readiness and BAU handover.</ins>
-          </div>
-          <div className="preview-resume-line" />
-          <div className="preview-resume-line medium" />
-          <div className="preview-resume-line short" />
-        </div>
-      </div>
-    );
-  }
-
-  if (kind === "prepare") {
-    return (
-      <div className="onboarding-product-preview" aria-hidden="true">
-        <div className="preview-window-bar"><i /><i /><i /></div>
-        <div className="preview-question-card">
-          <strong>Likely leadership question</strong>
-          <p>Tell us how you brought a complex service transition into stable operations.</p>
-          <div className="preview-evidence-chips">
-            <span>Operational readiness</span>
-            <span>RAID governance</span>
-            <span>BAU handover</span>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
+  /*
+   * The last of the three, so it needs no guard — TypeScript proves the union
+   * is exhausted, which is the point of narrowing PreviewKind to what the tour
+   * actually shows.
+   */
   return (
     <div className="onboarding-product-preview" aria-hidden="true">
       <div className="preview-window-bar"><i /><i /><i /></div>
-      <div className="preview-pipeline">
-        <div className="is-active"><strong>Saved</strong><small>3 roles</small></div>
-        <div className="is-active"><strong>Analysed</strong><small>2 roles</small></div>
-        <div className="is-active"><strong>Prepared</strong><small>1 role</small></div>
-        <div><strong>Interview</strong><small>Next</small></div>
-        <div><strong>Offer</strong><small>Goal</small></div>
+      <div className="preview-resume-card">
+        <strong>Your approved evidence</strong>
+        <small>Read straight from your résumé, nothing added</small>
+        <div className="preview-change">
+          <del>Managed transformation activities</del>
+          <ins>Led a multi-tower transition and transformation programme through operational readiness and BAU handover.</ins>
+        </div>
+        <div className="preview-resume-line" />
+        <div className="preview-resume-line medium" />
+        <div className="preview-resume-line short" />
       </div>
     </div>
   );

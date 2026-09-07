@@ -19,6 +19,13 @@ export async function GET() {
         // Uploading is the prerequisite for everything else, so the shell needs
         // to know whether it has happened before it renders the menu.
         hasResume: journey.steps.find((step) => step.id === "resume")?.complete ?? false,
+        /*
+         * Per-step completion, so the shell can congratulate somebody the
+         * moment a step is finished. The aggregate progress percentage cannot
+         * do that — it says how far along you are, never which thing you just
+         * finished, and "which thing" is the whole content of the message.
+         */
+        steps: journey.steps.map((step) => ({ id: step.id, label: step.label, complete: step.complete })),
       },
       { headers: { "Cache-Control": "private, no-store" } },
     );
