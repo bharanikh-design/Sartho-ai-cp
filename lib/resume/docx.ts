@@ -1,5 +1,5 @@
-import { AlignmentType, BorderStyle, Document, HeadingLevel, Packer, Paragraph, TextRun } from "docx";
-import type { ResumeContent } from "@/lib/resume/content";
+import { AlignmentType, BorderStyle, Document, HeadingLevel, Packer, Paragraph, TabStopType, TextRun } from "docx";
+import { EDUCATION_HEADING, EXPERIENCE_HEADING, SKILLS_HEADING, contactLine, headlineOf, roleDates, roleWhere, type ResumeContent } from "@/lib/resume/content";
 import { resumeTemplate, type ResumeDocxStyle } from "@/lib/resume/templates";
 
 /*
@@ -35,11 +35,36 @@ export function buildResumeDocx(content: ResumeContent): Document {
   const style = resumeTemplate(content.template).docx;
   const children: Paragraph[] = [];
 
-  if (content.headline.trim()) {
+  const align = style.nameAlign === "center" ? AlignmentType.CENTER : AlignmentType.LEFT;
+
+  if (content.name.trim()) {
     children.push(new Paragraph({
-      alignment: style.nameAlign === "center" ? AlignmentType.CENTER : AlignmentType.LEFT,
+      alignment: align,
+      spacing: { after: content.targetRole.trim() ? 40 : 120 },
+      children: [new TextRun({ text: content.name.trim(), bold: true, size: style.nameSize, font: style.font })],
+    }));
+  }
+
+  if (content.targetRole.trim()) {
+    children.push(new Paragraph({
+      alignment: align,
+      spacing: { after: 80 },
+      children: [new TextRun({ text: content.targetRole.trim(), size: style.headingSize, font: style.font })],
+    }));
+  }
+
+  /*
+   * The contact line is a paragraph, not a header. Contact details placed in a
+   * Word header are frequently dropped outright by a parser — which is how
+   * somebody's phone number goes missing from the one document whose purpose
+   * is to make them reachable.
+   */
+  const contact = contactLine(content.contact);
+  if (contact) {
+    children.push(new Paragraph({
+      alignment: align,
       spacing: { after: 160 },
-      children: [new TextRun({ text: content.headline.trim(), bold: true, size: style.nameSize, font: style.font })],
+      children: [new TextRun({ text: contact, size: style.bodySize, font: style.font })],
     }));
   }
 
@@ -49,6 +74,43 @@ export function buildResumeDocx(content: ResumeContent): Document {
       spacing: { after: 160 },
       children: [new TextRun({ text: content.summary.trim(), size: style.bodySize, font: style.font })],
     }));
+  }
+
+  if (content.roles.length) {
+    children.push(sectionHeading(EXPERIENCE_HEADING, style));
+    for (const role of content.roles) {
+      const where = roleWhere(role);
+      const dates = roleDates(role);
+      /*
+       * Title on the left, dates pushed to the right margin by a single right
+       * tab stop. This is what a Word résumé looks like, and a tab stop is the
+       * one way to get it that is not a table: a table is read column by column
+       * and is the most common reason a parser attributes somebody's dates to
+       * the wrong job.
+       */
+      if (role.title.trim() || where || dates) {
+        children.push(new Paragraph({
+          spacing: { before: 160, after: 20 },
+          tabStops: dates ? [{ type: TabStopType.RIGHT, position: 9020 }] : undefined,
+          children: [
+            new TextRun({ text: role.title.trim(), bold: true, size: style.bodySize, font: style.font }),
+            ...(where
+              ? [new TextRun({ text: `${role.title.trim() ? ", " : ""}${where}`, size: style.bodySize, font: style.font })]
+              : []),
+            ...(dates
+              ? [new TextRun({ text: `\t${dates}`, italics: true, size: style.bodySize, font: style.font })]
+              : []),
+          ],
+        }));
+      }
+      for (const bullet of role.bullets.filter((item) => item.text.trim())) {
+        children.push(new Paragraph({
+          bullet: { level: 0 },
+          spacing: { after: 60 },
+          children: [new TextRun({ text: bullet.text.trim(), size: style.bodySize, font: style.font })],
+        }));
+      }
+    }
   }
 
   for (const section of content.sections) {
@@ -66,10 +128,36 @@ export function buildResumeDocx(content: ResumeContent): Document {
     }
   }
 
+  if (content.skills.length) {
+    children.push(sectionHeading(SKILLS_HEADING, style));
+    children.push(new Paragraph({
+      spacing: { after: 160 },
+      children: [new TextRun({ text: content.skills.join(" · "), size: style.bodySize, font: style.font })],
+    }));
+  }
+
+  if (content.education.length) {
+    children.push(sectionHeading(EDUCATION_HEADING, style));
+    for (const entry of content.education) {
+      const left = [entry.qualification.trim(), entry.institution.trim()].filter(Boolean).join(", ");
+      if (!left && !entry.year.trim()) continue;
+      children.push(new Paragraph({
+        spacing: { after: 60 },
+        tabStops: entry.year.trim() ? [{ type: TabStopType.RIGHT, position: 9020 }] : undefined,
+        children: [
+          new TextRun({ text: left, size: style.bodySize, font: style.font }),
+          ...(entry.year.trim()
+            ? [new TextRun({ text: `\t${entry.year.trim()}`, italics: true, size: style.bodySize, font: style.font })]
+            : []),
+        ],
+      }));
+    }
+  }
+
   return new Document({
     creator: "Sartho",
     description: "Résumé generated by Sartho from approved career evidence.",
-    title: content.headline.trim() || "Résumé",
+    title: headlineOf(content) || "Résumé",
     styles: {
       default: {
         document: { run: { font: style.font, size: style.bodySize } },

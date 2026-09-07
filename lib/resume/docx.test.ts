@@ -1,10 +1,16 @@
 import { describe, expect, it } from "vitest";
+import { emptyContent } from "@/lib/resume/content";
 import { resumeDocxBuffer, resumeFileName } from "@/lib/resume/docx";
 import type { ResumeContent } from "@/lib/resume/content";
 
 const document: ResumeContent = {
   template: "classic",
-  headline: "Bharani Kumar K — Business Analyst",
+  name: "Bharani Kumar K",
+  targetRole: "Business Analyst",
+  contact: { email: "bharani@example.com", phone: "+61 400 000 000", location: "Melbourne", linkedin: "", website: "" },
+  roles: [],
+  skills: [],
+  education: [],
   summary: "Consulting and analytical professional with delivery experience.",
   sections: [
     {
@@ -50,14 +56,15 @@ describe("buildResumeDocx", () => {
   });
 
   it("survives a document with nothing in it rather than throwing", async () => {
-    const buffer = await resumeDocxBuffer({ template: "classic", headline: "", summary: "", sections: [] });
+    const buffer = await resumeDocxBuffer(emptyContent());
     expect(buffer.subarray(0, 2).toString()).toBe("PK");
   });
 
   it("does not fall over on a section whose bullets were all removed", async () => {
     const buffer = await resumeDocxBuffer({
+      ...emptyContent(),
       template: "modern",
-      headline: "A",
+      name: "A",
       summary: "B",
       sections: [{ id: "s0", heading: "Gone", bullets: [] }],
     });
