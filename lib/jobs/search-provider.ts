@@ -27,7 +27,12 @@ export type JobSearchResult = {
   url: string;
   salary: string | null;
   postedAt: string | null;
+  /** The provider Sartho queried — provenance, not the board carrying the ad. */
   source: string;
+  /** The boards this advert appears on: LinkedIn, Indeed, the employer's site. */
+  platforms: string[];
+  /** Whether one of those is the employer's own site. */
+  applyDirect: boolean;
 };
 
 export type JobSearchQuery = {
@@ -153,6 +158,13 @@ export function mapAdzunaResult(raw: AdzunaResult): JobSearchResult | null {
     salary: formatSalary(raw.salary_min, raw.salary_max),
     postedAt: raw.created?.trim() || null,
     source: "Adzuna",
+    /*
+     * Adzuna's search response names no other board, so claiming one would be
+     * inventing it. An empty list means "not known", and the card says nothing
+     * rather than something false.
+     */
+    platforms: [],
+    applyDirect: false,
   };
 }
 
@@ -246,7 +258,46 @@ type JSearchResult = {
   job_posted_at_datetime_utc?: string;
   job_min_salary?: number;
   job_max_salary?: number;
+  /*
+   * Where else this advert is listed. Google for Jobs is an index, not a
+   * board — it finds the same posting on LinkedIn, on Indeed and on the
+   * employer's own site, and names each one. Both of these were being
+   * discarded, which is why Sartho could never say "this is also on LinkedIn".
+   */
+  job_publisher?: string;
+  apply_options?: Array<{ publisher?: string; apply_link?: string; is_direct?: boolean }>;
 };
+
+/*
+ * The boards carrying an advert, and whether one of them is the employer.
+ *
+ * Worth surfacing for a reason beyond completeness: applying on the company's
+ * own site usually beats applying through an aggregator, because the
+ * aggregator's form is a second copy of your details that a recruiter may
+ * never open. A graduate deciding where to spend the next twenty minutes
+ * should be told which link is the direct one.
+ */
+export function readPlatforms(raw: JSearchResult): { platforms: string[]; applyDirect: boolean } {
+  const named = [
+    raw.job_publisher,
+    ...(raw.apply_options ?? []).map((option) => option.publisher),
+  ];
+
+  const platforms: string[] = [];
+  for (const name of named) {
+    const clean = typeof name === "string" ? name.trim() : "";
+    if (!clean || clean.length > 40) continue;
+    /* Case-insensitively unique: "LinkedIn" and "Linkedin" are one board. */
+    if (platforms.some((existing) => existing.toLowerCase() === clean.toLowerCase())) continue;
+    platforms.push(clean);
+    if (platforms.length === 5) break;
+  }
+
+  return {
+    platforms,
+    applyDirect: (raw.apply_options ?? []).some((option) => option.is_direct === true),
+  };
+}
 
 /** Pure mapping from one JSearch (Google for Jobs) record to Sartho's shape. */
 export function mapJSearchResult(raw: JSearchResult): JobSearchResult | null {
@@ -258,6 +309,7 @@ export function mapJSearchResult(raw: JSearchResult): JobSearchResult | null {
     .map((part) => part?.trim())
     .filter((part): part is string => Boolean(part))
     .join(", ") || null;
+  const { platforms, applyDirect } = readPlatforms(raw);
   return {
     title,
     employer: raw.employer_name?.trim() || null,
@@ -266,7 +318,14 @@ export function mapJSearchResult(raw: JSearchResult): JobSearchResult | null {
     url,
     salary: formatSalary(raw.job_min_salary, raw.job_max_salary),
     postedAt: raw.job_posted_at_datetime_utc?.trim() || null,
+    /*
+     * Where Sartho looked, not where the advert lives. Google for Jobs is the
+     * index; the boards carrying it are in `platforms`, which is a different
+     * claim and should not be collapsed into this one.
+     */
     source: "Google for Jobs",
+    platforms,
+    applyDirect,
   };
 }
 

@@ -32,6 +32,9 @@ type SearchResult = {
   /** What the advert asks for in years, when it says so, and the phrase it said it in. */
   requiredYears?: number | null;
   requiredEvidence?: string | null;
+  /** The boards carrying this advert, and whether the employer's site is one. */
+  platforms?: string[];
+  applyDirect?: boolean;
 };
 
 /* What the server actually searched — echoed back so nobody has to guess. */
@@ -153,6 +156,23 @@ export function JobSearchPanel({
             {result.salary ? <span style={{ fontSize: "0.8125rem", color: "var(--text-tertiary)" }}>{result.salary}</span> : null}
             <span style={{ fontSize: "0.75rem", color: "var(--text-tertiary)" }}>{result.source}</span>
           </div>
+          {/*
+            * Where else this advert is listed.
+            *
+            * Two things worth knowing before spending twenty minutes on an
+            * application: that the same posting is on LinkedIn and Indeed, so
+            * you are not looking at something obscure — and whether one of the
+            * links is the employer's own site, because an aggregator's form is
+            * a second copy of your details that a recruiter may never open.
+            */}
+          {result.platforms?.length ? (
+            <div className="match-platforms">
+              {result.applyDirect ? <span className="match-platform is-direct">Apply direct</span> : null}
+              {result.platforms.map((platform) => (
+                <span key={platform} className="match-platform">{platform}</span>
+              ))}
+            </div>
+          ) : null}
           {/* The score, in its parts — a bare percentage explains nothing. */}
           {typeof result.titleFit === "number" ? (
             <p className="match-reason">

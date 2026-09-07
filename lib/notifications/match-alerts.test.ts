@@ -23,6 +23,8 @@ function match(overrides: Partial<ScoredJobMatch>): ScoredJobMatch {
     missingRequirements: [],
     requiredYears: null,
     requiredEvidence: null,
+    platforms: [],
+    applyDirect: false,
     ...overrides,
   };
 }
