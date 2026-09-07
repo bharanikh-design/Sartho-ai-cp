@@ -432,3 +432,17 @@
  */
 .match-requirement { margin: 6px 0 0; color: #ffcf94; font-size: var(--text-2xs); line-height: 1.5; }
 .match-requirement strong { color: #ffd37a; }
+
+/*
+ * The boards carrying an advert. Quiet by default — this is orientation, not
+ * a finding — except the direct-apply badge, which is a genuine advantage and
+ * the one a person should act on.
+ */
+.match-platforms { display: flex; flex-wrap: wrap; gap: 5px; margin: 6px 0 0; }
+.match-platform {
+  padding: 2px 8px; border: 1px solid rgba(255,255,255,.09); border-radius: 5px;
+  color: var(--text-tertiary); font-size: var(--text-2xs); line-height: 1.6; white-space: nowrap;
+}
+.match-platform.is-direct {
+  border-color: rgba(114,230,189,.32); background: rgba(114,230,189,.1); color: #9fe4bd; font-weight: 650;
+}

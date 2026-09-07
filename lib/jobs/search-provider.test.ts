@@ -46,6 +46,9 @@ describe("mapAdzunaResult", () => {
       salary: "120,000–150,000",
       postedAt: "2026-09-01T00:00:00Z",
       source: "Adzuna",
+      /* Adzuna's search response names no other board, so none is claimed. */
+      platforms: [],
+      applyDirect: false,
     });
   });
 
@@ -90,6 +93,8 @@ describe("mapJSearchResult", () => {
       description: "Deliver analysis for consulting engagements.",
       url: "https://deloitte.com/careers/123",
       salary: "90,000–110,000",
+      platforms: [],
+      applyDirect: false,
       postedAt: "2026-09-01T00:00:00Z",
       source: "Google for Jobs",
     });
@@ -98,6 +103,94 @@ describe("mapJSearchResult", () => {
   it("drops a record missing a title, link or description", () => {
     expect(mapJSearchResult({ employer_name: "X", job_description: "d", job_apply_link: "https://x" })).toBeNull();
     expect(mapJSearchResult({ job_title: "T", job_apply_link: "https://x" })).toBeNull();
+  });
+});
+
+/*
+ * Google for Jobs is an index, not a board: it finds the same advert on
+ * LinkedIn, on Indeed and on the employer's own site, and names each one. Both
+ * fields carrying that were being discarded, which is why Sartho could never
+ * say "this is also on LinkedIn".
+ */
+describe("readPlatforms", () => {
+  const advert = {
+    job_title: "Graduate Analyst",
+    job_description: "Join our 2027 graduate programme.",
+    job_apply_link: "https://careers.example.com/1",
+  };
+
+  it("names every board carrying the advert", () => {
+    const result = mapJSearchResult({
+      ...advert,
+      job_publisher: "LinkedIn",
+      apply_options: [
+        { publisher: "LinkedIn", apply_link: "https://linkedin.com/jobs/1" },
+        { publisher: "Indeed", apply_link: "https://indeed.com/1" },
+        { publisher: "Example Corp", apply_link: "https://careers.example.com/1", is_direct: true },
+      ],
+    });
+    expect(result?.platforms).toEqual(["LinkedIn", "Indeed", "Example Corp"]);
+  });
+
+  /*
+   * Applying on the employer's own site usually beats an aggregator, whose
+   * form is a second copy of your details a recruiter may never open. Worth
+   * telling somebody deciding where to spend twenty minutes.
+   */
+  it("says when one of them is the employer itself", () => {
+    expect(mapJSearchResult({
+      ...advert,
+      apply_options: [{ publisher: "Example Corp", is_direct: true }],
+    })?.applyDirect).toBe(true);
+
+    expect(mapJSearchResult({
+      ...advert,
+      apply_options: [{ publisher: "Indeed", is_direct: false }],
+    })?.applyDirect).toBe(false);
+  });
+
+  it("treats one board named twice as one board", () => {
+    const result = mapJSearchResult({
+      ...advert,
+      job_publisher: "LinkedIn",
+      apply_options: [{ publisher: "linkedin" }, { publisher: "LinkedIn" }, { publisher: "Indeed" }],
+    });
+    expect(result?.platforms).toEqual(["LinkedIn", "Indeed"]);
+  });
+
+  it("caps the list rather than printing a paragraph of boards", () => {
+    const result = mapJSearchResult({
+      ...advert,
+      apply_options: Array.from({ length: 12 }, (_, index) => ({ publisher: `Board ${index}` })),
+    });
+    expect(result?.platforms).toHaveLength(5);
+  });
+
+  it("claims nothing when the provider named nothing", () => {
+    const result = mapJSearchResult(advert);
+    expect(result?.platforms).toEqual([]);
+    expect(result?.applyDirect).toBe(false);
+  });
+
+  it("ignores junk a provider might send", () => {
+    const result = mapJSearchResult({
+      ...advert,
+      job_publisher: "   ",
+      // @ts-expect-error deliberately wrong: this is a third party's JSON
+      apply_options: [{ publisher: null }, { publisher: 42 }, { publisher: "x".repeat(80) }, { publisher: "Seek" }],
+    });
+    expect(result?.platforms).toEqual(["Seek"]);
+  });
+
+  /*
+   * The provenance line stays "Google for Jobs" — where Sartho looked — and the
+   * boards are a separate claim. Collapsing them would make the criteria line
+   * say Sartho queried LinkedIn, which it did not.
+   */
+  it("keeps where Sartho looked apart from where the advert lives", () => {
+    const result = mapJSearchResult({ ...advert, job_publisher: "LinkedIn" });
+    expect(result?.source).toBe("Google for Jobs");
+    expect(result?.platforms).toEqual(["LinkedIn"]);
   });
 });
 

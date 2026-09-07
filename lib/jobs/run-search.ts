@@ -75,6 +75,13 @@ export type ScoredJobMatch = {
    */
   requiredYears: number | null;
   requiredEvidence: string | null;
+  /**
+   * The boards carrying this advert, and whether the employer's own site is
+   * one of them. Applying direct usually beats applying through an aggregator,
+   * so it is worth saying which link that is.
+   */
+  platforms: string[];
+  applyDirect: boolean;
 };
 
 /* What was actually searched, so the page (or email) can say so. */
@@ -366,6 +373,8 @@ export async function runBriefSearch(
        * states its experience requirement there.
        */
       ...readRequirement(`${result.title}. ${result.description}`),
+      platforms: result.platforms,
+      applyDirect: result.applyDirect,
     };
   };
 
@@ -624,6 +633,8 @@ export function normaliseResults(stored: unknown): ScoredJobMatch[] {
       missingRequirements: strings(value.missingRequirements),
       requiredYears: typeof value.requiredYears === "number" && Number.isFinite(value.requiredYears) ? value.requiredYears : null,
       requiredEvidence: nullableText(value.requiredEvidence),
+      platforms: strings(value.platforms),
+      applyDirect: value.applyDirect === true,
     }];
   });
 }
