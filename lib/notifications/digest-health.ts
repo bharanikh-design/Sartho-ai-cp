@@ -35,12 +35,20 @@ export function digestHealth(input: {
   lastSentAt: string | Date | null;
   /** When the preference was last changed, to tell "just switched on" from "broken". */
   enabledSince?: string | Date | null;
+  /**
+   * What the email is called, in the sentence. Match alerts run on their own
+   * daily schedule and go silent in exactly the same way, so they get the same
+   * reasoning — but telling somebody "no summary has been sent" about an alert
+   * would send them to the wrong switch.
+   */
+  noun?: string;
   now?: Date;
 }): DigestHealth {
   const now = input.now ?? new Date();
+  const noun = input.noun?.trim() || "summary";
 
   if (!input.enabled) {
-    return { state: "off", message: "The daily summary is off, so nothing is being sent.", concerning: false };
+    return { state: "off", message: `The daily ${noun} is off, so nothing is being sent.`, concerning: false };
   }
 
   const lastSent = toDate(input.lastSentAt);
@@ -56,13 +64,13 @@ export function digestHealth(input: {
     if (waitingHours !== null && waitingHours > OVERDUE_HOURS) {
       return {
         state: "overdue",
-        message: "No summary has ever been sent, and this has been switched on for more than two days. The scheduled run is not reaching Sartho.",
+        message: `No ${noun} has ever been sent, and this has been switched on for more than two days. The scheduled run is not reaching Sartho.`,
         concerning: true,
       };
     }
     return {
       state: "waiting",
-      message: "No summary has been sent yet. The first one goes out on the next scheduled run.",
+      message: `No ${noun} has been sent yet. The first one goes out on the next scheduled run.`,
       concerning: false,
     };
   }
@@ -71,7 +79,7 @@ export function digestHealth(input: {
   if (hours > OVERDUE_HOURS) {
     return {
       state: "overdue",
-      message: `The last summary was sent ${describeGap(hours)} ago. It should arrive daily, so the scheduled run is not reaching Sartho.`,
+      message: `The last ${noun} was sent ${describeGap(hours)} ago. It should arrive daily, so the scheduled run is not reaching Sartho.`,
       concerning: true,
     };
   }
@@ -84,14 +92,14 @@ export function digestHealth(input: {
      */
     return {
       state: "healthy",
-      message: `The last summary was sent ${describeGap(hours)} ago — a little later than usual, but the schedule is running.`,
+      message: `The last ${noun} was sent ${describeGap(hours)} ago — a little later than usual, but the schedule is running.`,
       concerning: false,
     };
   }
 
   return {
     state: "healthy",
-    message: `The last summary was sent ${describeGap(hours)} ago. The schedule is running.`,
+    message: `The last ${noun} was sent ${describeGap(hours)} ago. The schedule is running.`,
     concerning: false,
   };
 }
