@@ -4,6 +4,7 @@ import { ResumeImport } from "@/components/resume-import";
 import { ResumeLibrary } from "@/components/resume-library";
 import { JourneySteps } from "@/components/journey-steps";
 import { requireUser } from "@/lib/auth";
+import { connectionStatus } from "@/lib/integrations/store";
 import { getCareerWorkspace, getResumeImports } from "@/lib/data/career";
 import { loadProductJourneyStatus } from "@/lib/journey/load-product-journey";
 
@@ -19,6 +20,7 @@ export const dynamic = "force-dynamic";
  */
 export default async function UploadResumePage() {
   const { supabase, user } = await requireUser();
+  const driveConnected = (await connectionStatus(user.id)).connected;
   const [{ roles, evidence }, journey, imports] = await Promise.all([
     getCareerWorkspace(supabase, user.id),
     loadProductJourneyStatus(supabase, user.id),
@@ -47,7 +49,7 @@ export default async function UploadResumePage() {
             ? <span className="meta-pill">{roles.length} role{roles.length === 1 ? "" : "s"} · {approved} fact{approved === 1 ? "" : "s"}</span>
             : <span className="status-chip status-pending">Step 1</span>}
         </div>
-        <ResumeImport hasEvidence={hasEvidence} continueHref="/career-direction" />
+        <ResumeImport hasEvidence={hasEvidence} continueHref="/career-direction" driveConnected={driveConnected} />
       </section>
 
       {/*

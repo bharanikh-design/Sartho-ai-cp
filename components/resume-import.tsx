@@ -3,6 +3,7 @@
 import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { DriveResumePicker } from "@/components/drive-resume-picker";
 import { ResumeProgress, type ImportProgress } from "@/components/resume-progress";
 import { readProgressEvents } from "@/lib/resume/progress-stream";
 import {
@@ -38,8 +39,17 @@ export function ResumeImport({
   hasEvidence,
   showLead = true,
   continueHref,
+  driveConnected = false,
 }: {
   hasEvidence: boolean;
+  /**
+   * Whether Google Drive is connected, decided on the server.
+   *
+   * Passed in rather than fetched here so the picker does not flash a
+   * "connect Drive" prompt at somebody who connected it last week while a
+   * request goes out to find that out.
+   */
+  driveConnected?: boolean;
   /** Off where the surrounding page already makes the same promise. */
   showLead?: boolean;
   /*
@@ -79,34 +89,61 @@ export function ResumeImport({
     }
     const mimeType = normaliseResumeMimeType(kind, file.type);
 
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+    if (authError || !user) {
+      setError("Your session has expired. Please sign in again.");
+      return;
+    }
+
+    const objectPath = makeResumeObjectPath(user.id, file.name);
     setBusy(true);
     setError(null);
     setResult(null);
     setFileName(file.name);
     setProgress({ stage: "extracted", fileName: file.name, characters: 0, sample: "", roles: 0, claims: 0 });
 
-    let objectPath: string | null = null;
+    const { error: uploadError } = await supabase.storage
+      .from(RESUME_UPLOAD_BUCKET)
+      .upload(objectPath, file, { contentType: mimeType, upsert: false });
+    if (uploadError) {
+      setError("The résumé could not be uploaded securely. Please try again.");
+      setBusy(false);
+      setProgress(null);
+      return;
+    }
+
+    await runImport({ objectPath, fileName: file.name, mimeType, byteSize: file.size });
+  }
+
+  /*
+   * Everything after the bytes are in the bucket.
+   *
+   * Split out so a file from Google Drive walks the same path as one dropped
+   * on the page. The Drive route lands its download in the same bucket, at the
+   * same owned path, and hands back the same four fields — so there is one
+   * import pipeline with one streaming progress display, rather than a second
+   * copy that drifts.
+   */
+  async function runImport(upload: { objectPath: string; fileName: string; mimeType: string; byteSize: number }) {
+    const objectPath = upload.objectPath;
+    setBusy(true);
+    setError(null);
+    setResult(null);
+    setFileName(upload.fileName);
+    setProgress({ stage: "extracted", fileName: upload.fileName, characters: 0, sample: "", roles: 0, claims: 0 });
+
     try {
-      const {
-        data: { user },
-        error: authError,
-      } = await supabase.auth.getUser();
-      if (authError || !user) throw new Error("Your session has expired. Please sign in again.");
-
-      objectPath = makeResumeObjectPath(user.id, file.name);
-      const { error: uploadError } = await supabase.storage
-        .from(RESUME_UPLOAD_BUCKET)
-        .upload(objectPath, file, { contentType: mimeType, upsert: false });
-      if (uploadError) throw new Error("The résumé could not be uploaded securely. Please try again.");
-
       const response = await fetch("/api/career/import", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           objectPath,
-          fileName: file.name,
-          mimeType,
-          byteSize: file.size,
+          fileName: upload.fileName,
+          mimeType: upload.mimeType,
+          byteSize: upload.byteSize,
         }),
       });
 
@@ -158,7 +195,7 @@ export function ResumeImport({
     } finally {
       // The API removes the object after extraction. This second, idempotent
       // cleanup covers a lost request or a browser/network failure before then.
-      if (objectPath) {
+      {
         try {
           await supabase.storage.from(RESUME_UPLOAD_BUCKET).remove([objectPath]);
         } catch {
@@ -220,6 +257,17 @@ export function ResumeImport({
         <p className="resume-import-note">
           PDF, Word (.docx) or plain text, up to 8MB. You can also drop a file anywhere in this box.
         </p>
+
+        {/*
+          * The other way in, and for most people the better one: almost nobody
+          * knows which of their files is the current CV. Placed here, under the
+          * upload button, because this is the moment somebody is standing in
+          * front of that question — not on a settings page they would have to
+          * think to visit.
+          */}
+        {busy ? null : (
+          <DriveResumePicker connected={driveConnected} onImported={(upload) => void runImport(upload)} />
+        )}
       </div>
 
       {progress ? <ResumeProgress progress={progress} /> : null}
