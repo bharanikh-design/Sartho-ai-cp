@@ -326,6 +326,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               <div className="profile-menu-divider" />
               <Link href="/career-truth" className="profile-menu-link" role="menuitem"><span><strong>Upload résumé</strong><small>Add or replace your source résumé</small></span><b aria-hidden="true">→</b></Link>
               <Link href="/notifications" className="profile-menu-link" role="menuitem" onClick={() => setProfileOpen(false)}><span><strong>Email alerts</strong><small>Daily new matches and the pipeline summary</small></span><b aria-hidden="true">→</b></Link>
+              <Link href="/integrations" className="profile-menu-link" role="menuitem" onClick={() => setProfileOpen(false)}><span><strong>Integrations</strong><small>What Sartho is connected to, and how to disconnect it</small></span><b aria-hidden="true">→</b></Link>
               <button type="button" className="profile-menu-action" role="menuitem" onClick={openAccountPanel}><span><strong>Data & privacy</strong><small>Manage or remove your information</small></span><b aria-hidden="true">→</b></button>
               <button type="button" className="profile-menu-action profile-menu-signout" role="menuitem" onClick={() => void signOut()}><span><strong>Log out</strong><small>End this secure session</small></span></button>
             </div>

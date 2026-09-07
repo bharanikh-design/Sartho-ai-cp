@@ -1340,3 +1340,47 @@
   .email-settings__address { grid-template-columns: 1fr; gap: 6px; }
   .email-settings__row { align-items: flex-start; }
 }
+
+/*
+ * Integrations — what Sartho is connected to, and the button that takes it
+ * away.
+ *
+ * Disconnect is the reason this page exists. The argument the whole product
+ * makes is that it does not act behind your back, and the way to prove that is
+ * not a paragraph about privacy: it is a button that revokes the grant at
+ * Google's end in one click, with no confirmation maze in front of it.
+ */
+.integration-notice { margin: 0; padding: 11px 14px; border: 1px solid rgba(114,230,189,.3); border-radius: 12px; background: rgba(114,230,189,.08); color: var(--text); font-size: var(--text-sm); }
+.integration-notice.is-bad { border-color: rgba(255,142,163,.32); background: rgba(255,142,163,.08); color: var(--rose); }
+
+.integration-card { display: grid; gap: 13px; padding: 22px 24px; border: 1px solid var(--line); }
+.integration-card__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
+.integration-card__head strong { font-size: var(--text-md); font-weight: 700; }
+.integration-card__head p { margin: 4px 0 0; max-width: 62ch; color: var(--text-secondary); font-size: var(--text-sm); line-height: 1.55; }
+.integration-card__detail { margin: 0; color: var(--text-secondary); font-size: var(--text-xs); line-height: 1.6; }
+.integration-card__warn { margin: 0; padding: 9px 12px; border: 1px solid rgba(255,211,122,.3); border-radius: 10px; background: rgba(255,211,122,.07); color: var(--amber); font-size: var(--text-xs); line-height: 1.55; }
+.integration-card__actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+
+.integration-state { flex-shrink: 0; padding: 4px 11px; border: 1px solid var(--line); border-radius: 999px; color: var(--text-tertiary); font-size: var(--text-2xs); font-weight: 700; letter-spacing: .05em; text-transform: uppercase; }
+.integration-state.is-on { border-color: rgba(114,230,189,.4); background: rgba(114,230,189,.1); color: var(--mint); }
+
+/*
+ * The Drive picker, which lives under the upload button because that is the
+ * moment somebody is facing the question it answers: which of my files is the
+ * current one?
+ */
+.drive-picker { display: grid; gap: 10px; margin-top: 14px; width: 100%; }
+.drive-picker-hint { margin: 12px 0 0; color: var(--text-secondary); font-size: var(--text-xs); line-height: 1.6; }
+.drive-picker-hint a { color: var(--mint); }
+.drive-picker-link { padding: 0; border: 0; background: none; color: var(--mint); font: inherit; text-decoration: underline; cursor: pointer; }
+.drive-picker-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; text-align: left; }
+.drive-picker-list li { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; }
+.drive-picker-file { display: grid; gap: 2px; min-width: 0; }
+.drive-picker-file strong { overflow: hidden; color: var(--text); font-size: var(--text-sm); font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+.drive-picker-file span { color: var(--text-tertiary); font-size: var(--text-2xs); }
+.drive-picker-list li:first-child { border-color: rgba(114,230,189,.32); background: rgba(114,230,189,.05); }
+
+@media (max-width: 640px) {
+  .integration-card__head { flex-direction: column; }
+  .drive-picker-list li { flex-direction: column; align-items: stretch; }
+}

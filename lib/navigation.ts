@@ -193,6 +193,7 @@ const supportingPageLabels: Array<[prefix: string, label: string]> = [
   ["/jobs", "Opportunities"],
   ["/interview-prep", "Interview Preparation"],
   ["/diagnostics", "Diagnostics"],
+  ["/integrations", "Integrations"],
   ["/resume-studio", "Résumé Studio"],
 ];
 

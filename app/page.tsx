@@ -4,6 +4,7 @@ import { JourneyNudgeCard } from "@/components/journey-nudge-card";
 import { ProfileScorecard } from "@/components/profile-scorecard";
 import { ResumeImport } from "@/components/resume-import";
 import { requireUser } from "@/lib/auth";
+import { connectionStatus } from "@/lib/integrations/store";
 import {
   buildCareerCommandCentre,
   type CommandCentreApplication,
@@ -16,6 +17,7 @@ export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
   const { supabase, user } = await requireUser();
+  const driveConnected = (await connectionStatus(user.id)).connected;
 
   const [journeyResult, jobsResult, applicationsResult] = await Promise.all([
     loadProductJourney(supabase, user.id),
@@ -72,7 +74,7 @@ export default async function DashboardPage() {
             </div>
             <span className="status-chip status-pending">Step 1 of 3</span>
           </div>
-          <ResumeImport hasEvidence={false} continueHref="/career-direction" />
+          <ResumeImport hasEvidence={false} continueHref="/career-direction" driveConnected={driveConnected} />
         </section>
 
         <section className="glass-card content-card">
