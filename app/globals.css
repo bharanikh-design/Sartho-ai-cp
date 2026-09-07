@@ -637,11 +637,39 @@ button:focus-visible, a:focus-visible, textarea:focus-visible, input:focus-visib
 /* --text-primary was never a token, so this text inherited rather than lightened. */
 .extension-pill__action { padding: 4px 12px; border-radius: 100px; background: rgba(255,255,255,.1); color: var(--text); font-size: var(--text-xs); text-decoration: none; }
 
-.extension-flow, .extension-steps, .extension-facts { margin: 4px 0 0; padding-left: 22px; display: grid; gap: 14px; }
-.extension-flow li, .extension-steps li, .extension-facts li { color: var(--text-secondary); font-size: var(--text-sm); line-height: var(--leading-normal); }
-.extension-flow strong, .extension-steps strong, .extension-facts strong { color: var(--text); }
-.extension-steps li { padding-left: 4px; }
-.extension-steps .section-subtitle, .extension-flow .section-subtitle { margin: 4px 0 0; }
+.extension-facts { margin: 4px 0 0; padding-left: 22px; display: grid; gap: 14px; }
+.extension-facts li { color: var(--text-secondary); font-size: var(--text-sm); line-height: var(--leading-normal); }
+.extension-facts strong { color: var(--text); }
+
+/*
+ * The install card: the file, then the four things to click.
+ *
+ * The download is the reason anybody opened the page, so it is the first thing
+ * on it and the only button. Each step is one instruction in white with its
+ * caveat in grey underneath — so the four bold lines can be read on their own,
+ * and the grey is there for whoever wants it rather than in everybody's way.
+ */
+.extension-install { display: grid; gap: 14px; padding: 26px 28px; border: 1px solid var(--line); }
+.extension-download { justify-self: start; }
+.extension-meta { margin: 0; color: var(--text-tertiary); font-size: var(--text-xs); }
+
+.extension-steps { display: grid; gap: 12px; margin: 4px 0; padding: 0; list-style: none; counter-reset: extension-step; }
+.extension-steps li { display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 2px 12px; counter-increment: extension-step; }
+.extension-steps li::before {
+  content: counter(extension-step);
+  grid-row: span 2;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: rgba(114, 230, 189, .14);
+  color: var(--mint);
+  font-size: var(--text-xs);
+  font-weight: 800;
+}
+.extension-steps strong { color: var(--text); font-size: var(--text-base); font-weight: 650; }
+.extension-steps span { color: var(--text-secondary); font-size: var(--text-xs); line-height: 1.55; }
 
 /* Setup flow stepper — shown at the top of the four setup pages. */
 .journey-steps { width: 100%; }

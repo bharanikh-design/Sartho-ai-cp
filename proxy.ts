@@ -29,6 +29,13 @@ export async function proxy(request: NextRequest) {
  */
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|robots\\.txt|sitemap\\.xml|manifest\\.webmanifest|opengraph-image|twitter-image|\\.well-known/|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    /*
+     * .zip earns its place alongside the images: the browser extension is
+     * downloaded from /sartho-extension.zip, and the whole point of that link
+     * is that somebody who has never signed in can click it. Guarded, it
+     * answered a download with a 307 to /login — which a browser follows,
+     * saving an HTML sign-in page under the name of a zip.
+     */
+    "/((?!_next/static|_next/image|favicon.ico|robots\\.txt|sitemap\\.xml|manifest\\.webmanifest|opengraph-image|twitter-image|\\.well-known/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|zip)$).*)",
   ],
 };
