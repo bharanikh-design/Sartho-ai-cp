@@ -36,7 +36,7 @@ describe("resume templates", () => {
 
   it("defaults a stored document written before templates existed", () => {
     const parsed = parseResumeContent({
-      headline: "A",
+      name: "A",
       summary: "B",
       sections: [{ heading: "WORK", bullets: [{ text: "Did a thing." }] }],
     });
@@ -52,7 +52,7 @@ describe("resume templates", () => {
   it("accepts every template it offers when a document is saved", () => {
     for (const id of RESUME_TEMPLATE_IDS) {
       const parsed = parseResumeContent({
-        headline: "A",
+        name: "A",
         summary: "B",
         sections: [{ heading: "WORK", bullets: [{ text: "Did a thing." }] }],
         template: id,
@@ -69,7 +69,12 @@ describe("resume templates", () => {
  */
 describe("the Word file follows the template", () => {
   const base = {
-    headline: "A name",
+    name: "A name",
+    targetRole: "Business Analyst",
+    contact: { email: "a@example.com", phone: "", location: "Sydney", linkedin: "", website: "" },
+    roles: [],
+    skills: [],
+    education: [],
     summary: "A summary long enough to be worth setting.",
     sections: [{ id: "s0", heading: "Work", bullets: [{ id: "s0b0", text: "Did a thing with 3 people.", evidenceIds: [], edited: false }] }],
   };

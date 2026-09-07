@@ -63,6 +63,10 @@ const outputSchema = z.object({
   location: z.string().nullable(),
   // Optional so a response from before the field existed still parses.
   country: z.string().nullable().optional(),
+  fullName: z.string().nullable().optional(),
+  phone: z.string().nullable().optional(),
+  linkedin: z.string().nullable().optional(),
+  website: z.string().nullable().optional(),
   totalExperienceYears: z.number().nullable(),
 });
 
@@ -227,7 +231,7 @@ export async function POST(request: Request) {
      */
     const { data: profile } = await supabase
       .from("profiles")
-      .select("id,headline,summary,location,country,total_experience_years")
+      .select("id,full_name,headline,summary,location,country,total_experience_years,phone,linkedin_url,website_url")
       .eq("id", userId)
       .maybeSingle();
 
@@ -236,6 +240,16 @@ export async function POST(request: Request) {
       if (!profile.headline && parsed.headline) patch.headline = parsed.headline.trim();
       if (!profile.summary && parsed.summary) patch.summary = parsed.summary.trim();
       if (!profile.location && parsed.location) patch.location = parsed.location.trim();
+      /*
+       * Only ever filled in, never overwritten — the same rule the headline and
+       * summary above already follow. Somebody who corrected their own phone
+       * number must not have it replaced by whatever the document said the next
+       * time they upload one.
+       */
+      if (!profile.full_name && parsed.fullName?.trim()) patch.full_name = parsed.fullName.trim();
+      if (!profile.phone && parsed.phone?.trim()) patch.phone = parsed.phone.trim();
+      if (!profile.linkedin_url && parsed.linkedin?.trim()) patch.linkedin_url = parsed.linkedin.trim();
+      if (!profile.website_url && parsed.website?.trim()) patch.website_url = parsed.website.trim();
       // The inferred country is a default the person confirms on Search Brief —
       // it is only ever filled in, never overwritten.
       const inferredCountry = parsed.country?.trim().toLowerCase();

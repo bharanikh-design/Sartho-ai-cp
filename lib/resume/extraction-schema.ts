@@ -11,7 +11,7 @@
 export const RESUME_EXTRACTION_SCHEMA = {
   type: "object",
   additionalProperties: false,
-  required: ["roles", "evidence", "headline", "summary", "location", "country", "totalExperienceYears"],
+  required: ["roles", "evidence", "headline", "summary", "location", "country", "totalExperienceYears", "fullName", "phone", "linkedin", "website"],
   properties: {
     roles: {
       type: "array",
@@ -53,6 +53,16 @@ export const RESUME_EXTRACTION_SCHEMA = {
     headline: { type: ["string", "null"] },
     summary: { type: ["string", "null"] },
     location: { type: ["string", "null"] },
+    /*
+     * The contact block, which no résumé goes without and Sartho had nowhere
+     * to put. Every one of these is nullable and every one means "not stated"
+     * rather than "not found yet" — a résumé printing a phone number nobody
+     * supplied is worse than one printing none.
+     */
+    fullName: { type: ["string", "null"], description: "The person's name exactly as written at the top of the document. Null if the document does not state one." },
+    phone: { type: ["string", "null"], description: "Their phone number as written, including any country code. Null when absent." },
+    linkedin: { type: ["string", "null"], description: "Their LinkedIn profile, as written (e.g. linkedin.com/in/name). Null when absent." },
+    website: { type: ["string", "null"], description: "A personal site, portfolio or GitHub, as written. Null when absent. Never their employer's website." },
     country: {
       type: ["string", "null"],
       description: "ISO-3166 alpha-2 code of the country the person is based in, lower-case (e.g. au, in, sg, us). Null when the résumé gives no reliable signal.",
@@ -71,6 +81,7 @@ export const RESUME_EXTRACTION_SYSTEM = [
   "Attribute every claim to the employer and title it sits under. Leave both null when the résumé does not make that clear.",
   "Dates must be YYYY, YYYY-MM or YYYY-MM-DD exactly as precise as the document is. Use null when a date is absent, and never guess one.",
   "Split responsibilities into separate claims rather than merging several into one sentence.",
+  "Copy fullName, phone, linkedin and website verbatim from the document; never reformat, complete or invent one, and use null when the document does not state it.",
   "For country, infer the ISO-3166 alpha-2 code (lower-case) of where the person is based from concrete signals in the document: a stated address or city, a phone dialling code (+61 au, +91 in, +65 sg, +1 us, +44 gb), the location of their current employer or university, or stated work rights. Use null when those signals are absent or conflict; never guess from a name.",
 ].join(" ");
 

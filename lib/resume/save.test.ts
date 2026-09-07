@@ -1,11 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { saveResumeDraft } from "@/lib/resume/save";
-import type { ResumeContent } from "@/lib/resume/content";
+import { emptyContent, type ResumeContent } from "@/lib/resume/content";
 
 const content: ResumeContent = {
+  ...emptyContent(),
   template: "classic",
-  headline: "A",
+  name: "A",
   summary: "B",
   sections: [{ id: "s0", heading: "WORK", bullets: [{ id: "s0b0", text: "Did a thing.", evidenceIds: ["e1"], edited: false }] }],
 };

@@ -41,7 +41,13 @@ export async function POST(request: Request) {
   }
 
   const { content, versionName, employer } = input.data;
-  const hasBody = content.headline || content.summary || content.sections.some((section) => section.bullets.length);
+  const hasBody = content.name
+    || content.targetRole
+    || content.summary
+    || content.roles.some((role) => role.title || role.employer || role.bullets.length)
+    || content.sections.some((section) => section.bullets.length)
+    || content.skills.length
+    || content.education.length;
   if (!hasBody) {
     return NextResponse.json({ error: "This draft is empty, so there is nothing to download." }, { status: 400 });
   }
