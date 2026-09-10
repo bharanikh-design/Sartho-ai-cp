@@ -336,6 +336,7 @@ export async function runBriefSearch(
           if (caught instanceof JobSearchNotConfiguredError) { dead.add(provider); continue; }
           const label = provider === "jsearch" ? "Google for Jobs" : "Adzuna";
           errors.push(`${label}: ${caught instanceof Error ? caught.message : "unknown error"}`);
+          console.error(`[DEBUG] Provider error on ${label}:`, caught);
           // We intentionally do not call `dead.add(provider)` here so a single timeout doesn't kill the provider for the whole run
         }
       }

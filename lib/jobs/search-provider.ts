@@ -177,8 +177,11 @@ export class JobSearchNotConfiguredError extends Error {
 }
 
 function resolveCountry(query: JobSearchQuery): string {
-  const country = query.country?.trim().toLowerCase();
-  return country && /^[a-z]{2}$/.test(country) ? country : defaultJobMarket();
+  const c = query.country?.trim().toLowerCase();
+  if (c === "australia") return "au";
+  if (c === "united kingdom" || c === "uk") return "gb";
+  if (c === "united states" || c === "us" || c === "usa") return "us";
+  return c && /^[a-z]{2}$/.test(c) ? c : defaultJobMarket();
 }
 
 /** The Adzuna request URL for a query — pure, so the criteria mapping is testable. */
@@ -349,6 +352,7 @@ export function buildJSearchParams(query: JobSearchQuery): URLSearchParams {
   if (query.location?.trim()) text = `${text} in ${query.location.trim()}`;
   const params = new URLSearchParams({
     query: text,
+    page: "1",
     num_pages: "1",
     date_posted: "all",
     country: resolveCountry(query),
@@ -361,7 +365,7 @@ export function buildJSearchParams(query: JobSearchQuery): URLSearchParams {
   return params;
 }
 
-let cachedJSearchEndpoint: "search" | "search-v2" | null = "search";
+let cachedJSearchEndpoint: "search" | "search-v2" | null = "search-v2";
 
 async function searchJSearch(query: JobSearchQuery): Promise<JobSearchResult[]> {
   const config = jsearchConfig();
@@ -373,24 +377,24 @@ async function searchJSearch(query: JobSearchQuery): Promise<JobSearchResult[]> 
     "x-rapidapi-host": "jsearch.p.rapidapi.com",
   };
 
-  // Primary endpoint on RapidAPI for JSearch v5 is /search.
+  // Primary endpoint on RapidAPI for JSearch v5 is /search-v2.
   // Cache the working endpoint so we don't encounter redundant round-trips.
-  const endpoint = cachedJSearchEndpoint ?? "search";
+  const endpoint = cachedJSearchEndpoint ?? "search-v2";
   let response = await fetch(`https://jsearch.p.rapidapi.com/${endpoint}?${searchParams}`, {
     method: "GET",
     headers,
     signal: AbortSignal.timeout(16_000),
   });
 
-  if (response.status === 404 && endpoint === "search") {
-    cachedJSearchEndpoint = "search-v2";
-    response = await fetch(`https://jsearch.p.rapidapi.com/search-v2?${searchParams}`, {
+  if (response.status === 404 && endpoint === "search-v2") {
+    cachedJSearchEndpoint = "search";
+    response = await fetch(`https://jsearch.p.rapidapi.com/search?${searchParams}`, {
       method: "GET",
       headers,
       signal: AbortSignal.timeout(16_000),
     });
   } else if (response.ok && cachedJSearchEndpoint === null) {
-    cachedJSearchEndpoint = "search";
+    cachedJSearchEndpoint = "search-v2";
   }
   if (!response.ok) {
     // Surface RapidAPI's own reason (e.g. "You are not subscribed to this API")
