@@ -331,7 +331,10 @@ export async function runBriefSearch(
           for (const result of batch) {
             if (!byUrl.has(result.url)) byUrl.set(result.url, result);
           }
-          break; // this provider answered; move to the next query
+          if (batch.length > 0) {
+            break; // this provider found results; move to the next query
+          }
+          // If 0 results, we continue to the next provider (fallback)
         } catch (caught) {
           const label = provider === "jsearch" ? "Google for Jobs" : "Adzuna";
           if (caught instanceof JobSearchNotConfiguredError) {
