@@ -310,7 +310,7 @@ export async function runBriefSearch(
    * is skipped for the rest of this run.
    */
   const startedAt = Date.now();
-  const budgetMs = options.budgetMs ?? 42_000;
+  const budgetMs = options.budgetMs ?? 9_000;
   const dead = new Set<JobSearchProviderName>();
   const byUrl = new Map<string, JobSearchResult>();
   const errors: string[] = [];
@@ -321,7 +321,7 @@ export async function runBriefSearch(
   async function run(list: JobSearchQuery[]) {
     for (let index = 0; index < list.length; index++) {
       if (Date.now() - startedAt > budgetMs) { queriesSkipped += list.length - index; break; }
-      if (queriesRun > 0) await new Promise((resolve) => setTimeout(resolve, 900));
+      if (queriesRun > 0) await new Promise((resolve) => setTimeout(resolve, 150));
       for (const provider of providers) {
         if (dead.has(provider)) continue;
         try {
@@ -424,7 +424,7 @@ export async function runBriefSearch(
 
   const usedLocations = brief.locations.slice(0, MAX_LOCATION_QUERIES);
   let broadened = false;
-  if (usedLocations.length && strongCount() < MIN_STRONG_BEFORE_WIDENING && dead.size < providers.length) {
+  if (usedLocations.length && strongCount() < MIN_STRONG_BEFORE_WIDENING && dead.size < providers.length && (Date.now() - startedAt < budgetMs - 2_500)) {
     broadened = true;
     const before = new Set(byUrl.keys());
     await run(widenToCountry(queries));
@@ -505,7 +505,8 @@ export async function runBriefSearch(
   let advertsRead = 0;
   if (filterYears !== null && Number.isFinite(filterYears)) {
     const candidates = survivors.slice(0, MAX_ADVERTS_READ).filter((match) => match.url);
-    const deadline = Date.now() + Math.min(ADVERT_BUDGET_MS, Math.max(0, budgetMs + 15_000 - (Date.now() - startedAt)));
+    const remainingMs = Math.max(0, (startedAt + budgetMs) - Date.now());
+    const deadline = Date.now() + Math.min(ADVERT_BUDGET_MS, remainingMs);
 
     let cursor = 0;
     const worker = async () => {

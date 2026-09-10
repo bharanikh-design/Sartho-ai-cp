@@ -19,12 +19,19 @@ const STATUS: Record<string, number> = {
 };
 
 export async function POST() {
-  const { supabase, user } = await getAuthenticatedUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  try {
+    const { supabase, user } = await getAuthenticatedUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const outcome = await runBriefSearch(supabase, user.id);
-  if (!outcome.ok) {
-    return NextResponse.json({ error: outcome.error, code: outcome.code }, { status: STATUS[outcome.code] ?? 500 });
+    const budgetMs = process.env.SEARCH_BUDGET_MS ? Number(process.env.SEARCH_BUDGET_MS) : 9_000;
+    const outcome = await runBriefSearch(supabase, user.id, { budgetMs });
+    if (!outcome.ok) {
+      return NextResponse.json({ error: outcome.error, code: outcome.code }, { status: STATUS[outcome.code] ?? 500 });
+    }
+    return NextResponse.json({ results: outcome.results, count: outcome.results.length, criteria: outcome.criteria });
+  } catch (caught) {
+    console.error("POST /api/jobs/search failed:", caught);
+    const message = caught instanceof Error ? caught.message : "Search failed unexpectedly.";
+    return NextResponse.json({ error: message, code: "server_error" }, { status: 500 });
   }
-  return NextResponse.json({ results: outcome.results, count: outcome.results.length, criteria: outcome.criteria });
 }
