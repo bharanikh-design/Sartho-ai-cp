@@ -23,7 +23,7 @@ export async function POST() {
     const { supabase, user } = await getAuthenticatedUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const budgetMs = process.env.SEARCH_BUDGET_MS ? Number(process.env.SEARCH_BUDGET_MS) : 9_000;
+    const budgetMs = process.env.SEARCH_BUDGET_MS ? Number(process.env.SEARCH_BUDGET_MS) : 28_000;
     const outcome = await runBriefSearch(supabase, user.id, { budgetMs });
     if (!outcome.ok) {
       return NextResponse.json({ error: outcome.error, code: outcome.code }, { status: STATUS[outcome.code] ?? 500 });
