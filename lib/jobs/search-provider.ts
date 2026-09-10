@@ -17,6 +17,7 @@
  * approved evidence before it is shown or saved.
  */
 
+import { countryName } from "@/lib/jobs/countries";
 import { adzunaEmploymentParams, employmentQueryHints, jsearchEmploymentTypes } from "@/lib/jobs/employment-types";
 
 export type JobSearchResult = {
@@ -262,6 +263,7 @@ type JSearchResult = {
   employer_name?: string;
   job_description?: string;
   job_apply_link?: string;
+  job_google_link?: string;
   job_city?: string;
   job_state?: string;
   job_country?: string;
@@ -350,7 +352,12 @@ export function mapJSearchResult(raw: JSearchResult): JobSearchResult | null {
 export function buildJSearchParams(query: JobSearchQuery): URLSearchParams {
   let text = query.keywords.trim();
   if (query.employer?.trim()) text = `${text} at ${query.employer.trim()}`;
-  if (query.location?.trim()) text = `${text} in ${query.location.trim()}`;
+  if (query.location?.trim()) {
+    text = `${text} in ${query.location.trim()}`;
+  } else {
+    const name = countryName(query.country);
+    if (name) text = `${text} in ${name}`;
+  }
   const params = new URLSearchParams({
     query: text,
     page: "1",
