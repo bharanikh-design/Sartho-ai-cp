@@ -354,7 +354,6 @@ export function buildJSearchParams(query: JobSearchQuery): URLSearchParams {
     query: text,
     page: "1",
     num_pages: "1",
-    date_posted: "all",
     country: resolveCountry(query),
   });
   if (query.remoteOnly) params.set("work_from_home", "true");
