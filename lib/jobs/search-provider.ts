@@ -314,7 +314,8 @@ export function readPlatforms(raw: JSearchResult): { platforms: string[]; applyD
 export function mapJSearchResult(raw: JSearchResult): JobSearchResult | null {
   if (!raw || typeof raw !== "object") return null;
   const title = raw.job_title?.trim();
-  const url = raw.job_apply_link?.trim();
+  const applyOptions = Array.isArray(raw.apply_options) ? raw.apply_options : [];
+  const url = (raw.job_apply_link || raw.job_google_link || applyOptions[0]?.apply_link)?.trim();
   const description = raw.job_description?.trim();
   if (!title || !url || !description) return null;
   const location = [raw.job_city, raw.job_state, raw.job_country]
