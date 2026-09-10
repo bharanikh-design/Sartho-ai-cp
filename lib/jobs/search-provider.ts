@@ -382,7 +382,7 @@ async function searchJSearch(query: JobSearchQuery): Promise<JobSearchResult[]> 
   let response = await fetch(`https://jsearch.p.rapidapi.com/${endpoint}?${searchParams}`, {
     method: "GET",
     headers,
-    signal: AbortSignal.timeout(5_000),
+    signal: AbortSignal.timeout(12_000),
   });
 
   if (response.status === 404 && endpoint === "search-v2") {
@@ -390,7 +390,7 @@ async function searchJSearch(query: JobSearchQuery): Promise<JobSearchResult[]> 
     response = await fetch(`https://jsearch.p.rapidapi.com/search?${searchParams}`, {
       method: "GET",
       headers,
-      signal: AbortSignal.timeout(5_000),
+      signal: AbortSignal.timeout(12_000),
     });
   } else if (response.ok && cachedJSearchEndpoint === null) {
     cachedJSearchEndpoint = "search-v2";
