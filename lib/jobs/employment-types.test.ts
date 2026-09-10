@@ -38,4 +38,11 @@ describe("employment types", () => {
     expect(isEmploymentType("Full-time")).toBe(true);
     expect(isEmploymentType("Whenever I feel like it")).toBe(false);
   });
+
+  it("omits mutually exclusive contract and permanent flags to prevent Adzuna 400", () => {
+    expect(adzunaEmploymentParams(["Contract", "Permanent"])).toEqual([]);
+    expect(adzunaEmploymentParams(["Full-time", "Contract", "Permanent"])).toEqual(["full_time"]);
+    expect(adzunaEmploymentParams(["Contract"])).toEqual(["contract"]);
+    expect(adzunaEmploymentParams(["Permanent"])).toEqual(["permanent"]);
+  });
 });

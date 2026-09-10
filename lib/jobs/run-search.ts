@@ -381,7 +381,7 @@ export async function runBriefSearch(
 
   if (!byUrl.size && errors.length) {
     console.error("Jobs search failed", errors);
-    return { ok: false, code: "provider_error", error: `Jobs provider error: ${errors[errors.length - 1]}` };
+    return { ok: false, code: "provider_error", error: `Jobs provider error: ${[...new Set(errors)].join("; ")}` };
   }
 
   const score = (result: JobSearchResult): ScoredJobMatch => {
