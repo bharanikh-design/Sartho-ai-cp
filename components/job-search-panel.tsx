@@ -366,8 +366,12 @@ export function JobSearchPanel({
       ) : null}
 
       {status === "loading" ? (
-        <div className="application-list" style={{ marginTop: "12px" }} aria-label="Searching live listings">
-          {[1, 2, 3].map((item) => <div key={item} className="search-result-skeleton" />)}
+        <div className="search-loading-state" aria-label="Searching live listings">
+          <div className="search-loading-spinner" />
+          <div className="search-loading-text">
+            <h3>Searching live job boards</h3>
+            <p>Scanning active listings and scoring them against your approved evidence...</p>
+          </div>
         </div>
       ) : null}
 
