@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { deduplicateSearchResults } from "@/lib/jobs/location-guard";
 
 /*
  * Real search, on demand. Presses the brief against the jobs provider and shows
@@ -233,15 +234,9 @@ export function JobSearchPanel({
     );
   };
 
-  // De-duplicate near-identical reposts (same title + employer), then split into
-  // strong matches (worth acting on) and weaker ones (collapsed by default).
-  const seen = new Set<string>();
-  const unique = results.filter((result) => {
-    const key = `${result.title}|${result.employer ?? ""}`.toLowerCase().trim();
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
+  // De-duplicate near-identical reposts and clean scraper artifacts, then split
+  // into strong matches (worth acting on) and weaker ones (collapsed by default).
+  const unique = deduplicateSearchResults(results);
   const strong = unique.filter((result) => result.recommendation !== "skip");
   const weak = unique.filter((result) => result.recommendation === "skip");
   const primary = strong.length ? strong : weak.slice(0, 3);
