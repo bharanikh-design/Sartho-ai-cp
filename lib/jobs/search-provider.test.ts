@@ -3,6 +3,7 @@ import {
   adzunaCoversCountry,
   buildAdzunaUrl,
   buildJSearchParams,
+  extractJSearchJobs,
   mapAdzunaResult,
   mapJSearchResult,
   normaliseAdzunaCountry,
@@ -249,3 +250,83 @@ describe("query → provider request mapping", () => {
     expect(buildJSearchParams({ keywords: "Data Analyst", country: "in" }).get("query")).toBe("Data Analyst");
   });
 });
+
+describe("extractJSearchJobs", () => {
+  const sampleJob = {
+    job_title: "Graduate Banking Analyst",
+    employer_name: "Deloitte",
+    job_description: "Join our consulting practice.",
+    job_apply_link: "https://deloitte.example.com/apply/1",
+  };
+
+  it("extracts jobs from canonical { status: 'OK', data: [...] } structure", () => {
+    const jobs = extractJSearchJobs({ status: "OK", data: [sampleJob] });
+    expect(jobs).toHaveLength(1);
+    expect(jobs[0]?.job_title).toBe("Graduate Banking Analyst");
+  });
+
+  it("extracts jobs when response body is directly an array", () => {
+    const jobs = extractJSearchJobs([sampleJob]);
+    expect(jobs).toHaveLength(1);
+    expect(jobs[0]?.job_title).toBe("Graduate Banking Analyst");
+  });
+
+  it("extracts jobs when nested under data.jobs", () => {
+    const jobs = extractJSearchJobs({ status: "OK", data: { jobs: [sampleJob] } });
+    expect(jobs).toHaveLength(1);
+    expect(jobs[0]?.job_title).toBe("Graduate Banking Analyst");
+  });
+
+  it("extracts jobs when nested under data.results", () => {
+    const jobs = extractJSearchJobs({ status: "OK", data: { results: [sampleJob] } });
+    expect(jobs).toHaveLength(1);
+    expect(jobs[0]?.job_title).toBe("Graduate Banking Analyst");
+  });
+
+  it("extracts jobs when top-level results array is present", () => {
+    const jobs = extractJSearchJobs({ results: [sampleJob] });
+    expect(jobs).toHaveLength(1);
+  });
+
+  it("safely returns an empty array when data is an empty dictionary {} without throwing", () => {
+    // This exact payload threw '((intermediate value).data ?? []).map is not a function' in production
+    const jobs = extractJSearchJobs({ status: "OK", request_id: "abc", data: {} });
+    expect(jobs).toEqual([]);
+  });
+
+  it("safely returns an empty array for empty, null or primitive inputs", () => {
+    expect(extractJSearchJobs(null)).toEqual([]);
+    expect(extractJSearchJobs(undefined)).toEqual([]);
+    expect(extractJSearchJobs({})).toEqual([]);
+    expect(extractJSearchJobs({ data: null })).toEqual([]);
+    expect(extractJSearchJobs("string")).toEqual([]);
+  });
+
+  it("throws descriptive error when status is ERROR with error.message", () => {
+    expect(() =>
+      extractJSearchJobs({
+        status: "ERROR",
+        error: { message: "You have exceeded the MONTHLY quota for Requests on your current plan." },
+      }),
+    ).toThrow("You have exceeded the MONTHLY quota for Requests on your current plan.");
+  });
+
+  it("throws descriptive error when status is ERROR with top-level message", () => {
+    expect(() =>
+      extractJSearchJobs({
+        status: "ERROR",
+        message: "Invalid query parameter: date_posted",
+      }),
+    ).toThrow("Invalid query parameter: date_posted");
+  });
+
+  it("throws descriptive error when nested data contains an error string", () => {
+    expect(() =>
+      extractJSearchJobs({
+        status: "ERROR",
+        data: { error: "Access forbidden" },
+      }),
+    ).toThrow("Access forbidden");
+  });
+});
+

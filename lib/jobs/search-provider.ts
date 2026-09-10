@@ -145,6 +145,7 @@ function formatSalary(min?: number, max?: number): string | null {
 
 /** Pure mapping from one Adzuna record to Sartho's shape — kept testable. */
 export function mapAdzunaResult(raw: AdzunaResult): JobSearchResult | null {
+  if (!raw || typeof raw !== "object") return null;
   const title = raw.title?.trim();
   const url = raw.redirect_url?.trim();
   const description = raw.description?.trim();
@@ -241,8 +242,14 @@ async function searchAdzuna(query: JobSearchQuery): Promise<JobSearchResult[]> {
     throw new Error(`Adzuna search failed (${response.status}).`);
   }
 
-  const body = (await response.json()) as { results?: AdzunaResult[] };
-  return (body.results ?? [])
+  let body: { results?: AdzunaResult[] };
+  try {
+    body = (await response.json()) as { results?: AdzunaResult[] };
+  } catch {
+    throw new Error(`Adzuna returned non-JSON response (${response.status}).`);
+  }
+  const rawResults = Array.isArray(body?.results) ? body.results : [];
+  return rawResults
     .map(mapAdzunaResult)
     .filter((item): item is JobSearchResult => item !== null);
 }
@@ -278,9 +285,10 @@ type JSearchResult = {
  * should be told which link is the direct one.
  */
 export function readPlatforms(raw: JSearchResult): { platforms: string[]; applyDirect: boolean } {
+  const applyOptions = Array.isArray(raw.apply_options) ? raw.apply_options : [];
   const named = [
     raw.job_publisher,
-    ...(raw.apply_options ?? []).map((option) => option.publisher),
+    ...applyOptions.map((option) => option?.publisher),
   ];
 
   const platforms: string[] = [];
@@ -295,12 +303,13 @@ export function readPlatforms(raw: JSearchResult): { platforms: string[]; applyD
 
   return {
     platforms,
-    applyDirect: (raw.apply_options ?? []).some((option) => option.is_direct === true),
+    applyDirect: applyOptions.some((option) => option?.is_direct === true),
   };
 }
 
 /** Pure mapping from one JSearch (Google for Jobs) record to Sartho's shape. */
 export function mapJSearchResult(raw: JSearchResult): JobSearchResult | null {
+  if (!raw || typeof raw !== "object") return null;
   const title = raw.job_title?.trim();
   const url = raw.job_apply_link?.trim();
   const description = raw.job_description?.trim();
@@ -398,10 +407,93 @@ async function searchJSearch(query: JobSearchQuery): Promise<JobSearchResult[]> 
     throw new Error(`JSearch returned ${response.status}${detail ? ` — ${detail}` : ""} [${keyHint}]`);
   }
 
-  const body = (await response.json()) as { data?: JSearchResult[] };
-  return (body.data ?? [])
+  let body: unknown;
+  try {
+    body = await response.json();
+  } catch {
+    throw new Error(`JSearch returned non-JSON response (${response.status})`);
+  }
+
+  return extractJSearchJobs(body)
     .map(mapJSearchResult)
     .filter((item): item is JobSearchResult => item !== null);
+}
+
+/**
+ * Safely extracts JSearch job listing records from various API response shapes.
+ *
+ * RapidAPI JSearch returns `{ status: "OK", data: JSearchResult[] }` on success,
+ * but can return `{ status: "OK", data: {} }` on empty results or wrapped shapes
+ * like `{ data: { jobs: [...] } }`. If an error payload is returned with HTTP 200,
+ * this throws a descriptive error with the API message so telemetry captures it
+ * rather than throwing a TypeError.
+ */
+export function extractJSearchJobs(body: unknown): JSearchResult[] {
+  if (!body || typeof body !== "object") return [];
+
+  const record = body as Record<string, unknown>;
+
+  // Check for explicit API error fields even if HTTP status was 200
+  if (record.status === "ERROR" || record.error) {
+    let detail = "";
+    const errorObj = record.error;
+    if (typeof errorObj === "string") {
+      detail = errorObj;
+    } else if (errorObj && typeof errorObj === "object") {
+      const errRecord = errorObj as Record<string, unknown>;
+      if (typeof errRecord.message === "string") {
+        detail = errRecord.message;
+      } else if (typeof errRecord.code === "string" || typeof errRecord.code === "number") {
+        detail = String(errRecord.code);
+      }
+    }
+    if (!detail && typeof record.message === "string") {
+      detail = record.message;
+    }
+    if (!detail && record.data && typeof record.data === "object") {
+      const dataRecord = record.data as Record<string, unknown>;
+      if (typeof dataRecord.error === "string") detail = dataRecord.error;
+      else if (typeof dataRecord.message === "string") detail = dataRecord.message;
+    }
+    if (detail) {
+      throw new Error(detail);
+    }
+    if (record.status === "ERROR") {
+      throw new Error("JSearch API returned status: ERROR");
+    }
+  }
+
+  // 1. Standard JSearch response: body.data is an array
+  if (Array.isArray(record.data)) {
+    return record.data as JSearchResult[];
+  }
+
+  // 2. Nested dictionary in data (e.g. data.jobs, data.results, or empty dictionary {})
+  if (record.data && typeof record.data === "object") {
+    const nested = record.data as Record<string, unknown>;
+    if (Array.isArray(nested.jobs)) return nested.jobs as JSearchResult[];
+    if (Array.isArray(nested.results)) return nested.results as JSearchResult[];
+    if (Array.isArray(nested.data)) return nested.data as JSearchResult[];
+    if (typeof nested.error === "string") throw new Error(nested.error);
+    if (typeof nested.message === "string") throw new Error(nested.message);
+    // Non-array data object (e.g. empty dictionary {} when zero results match)
+    return [];
+  }
+
+  // 3. Top-level array
+  if (Array.isArray(body)) {
+    return body as JSearchResult[];
+  }
+
+  // 4. Top-level jobs / results array
+  if (Array.isArray(record.jobs)) {
+    return record.jobs as JSearchResult[];
+  }
+  if (Array.isArray(record.results)) {
+    return record.results as JSearchResult[];
+  }
+
+  return [];
 }
 
 /**
