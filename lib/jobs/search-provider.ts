@@ -365,6 +365,8 @@ export function buildJSearchParams(query: JobSearchQuery): URLSearchParams {
   return params;
 }
 
+let cachedJSearchEndpoint: "search" | "search-v2" | null = null;
+
 async function searchJSearch(query: JobSearchQuery): Promise<JobSearchResult[]> {
   const config = jsearchConfig();
   if (!config) throw new JobSearchNotConfiguredError();
@@ -376,19 +378,23 @@ async function searchJSearch(query: JobSearchQuery): Promise<JobSearchResult[]> 
   };
 
   // Primary endpoint on RapidAPI is /search; some configurations or accounts use /search-v2.
-  // Query /search first, falling back to /search-v2 if 404 is encountered.
-  let response = await fetch(`https://jsearch.p.rapidapi.com/search?${searchParams}`, {
+  // Cache the working endpoint so we don't encounter redundant 404 round-trips.
+  const endpoint = cachedJSearchEndpoint ?? "search";
+  let response = await fetch(`https://jsearch.p.rapidapi.com/${endpoint}?${searchParams}`, {
     method: "GET",
     headers,
-    signal: AbortSignal.timeout(30_000),
+    signal: AbortSignal.timeout(8_000),
   });
 
-  if (response.status === 404) {
+  if (response.status === 404 && endpoint === "search") {
+    cachedJSearchEndpoint = "search-v2";
     response = await fetch(`https://jsearch.p.rapidapi.com/search-v2?${searchParams}`, {
       method: "GET",
       headers,
-      signal: AbortSignal.timeout(30_000),
+      signal: AbortSignal.timeout(8_000),
     });
+  } else if (response.ok && cachedJSearchEndpoint === null) {
+    cachedJSearchEndpoint = "search";
   }
   if (!response.ok) {
     // Surface RapidAPI's own reason (e.g. "You are not subscribed to this API")

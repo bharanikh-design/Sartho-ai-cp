@@ -86,11 +86,26 @@ export function JobSearchPanel({
     setPage(0);
     try {
       const response = await fetch("/api/jobs/search", { method: "POST" });
-      const data = await response.json() as { results?: SearchResult[]; criteria?: SearchCriteria; error?: string; code?: string };
+      let data: { results?: SearchResult[]; criteria?: SearchCriteria; error?: string; code?: string } = {};
+      const contentType = response.headers.get("content-type") ?? "";
+      if (contentType.includes("application/json")) {
+        try {
+          data = (await response.json()) as typeof data;
+        } catch {
+          // non-JSON or malformed payload
+        }
+      }
       if (!response.ok) {
         if (data.code === "not_configured") { setStatus("not_configured"); return; }
         if (data.code === "no_targets") { setStatus("no_targets"); setError(data.error ?? null); return; }
-        throw new Error(data.error ?? "Search failed.");
+        if (data.error) throw new Error(data.error);
+        if (response.status === 504) {
+          throw new Error("Job search timed out while querying job boards. Please retry or narrow target locations.");
+        }
+        if (response.status === 502) {
+          throw new Error("Job search provider gateway error (502). Please retry in a moment.");
+        }
+        throw new Error(`Search request failed with status ${response.status}.`);
       }
       setResults(data.results ?? []);
       setCriteria(data.criteria ?? null);
