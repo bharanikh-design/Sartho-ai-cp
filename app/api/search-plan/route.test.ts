@@ -17,7 +17,7 @@ describe("search plan boundary", () => {
       country: "AU",
       targetLocations: ["Sydney"],
       targetCompanies: ["PwC", "Deloitte"],
-      remotePreference: "Flexible",
+      remotePreferences: ["Flexible"],
       sources: [source],
     });
     expect(parsed.success).toBe(true);
@@ -31,7 +31,7 @@ describe("search plan boundary", () => {
     const parsed = searchPlanSchema.safeParse({
       country: "in",
       targetLocations: [],
-      remotePreference: "Remote",
+      remotePreferences: ["Remote"],
       sources: [source],
     });
     expect(parsed.success).toBe(true);
@@ -41,22 +41,22 @@ describe("search plan boundary", () => {
   it("still accepts a brief from before the country model", () => {
     expect(searchPlanSchema.safeParse({
       targetLocations: ["Singapore"],
-      remotePreference: "Flexible",
+      remotePreferences: ["Flexible"],
       sources: [source],
     }).success).toBe(true);
   });
 
   it("normalises uk to gb and nulls an unknown market", () => {
-    const uk = searchPlanSchema.safeParse({ country: "UK", targetLocations: [], remotePreference: "Flexible", sources: [source] });
+    const uk = searchPlanSchema.safeParse({ country: "UK", targetLocations: [], remotePreferences: ["Flexible"], sources: [source] });
     expect(uk.success && uk.data.country).toBe("gb");
-    const unknown = searchPlanSchema.safeParse({ country: "zz", targetLocations: [], remotePreference: "Flexible", sources: [source] });
+    const unknown = searchPlanSchema.safeParse({ country: "zz", targetLocations: [], remotePreferences: ["Flexible"], sources: [source] });
     expect(unknown.success && unknown.data.country).toBeNull();
   });
 
   it("rejects a brief with no active source", () => {
     expect(searchPlanSchema.safeParse({
       targetLocations: ["Singapore"],
-      remotePreference: "Flexible",
+      remotePreferences: ["Flexible"],
       sources: [{ ...source, active: false }],
     }).success).toBe(false);
   });

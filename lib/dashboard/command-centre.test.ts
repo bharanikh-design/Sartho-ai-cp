@@ -35,7 +35,7 @@ const readyInput: ProductJourneyInput = {
     targetLocations: ["Singapore"],
     targetCompanies: [],
     experienceLevel: null,
-    remotePreference: "Flexible",
+    remotePreferences: ["Flexible"],
     sources: [{ id: "official", name: "Employer", url: "https://example.com/jobs", type: "Official", coverage: "Global", trust: "Primary", active: true }],
   },
 };

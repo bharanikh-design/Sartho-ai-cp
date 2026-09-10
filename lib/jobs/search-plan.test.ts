@@ -30,7 +30,7 @@ describe("planSearchQueries", () => {
     country: "au",
     locations: ["Sydney", "Melbourne", "Brisbane"],
     companies: ["PwC", "Deloitte", "KPMG", "Accenture", "BCG"],
-    remotePreference: "Hybrid",
+    remotePreferences: ["Hybrid"],
   };
 
   it("scopes every query to the person's country", () => {
@@ -123,7 +123,7 @@ describe("planSearchQueries", () => {
   });
 
   it("asks for remote-only listings when the work model is Remote", () => {
-    expect(planSearchQueries({ ...brief, remotePreference: "Remote" }).every((query) => query.remoteOnly)).toBe(true);
+    expect(planSearchQueries({ ...brief, remotePreferences: ["Remote"] }).every((query) => query.remoteOnly)).toBe(true);
     expect(planSearchQueries(brief).some((query) => query.remoteOnly)).toBe(false);
   });
 
@@ -139,13 +139,13 @@ describe("widenToCountry", () => {
       country: "au",
       locations: ["Sydney", "Melbourne"],
       companies: ["PwC"],
-      remotePreference: "Flexible",
+      remotePreferences: ["Flexible"],
     }));
     expect(widened.map((query) => query.keywords)).toEqual(["Business Analyst", "Data Analyst"]);
     expect(widened.every((query) => query.location === undefined && !query.employer && query.country === "au")).toBe(true);
   });
 
   it("has nothing to widen when the brief was already nationwide", () => {
-    expect(widenToCountry(planSearchQueries({ roles: ["BA"], country: "in", locations: [], companies: [], remotePreference: null }))).toEqual([]);
+    expect(widenToCountry(planSearchQueries({ roles: ["BA"], country: "in", locations: [], companies: [], remotePreferences: [] }))).toEqual([]);
   });
 });

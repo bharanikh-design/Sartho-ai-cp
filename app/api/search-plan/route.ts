@@ -23,7 +23,7 @@ export const searchPlanSchema = z.object({
   // that falls back to the résumé-derived total rather than to zero.
   experienceLevel: z.string().trim().max(10).nullable().optional()
     .transform((value) => normaliseExperienceBand(value)),
-  remotePreference: z.enum(["On-site", "Hybrid", "Remote", "Flexible"]),
+  remotePreferences: z.array(z.enum(["On-site", "Hybrid", "Remote", "Flexible"])).default([]),
   sources: z.array(z.object({ id: z.string().min(1).max(100), name: z.string().trim().min(1).max(180), url: z.string().url().startsWith("https://"), type: z.string().max(100), coverage: z.string().max(100), trust: z.string().max(100), active: z.boolean() })).min(1).max(40)
     .refine((sources) => sources.some((source) => source.active), "Choose at least one active source."),
 });
@@ -54,7 +54,7 @@ export async function PUT(request: Request) {
     target_locations: dedupe(parsed.data.targetLocations),
     target_companies: dedupe(parsed.data.targetCompanies),
     experience_level: parsed.data.experienceLevel,
-    remote_preference: parsed.data.remotePreference,
+    remote_preference: parsed.data.remotePreferences.join(","),
     sources: parsed.data.sources,
     updated_at: new Date().toISOString(),
   });

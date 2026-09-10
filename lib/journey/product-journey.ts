@@ -56,7 +56,7 @@ export function buildProductJourney(input: ProductJourneyInput): ProductJourneyS
     || input.searchPreferences.targetLocations.length > 0;
   const searchComplete = hasCoverage
     && activeSources > 0
-    && Boolean(input.searchPreferences.remotePreference);
+    && input.searchPreferences.remotePreferences.length > 0;
   const coverageLabel = input.searchPreferences.targetLocations.length
     ? `${input.searchPreferences.targetLocations.length} locations`
     : `${input.searchPreferences.country?.toUpperCase() ?? "?"} nationwide`;

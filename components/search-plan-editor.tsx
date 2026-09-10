@@ -55,7 +55,7 @@ export function SearchPlanEditor({
   initialEmploymentTypes: string[];
   initialLocations: string[];
   initialCompanies: string[];
-  initialRemote: string;
+  initialRemotePreferences: string[];
   targetLanes: TargetLaneRecord[];
   /** Employers found in the saved cities list and moved across on load. */
   movedCompanies?: number;
@@ -84,7 +84,7 @@ export function SearchPlanEditor({
   const [employmentTypes, setEmploymentTypes] = useState(initialEmploymentTypes);
   const [locations, setLocations] = useState(initialLocations);
   const [companies, setCompanies] = useState(initialCompanies);
-  const [remote, setRemote] = useState(initialRemote);
+  const [remotePreferences, setRemotePreferences] = useState(initialRemotePreferences);
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
 
   /*
@@ -115,14 +115,14 @@ export function SearchPlanEditor({
   const hasChanges = useMemo(() => {
     if (!sameList(codes, initialCountries)) return true;
     if (movedCompanies > 0) return true;
-    if (remote !== initialRemote) return true;
+    if (!sameList(remotePreferences, initialRemotePreferences)) return true;
     /* A band suggested from the résumé but never saved is a change too. */
     if (experience !== initialExperience) return true;
     if (!sameList(employmentTypes, initialEmploymentTypes)) return true;
     if (!sameList(locations, initialLocations)) return true;
     if (!sameList(companies, initialCompanies)) return true;
     return false;
-  }, [codes, movedCompanies, remote, experience, employmentTypes, locations, companies, initialCountries, initialRemote, initialExperience, initialEmploymentTypes, initialLocations, initialCompanies]);
+  }, [codes, movedCompanies, remotePreferences, experience, employmentTypes, locations, companies, initialCountries, initialRemotePreferences, initialExperience, initialEmploymentTypes, initialLocations, initialCompanies]);
 
   async function save() {
     if (!hasChanges) return;
@@ -138,7 +138,7 @@ export function SearchPlanEditor({
         sources: sources.some((source) => source.active) ? sources : DEFAULT_JOB_SOURCES,
         targetLocations: locations,
         targetCompanies: companies,
-        remotePreference: remote || "Flexible",
+        remotePreferences,
       }),
     });
     setStatus(response.ok ? "saved" : "error");
@@ -417,7 +417,16 @@ export function SearchPlanEditor({
             </label>
             <div className="work-model-options" role="group" aria-label="Preferred work model" style={{ marginTop: 0 }}>
               {["On-site", "Hybrid", "Remote", "Flexible"].map((option) => (
-                <button key={option} type="button" className={remote === option ? "is-selected" : ""} onClick={() => setRemote(option)}>{option}</button>
+                <button 
+                  key={option} 
+                  type="button" 
+                  className={remotePreferences.includes(option) ? "is-selected" : ""} 
+                  onClick={() => setRemotePreferences(prev => 
+                    prev.includes(option) ? prev.filter(p => p !== option) : [...prev, option]
+                  )}
+                >
+                  {option}
+                </button>
               ))}
             </div>
           </div>

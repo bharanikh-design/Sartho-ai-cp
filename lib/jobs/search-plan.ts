@@ -67,7 +67,7 @@ export function planSearchQueries(input: {
   country: string;
   locations: string[];
   companies: string[];
-  remotePreference: string | null;
+  remotePreferences: string[];
   employmentTypes?: string[];
   /**
    * This market's words for a graduate role, when the person is early enough in
@@ -75,7 +75,7 @@ export function planSearchQueries(input: {
    */
   entryLevelTerms?: string[];
 }): JobSearchQuery[] {
-  const remoteOnly = input.remotePreference === "Remote";
+  const remoteOnly = input.remotePreferences.length === 1 && input.remotePreferences[0] === "Remote";
   const employmentTypes = input.employmentTypes?.length ? input.employmentTypes : undefined;
   const locations = input.locations.map((item) => item.trim()).filter(Boolean).slice(0, MAX_LOCATION_QUERIES);
   const primaryLocation = locations[0];

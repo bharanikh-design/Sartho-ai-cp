@@ -30,7 +30,7 @@ const ready: ProductJourneyInput = {
     targetLocations: ["Singapore"],
     targetCompanies: [],
     experienceLevel: null,
-    remotePreference: "Flexible",
+    remotePreferences: ["Flexible"],
     sources: [{ id: "official", name: "Employer", url: "https://example.com/jobs", type: "Official", coverage: "Global", trust: "Primary", active: true }],
   },
 };
@@ -55,7 +55,7 @@ describe("product journey", () => {
   it("requires search coverage before the dashboard is activated", () => {
     const state = buildProductJourney({
       ...ready,
-      searchPreferences: { country: null, countries: [], employmentTypes: [], targetLocations: [], targetCompanies: [], experienceLevel: null, remotePreference: "Flexible", sources: [] },
+      searchPreferences: { country: null, countries: [], employmentTypes: [], targetLocations: [], targetCompanies: [], experienceLevel: null, remotePreferences: ["Flexible"], sources: [] },
     });
     expect(state.activated).toBe(false);
     expect(state.current.id).toBe("search");

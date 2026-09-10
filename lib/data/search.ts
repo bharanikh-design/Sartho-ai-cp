@@ -26,7 +26,7 @@ export type SearchPreferences = {
    * said — which is not zero, and falls back to the résumé-derived total.
    */
   experienceLevel: ExperienceBandId | null;
-  remotePreference: string | null;
+  remotePreferences: string[];
   sources: SearchSourcePreference[];
 };
 
@@ -59,7 +59,9 @@ export async function getSearchPreferences(supabase: SupabaseClient, userId: str
     targetLocations: stringList(data?.target_locations),
     targetCompanies: stringList(data?.target_companies),
     experienceLevel: normaliseExperienceBand(data?.experience_level),
-    remotePreference: typeof data?.remote_preference === "string" ? data.remote_preference : null,
+    remotePreferences: typeof data?.remote_preference === "string" && data.remote_preference.trim()
+      ? data.remote_preference.split(",")
+      : [],
     sources: Array.isArray(data?.sources) ? data.sources.filter(isSearchSource) : [],
   };
 }

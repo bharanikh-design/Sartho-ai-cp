@@ -65,7 +65,7 @@ export default async function SearchPlanPage() {
         initialEmploymentTypes={preferences.employmentTypes}
         initialLocations={split.locations}
         initialCompanies={split.companies}
-        initialRemote={preferences.remotePreference ?? "Flexible"}
+        initialRemotePreferences={preferences.remotePreferences}
         targetLanes={lanes}
         movedCompanies={split.moved}
       />
