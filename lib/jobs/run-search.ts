@@ -20,6 +20,7 @@ import { scoreOpportunity } from "@/lib/matching/opportunity-score";
 import { candidateSeniority, isEntryLevelTitle } from "@/lib/matching/title-fit";
 import { seniorityReach } from "@/lib/matching/seniority-reach";
 import { searchEmployerDirectly } from "@/lib/jobs/company-careers/registry";
+import { deduplicateSearchResults, isMarketLocationConsistent } from "@/lib/jobs/location-guard";
 import {
   MAX_COMPANY_QUERIES,
   MAX_LOCATION_QUERIES,
@@ -480,6 +481,7 @@ export async function runBriefSearch(
   for (const match of scoredByUrl.values()) {
     if (!seniorityReach(match.title, heldTitles, seniorityYears).withinReach) { tooSenior += 1; continue; }
     if (!familyFit(match.title, heldTitles, roleNames).withinReach) { offFamily += 1; continue; }
+    if (!isMarketLocationConsistent(match, country)) continue;
     survivors.push(match);
   }
   survivors.sort((a, b) => b.overallMatch - a.overallMatch);
@@ -547,7 +549,8 @@ export async function runBriefSearch(
     withinReach.push(match);
   }
 
-  const results: ScoredJobMatch[] = withinReach.slice(0, options.maxResults ?? 20);
+  const deduplicated = deduplicateSearchResults(withinReach);
+  const results: ScoredJobMatch[] = deduplicated.slice(0, options.maxResults ?? 20);
 
   const criteria: SearchCriteria = {
     country,
