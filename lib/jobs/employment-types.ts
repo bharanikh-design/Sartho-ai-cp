@@ -85,11 +85,18 @@ export function jsearchEmploymentTypes(selected: string[]): string | null {
 
 /** Adzuna's boolean flags for a selection. */
 export function adzunaEmploymentParams(selected: string[]): string[] {
-  return [...new Set(
+  const params = [...new Set(
     selected
       .map((id) => employmentType(id)?.adzunaParam)
       .filter((param): param is NonNullable<typeof param> => Boolean(param)),
   )];
+
+  // Adzuna treats contract=1 and permanent=1 as mutually exclusive. Sending both returns 400 Bad Request.
+  // When a candidate is open to both contract and permanent work, omit the conflicting contract-type flags.
+  if (params.includes("contract") && params.includes("permanent")) {
+    return params.filter((param) => param !== "contract" && param !== "permanent");
+  }
+  return params;
 }
 
 /** Words to fold into the query text for selections THIS provider cannot filter. */
