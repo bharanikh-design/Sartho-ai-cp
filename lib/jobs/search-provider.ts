@@ -360,17 +360,27 @@ async function searchJSearch(query: JobSearchQuery): Promise<JobSearchResult[]> 
   const config = jsearchConfig();
   if (!config) throw new JobSearchNotConfiguredError();
 
-  // JSearch v5's endpoint is /search-v2 (the old /search 404s with
-  // "endpoint does not exist"). Headers mirror RapidAPI's own snippet; JSearch
-  // can take ~25s to answer, so the timeout is generous.
-  const response = await fetch(`https://jsearch.p.rapidapi.com/search-v2?${buildJSearchParams(query).toString()}`, {
+  const searchParams = buildJSearchParams(query).toString();
+  const headers = {
+    "x-rapidapi-key": config.key,
+    "x-rapidapi-host": "jsearch.p.rapidapi.com",
+  };
+
+  // Primary endpoint on RapidAPI is /search; some configurations or accounts use /search-v2.
+  // Query /search first, falling back to /search-v2 if 404 is encountered.
+  let response = await fetch(`https://jsearch.p.rapidapi.com/search?${searchParams}`, {
     method: "GET",
-    headers: {
-      "x-rapidapi-key": config.key,
-      "x-rapidapi-host": "jsearch.p.rapidapi.com",
-    },
+    headers,
     signal: AbortSignal.timeout(30_000),
   });
+
+  if (response.status === 404) {
+    response = await fetch(`https://jsearch.p.rapidapi.com/search-v2?${searchParams}`, {
+      method: "GET",
+      headers,
+      signal: AbortSignal.timeout(30_000),
+    });
+  }
   if (!response.ok) {
     // Surface RapidAPI's own reason (e.g. "You are not subscribed to this API")
     // so a configuration mistake is diagnosable instead of a blank 502.
