@@ -333,8 +333,12 @@ export async function runBriefSearch(
           }
           break; // this provider answered; move to the next query
         } catch (caught) {
-          if (caught instanceof JobSearchNotConfiguredError) { dead.add(provider); continue; }
           const label = provider === "jsearch" ? "Google for Jobs" : "Adzuna";
+          if (caught instanceof JobSearchNotConfiguredError) {
+            errors.push(`${label}: API key is not configured in environment variables`);
+            dead.add(provider);
+            continue;
+          }
           errors.push(`${label}: ${caught instanceof Error ? caught.message : "unknown error"}`);
           console.error(`[DEBUG] Provider error on ${label}:`, caught);
           // We intentionally do not call `dead.add(provider)` here so a single timeout doesn't kill the provider for the whole run
