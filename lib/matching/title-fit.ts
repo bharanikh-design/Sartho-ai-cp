@@ -18,9 +18,16 @@ import { normaliseText } from "@/lib/matching/skill-vocabulary";
 export type SeniorityLevel = 0 | 1 | 2 | 3 | 4 | 5;
 
 const SENIORITY_WORDS: Array<{ words: string[]; level: SeniorityLevel }> = [
-  { words: ["intern", "internship", "trainee", "cadet", "graduate", "grad", "entry level", "apprentice"], level: 0 },
+  {
+    words: [
+      "intern", "internship", "trainee", "cadet", "graduate", "grad", "entry level",
+      "apprentice", "vacationer", "fresher", "new grad", "student", "campus",
+      "werkstudent", "praktikant", "praktikum",
+    ],
+    level: 0,
+  },
   { words: ["junior", "assistant", "associate", "jr"], level: 1 },
-  { words: ["senior", "snr", "sr"], level: 3 },
+  { words: ["senior", "snr", "sr", "mid-senior", "experienced"], level: 3 },
   /*
    * "managing" was missing, and it cost a real search: ERM's "Managing
    * Consultant — ESG Due Diligence" scored 96% and was recommended to somebody
@@ -28,9 +35,33 @@ const SENIORITY_WORDS: Array<{ words: string[]; level: SeniorityLevel }> = [
    * " managing ", so the title fell through to the unqualified default of 2,
    * one rung above the candidate, and passed the seniority filter.
    */
-  { words: ["lead", "principal", "staff", "manager", "managing", "management", "executive"], level: 4 },
+  { words: ["lead", "principal", "staff", "manager", "managing", "management", "executive", "expert"], level: 4 },
   { words: ["head", "director", "chief", "vp", "vice president", "partner", "associate director"], level: 5 },
 ];
+
+const ENTRY_TITLE_TERMS = [
+  "intern", "internship", "trainee", "cadet", "graduate", "grad", "entry level",
+  "apprentice", "apprenticeship", "vacationer", "fresher", "new grad", "student",
+  "campus", "junior", "jr", "assistant", "werkstudent", "praktikant", "praktikum",
+];
+
+const SENIOR_TITLE_TERMS = [
+  "senior", "snr", "sr", "lead", "principal", "manager", "managing", "management",
+  "head", "director", "chief", "vp", "vice president", "partner", "associate director",
+  "executive", "staff", "experienced", "mid-senior", "expert",
+];
+
+/** Whether a job title explicitly states it is for people starting out. */
+export function isEntryLevelTitle(title: string): boolean {
+  const haystack = normaliseText(title);
+  return ENTRY_TITLE_TERMS.some((term) => haystack.includes(` ${term} `));
+}
+
+/** Whether a job title explicitly carries senior/leadership qualifiers. */
+export function hasSeniorTitleModifier(title: string): boolean {
+  const haystack = normaliseText(title);
+  return SENIOR_TITLE_TERMS.some((term) => haystack.includes(` ${term} `));
+}
 
 /* Words that describe the shape of a job rather than its subject. */
 const NOISE = new Set([

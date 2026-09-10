@@ -101,6 +101,16 @@ describe("planSearchQueries", () => {
     expect(early[0].entryLevelTerms).toEqual(["graduate program", "entry level"]);
   });
 
+  it("adds early-career cohort queries for target companies", () => {
+    const queries = planSearchQueries({
+      ...brief,
+      entryLevelTerms: ["graduate program", "vacationer"],
+    });
+    const earlyCompanyQueries = queries.filter((q) => q.earlyCareerOnly && q.employer);
+    expect(earlyCompanyQueries.map((q) => q.employer)).toEqual(["PwC", "Deloitte", "KPMG", "Accenture", "BCG"]);
+    expect(earlyCompanyQueries.every((q) => q.keywords === "graduate program")).toBe(true);
+  });
+
   it("does not add the pass for somebody who is not early career", () => {
     const queries = planSearchQueries({ ...brief, companies: [], employmentTypes: [], entryLevelTerms: [] });
     expect(queries.some((query) => query.earlyCareerOnly)).toBe(false);

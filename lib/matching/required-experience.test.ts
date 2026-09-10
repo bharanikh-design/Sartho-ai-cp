@@ -128,10 +128,34 @@ describe("demandsMoreExperience", () => {
     expect(demandsMoreExperience(read(6), 5)).toBe(false);
   });
 
-  it("never filters an advert that invites beginners", () => {
-    /* A graduate programme mentioning "two years of rotations" is not asking
-     * for two years of experience. */
+  it("keeps early career adverts within stretch but strictly filters out senior demands", () => {
+    /* Within stretch for 0 years (0 + 1 = 1 year, or 2 years with stretch): kept */
+    expect(demandsMoreExperience(read(1, true), 0)).toBe(false);
     expect(demandsMoreExperience(read(2, true), 0)).toBe(false);
-    expect(demandsMoreExperience(read(9, true), 0)).toBe(false);
+
+    /* A 4-7 year or 9 year role stating experience strictly overrides soft words */
+    expect(demandsMoreExperience(read(4, true), 0)).toBe(true);
+    expect(demandsMoreExperience(read(7, true), 0)).toBe(true);
+    expect(demandsMoreExperience(read(9, true), 0)).toBe(true);
+  });
+
+  describe("cross-market early career phrasings", () => {
+    const globalPhrasings = [
+      "PwC 2026 Graduate Program Sydney",
+      "Deloitte Summer Vacationer Internship",
+      "New Grad Software Engineer (US)",
+      "Campus Hire Analyst 2025",
+      "UK Graduate Scheme in Finance",
+      "Fresher Trainee in Bangalore",
+      "Fresh Graduate Development Program Dubai",
+      "Werkstudent IT & Business Analytics",
+      "Apprenticeship in Data Science",
+    ];
+
+    for (const text of globalPhrasings) {
+      it(`recognises global term: ${text}`, () => {
+        expect(requiredExperienceIn(text).entryFriendly).toBe(true);
+      });
+    }
   });
 });

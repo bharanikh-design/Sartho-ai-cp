@@ -129,6 +129,19 @@ export function planSearchQueries(input: {
         limit: 20,
       });
     }
+    for (const employer of input.companies.slice(0, MAX_COMPANY_QUERIES)) {
+      const cohortKeywords = entryLevelTerms[0] ?? "graduate";
+      queries.push({
+        keywords: cohortKeywords,
+        country: input.country,
+        employer,
+        remoteOnly,
+        employmentTypes,
+        earlyCareerOnly: true,
+        entryLevelTerms: entryLevelTerms.length ? entryLevelTerms : undefined,
+        limit: 10,
+      });
+    }
   }
 
   return queries;
