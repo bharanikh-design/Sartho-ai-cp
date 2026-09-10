@@ -73,22 +73,22 @@ const YEARS_PATTERN = new RegExp(
  */
 const ENTRY_FRIENDLY = new RegExp([
   String.raw`no\s+(?:prior\s+|previous\s+|professional\s+)?experience\s+(?:is\s+)?(?:required|necessary|needed)`,
-  String.raw`graduate\s+(?:programme|program|scheme|role|position|opportunit)`,
-  String.raw`\bfresh\s+graduate`,
+  String.raw`graduate\s+(?:programme|program|scheme|role|position|opportunit|intake|development|trainee)`,
+  String.raw`\bfresh\s+graduates?\b`,
   String.raw`\bfreshers?\b`,
   String.raw`\bentry[\s-]level\b`,
-  String.raw`\binternship\b`,
-  String.raw`\bintern\b`,
+  String.raw`\binternships?\b`,
+  String.raw`\bintern\s+(?:role|position|program|programme|scheme|opportunity|hire)\b`,
+  String.raw`\bsummer\s+intern(?:ship)?s?\b`,
+  String.raw`\bvacationer\b`,
+  String.raw`\bwerkstudent(?:in)?\b`,
+  String.raw`\bpraktik(?:um|ant)\b`,
   String.raw`\btrainee\b`,
-  String.raw`\bapprentice`,
+  String.raw`\bapprentice(?:ship)?\b`,
   String.raw`\bcampus\s+hire`,
+  String.raw`\bnew\s+grads?\b`,
   String.raw`recent\s+graduates?`,
   String.raw`\b0\s*(?:-|–|to)\s*[12]\s*years?`,
-  /*
-   * Joined explicitly. Handing the array itself to RegExp stringifies it with
-   * commas, producing one literal pattern that matches nothing — silently, and
-   * in the direction that filters graduates out of graduate programmes.
-   */
 ].join("|"), "i");
 
 /** The window either side of a number in which an experience word still counts. */
@@ -146,14 +146,21 @@ export function requiredExperienceIn(description: string): RequiredExperience {
  * would actually have got. What this exists to remove is the eight-years-plus
  * wall, not the near miss.
  *
- * And an advert that welcomes beginners is never filtered, whatever number
- * appears elsewhere in it — a graduate programme mentioning "two years of
- * rotations" is not asking for two years of experience.
+ * However, explicit numerical demands take strict precedence over soft words.
+ * An advert stating "4 to 7 years experience" that happens to mention a
+ * "graduate degree" or an "intern" is unequivocally out of reach for someone
+ * with 0-1 years. A genuine entry-level posting ("0-2 years") is admitted.
  */
 export const EXPERIENCE_STRETCH_YEARS = 1;
 
 export function demandsMoreExperience(required: RequiredExperience, candidateYears: number): boolean {
-  if (required.entryFriendly) return false;
-  if (required.minYears === null) return false;
-  return required.minYears > candidateYears + EXPERIENCE_STRETCH_YEARS;
+  if (required.minYears !== null) {
+    // If an advert specifically welcomes beginners/graduates and asks for up to 2 years,
+    // it is within reach for early career applicants.
+    if (required.entryFriendly && required.minYears <= 2) {
+      return false;
+    }
+    return required.minYears > candidateYears + EXPERIENCE_STRETCH_YEARS;
+  }
+  return false;
 }

@@ -336,8 +336,10 @@ export function mapJSearchResult(raw: JSearchResult): JobSearchResult | null {
  */
 export function buildJSearchParams(query: JobSearchQuery): URLSearchParams {
   let text = query.keywords.trim();
-  const hints = employmentQueryHints(query.employmentTypes ?? [], "jsearch");
-  if (hints.length) text = `${text} ${hints.join(" ")}`;
+  if (!query.earlyCareerOnly) {
+    const hints = employmentQueryHints(query.employmentTypes ?? [], "jsearch");
+    if (hints.length) text = `${text} ${hints.join(" ")}`;
+  }
   if (query.employer?.trim()) text = `${text} at ${query.employer.trim()}`;
   if (query.location?.trim()) text = `${text} in ${query.location.trim()}`;
   const params = new URLSearchParams({
@@ -347,8 +349,10 @@ export function buildJSearchParams(query: JobSearchQuery): URLSearchParams {
     country: resolveCountry(query),
   });
   if (query.remoteOnly) params.set("work_from_home", "true");
-  const employment = jsearchEmploymentTypes(query.employmentTypes ?? []);
-  if (employment) params.set("employment_types", employment);
+  if (!query.earlyCareerOnly) {
+    const employment = jsearchEmploymentTypes(query.employmentTypes ?? []);
+    if (employment) params.set("employment_types", employment);
+  }
   return params;
 }
 

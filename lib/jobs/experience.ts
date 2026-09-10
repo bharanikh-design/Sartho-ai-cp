@@ -133,14 +133,19 @@ export function yearsForSeniority(band: ExperienceBand): number {
  * extra required word would empty the page.
  */
 const ENTRY_LEVEL_TERMS: Record<string, string[]> = {
-  au: ["graduate program", "graduate", "entry level", "internship"],
+  au: ["graduate program", "vacationer", "graduate", "entry level", "internship", "cadet"],
   nz: ["graduate program", "graduate", "entry level", "internship"],
-  gb: ["graduate scheme", "graduate", "entry level", "internship"],
+  gb: ["graduate scheme", "graduate programme", "industrial placement", "spring week", "internship"],
   ie: ["graduate programme", "graduate", "entry level", "internship"],
-  us: ["entry level", "new grad", "graduate", "internship"],
-  ca: ["entry level", "new grad", "graduate", "internship"],
-  in: ["fresher", "graduate trainee", "entry level", "internship"],
-  sg: ["management trainee", "graduate", "entry level", "internship"],
+  us: ["new grad", "campus hire", "entry level", "university graduate", "internship", "summer analyst"],
+  ca: ["new grad", "campus hire", "entry level", "university graduate", "internship"],
+  in: ["fresher", "graduate trainee", "campus recruitment", "management trainee", "entry level", "internship"],
+  ae: ["fresh graduate", "graduate program", "graduate development program", "national graduate", "internship"],
+  sa: ["fresh graduate", "graduate development program", "graduate program", "entry level", "internship"],
+  de: ["trainee", "werkstudent", "graduate program", "junior", "praktikum"],
+  fr: ["stage", "alternance", "jeune diplome", "graduate program"],
+  nl: ["traineeship", "starter", "graduate program", "stage", "junior"],
+  sg: ["management trainee", "graduate program", "entry level", "internship"],
 };
 
 const DEFAULT_ENTRY_LEVEL_TERMS = ["graduate", "entry level", "internship"];

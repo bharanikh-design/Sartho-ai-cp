@@ -17,8 +17,9 @@ import { familyFit, reachFrom } from "@/lib/matching/job-family";
 import { demandsMoreExperience, requiredExperienceIn } from "@/lib/matching/required-experience";
 import { fetchAdvertText } from "@/lib/jobs/advert-text";
 import { scoreOpportunity } from "@/lib/matching/opportunity-score";
-import { candidateSeniority } from "@/lib/matching/title-fit";
+import { candidateSeniority, isEntryLevelTitle } from "@/lib/matching/title-fit";
 import { seniorityReach } from "@/lib/matching/seniority-reach";
+import { searchEmployerDirectly } from "@/lib/jobs/company-careers/registry";
 import {
   MAX_COMPANY_QUERIES,
   MAX_LOCATION_QUERIES,
@@ -173,8 +174,8 @@ const ADVERT_BUDGET_MS = 12_000;
 function readRequirement(text: string): { requiredYears: number | null; requiredEvidence: string | null } {
   const required = requiredExperienceIn(text);
   return {
-    requiredYears: required.entryFriendly ? null : required.minYears,
-    requiredEvidence: required.entryFriendly ? null : required.evidence,
+    requiredYears: required.minYears,
+    requiredEvidence: required.evidence,
   };
 }
 
@@ -341,6 +342,36 @@ export async function runBriefSearch(
 
   await run(queries);
 
+  /*
+   * Direct company career portal search: for target employers that have known
+   * ATS endpoints (Workday CXS, Greenhouse), query them directly to fetch
+   * authentic first-party listings with direct apply links and 0 CAPTCHAs.
+   */
+  if (brief.companies.length) {
+    const directTerm = earlyCareerPass
+      ? (entryLevelTermsFor(country)[0] ?? "graduate")
+      : (activeLanes[0]?.name ? toSearchKeywords(activeLanes[0].name) : "analyst");
+
+    const directQueries = brief.companies.slice(0, 6).map(async (employer) => {
+      try {
+        const directMatches = await searchEmployerDirectly(employer, {
+          employer,
+          searchText: directTerm,
+          country,
+          limit: 10,
+        });
+        for (const item of directMatches) {
+          if (!byUrl.has(item.url)) byUrl.set(item.url, item);
+        }
+        if (directMatches.length) providersUsed.add("Company Careers");
+      } catch {
+        // Direct ATS query failure is non-fatal; aggregator covers it.
+      }
+    });
+
+    await Promise.allSettled(directQueries);
+  }
+
   if (!byUrl.size && errors.length) {
     console.error("Jobs search failed", errors);
     return { ok: false, code: "provider_error", error: `Jobs provider error: ${errors[errors.length - 1]}` };
@@ -500,6 +531,18 @@ export async function runBriefSearch(
     if (filterYears !== null && match.requiredYears !== null) {
       const required = { minYears: match.requiredYears, evidence: match.requiredEvidence, entryFriendly: false };
       if (demandsMoreExperience(required, filterYears)) { tooMuchExperience += 1; continue; }
+    } else if (earlyCareerPass && match.requiredYears === null) {
+      // For early career (0-1 years), an advert whose requirements could not be
+      // read from scraping or snippets must show affirmative entry-level evidence.
+      // Unqualified mid-level roles (e.g. "Associate Consultant", "Financial Analyst")
+      // that asked for 3-7 years on anti-bot protected pages are thus prevented
+      // from flooding the feed.
+      const entryInTitle = isEntryLevelTitle(match.title);
+      const entryInBody = requiredExperienceIn(`${match.title}. ${match.description}`).entryFriendly;
+      if (!entryInTitle && !entryInBody && !match.applyDirect) {
+        tooMuchExperience += 1;
+        continue;
+      }
     }
     withinReach.push(match);
   }

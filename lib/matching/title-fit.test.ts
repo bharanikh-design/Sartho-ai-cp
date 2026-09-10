@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { candidateSeniority, scoreTitleFit, seniorityOf, titleSubject } from "./title-fit";
+import {
+  candidateSeniority,
+  hasSeniorTitleModifier,
+  isEntryLevelTitle,
+  scoreTitleFit,
+  seniorityOf,
+  titleSubject,
+} from "./title-fit";
 
 describe("seniorityOf", () => {
   it("reads the level from the words a title uses", () => {
@@ -9,6 +16,36 @@ describe("seniorityOf", () => {
     expect(seniorityOf("Senior Business Analyst")).toBe(3);
     expect(seniorityOf("Engagement Manager")).toBe(4);
     expect(seniorityOf("Head of Transformation")).toBe(5);
+  });
+});
+
+describe("isEntryLevelTitle", () => {
+  it("identifies global entry-level and graduate titles", () => {
+    expect(isEntryLevelTitle("2026 Graduate Program - Technology")).toBe(true);
+    expect(isEntryLevelTitle("Summer Vacationer - Audit & Assurance")).toBe(true);
+    expect(isEntryLevelTitle("Junior Financial Analyst")).toBe(true);
+    expect(isEntryLevelTitle("Fresher Software Engineer")).toBe(true);
+    expect(isEntryLevelTitle("Campus Hire Consultant")).toBe(true);
+    expect(isEntryLevelTitle("Werkstudent Business Analytics")).toBe(true);
+    expect(isEntryLevelTitle("Intern - Corporate Banking")).toBe(true);
+
+    expect(isEntryLevelTitle("Business Analyst")).toBe(false);
+    expect(isEntryLevelTitle("Senior Consultant")).toBe(false);
+    expect(isEntryLevelTitle("Project Manager")).toBe(false);
+  });
+});
+
+describe("hasSeniorTitleModifier", () => {
+  it("identifies senior or leadership modifiers", () => {
+    expect(hasSeniorTitleModifier("Senior Business Analyst")).toBe(true);
+    expect(hasSeniorTitleModifier("Lead Developer")).toBe(true);
+    expect(hasSeniorTitleModifier("Principal Consultant")).toBe(true);
+    expect(hasSeniorTitleModifier("Engineering Manager")).toBe(true);
+    expect(hasSeniorTitleModifier("Mid-Senior Banking Specialist")).toBe(true);
+
+    expect(hasSeniorTitleModifier("Graduate Analyst")).toBe(false);
+    expect(hasSeniorTitleModifier("Business Analyst")).toBe(false);
+    expect(hasSeniorTitleModifier("Junior Developer")).toBe(false);
   });
 });
 
