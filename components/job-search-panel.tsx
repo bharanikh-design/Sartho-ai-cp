@@ -300,6 +300,11 @@ export function JobSearchPanel({
             ? <> · {criteria.employmentHinted.join(" and ")} searched by keyword only — no provider filters for {criteria.employmentHinted.length === 1 ? "it" : "them"}</>
             : null}
           {criteria.providers.length ? <> · via {criteria.providers.join(" + ")}</> : null}
+          {criteria.providerErrors?.length ? (
+            <span style={{ color: "#e0b061" }}>
+              {" "}· provider note: {criteria.providerErrors.join("; ")}
+            </span>
+          ) : null}
           {criteria.countrySource === "default" ? <> · <Link href="#country">choose your country</Link> to search the right market</> : null}
           {criteria.tooSenior ? <> · {criteria.tooSenior} hidden as too senior for your experience</> : null}
           {/*

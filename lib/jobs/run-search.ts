@@ -148,6 +148,7 @@ export type SearchCriteria = {
   roles: string[];
   remoteOnly: boolean;
   providers: string[];
+  providerErrors?: string[];
   queriesRun: number;
   queriesSkipped: number;
 };
@@ -333,7 +334,8 @@ export async function runBriefSearch(
           break; // this provider answered; move to the next query
         } catch (caught) {
           if (caught instanceof JobSearchNotConfiguredError) { dead.add(provider); continue; }
-          errors.push(`${provider}: ${caught instanceof Error ? caught.message : "unknown error"}`);
+          const label = provider === "jsearch" ? "Google for Jobs" : "Adzuna";
+          errors.push(`${label}: ${caught instanceof Error ? caught.message : "unknown error"}`);
           dead.add(provider); // fall through to the next provider for this and later queries
         }
       }
@@ -585,6 +587,7 @@ export async function runBriefSearch(
     roles: activeLanes.map((lane) => toSearchKeywords(lane.name)),
     remoteOnly: preferences.remotePreference === "Remote",
     providers: Array.from(providersUsed),
+    providerErrors: errors.length ? errors : undefined,
     queriesRun,
     queriesSkipped,
   };
