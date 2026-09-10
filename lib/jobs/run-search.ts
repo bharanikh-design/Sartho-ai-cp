@@ -310,7 +310,7 @@ export async function runBriefSearch(
    * is skipped for the rest of this run.
    */
   const startedAt = Date.now();
-  const budgetMs = options.budgetMs ?? 9_000;
+  const budgetMs = options.budgetMs ?? 28_000;
   const dead = new Set<JobSearchProviderName>();
   const byUrl = new Map<string, JobSearchResult>();
   const errors: string[] = [];
@@ -338,6 +338,10 @@ export async function runBriefSearch(
           errors.push(`${label}: ${caught instanceof Error ? caught.message : "unknown error"}`);
           dead.add(provider); // fall through to the next provider for this and later queries
         }
+      }
+      if (byUrl.size >= 25 && index >= activeLanes.length) {
+        queriesSkipped += list.length - index - 1;
+        break;
       }
       if (dead.size === providers.length) { queriesSkipped += list.length - index - 1; break; }
     }
