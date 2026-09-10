@@ -39,7 +39,7 @@ export function SearchPlanEditor({
   initialEmploymentTypes,
   initialLocations,
   initialCompanies,
-  initialRemote,
+  initialRemotePreferences,
   targetLanes,
   movedCompanies = 0,
 }: {
@@ -219,7 +219,7 @@ export function SearchPlanEditor({
     experience ? experienceBand(experience)?.label ?? "" : "",
     companies.length ? `${companies.length} employer${companies.length === 1 ? "" : "s"}` : "",
     employmentTypes.join(" · "),
-    remote,
+    remotePreferences.join(" · "),
   ].filter(Boolean);
 
   return (
@@ -421,8 +421,8 @@ export function SearchPlanEditor({
                   key={option} 
                   type="button" 
                   className={remotePreferences.includes(option) ? "is-selected" : ""} 
-                  onClick={() => setRemotePreferences(prev => 
-                    prev.includes(option) ? prev.filter(p => p !== option) : [...prev, option]
+                  onClick={() => setRemotePreferences((prev: string[]) => 
+                    prev.includes(option) ? prev.filter((p: string) => p !== option) : [...prev, option]
                   )}
                 >
                   {option}
