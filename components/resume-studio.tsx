@@ -9,7 +9,6 @@ import { renderResumeText, resumeContentOf, type ResumeContent } from "@/lib/res
 import { ResumeDocument, type BulletCoach } from "@/components/resume-document";
 import { RESUME_TEMPLATES, resumeTemplate } from "@/lib/resume/templates";
 import { ResumeWorkbench } from "@/components/resume-workbench";
-import { pdf } from "@react-pdf/renderer";
 import { ResumePdfRenderer } from "@/components/resume-pdf-templates";
 import { LivePdfPreview } from "@/components/live-pdf-preview";
 import type { ApplicationRecord, ResumeChange, ResumeVersionRecord, RuleAnalysis } from "@/lib/types";
@@ -227,6 +226,7 @@ export function ResumeStudio({
    */
   async function downloadPdf(draft: StudioDraft, content: ResumeContent) {
     try {
+      const { pdf } = await import("@react-pdf/renderer");
       const blob = await pdf(<ResumePdfRenderer content={content} />).toBlob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -859,7 +859,7 @@ return (
           <div className="empty-inline-state" style={{ textAlign: "center", padding: "40px 20px" }}>
             <h3 style={{ fontSize: "18px", color: "white", marginBottom: "10px" }}>Ready to unlock the Resume Templates?</h3>
             <p style={{ color: "#a0aec0", marginBottom: "20px" }}>
-              Sartho's templates (including the 2-column ATS-safe designs) are powered by your Career Evidence.
+              Sartho&apos;s templates (including the 2-column ATS-safe designs) are powered by your Career Evidence.
             </p>
             <div style={{ display: "flex", flexWrap: "wrap", gap: "10px", justifyContent: "center" }}>
               <button type="button" className="primary-button" onClick={generateMaster} disabled={generatingId === "master"}>

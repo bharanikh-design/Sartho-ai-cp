@@ -247,7 +247,7 @@ describe("query → provider request mapping", () => {
     expect(params.get("query")).toBe("Business Analyst at PwC in Sydney");
     expect(params.get("country")).toBe("au");
     expect(params.get("work_from_home")).toBe("true");
-    expect(buildJSearchParams({ keywords: "Data Analyst", country: "in" }).get("query")).toBe("Data Analyst");
+    expect(buildJSearchParams({ keywords: "Data Analyst", country: "in" }).get("query")).toBe("Data Analyst in India");
   });
 });
 
@@ -329,4 +329,3 @@ describe("extractJSearchJobs", () => {
     ).toThrow("Access forbidden");
   });
 });
-

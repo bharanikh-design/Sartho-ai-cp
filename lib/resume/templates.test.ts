@@ -12,8 +12,8 @@ import { parseResumeContent } from "@/lib/resume/content";
  * and how much air a section gets all happen inside one column.
  */
 describe("resume templates", () => {
-  it("offers six, and every one is real", () => {
-    expect(RESUME_TEMPLATES).toHaveLength(6);
+  it("offers seven, and every one is real", () => {
+    expect(RESUME_TEMPLATES).toHaveLength(7);
     for (const template of RESUME_TEMPLATES) {
       expect(template.name.trim()).not.toBe("");
       expect(template.description.trim()).not.toBe("");
@@ -23,7 +23,7 @@ describe("resume templates", () => {
       expect(template.docx.bodySize).toBeGreaterThan(0);
       expect(template.docx.nameSize).toBeGreaterThan(template.docx.bodySize);
     }
-    expect(new Set(RESUME_TEMPLATES.map((t) => t.id)).size).toBe(6);
+    expect(new Set(RESUME_TEMPLATES.map((t) => t.id)).size).toBe(7);
   });
 
   it("falls back rather than rejecting an id it does not know", () => {
