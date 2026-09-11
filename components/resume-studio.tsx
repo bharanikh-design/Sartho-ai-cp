@@ -859,14 +859,37 @@ export function ResumeStudio({
           onClick={(event) => { if (event.target === event.currentTarget) setExpandedId(null); }}
         >
           <div className="studio-overlay-panel">
-            <header className="studio-overlay-head">
+            <header className="studio-overlay-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
                 <strong>{expanded.application.resume_version ?? expanded.jobTitle}</strong>
                 <small>{expanded.employer ?? "Employer not recorded"}</small>
               </div>
-              <button type="button" className="secondary-button" onClick={() => setExpandedId(null)}>
-                Close <span aria-hidden="true">✕</span>
-              </button>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <button type="button" className="primary-button" onClick={() => {
+                  const stored = expanded.application.resume_content;
+                  const text = expanded.application.resume_draft ?? "";
+                  const c = documents[expanded.application.id] ?? resumeContentOf(stored, text);
+                  if (c) void downloadPdf(expanded, c);
+                }}>
+                  Download PDF
+                </button>
+                <button
+                  type="button"
+                  className="secondary-button"
+                  disabled={downloadingId === expanded.application.id}
+                  onClick={() => {
+                    const stored = expanded.application.resume_content;
+                    const text = expanded.application.resume_draft ?? "";
+                    const c = documents[expanded.application.id] ?? resumeContentOf(stored, text);
+                    if (c) void downloadDocx(expanded, c);
+                  }}
+                >
+                  {downloadingId === expanded.application.id ? "Building…" : "Download Word"}
+                </button>
+                <button type="button" className="secondary-button" onClick={() => setExpandedId(null)}>
+                  Close <span aria-hidden="true">✕</span>
+                </button>
+              </div>
             </header>
             <div className="studio-overlay-body">{renderWorkspace(expanded)}</div>
           </div>

@@ -133,7 +133,7 @@ export function bulletsIn(draft: string): string[] {
   // If the user pasted plain text without bullet markers, treat any sentence/line 
   // longer than 8 words as a 'bullet' so the ATS engine still provides feedback.
   if (strictBullets.length === 0) {
-    return lines.filter(line => line.split(" ").length > 8);
+    return lines.filter(line => line.split(/\s+/).length > 8);
   }
   return strictBullets;
 }
