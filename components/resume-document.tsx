@@ -194,9 +194,23 @@ function BulletList({
               </span>
 
               {coach && weakBulletIds.has(bullet.id) && coach.activeId !== bullet.id ? (
-                <button type="button" className="resume-doc-coach-open" onClick={() => coach.onOpen(bullet.id, bullet.text)}>
-                  Add a figure
-                </button>
+                <div style={{ display: 'block', marginTop: '8px', marginBottom: '16px' }}>
+                  <button type="button" style={{ 
+                    border: "1px dashed rgba(224,176,97,.5)", 
+                    borderRadius: "7px", 
+                    padding: "6px 12px", 
+                    color: "#e0b061", 
+                    background: "rgba(224,176,97,.1)", 
+                    fontFamily: "var(--font-sans)", 
+                    fontSize: "12px", 
+                    cursor: "pointer",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "6px"
+                  }} onClick={() => coach.onOpen(bullet.id, bullet.text)}>
+                    <span>✨</span> Add a figure to improve ATS score
+                  </button>
+                </div>
               ) : null}
 
               {coach && coach.activeId === bullet.id ? (
