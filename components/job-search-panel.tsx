@@ -271,7 +271,7 @@ export function JobSearchPanel({
             {lastRun ? ` Last searched ${new Date(lastRun).toLocaleString()}.` : ""}
           </p>
         </div>
-        <button type="button" className="primary-button" onClick={() => void runSearch()} disabled={status === "loading"}>
+        <button type="button" className="primary-button" onClick={() => void runSearch()} disabled={status === "loading"} style={{ marginRight: "15px" }}>
           {status === "loading" ? "Searching…" : status === "ready" ? "Search again" : "Search now"}
         </button>
       </div>
