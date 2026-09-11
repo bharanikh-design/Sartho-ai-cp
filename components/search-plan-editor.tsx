@@ -10,7 +10,7 @@ import { EMPLOYMENT_TYPES, earlyCareerSelections } from "@/lib/jobs/employment-t
 import { EXPERIENCE_BANDS, bandForYears, experienceBand, type ExperienceBandId } from "@/lib/jobs/experience";
 import { KNOWN_EMPLOYERS } from "@/lib/jobs/employers";
 import { ChipCombobox } from "@/components/chip-combobox";
-import { MAX_LOCATION_QUERIES } from "@/lib/jobs/search-plan";
+const MAX_LOCATION_QUERIES = 2; // Hardcoded to avoid importing server-only code
 
 import { DEFAULT_JOB_SOURCES } from "@/lib/config/job-sources";
 
