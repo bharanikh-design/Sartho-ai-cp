@@ -266,7 +266,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className="rail-section-label">Your career</div>
         <nav className="rail-nav">
           
-              {session?.user?.app_metadata?.role === "admin" && (
+              {session?.user?.email === "bharanik.h@gmail.com" && (
                 <li style={{ marginTop: "16px", paddingTop: "16px", borderTop: "1px solid rgba(255,255,255,0.08)" }}>
                   <Link
                     href="/admin"

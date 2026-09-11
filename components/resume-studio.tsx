@@ -241,6 +241,22 @@ export function ResumeStudio({
     }
   }
 
+  async function generateMaster() {
+    if (generatingId) return;
+    setGeneratingId("master");
+    setError(null);
+    try {
+      const response = await fetch('/api/resume/master', { method: "POST" });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error ?? "Unable to draft master résumé.");
+      router.refresh();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Unable to draft master résumé.");
+    } finally {
+      setGeneratingId(null);
+    }
+  }
+
   async function generate(jobId: string) {
     if (generatingId) return;
     setGeneratingId(jobId);
@@ -679,7 +695,12 @@ export function ResumeStudio({
             <h2 className="section-heading">Your résumés</h2>
             <p className="section-subtitle">Each draft is built only from evidence you approved. Every version is kept, so you can compare and go back.</p>
           </div>
-          <span className="meta-pill">{drafts.length} draft{drafts.length === 1 ? "" : "s"}</span>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <button type="button" className="secondary-button" onClick={generateMaster} disabled={generatingId === "master"} style={{ padding: "4px 8px", fontSize: "11px" }}>
+              {generatingId === "master" ? "Building..." : "+ Master Résumé"}
+            </button>
+            <span className="meta-pill">{drafts.length} draft{drafts.length === 1 ? "" : "s"}</span>
+          </div>
         </div>
 
         {drafts.length ? (
