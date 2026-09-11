@@ -17,7 +17,7 @@
  * identically, and choosing one changes the typography, not your chances.
  */
 
-export type ResumeTemplateId = "classic" | "modern" | "executive" | "impact" | "editorial" | "compact";
+export type ResumeTemplateId = "classic" | "modern" | "executive" | "impact" | "editorial" | "compact" | "innovator";
 
 /*
  * What the Word file does, per template.
@@ -55,6 +55,13 @@ export type ResumeTemplate = {
 };
 
 export const RESUME_TEMPLATES: ResumeTemplate[] = [
+  {
+    id: "innovator",
+    name: "Innovator",
+    description: "A striking two-column design with elegant spacing and a highly professional ATS-friendly layout.",
+    bestFor: "Design, Product, Tech, and any role where presentation matters as much as the content.",
+    docx: { font: "Helvetica", nameAlign: "left", nameSize: 36, bodySize: 22, headingSize: 24, headingUpper: true, headingRule: false },
+  },
   {
     id: "classic",
     name: "Classic",
