@@ -74,6 +74,7 @@ export function planSearchQueries(input: {
    * their career for those postings to be worth a pass of their own.
    */
   entryLevelTerms?: string[];
+  resumeSkills?: string[];
 }): JobSearchQuery[] {
   const remoteOnly = input.remotePreferences.length === 1 && input.remotePreferences[0] === "Remote";
   const employmentTypes = input.employmentTypes?.length ? input.employmentTypes : undefined;

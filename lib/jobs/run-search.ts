@@ -242,6 +242,17 @@ export async function runBriefSearch(
   // treated as companies here too, so an unsaved brief still searches sensibly.
   const brief = splitMisfiledCompanies(preferences.targetLocations, preferences.targetCompanies);
   const roleNames = activeLanes.map((lane) => lane.name);
+  // Extract the most common domains/skills from the user's evidence to contextualize the search.
+  const domainCounts = new Map<string, number>();
+  for (const record of (evidence || [])) {
+    for (const domain of record.domains || []) {
+      domainCounts.set(domain, (domainCounts.get(domain) || 0) + 1);
+    }
+  }
+  const resumeSkills = Array.from(domainCounts.entries())
+    .sort((a, b) => b[1] - a[1])
+    .map((e) => e[0])
+    .slice(0, 3);
 
   /*
    * Experience, most deliberate signal first: the band the person chose, then
@@ -288,6 +299,7 @@ export async function runBriefSearch(
       remotePreferences: preferences.remotePreferences,
       employmentTypes: preferences.employmentTypes,
       entryLevelTerms: earlyCareerPass ? entryLevelTermsFor(country) : undefined,
+      resumeSkills,
     }),
     ...markets.slice(1).flatMap((market) => planSearchQueries({
       roles: roleNames,
@@ -298,6 +310,7 @@ export async function runBriefSearch(
       employmentTypes: preferences.employmentTypes,
       /* Each market gets its own vocabulary; "graduate scheme" finds nothing in Sydney. */
       entryLevelTerms: earlyCareerPass ? entryLevelTermsFor(market) : undefined,
+      resumeSkills,
     })),
   ];
 
@@ -321,7 +334,12 @@ export async function runBriefSearch(
   async function run(list: JobSearchQuery[]) {
     for (let index = 0; index < list.length; index++) {
       if (Date.now() - startedAt > budgetMs) { queriesSkipped += list.length - index; break; }
-      if (queriesRun > 0) await new Promise((resolve) => setTimeout(resolve, 150));
+      if (queriesRun > 0) {
+        // JSearch (RapidAPI) has a strict 1 req/sec limit. 
+        // Pushing faster triggers 429s, causing Google Jobs to silently drop out.
+        const delay = providers.includes("jsearch") ? 1100 : 300;
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
       const outcomes = await Promise.allSettled(
         providers.map(async (provider) => {
           if (dead.has(provider)) return;

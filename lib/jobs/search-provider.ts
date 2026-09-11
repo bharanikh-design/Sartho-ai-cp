@@ -57,6 +57,11 @@ export type JobSearchQuery = {
    * extra required word would empty the page.
    */
   entryLevelTerms?: string[];
+  /** 
+   * Skills or strengths from the user's resume/evidence. 
+   * Used to heavily contextualize generic job titles (e.g., 'Business Analyst' + 'SQL, Python').
+   */
+  resumeSkills?: string[];
   limit?: number;
 };
 
