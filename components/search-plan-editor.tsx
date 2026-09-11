@@ -230,18 +230,16 @@ export function SearchPlanEditor({
           <strong>{targetLanes.length ? targetLanes.map((lane) => lane.name).join(" · ") : "No target roles yet"}</strong>
         </div>
         <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-          <Link href="/career-direction#priorities" className="secondary-button">Edit roles</Link>
-          {!expanded && (
-            <button type="button" className="secondary-button" onClick={() => setExpanded(true)}>
-              Edit criteria
-            </button>
-          )}
+          <Link href="/career-direction#priorities" className="secondary-button">Edit job titles</Link>
         </div>
       </div>
 
       {!expanded ? (
-        <div className="search-criteria-summary">
+        <div className="search-criteria-summary" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <p>{summary.join("  ·  ")}</p>
+          <button type="button" className="secondary-button" onClick={() => setExpanded(true)}>
+            Edit criteria
+          </button>
         </div>
       ) : null}
 

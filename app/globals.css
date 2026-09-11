@@ -390,11 +390,11 @@ button:focus-visible, a:focus-visible, textarea:focus-visible, input:focus-visib
   border: 1px solid rgba(255, 255, 255, 0.15);
   color: #ffffff;
   background: linear-gradient(135deg, #6366f1, #a855f7, #ec4899); background-size: 200% auto;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.2), 0 8px 20px rgba(168, 85, 247, 0.3);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.2), 0 0 0 1px rgba(236,72,153,0.3), 0 8px 20px rgba(168,85,247,0.4), 0 0 15px rgba(168,85,247,0.2);
 }
 .primary-button:hover, .secondary-button:hover, .ghost-button:hover { transform: translateY(-2px); }
-.secondary-button { border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.045); }
-.secondary-button:hover { border-color: rgba(255,255,255,.18); background: rgba(255,255,255,.075); }
+.secondary-button { border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.045); box-shadow: 0 0 0 1px rgba(255,255,255,0.05), 0 0 12px rgba(255,255,255,0.02); }
+.secondary-button:hover { border-color: rgba(255,255,255,.2); background: rgba(255,255,255,.075); box-shadow: 0 0 0 1px rgba(255,255,255,0.1), 0 0 15px rgba(255,255,255,0.08); }
 .ghost-button { border: 1px solid transparent; color: var(--text-secondary); }
 .ghost-button:hover { color: white; background: rgba(255,255,255,.04); }
 
