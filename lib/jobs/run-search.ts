@@ -26,6 +26,7 @@ import {
   MAX_LOCATION_QUERIES,
   MAX_ROLE_QUERIES,
   planSearchQueries,
+  planSmartSearchQueries,
   toSearchKeywords,
   widenToCountry,
 } from "@/lib/jobs/search-plan";
@@ -291,7 +292,7 @@ export async function runBriefSearch(
    * without severely impacting the execution budget.
    */
   const queries = [
-    ...planSearchQueries({
+    ...(await planSmartSearchQueries({
       roles: roleNames,
       country,
       locations: brief.locations,
@@ -300,8 +301,11 @@ export async function runBriefSearch(
       employmentTypes: preferences.employmentTypes,
       entryLevelTerms: earlyCareerPass ? entryLevelTermsFor(country) : undefined,
       resumeSkills,
-    }),
-    ...markets.slice(1).flatMap((market) => planSearchQueries({
+    }))
+  ];
+
+  if (markets.length > 1) {
+    const additionalQueries = await Promise.all(markets.slice(1).map(market => planSmartSearchQueries({
       roles: roleNames,
       country: market,
       locations: [],
@@ -311,8 +315,9 @@ export async function runBriefSearch(
       /* Each market gets its own vocabulary; "graduate scheme" finds nothing in Sydney. */
       entryLevelTerms: earlyCareerPass ? entryLevelTermsFor(market) : undefined,
       resumeSkills,
-    })),
-  ];
+    })));
+    queries.push(...additionalQueries.flat());
+  }
 
   /*
    * Queries run sequentially with a short gap so a low rate limit is not
