@@ -489,7 +489,7 @@ h2.resume-doc-heading.resume-doc-field { margin-bottom: 0; border-bottom: 1px so
 .resume-doc-coach-failed p { margin: 0; color: #e5917a; font-size: var(--text-xs); line-height: 1.5; }
 
 /* Offered on the line itself, because that is where you notice it. */
-.resume-doc-coach-open { grid-column: 2; justify-self: start; margin: 2px 0 6px; border: 1px dashed rgba(224,176,97,.5); border-radius: 7px; padding: 3px 9px; color: #e0b061; background: transparent; font-family: var(--font-sans); font-size: var(--text-2xs); cursor: pointer; opacity: 0; transition: opacity .12s ease; }
+.resume-doc-coach-open { grid-column: 2; justify-self: start; margin: 2px 0 6px; border: 1px dashed rgba(224,176,97,.5); border-radius: 7px; padding: 3px 9px; color: #e0b061; background: transparent; font-family: var(--font-sans); font-size: var(--text-2xs); cursor: pointer; opacity: 1; transition: opacity .12s ease; }
 .resume-doc-bullet:hover .resume-doc-coach-open,
 .resume-doc-bullet:focus-within .resume-doc-coach-open { opacity: 1; }
 .resume-doc-bullet.is-coaching { background: rgba(107,207,147,.04); border-radius: 8px; }
