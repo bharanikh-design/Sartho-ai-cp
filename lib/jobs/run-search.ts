@@ -275,9 +275,9 @@ export async function runBriefSearch(
   const earlyCareerPass = band?.earlyCareer === true;
 
   /*
-   * The primary market gets the full plan. Each additional market gets the top
-   * role only — someone with work rights in three countries should see all
-   * three, without tripling the provider calls for every role and employer.
+   * All markets receive the full set of roles.
+   * With parallel execution, we can query multiple markets for multiple roles
+   * without severely impacting the execution budget.
    */
   const queries = [
     ...planSearchQueries({
@@ -290,7 +290,7 @@ export async function runBriefSearch(
       entryLevelTerms: earlyCareerPass ? entryLevelTermsFor(country) : undefined,
     }),
     ...markets.slice(1).flatMap((market) => planSearchQueries({
-      roles: roleNames.slice(0, 1),
+      roles: roleNames,
       country: market,
       locations: [],
       companies: [],

@@ -224,18 +224,24 @@ export function SearchPlanEditor({
 
   return (
     <section className={`glass-card search-criteria${expanded ? "" : " is-collapsed"}`} id="criteria" aria-label="Search criteria">
-      <div className="search-criteria-roles">
-        <span>Searching for</span>
-        <strong>{targetLanes.length ? targetLanes.map((lane) => lane.name).join(" · ") : "No target roles yet"}</strong>
-        <Link href="/career-direction#priorities">Edit roles →</Link>
+      <div className="search-criteria-roles" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div style={{ display: "flex", alignItems: "baseline", gap: "12px", flexWrap: "wrap", flex: 1 }}>
+          <span>Searching for</span>
+          <strong>{targetLanes.length ? targetLanes.map((lane) => lane.name).join(" · ") : "No target roles yet"}</strong>
+        </div>
+        <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+          <Link href="/career-direction#priorities" className="secondary-button">Edit roles</Link>
+          {!expanded && (
+            <button type="button" className="secondary-button" onClick={() => setExpanded(true)}>
+              Edit criteria
+            </button>
+          )}
+        </div>
       </div>
 
       {!expanded ? (
         <div className="search-criteria-summary">
           <p>{summary.join("  ·  ")}</p>
-          <button type="button" className="secondary-button" onClick={() => setExpanded(true)}>
-            Edit criteria
-          </button>
         </div>
       ) : null}
 
@@ -247,7 +253,7 @@ export function SearchPlanEditor({
             {!codes.length
               ? "Choose one or more markets. They may not be where you live today."
               : codes.length > 1
-                ? `${primaryName} is searched in full; the others are searched for your top role.`
+                ? `Searching across multiple countries simultaneously.`
                 : "Add another if you hold work rights in more than one country."}
           </small>
         </label>
