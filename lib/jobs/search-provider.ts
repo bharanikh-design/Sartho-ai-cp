@@ -319,7 +319,11 @@ export function mapJSearchResult(raw: JSearchResult): JobSearchResult | null {
   const applyOptions = Array.isArray(raw.apply_options) ? raw.apply_options : [];
   const url = (raw.job_apply_link || raw.job_google_link || applyOptions[0]?.apply_link)?.trim();
   const description = raw.job_description?.trim();
-  if (!title || !url || !description) return null;
+  
+  const employer = raw.employer_name?.trim();
+  const finalUrl = url || (title ? `https://www.google.com/search?q=${encodeURIComponent(`${title} ${employer || ""} job`.trim())}` : undefined);
+  
+  if (!title || !finalUrl || !description) return null;
   const location = [raw.job_city, raw.job_state, raw.job_country]
     .map((part) => part?.trim())
     .filter((part): part is string => Boolean(part))
@@ -330,7 +334,7 @@ export function mapJSearchResult(raw: JSearchResult): JobSearchResult | null {
     employer: raw.employer_name?.trim() || null,
     location,
     description,
-    url,
+    url: finalUrl,
     salary: formatSalary(raw.job_min_salary, raw.job_max_salary),
     postedAt: raw.job_posted_at_datetime_utc?.trim() || null,
     /*

@@ -322,31 +322,34 @@ export async function runBriefSearch(
     for (let index = 0; index < list.length; index++) {
       if (Date.now() - startedAt > budgetMs) { queriesSkipped += list.length - index; break; }
       if (queriesRun > 0) await new Promise((resolve) => setTimeout(resolve, 150));
-      for (const provider of providers) {
-        if (dead.has(provider)) continue;
-        try {
+      const outcomes = await Promise.allSettled(
+        providers.map(async (provider) => {
+          if (dead.has(provider)) return;
           const batch = await searchWithProvider(provider, list[index]);
-          queriesRun++;
+          return { provider, batch };
+        })
+      );
+
+      queriesRun++;
+
+      for (const outcome of outcomes) {
+        if (outcome.status === "fulfilled" && outcome.value) {
+          const { provider, batch } = outcome.value;
           providersUsed.add(provider === "jsearch" ? "Google for Jobs" : "Adzuna");
           for (const result of batch) {
             if (!byUrl.has(result.url)) byUrl.set(result.url, result);
           }
-          if (batch.length > 0) {
-            break; // this provider found results; move to the next query
-          }
-          // If 0 results, we continue to the next provider (fallback)
-        } catch (caught) {
-          const label = provider === "jsearch" ? "Google for Jobs" : "Adzuna";
-          if (caught instanceof JobSearchNotConfiguredError) {
-            errors.push(`${label}: API key is not configured in environment variables`);
-          } else if (caught instanceof Error && (caught.name === "TimeoutError" || caught.name === "AbortError")) {
-            // Silently swallow timeouts. The budgetMs limit handles skipped queries gracefully.
-            console.warn(`${label} timed out on query ${index}`);
+        } else if (outcome.status === "rejected") {
+          const caught = outcome.reason;
+          if (caught instanceof Error && (caught.name === "TimeoutError" || caught.name === "AbortError")) {
+            console.warn("Provider timed out on query");
+          } else if (caught && typeof caught === "object" && caught.name === "JobSearchNotConfiguredError") {
+            // Usually we'd dead.add(provider) but we can't easily extract provider name here, so just log it.
+            errors.push(`API key is not configured for a provider`);
           } else {
-            errors.push(`${label}: ${caught instanceof Error ? caught.message : "unknown error"}`);
+            errors.push(`Provider Error: ${caught instanceof Error ? caught.message : "unknown error"}`);
+            console.error(`[DEBUG] Provider error:`, caught);
           }
-          console.error(`[DEBUG] Provider error on ${label}:`, caught);
-          // We intentionally do not call `dead.add(provider)` here so a single timeout doesn't kill the provider for the whole run
         }
       }
       if (byUrl.size >= 25 && index >= activeLanes.length) {
