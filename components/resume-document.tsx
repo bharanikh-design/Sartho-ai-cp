@@ -141,6 +141,40 @@ export type BulletCoach = {
  * have guaranteed the two drifted, with the evidence dot working in one of them
  * and not the other.
  */
+function CoachPanel({ coach, activeId, text }: { coach: BulletCoach; activeId: string; text: string }) {
+  return (
+    <div className="resume-doc-coach">
+      {coach.error ? (
+        <div className="resume-doc-coach-failed" role="alert">
+          <p>{coach.error}</p>
+          <button type="button" className="secondary-button" onClick={() => coach.onRetry(activeId, text)}>Try again</button>
+        </div>
+      ) : coach.proposal === undefined ? (
+        <p className="resume-doc-coach-pending">Sartho is drafting a stronger version…</p>
+      ) : (
+        <>
+          <label htmlFor={`coach-${activeId}`}>
+            Sartho&rsquo;s version — replace anything in [brackets]. It will not guess a figure for you.
+          </label>
+          <textarea id={`coach-${activeId}`} rows={3} value={coach.proposal} onChange={(event) => coach.onChange(event.target.value)} />
+          {coach.questions.length ? (
+            <ul className="resume-doc-coach-questions">
+              {coach.questions.map((question) => <li key={question}>{question}</li>)}
+            </ul>
+          ) : null}
+          <div className="resume-doc-coach-actions">
+            <button type="button" className="primary-button" disabled={coach.blanks.length > 0 || !coach.proposal.trim()} onClick={() => coach.onAccept(activeId)}>
+              Use this line
+            </button>
+            <button type="button" className="secondary-button" onClick={coach.onClose}>Leave it</button>
+            {coach.blanks.length ? <small>Still to fill: {coach.blanks.join(", ")}</small> : null}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function BulletList({
   bullets,
   ownerLabel,
@@ -214,35 +248,7 @@ function BulletList({
               ) : null}
 
               {coach && coach.activeId === bullet.id ? (
-                <div className="resume-doc-coach">
-                  {coach.error ? (
-                    <div className="resume-doc-coach-failed" role="alert">
-                      <p>{coach.error}</p>
-                      <button type="button" className="secondary-button" onClick={() => coach.onRetry(bullet.id, bullet.text)}>Try again</button>
-                    </div>
-                  ) : coach.proposal === undefined ? (
-                    <p className="resume-doc-coach-pending">Sartho is drafting a stronger version…</p>
-                  ) : (
-                    <>
-                      <label htmlFor={`coach-${bullet.id}`}>
-                        Sartho&rsquo;s version — replace anything in [brackets]. It will not guess a figure for you.
-                      </label>
-                      <textarea id={`coach-${bullet.id}`} rows={3} value={coach.proposal} onChange={(event) => coach.onChange(event.target.value)} />
-                      {coach.questions.length ? (
-                        <ul className="resume-doc-coach-questions">
-                          {coach.questions.map((question) => <li key={question}>{question}</li>)}
-                        </ul>
-                      ) : null}
-                      <div className="resume-doc-coach-actions">
-                        <button type="button" className="primary-button" disabled={coach.blanks.length > 0 || !coach.proposal.trim()} onClick={() => coach.onAccept(bullet.id)}>
-                          Use this line
-                        </button>
-                        <button type="button" className="secondary-button" onClick={coach.onClose}>Leave it</button>
-                        {coach.blanks.length ? <small>Still to fill: {coach.blanks.join(", ")}</small> : null}
-                      </div>
-                    </>
-                  )}
-                </div>
+                <CoachPanel coach={coach} activeId={bullet.id} text={bullet.text} />
               ) : null}
             </li>
           );
@@ -447,6 +453,30 @@ export function ResumeDocument({
         value={content.summary}
         onChange={(summary) => onChange({ ...content, summary })}
       />
+      {coach && coach.activeId !== "summary" ? (
+        <div style={{ display: 'block', marginTop: '8px', marginBottom: '24px' }}>
+          <button type="button" style={{ 
+            border: "1px dashed rgba(224,176,97,.5)", 
+            borderRadius: "7px", 
+            padding: "6px 12px", 
+            color: "#e0b061", 
+            background: "rgba(224,176,97,.1)", 
+            fontFamily: "var(--font-sans)", 
+            fontSize: "12px", 
+            cursor: "pointer",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "6px"
+          }} onClick={() => coach.onOpen("summary", content.summary)}>
+            <span>✨</span> Improve summary with AI
+          </button>
+        </div>
+      ) : null}
+      {coach && coach.activeId === "summary" ? (
+        <div style={{ marginBottom: '24px' }}>
+          <CoachPanel coach={coach} activeId="summary" text={content.summary} />
+        </div>
+      ) : null}
 
       <h2 className="resume-doc-heading">Experience</h2>
       {content.roles.map((role, roleIndex) => (
