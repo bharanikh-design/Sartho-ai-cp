@@ -9,6 +9,8 @@ import { renderResumeText, resumeContentOf, type ResumeContent } from "@/lib/res
 import { ResumeDocument, type BulletCoach } from "@/components/resume-document";
 import { RESUME_TEMPLATES, resumeTemplate } from "@/lib/resume/templates";
 import { ResumeWorkbench } from "@/components/resume-workbench";
+import { pdf } from "@react-pdf/renderer";
+import { ResumePdfRenderer } from "@/components/resume-pdf-templates";
 import type { ApplicationRecord, ResumeChange, ResumeVersionRecord, RuleAnalysis } from "@/lib/types";
 
 /*
@@ -222,13 +224,21 @@ export function ResumeStudio({
    * a clean read-only copy of the document on the page and hides everything
    * else, so what prints is the résumé and not the editor around it.
    */
-  function downloadPdf(draft: StudioDraft) {
-    setPrintingId(draft.application.id);
-    /* One frame, so the print-only copy is in the DOM before the dialog opens. */
-    window.requestAnimationFrame(() => {
-      window.print();
-      setPrintingId(null);
-    });
+  async function downloadPdf(draft: StudioDraft, content: ResumeContent) {
+    try {
+      const blob = await pdf(<ResumePdfRenderer content={content} />).toBlob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${content.name} - Resume.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Failed to generate PDF", err);
+      setError("Failed to generate PDF");
+    }
   }
 
   async function generate(jobId: string) {
@@ -501,7 +511,7 @@ export function ResumeStudio({
               * applicant tracking system parses most reliably; PDF is what a
               * person opens without it reflowing on them.
               */}
-            <button type="button" className="secondary-button" onClick={() => downloadPdf(draft)}>
+            <button type="button" className="secondary-button" onClick={() => void downloadPdf(draft, content)}>
               Download PDF
             </button>
             <button
