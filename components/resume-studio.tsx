@@ -9,7 +9,6 @@ import { renderResumeText, resumeContentOf, type ResumeContent } from "@/lib/res
 import { ResumeDocument, type BulletCoach } from "@/components/resume-document";
 import { RESUME_TEMPLATES, resumeTemplate } from "@/lib/resume/templates";
 import { ResumeWorkbench } from "@/components/resume-workbench";
-import { pdf } from "@react-pdf/renderer";
 import { ResumePdfRenderer } from "@/components/resume-pdf-templates";
 import { LivePdfPreview } from "@/components/live-pdf-preview";
 import type { ApplicationRecord, ResumeChange, ResumeVersionRecord, RuleAnalysis } from "@/lib/types";
@@ -227,6 +226,7 @@ export function ResumeStudio({
    */
   async function downloadPdf(draft: StudioDraft, content: ResumeContent) {
     try {
+      const { pdf } = await import("@react-pdf/renderer");
       const blob = await pdf(<ResumePdfRenderer content={content} />).toBlob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
