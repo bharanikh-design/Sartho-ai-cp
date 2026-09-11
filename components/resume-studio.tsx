@@ -345,7 +345,10 @@ export function ResumeStudio({
      * bullet here — which is what lets a flagged line be marked in the document
      * and opened from the rail.
      */
-    const flatBullets = content.sections.flatMap((section) => section.bullets);
+    const flatBullets = [
+      ...content.roles.flatMap(r => r.bullets),
+      ...content.sections.flatMap(s => s.bullets)
+    ];
     const weak = ats.weakBullets
       .map((bullet) => ({ bullet: flatBullets[bullet.index], text: bullet.text }))
       .filter((entry): entry is { bullet: typeof flatBullets[number]; text: string } => Boolean(entry.bullet));
