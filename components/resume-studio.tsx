@@ -11,6 +11,7 @@ import { RESUME_TEMPLATES, resumeTemplate } from "@/lib/resume/templates";
 import { ResumeWorkbench } from "@/components/resume-workbench";
 import { pdf } from "@react-pdf/renderer";
 import { ResumePdfRenderer } from "@/components/resume-pdf-templates";
+import { LivePdfPreview } from "@/components/live-pdf-preview";
 import type { ApplicationRecord, ResumeChange, ResumeVersionRecord, RuleAnalysis } from "@/lib/types";
 
 /*
@@ -298,7 +299,7 @@ export function ResumeStudio({
    * render exactly the same thing — a résumé being improved should not behave
    * differently because of how much room it has.
    */
-  function renderWorkspace(draft: StudioDraft) {
+  function renderWorkspace(draft: StudioDraft, isExpanded: boolean = false) {
     const chosen = draft.history.find((version) => version.id === viewing[draft.application.id]);
     const current = draft.history[0];
     const isOlderVersion = Boolean(chosen && chosen.id !== current?.id);
@@ -416,7 +417,93 @@ export function ResumeStudio({
         }));
     }
 
-    return (
+        if (isExpanded) {
+      return (
+        <div className="studio-draft-body" style={{ gridTemplateColumns: '1fr 1fr', height: '80vh', overflow: 'hidden' }}>
+          <div className="studio-draft-reader" style={{ overflowY: 'auto', paddingRight: '20px' }}>
+            <div className="resume-draft-label">
+              {isOlderVersion
+                ? <>Version {chosen?.version_number} — an earlier draft, kept for comparison</>
+                : dirty
+                  ? <>Editing — not saved yet</>
+                  : <>Draft — click any line to edit it</>}
+            </div>
+
+            <ResumeDocument
+              content={content}
+              onChange={setContent}
+              weakBulletIds={weakBulletIds}
+              coach={isOlderVersion ? undefined : coach}
+              readOnly={isOlderVersion}
+            />
+
+            <div className="studio-draft-actions">
+              {dirty ? (
+                <button
+                  type="button"
+                  className="primary-button"
+                  disabled={savingId === draft.application.id}
+                  onClick={() => void saveVersion(draft, documentKey, content, changesFor(content))}
+                >
+                  {savingId === draft.application.id ? "Saving…" : "Save as a new version"}
+                </button>
+              ) : null}
+              <button type="button" className="secondary-button" onClick={() => void downloadPdf(draft, content)}>
+                Download PDF
+              </button>
+              <button
+                type="button"
+                className="secondary-button"
+                disabled={downloadingId === draft.application.id}
+                onClick={() => void downloadDocx(draft, content)}
+              >
+                {downloadingId === draft.application.id ? "Building…" : "Download Word"}
+              </button>
+              <button type="button" className="secondary-button" onClick={() => void copy(text, draft.application.id)}>
+                {copiedId === draft.application.id ? "Copied ✓" : "Copy draft"}
+              </button>
+              <button type="button" className="secondary-button" onClick={() => void generate(draft.jobId)} disabled={generatingId === draft.jobId}>
+                {generatingId === draft.jobId ? "Regenerating…" : "Regenerate"}
+              </button>
+              {dirty ? (
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={() => setDocuments((state) => { const next = { ...state }; delete next[documentKey]; return next; })}
+                >
+                  Discard edits
+                </button>
+              ) : null}
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#1e2420', borderRadius: '12px' }}>
+            {!isOlderVersion ? (
+              <div className="studio-templates" role="radiogroup" aria-label="Résumé template" style={{ padding: '16px', background: 'rgba(0,0,0,0.2)', borderBottom: '1px solid var(--line)', margin: 0 }}>
+                {RESUME_TEMPLATES.map((template) => (
+                  <button
+                    key={template.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={content.template === template.id}
+                    className={content.template === template.id ? "is-selected" : ""}
+                    title={`${template.description} ${template.bestFor}`}
+                    onClick={() => setContent({ ...content, template: template.id })}
+                  >
+                    {template.name}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+            <div style={{ flexGrow: 1, overflow: 'hidden' }}>
+               <LivePdfPreview content={content} />
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+return (
       <div className="studio-draft-body">
         <div className="studio-draft-reader">
           {draft.history.length > 1 ? (
@@ -451,7 +538,7 @@ export function ResumeStudio({
             * the gallery of ten that every other builder sells is mostly
             * two-column layouts that get people filtered out.
             */}
-          {!isOlderVersion ? (
+          {!isOlderVersion && !isExpanded ? (
             <div className="studio-templates" role="radiogroup" aria-label="Résumé template">
               {RESUME_TEMPLATES.map((template) => (
                 <button
@@ -861,7 +948,7 @@ export function ResumeStudio({
           aria-label={`Editing ${expanded.application.resume_version ?? expanded.jobTitle}`}
           onClick={(event) => { if (event.target === event.currentTarget) setExpandedId(null); }}
         >
-          <div className="studio-overlay-panel">
+          <div className="studio-overlay-panel" style={{ width: "95vw", maxWidth: "1600px" }}>
             <header className="studio-overlay-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
                 <strong>{expanded.application.resume_version ?? expanded.jobTitle}</strong>
@@ -894,7 +981,7 @@ export function ResumeStudio({
                 </button>
               </div>
             </header>
-            <div className="studio-overlay-body">{renderWorkspace(expanded)}</div>
+            <div className="studio-overlay-body" style={{ padding: '0 20px 20px', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>{renderWorkspace(expanded, true)}</div>
           </div>
         </div>
       ) : null}
