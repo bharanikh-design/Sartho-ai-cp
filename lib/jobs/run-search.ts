@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getCareerWorkspace } from "@/lib/data/career";
+import { generateStructuredJson } from "@/lib/ai/provider";
 import { getSearchPreferences } from "@/lib/data/search";
 import { countryName, normaliseCountryCode } from "@/lib/jobs/countries";
 import { splitMisfiledCompanies } from "@/lib/jobs/employers";
@@ -593,7 +594,65 @@ export async function runBriefSearch(
   }
 
   const deduplicated = deduplicateSearchResults(withinReach);
-  const results: ScoredJobMatch[] = deduplicated.slice(0, options.maxResults ?? 20);
+  
+  const preLlmResults: ScoredJobMatch[] = deduplicated.slice(0, options.maxResults ?? 20);
+  
+  // Phase 2: LLM Screening Pipeline
+  // Fire the top results into Gemini Flash in parallel for true semantic HR screening.
+  const llmScreenedResults = await Promise.all(
+    preLlmResults.map(async (match) => {
+      try {
+        const payload = {
+          title: match.title,
+          description: match.description.slice(0, 1500), // Prevent context bloat
+          candidateSkills: resumeSkills.join(", "),
+          candidateLevel: level,
+        };
+        
+        const response = await Promise.race([
+          generateStructuredJson({
+            workload: "fast",
+            system: "You are a ruthless HR Gatekeeper screening candidates. Read the Job Description and the Candidate's Profile. Determine if they are a strong match. Throw out garbage roles (e.g. pure sales if they are delivery, or entry-level if they are senior). Provide a score (0-100), recommendation (apply, review, skip), and a 1-sentence human justification.",
+            prompt: JSON.stringify(payload),
+            schemaName: "hr_screening",
+            schema: {
+              type: "object",
+              properties: {
+                score: { type: "number" },
+                recommendation: { type: "string", enum: ["apply", "review", "skip"] },
+                justification: { type: "string" }
+              },
+              required: ["score", "recommendation", "justification"],
+              additionalProperties: false,
+            }
+          }),
+          new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 8000))
+        ]) as { score: number; recommendation: "apply" | "review" | "skip"; justification: string };
+
+        // We map the LLM reasoning directly to the match object
+        // We use closestTitle field as a hack to pass the justification to the UI since it's an existing string field
+        // Wait, closestTitle is already used. Let's just override missingRequirements or matchedSkills with the justification as a single item list so the UI displays it.
+        // Actually, missingRequirements is rendered as an array of red X strings. matchedSkills is rendered as green checks.
+        // We will just replace matchedSkills with the justification.
+        
+        return {
+          ...match,
+          overallMatch: response.score,
+          recommendation: response.recommendation,
+          matchedSkills: [`HR Insight: ${response.justification}`]
+        };
+      } catch (error) {
+        console.warn("LLM Screening failed for a job, falling back to heuristic score", error);
+        return match; // Fallback to heuristic
+      }
+    })
+  );
+  
+  // Filter out skipped jobs from the final results and re-sort by LLM score
+  const results: ScoredJobMatch[] = llmScreenedResults
+    .filter(r => r.recommendation !== "skip")
+    .sort((a, b) => b.overallMatch - a.overallMatch);
+
 
   const criteria: SearchCriteria = {
     country,

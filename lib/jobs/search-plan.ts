@@ -176,7 +176,7 @@ export async function planSmartSearchQueries(input: Parameters<typeof planSearch
     const response = await Promise.race([
       generateStructuredJson({
         workload: "fast",
-        system: "You are an Executive Talent Acquisition specialist.\nGiven a list of target roles and a list of resume skills, generate 3 highly targeted Boolean/Semantic keyword strings that blend the target roles with the most relevant resume skills.\nOutput them as a JSON object with a single array property \"keywords\" containing exactly 3 strings.",
+        system: "You are an Executive Talent Acquisition specialist.\nGiven a list of target roles and a list of resume skills, generate 3 highly targeted Boolean/Semantic keyword strings that blend the target roles with the most relevant resume skills.\nCRITICAL INSTRUCTIONS:\n1. Include NEGATIVE KEYWORDS to exclude junior/garbage roles (e.g. if the user is senior, append -(Junior OR Associate OR Assistant)).\n2. Exclude Sales/Pre-sales if the skills are purely delivery (e.g. -(Sales OR Account Executive)).\n3. Use regional semantic expansions for titles (e.g. Engagement Manager OR Delivery Director).\nOutput them as a JSON object with a single array property \"keywords\" containing exactly 3 strings.",
         prompt: `Roles: ${input.roles.join(", ")}\nSkills: ${input.resumeSkills.join(", ")}`,
         schemaName: "smart_search_queries",
         schema: {
