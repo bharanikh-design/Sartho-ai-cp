@@ -859,7 +859,7 @@ return (
           <div className="empty-inline-state" style={{ textAlign: "center", padding: "40px 20px" }}>
             <h3 style={{ fontSize: "18px", color: "white", marginBottom: "10px" }}>Ready to unlock the Resume Templates?</h3>
             <p style={{ color: "#a0aec0", marginBottom: "20px" }}>
-              Sartho's templates (including the 2-column ATS-safe designs) are powered by your Career Evidence.
+              Sartho&apos;s templates (including the 2-column ATS-safe designs) are powered by your Career Evidence.
             </p>
             <div style={{ display: "flex", flexWrap: "wrap", gap: "10px", justifyContent: "center" }}>
               <button type="button" className="primary-button" onClick={generateMaster} disabled={generatingId === "master"}>

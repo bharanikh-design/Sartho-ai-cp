@@ -1,5 +1,5 @@
 /*
- * Six templates, and every one of them a single column.
+ * Seven templates, and every one of them a single column.
  *
  * The gallery every résumé builder sells is mostly two-column, and a second
  * column is the single most common reason an applicant tracking system parses a

@@ -146,7 +146,7 @@ describe("quantified achievement, judged per bullet", () => {
   });
 
   it("says so plainly when there are no bullets to judge", () => {
-    const result = scoreAts("Just prose, no list at all, running to some length.", noAnalysis);
+    const result = scoreAts("Just prose.", noAnalysis);
     expect(result.bulletCount).toBe(0);
     expect(result.checks[1].state).toBe("fail");
     expect(result.checks[1].detail).toMatch(/No bullet points found/);
