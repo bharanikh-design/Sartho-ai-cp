@@ -266,7 +266,8 @@ export function SearchPlanEditor({
 
       {expanded && codes.length ? (
         <>
-          <div className="search-criteria-row" id="geography">
+          {codes.length === 1 ? (
+            <div className="search-criteria-row" id="geography">
             <label htmlFor="criteria-cities">
               <strong>{regionGroups.length ? <>Where in {primaryName}?</> : "Which cities?"}</strong>
               <small>
@@ -303,6 +304,7 @@ export function SearchPlanEditor({
               emptyHint={`Anywhere in ${primaryName}`}
             />
           </div>
+          ) : null}
 
           {/*
             * Asked here, not on the profile, because this is where its effect
