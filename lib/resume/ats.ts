@@ -124,12 +124,18 @@ export const BULLET_MARKER = /^[•\u2022\u2023\u25E6\u2043\u2219*\u00B7\u2013\u
 
 /** The bullet lines of a résumé, in order. */
 export function bulletsIn(draft: string): string[] {
-  return draft
-    .split("\n")
-    .map((line) => line.trim())
+  const lines = draft.split("\n").map((line) => line.trim()).filter(Boolean);
+  const strictBullets = lines
     .filter((line) => BULLET_MARKER.test(line))
     .map((line) => line.replace(BULLET_MARKER, "").trim())
     .filter(Boolean);
+    
+  // If the user pasted plain text without bullet markers, treat any sentence/line 
+  // longer than 8 words as a 'bullet' so the ATS engine still provides feedback.
+  if (strictBullets.length === 0) {
+    return lines.filter(line => line.split(" ").length > 8);
+  }
+  return strictBullets;
 }
 
 export function scoreAts(draft: string, analysis: RuleAnalysis | null): AtsScore {
