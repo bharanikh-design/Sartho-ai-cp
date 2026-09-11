@@ -1,6 +1,7 @@
 import type { JobSearchQuery } from "@/lib/jobs/search-provider";
 import { earlyCareerSelections } from "@/lib/jobs/employment-types";
 import { marketTitleIn } from "@/lib/matching/job-family";
+import { generateStructuredJson } from "@/lib/ai/provider";
 
 /*
  * A target role is a person's own phrasing ("Business Analyst / Junior
@@ -75,12 +76,13 @@ export function planSearchQueries(input: {
    */
   entryLevelTerms?: string[];
   resumeSkills?: string[];
+  smartKeywords?: string[];
 }): JobSearchQuery[] {
   const remoteOnly = input.remotePreferences.length === 1 && input.remotePreferences[0] === "Remote";
   const employmentTypes = input.employmentTypes?.length ? input.employmentTypes : undefined;
   const locations = input.locations.map((item) => item.trim()).filter(Boolean).slice(0, MAX_LOCATION_QUERIES);
   const primaryLocation = locations[0];
-  const roles = input.roles.map(toSearchKeywords).filter(Boolean).slice(0, MAX_ROLE_QUERIES);
+  const roles = input.smartKeywords ? input.smartKeywords.slice(0, MAX_ROLE_QUERIES) : input.roles.map(toSearchKeywords).filter(Boolean).slice(0, MAX_ROLE_QUERIES);
   const queries: JobSearchQuery[] = [];
   const topRole = roles[0];
   if (!topRole) return queries;
@@ -163,4 +165,45 @@ export function widenToCountry(queries: JobSearchQuery[]): JobSearchQuery[] {
       seen.add(query.keywords);
       return true;
     });
+}
+
+export async function planSmartSearchQueries(input: Parameters<typeof planSearchQueries>[0]): Promise<JobSearchQuery[]> {
+  if (!input.resumeSkills || input.resumeSkills.length === 0 || !input.roles || input.roles.length === 0) {
+    return planSearchQueries(input);
+  }
+  
+  try {
+    const response = await Promise.race([
+      generateStructuredJson({
+        workload: "fast",
+        system: "You are an Executive Talent Acquisition specialist.\nGiven a list of target roles and a list of resume skills, generate 3 highly targeted Boolean/Semantic keyword strings that blend the target roles with the most relevant resume skills.\nOutput them as a JSON object with a single array property \"keywords\" containing exactly 3 strings.",
+        prompt: `Roles: ${input.roles.join(", ")}\nSkills: ${input.resumeSkills.join(", ")}`,
+        schemaName: "smart_search_queries",
+        schema: {
+          type: "object",
+          properties: {
+            keywords: {
+              type: "array",
+              items: { type: "string" },
+              minItems: 1,
+              maxItems: 3,
+            }
+          },
+          required: ["keywords"],
+          additionalProperties: false,
+        }
+      }),
+      new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 8000))
+    ]) as { keywords?: string[] };
+
+    const smartKeywords = (response.keywords || []).filter(Boolean);
+    if (smartKeywords.length === 0) {
+      return planSearchQueries(input);
+    }
+    
+    return planSearchQueries({ ...input, smartKeywords });
+  } catch (error) {
+    console.error("Smart search query generation failed, falling back to basic search:", error);
+    return planSearchQueries(input);
+  }
 }
