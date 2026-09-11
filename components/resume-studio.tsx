@@ -766,8 +766,20 @@ export function ResumeStudio({
            * The guidance lives here, where the absence is, rather than in a
            * card of its own further down the page.
            */
-          <div className="empty-inline-state">
-            {blockedReason ?? <>No résumés yet. Pick a role below to build your first draft.</>}
+          <div className="empty-inline-state" style={{ textAlign: "center", padding: "40px 20px" }}>
+            <h3 style={{ fontSize: "18px", color: "white", marginBottom: "10px" }}>Ready to unlock the Resume Templates?</h3>
+            <p style={{ color: "#a0aec0", marginBottom: "20px" }}>
+              Sartho's templates (including the 2-column ATS-safe designs) are powered by your Career Evidence.
+            </p>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "10px", justifyContent: "center" }}>
+              <button type="button" className="primary-button" onClick={generateMaster} disabled={generatingId === "master"}>
+                {generatingId === "master" ? "Building Master Résumé..." : "Build Master Résumé"}
+              </button>
+              <Link href="/applications" className="secondary-button">
+                Find a Job in Opportunities
+              </Link>
+            </div>
+            {error && generatingId === null && <p style={{ color: 'red', fontSize: '12px', marginTop: '10px' }}>{error}</p>}
           </div>
         )}
       </section>
@@ -821,9 +833,12 @@ export function ResumeStudio({
             {tailorable.map((role) => (
               <article key={role.id}>
                 <div><strong>{role.title}</strong><small>{role.employer ?? "Employer not recorded"}</small></div>
-                <button type="button" className="primary-button" onClick={() => void generate(role.id)} disabled={Boolean(generatingId)}>
-                  {generatingId === role.id ? "Drafting…" : "Build résumé"}
-                </button>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+                  <button type="button" className="primary-button" onClick={() => void generate(role.id)} disabled={Boolean(generatingId)}>
+                    {generatingId === role.id ? "Drafting…" : "Build résumé"}
+                  </button>
+                  {error && generatingId === null && <span style={{ color: 'red', fontSize: '12px', maxWidth: '300px', textAlign: 'right' }}>{error}</span>}
+                </div>
               </article>
             ))}
           </div>
