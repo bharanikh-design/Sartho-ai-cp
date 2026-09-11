@@ -97,6 +97,9 @@ export type AtsVerdict = {
  */
 const METRIC_SOURCE = /(?:[$£€]\s?\d[\d,.]*\s?(?:k|m|bn|b)?|\d+(?:\.\d+)?\s?%|\b\d+(?:[.,]\d+)*\s?(?:k|m|bn)?\b)/gi;
 
+const WEAK_VERBS = /^(?:worked|helped|assisted|responsible for|duties included|handled|did|made)\b/i;
+const PASSIVE_VOICE = /\b(?:was|were|is|are|am|be|been|being)\b\s+\w+ed\b/i;
+
 /*
  * A fresh regex per call. A /g regex carries lastIndex between .test() calls,
  * so reusing one across bullets silently skips every other line.

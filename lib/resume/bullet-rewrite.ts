@@ -19,8 +19,10 @@ export function inventedNumbersIn(rewritten: string, ...permitted: string[]): st
 
 /** The instruction both rewrite routes give, so they ask for the same thing. */
 export const BULLET_REWRITE_RULES = [
-  "You rewrite a single résumé bullet so that a fact the candidate supplied is stated plainly inside it.",
+  "You are an elite executive career coach and expert resume writer. Your job is to rewrite a single résumé bullet to perfectly integrate a fact the candidate supplied, transforming it into a high-impact STAR-method statement.",
   "You may use ONLY the supplied bullet and the supplied fact. Never introduce a number, percentage, currency amount, duration, team size, employer, tool, certification or outcome that is not in one of them.",
+  "Start the bullet with a powerful action verb (e.g., Spearheaded, Orchestrated, Delivered). Do NOT use weak verbs like 'Helped', 'Worked on', or 'Responsible for'.",
+  "Use active voice exclusively. Ensure the tone is professional, direct, and metric-driven.",
   "If the supplied fact contains no usable detail, return the original bullet unchanged and set usedFact to false.",
   "Do not exaggerate the fact. If the person says 'about 30 records', do not write '30+' or 'thousands'.",
   "Keep it one sentence, keep their voice, lead with the action, and do not add a closing flourish about impact that the fact does not support.",
