@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { atsVerdict, scoreAts, tailoringGain } from "@/lib/resume/ats";
 import { unfilledBlanks } from "@/lib/resume/bullet-rewrite";
+import { suggestResumeFor, type PastResume } from "@/lib/resume/suggest";
 import { renderResumeText, resumeContentOf, type ResumeContent } from "@/lib/resume/content";
 import { ResumeDocument, type BulletCoach } from "@/components/resume-document";
 import { RESUME_TEMPLATES, resumeTemplate } from "@/lib/resume/templates";
@@ -932,6 +933,19 @@ return (
   const expanded = drafts.find((draft) => draft.application.id === expandedId) ?? null;
 
   /* Whether there is a role a truthful draft could be written for right now. */
+  /*
+   * The résumés this person already has, in the shape the suggester wants.
+   * Read off the drafts the page was given rather than fetched again: they are
+   * the same rows, and a second query for data already in props is a round
+   * trip nobody is waiting for.
+   */
+  const pastResumes: PastResume[] = drafts.map((draft) => ({
+    applicationId: draft.application.id,
+    jobTitle: draft.jobTitle,
+    employer: draft.employer,
+    updatedAt: draft.application.updated_at ?? "",
+  }));
+
   const canBuild = evidenceReady && tailorable.length > 0;
 
   /*
@@ -1111,9 +1125,45 @@ return (
           </div>
 
           <div className="studio-role-list">
-            {tailorable.map((role) => (
+            {tailorable.map((role) => {
+              /*
+               * The résumé already written for the most similar role.
+               *
+               * Every draft is built from scratch, which is right the first
+               * time and wasteful the fifth: somebody who has already tailored
+               * for a ServiceNow delivery role has chosen which evidence
+               * leads, which wording survived and which lines they edited by
+               * hand. Starting the next one blank throws that away and asks
+               * them to decide it all again.
+               *
+               * Offered beside the build button rather than instead of it. A
+               * suggestion read off two job titles is sometimes wrong, and the
+               * cost of being wrong must never be a résumé somebody did not
+               * choose.
+               */
+              const suggestion = suggestResumeFor(role.title, pastResumes);
+              return (
               <article key={role.id}>
-                <div><strong>{role.title}</strong><small>{role.employer ?? "Employer not recorded"}</small></div>
+                <div>
+                  <strong>{role.title}</strong>
+                  <small>{role.employer ?? "Employer not recorded"}</small>
+                  {suggestion ? (
+                    <small className="studio-resume-suggestion">
+                      {suggestion.reason}{" "}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setOpenId(suggestion.resume.applicationId);
+                          requestAnimationFrame(() => {
+                            document.getElementById("drafts")?.scrollIntoView({ behavior: "smooth", block: "start" });
+                          });
+                        }}
+                      >
+                        Open it
+                      </button>
+                    </small>
+                  ) : null}
+                </div>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
                   <button type="button" className="primary-button" onClick={() => void generate(role.id)} disabled={Boolean(generatingId)}>
                     {generatingId === role.id ? "Drafting…" : "Build résumé"}
@@ -1121,7 +1171,8 @@ return (
                   {error && generatingId === null && <span style={{ color: 'red', fontSize: '12px', maxWidth: '300px', textAlign: 'right' }}>{error}</span>}
                 </div>
               </article>
-            ))}
+              );
+            })}
           </div>
         </section>
       ) : null}
