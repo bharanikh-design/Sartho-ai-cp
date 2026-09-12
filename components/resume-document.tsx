@@ -236,13 +236,24 @@ function BulletList({
                 * content — and it is also where its dashed gold styling is
                 * defined once, rather than re-typed here in hex.
                 */}
-              {coach && weakBulletIds.has(bullet.id) && coach.activeId !== bullet.id ? (
+              {/*
+                * Offered on every line, not only the ones missing a number.
+                *
+                * The coach does more than count figures — it rewrites the line,
+                * leaves a named blank wherever it would otherwise have to guess,
+                * and asks two to four questions specific to that sentence. None
+                * of that was reachable except through a button labelled "Add a
+                * figure", shown only on bullets with no digit in them, so the
+                * whole feature read as "put numbers everywhere" and a line that
+                * was merely vague had nothing offered at all.
+                */}
+              {coach && coach.activeId !== bullet.id ? (
                 <button
                   type="button"
-                  className="resume-doc-coach-open"
+                  className={`resume-doc-coach-open${weakBulletIds.has(bullet.id) ? " is-weak" : ""}`}
                   onClick={() => coach.onOpen(bullet.id, bullet.text)}
                 >
-                  ✨ Add a figure to improve ATS score
+                  {weakBulletIds.has(bullet.id) ? "✨ Strengthen this line — it states no result" : "✨ Strengthen this line"}
                 </button>
               ) : null}
 

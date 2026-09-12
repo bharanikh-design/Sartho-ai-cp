@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createSafetyIdentifier, generateStructuredJson } from "@/lib/ai/provider";
-import { describeAiFailure } from "@/lib/ai/failure";
+import { describeAiFailure, DOCUMENT_SUBJECT } from "@/lib/ai/failure";
 import { aiQuotaResponse, checkAiQuota } from "@/lib/ai/quota";
 import { getAuthenticatedUser } from "@/lib/auth";
 import { logError } from "@/lib/logger";
@@ -286,7 +286,7 @@ export async function POST(request: Request) {
         const rawMessage = caught instanceof Error ? caught.message : "The import failed.";
         const message = rawMessage === "Sartho did not find any career evidence in that document."
           ? rawMessage
-          : describeAiFailure(rawMessage);
+          : describeAiFailure(rawMessage, DOCUMENT_SUBJECT);
         logError(supabase, "career_import", caught);
         await supabase
           .from("resume_imports")

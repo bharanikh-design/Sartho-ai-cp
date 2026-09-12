@@ -46,6 +46,37 @@ const stateTone: Record<"pass" | "warn" | "fail", string> = {
   fail: "#e5917a",
 };
 
+/*
+ * The document toolbar's icons.
+ *
+ * Five text buttons — Download PDF, Download Word, Print, Copy draft,
+ * Regenerate — wrapped onto two rows and spent the width of the document on
+ * words their shapes already carry. Each button keeps the words in its
+ * accessible name and its tooltip, so nothing is lost to a screen reader or to
+ * somebody meeting the row for the first time.
+ */
+const toolIcon = {
+  width: 17, height: 17, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor",
+  strokeWidth: 1.8, strokeLinecap: "round" as const, strokeLinejoin: "round" as const, "aria-hidden": true,
+};
+
+function ToolIcon({ name }: { name: "pdf" | "word" | "print" | "copy" | "regenerate" | "discard" }) {
+  switch (name) {
+    case "pdf":
+      return <svg {...toolIcon}><path d="M12 3v11" /><path d="m8 10.5 4 3.5 4-3.5" /><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" /></svg>;
+    case "word":
+      return <svg {...toolIcon}><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Z" /><path d="M14 3v5h5" /><path d="M9 13h6M9 17h4" /></svg>;
+    case "print":
+      return <svg {...toolIcon}><path d="M7 9V3h10v6" /><path d="M7 19H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2" /><path d="M7 15h10v6H7z" /></svg>;
+    case "copy":
+      return <svg {...toolIcon}><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15V5a2 2 0 0 1 2-2h10" /></svg>;
+    case "regenerate":
+      return <svg {...toolIcon}><path d="M21 12a9 9 0 1 1-3.2-6.9" /><path d="M21 4v5h-5" /></svg>;
+    case "discard":
+      return <svg {...toolIcon}><path d="M3 12a9 9 0 1 0 3.2-6.9" /><path d="M3 4v5h5" /></svg>;
+  }
+}
+
 export function ResumeStudio({
   drafts,
   tailorable,
@@ -287,9 +318,24 @@ export function ResumeStudio({
     setError(null);
     try {
       const response = await fetch(`/api/jobs/${jobId}/resume`, { method: "POST" });
-      const result = await response.json() as { error?: string };
+      const result = await response.json() as { error?: string; applicationId?: string };
       if (!response.ok) throw new Error(result.error ?? "Unable to draft the résumé.");
       router.refresh();
+      /*
+       * Open what was just built, in "Your résumés" where it now lives.
+       *
+       * Building used to refresh the page and leave the new draft collapsed in
+       * a list further down — so the answer to "Build résumé" was a spinner
+       * stopping, and the person had to go and find the thing they had asked
+       * for. The id comes back from the route so the right row opens even when
+       * several drafts arrive close together.
+       */
+      if (result.applicationId) {
+        setOpenId(result.applicationId);
+        requestAnimationFrame(() => {
+          document.getElementById("drafts")?.scrollIntoView({ behavior: "smooth", block: "start" });
+        });
+      }
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Unable to draft the résumé.");
     } finally {
@@ -471,23 +517,38 @@ export function ResumeStudio({
                   {savingId === draft.application.id ? "Saving…" : "Save as a new version"}
                 </button>
               ) : null}
-              <button type="button" className="secondary-button" onClick={() => void downloadPdf(draft, content)}>
-                Download PDF
-              </button>
-              <button
-                type="button"
-                className="secondary-button"
-                disabled={downloadingId === draft.application.id}
-                onClick={() => void downloadDocx(draft, content)}
-              >
-                {downloadingId === draft.application.id ? "Building…" : "Download Word"}
-              </button>
-              <button type="button" className="secondary-button" onClick={() => void copy(text, draft.application.id)}>
-                {copiedId === draft.application.id ? "Copied ✓" : "Copy draft"}
-              </button>
-              <button type="button" className="secondary-button" onClick={() => void generate(draft.jobId)} disabled={generatingId === draft.jobId}>
-                {generatingId === draft.jobId ? "Regenerating…" : "Regenerate"}
-              </button>
+              <span className="resume-doc-tools">
+                <button type="button" title="Download PDF" aria-label="Download PDF" onClick={() => void downloadPdf(draft, content)}>
+                  <ToolIcon name="pdf" />
+                </button>
+                <button
+                  type="button"
+                  title="Download Word"
+                  aria-label="Download Word"
+                  disabled={downloadingId === draft.application.id}
+                  onClick={() => void downloadDocx(draft, content)}
+                >
+                  <ToolIcon name="word" />
+                </button>
+                <button
+                  type="button"
+                  title={copiedId === draft.application.id ? "Copied" : "Copy draft"}
+                  aria-label={copiedId === draft.application.id ? "Copied" : "Copy draft"}
+                  onClick={() => void copy(text, draft.application.id)}
+                >
+                  <ToolIcon name="copy" />
+                </button>
+                <span className="resume-doc-tools-split" aria-hidden="true" />
+                <button
+                  type="button"
+                  title="Regenerate — this version is kept"
+                  aria-label="Regenerate. This version is kept."
+                  onClick={() => void generate(draft.jobId)}
+                  disabled={generatingId === draft.jobId}
+                >
+                  <ToolIcon name="regenerate" />
+                </button>
+              </span>
               {dirty ? (
                 <button
                   type="button"
@@ -638,47 +699,61 @@ return (
             {/*
               * Two formats, because employers ask for two. Word is what an
               * applicant tracking system parses most reliably; PDF is what a
-              * person opens without it reflowing on them.
+              * person opens without it reflowing on them. Printing is neither:
+              * it goes through the print stylesheet, the only path that lays
+              * the résumé out in points on a real page.
               */}
-            <button type="button" className="secondary-button" onClick={() => void downloadPdf(draft, content)}>
-              Download PDF
-            </button>
-            <button
-              type="button"
-              className="secondary-button"
-              disabled={downloadingId === draft.application.id}
-              onClick={() => void downloadDocx(draft, content)}
-            >
-              {downloadingId === draft.application.id ? "Building…" : "Download Word"}
-            </button>
-            {/*
-              * Printing is not the PDF download in another hat: it goes through
-              * the print stylesheet, which is the only path that lays the
-              * résumé out in points on a real page.
-              */}
-            <button
-              type="button"
-              className="secondary-button"
-              disabled={printingId !== null}
-              onClick={() => setPrintingId(draft.application.id)}
-            >
-              Print
-            </button>
-            <button type="button" className="secondary-button" onClick={() => void copy(text, draft.application.id)}>
-              {copiedId === draft.application.id ? "Copied ✓" : "Copy draft"}
-            </button>
-            <button type="button" className="secondary-button" onClick={() => void generate(draft.jobId)} disabled={generatingId === draft.jobId}>
-              {generatingId === draft.jobId ? "Regenerating…" : "Regenerate"}
-            </button>
-            {dirty ? (
+            <span className="resume-doc-tools">
+              <button type="button" title="Download PDF" aria-label="Download PDF" onClick={() => void downloadPdf(draft, content)}>
+                <ToolIcon name="pdf" />
+              </button>
               <button
                 type="button"
-                className="secondary-button"
-                onClick={() => setDocuments((state) => { const next = { ...state }; delete next[documentKey]; return next; })}
+                title="Download Word"
+                aria-label={downloadingId === draft.application.id ? "Building Word document" : "Download Word"}
+                disabled={downloadingId === draft.application.id}
+                onClick={() => void downloadDocx(draft, content)}
               >
-                Discard edits
+                <ToolIcon name="word" />
               </button>
-            ) : null}
+              <button
+                type="button"
+                title="Print"
+                aria-label="Print"
+                disabled={printingId !== null}
+                onClick={() => setPrintingId(draft.application.id)}
+              >
+                <ToolIcon name="print" />
+              </button>
+              <button
+                type="button"
+                title={copiedId === draft.application.id ? "Copied" : "Copy draft"}
+                aria-label={copiedId === draft.application.id ? "Copied" : "Copy draft"}
+                onClick={() => void copy(text, draft.application.id)}
+              >
+                <ToolIcon name="copy" />
+              </button>
+              <span className="resume-doc-tools-split" aria-hidden="true" />
+              <button
+                type="button"
+                title="Regenerate — this version is kept"
+                aria-label={generatingId === draft.jobId ? "Regenerating" : "Regenerate. This version is kept."}
+                onClick={() => void generate(draft.jobId)}
+                disabled={generatingId === draft.jobId}
+              >
+                <ToolIcon name="regenerate" />
+              </button>
+              {dirty ? (
+                <button
+                  type="button"
+                  title="Discard edits"
+                  aria-label="Discard edits"
+                  onClick={() => setDocuments((state) => { const next = { ...state }; delete next[documentKey]; return next; })}
+                >
+                  <ToolIcon name="discard" />
+                </button>
+              ) : null}
+            </span>
             <small className="studio-regenerate-note">
               {dirty
                 ? "Your edits are not saved until you save them. Regenerating would replace them."

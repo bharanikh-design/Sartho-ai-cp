@@ -836,3 +836,35 @@ h2.resume-doc-heading.resume-doc-field { margin-bottom: 0; border-bottom: 1px so
 .studio-empty p { margin: 0; max-width: 52ch; color: var(--text-secondary); font-size: var(--text-sm); line-height: 1.6; }
 .studio-empty p a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
 .studio-empty-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 6px; }
+
+/*
+ * The coach is offered on every line now, so the affordance has two weights:
+ * quiet on a line that is merely improvable, lit on one the ATS check actually
+ * flagged. One button, two states — rather than a button that only exists when
+ * a line has no digit in it.
+ */
+.resume-doc-coach-open { opacity: .45; border-color: var(--line); color: var(--text-tertiary); }
+.resume-doc-bullet:hover .resume-doc-coach-open,
+.resume-doc-bullet:focus-within .resume-doc-coach-open { opacity: 1; }
+.resume-doc-coach-open.is-weak { opacity: 1; border-color: rgba(224,176,97,.5); color: #e0b061; }
+
+/*
+ * The document toolbar: icons on one line.
+ *
+ * Five full-width text buttons wrapped onto two rows and spent the width of the
+ * document on words the icons already say. The label stays in the tooltip and
+ * the accessible name, so nothing is lost to a screen reader or to a first-time
+ * reader who hovers.
+ */
+.resume-doc-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.resume-doc-tools button {
+  display: inline-grid; place-items: center; width: 38px; height: 38px;
+  border: 1px solid var(--line); border-radius: 9px;
+  color: var(--text-secondary); background: transparent; cursor: pointer;
+  transition: color .12s ease, border-color .12s ease, background .12s ease;
+}
+.resume-doc-tools button:hover:not(:disabled) { color: var(--text); border-color: var(--text-tertiary); background: rgba(255,255,255,.05); }
+.resume-doc-tools button:disabled { opacity: .4; cursor: default; }
+.resume-doc-tools button svg { width: 17px; height: 17px; }
+/* The destructive-ish one sits apart, after a hairline, so it is never a slip. */
+.resume-doc-tools .resume-doc-tools-split { width: 1px; height: 22px; background: var(--line); margin-inline: 4px; }

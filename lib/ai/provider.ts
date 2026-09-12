@@ -473,7 +473,7 @@ async function spokenFailure(route: ProviderRoute, rawMessage: string): Promise<
    * lever, and that is more useful than this one.
    */
   if (!models.length && classifyAiFailure(rawMessage) === "unknown") {
-    return "Sartho's AI provider rejected the request and its key can list no models at all, which means the key is not valid or the Generative Language API is not enabled for its Google Cloud project. Nothing is wrong with your résumé. The administrator needs to check GEMINI_API_KEY and that the API is enabled for that project.";
+    return "Sartho's AI provider rejected the request and its key can list no models at all, which means the key is not valid or the Generative Language API is not enabled for its Google Cloud project. Nothing is wrong with your data. The administrator needs to check GEMINI_API_KEY and that the API is enabled for that project.";
   }
   return describeAiFailure(rawMessage);
 }
