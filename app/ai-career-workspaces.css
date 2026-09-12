@@ -961,3 +961,12 @@ h2.resume-doc-heading.resume-doc-field { margin-bottom: 0; border-bottom: 1px so
  * file to attach where, not a warning.
  */
 .studio-template-flag { border-radius: 999px; padding: 1px 6px; color: #e0b061; background: rgba(224,176,97,.14); font-size: var(--text-2xs); font-weight: 700; letter-spacing: .04em; }
+
+/*
+ * The master résumé, read-only above the tailored drafts.
+ *
+ * Capped in height because it is a reference, not the thing being worked on —
+ * a full-length document here would push the drafts, which is where the work
+ * happens, off the first screen entirely.
+ */
+.studio-master-body { max-height: 560px; overflow-y: auto; border: 1px solid rgba(255,255,255,.07); border-radius: 12px; padding: 4px; }

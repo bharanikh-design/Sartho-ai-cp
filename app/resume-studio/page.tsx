@@ -49,7 +49,7 @@ export default async function ResumeStudioPage() {
      * migration run by hand. Folded in elsewhere, a deployment running ahead
      * of its schema would lose the page rather than the comparison.
      */
-    supabase.from("profiles").select("master_resume,master_resume_text").eq("id", user.id).maybeSingle(),
+    supabase.from("profiles").select("master_resume,master_resume_text,master_resume_updated_at").eq("id", user.id).maybeSingle(),
   ]);
 
   if (applicationsResult.error) throw applicationsResult.error;
@@ -124,6 +124,8 @@ export default async function ResumeStudioPage() {
         analysedCount={analysed.length}
         evidenceReady={(approvedResult.count ?? 0) > 0}
         masterResumeText={masterResumeText}
+        master={master}
+        masterUpdatedAt={masterResult.error ? null : (masterResult.data?.master_resume_updated_at ?? null)}
       />
     </div>
   );

@@ -130,6 +130,8 @@ export function ResumeStudio({
   analysedCount,
   evidenceReady,
   masterResumeText,
+  master,
+  masterUpdatedAt,
 }: {
   drafts: StudioDraft[];
   /** Roles whose analysis is finished, so a truthful draft can be built. */
@@ -148,6 +150,13 @@ export function ResumeStudio({
    * same role analysis, so the difference is like-for-like.
    */
   masterResumeText: string | null;
+  /**
+   * The master résumé as a document, so it can be read rather than only scored
+   * against. Null until one has been built.
+   */
+  master: ResumeContent | null;
+  /** When it was last built, so "is this current?" has an answer on the page. */
+  masterUpdatedAt: string | null;
 }) {
   const router = useRouter();
   const [openId, setOpenId] = useState<string | null>(drafts[0]?.application.id ?? null);
@@ -1075,6 +1084,14 @@ return (
     updatedAt: draft.application.updated_at ?? "",
   }));
 
+  /*
+   * Said as a date rather than "Saved", because the only question anybody has
+   * about a master résumé is whether it still reflects them.
+   */
+  const masterUpdatedLabel = masterUpdatedAt
+    ? `Built ${new Date(masterUpdatedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}`
+    : "Built from your approved evidence";
+
   const canBuild = evidenceReady && tailorable.length > 0;
 
   /*
@@ -1098,6 +1115,49 @@ return (
   return (
     <>
       {error ? <div className="inline-error" role="alert">{error}</div> : null}
+
+      {/*
+        * The master résumé, which had nowhere to be read.
+        *
+        * It was built by a button, written to profiles.master_resume, loaded by
+        * this page — and used for exactly one thing: scoring a tailored draft
+        * against it. Somebody pressed "Build master résumé", a spinner stopped,
+        * and there was no page anywhere in the product showing what had been
+        * built. The one document that is the source of every other one was the
+        * only one you could not look at.
+        *
+        * It sits above the tailored drafts because that is the order the work
+        * happens in: the master is written once and the role-specific versions
+        * come off it.
+        */}
+      {master ? (
+        <section className="glass-card content-card" id="master">
+          <div className="card-header">
+            <div>
+              <h2 className="section-heading">Your master résumé</h2>
+              <p className="section-subtitle">
+                Everything you can evidence, aimed at no particular advert. Every tailored draft below starts from this.
+              </p>
+            </div>
+            <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={generateMaster}
+                disabled={generatingId === "master"}
+                style={{ padding: "4px 10px", fontSize: "11px" }}
+              >
+                {generatingId === "master" ? "Rebuilding…" : "Rebuild"}
+              </button>
+              <span className="meta-pill">{masterUpdatedLabel}</span>
+            </div>
+          </div>
+
+          <div className="studio-master-body">
+            <ResumeDocument content={master} onChange={() => {}} weakBulletIds={new Set()} readOnly />
+          </div>
+        </section>
+      ) : null}
 
       <section className="glass-card content-card" id="drafts">
         <div className="card-header">
