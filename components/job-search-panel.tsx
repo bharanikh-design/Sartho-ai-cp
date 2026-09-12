@@ -315,6 +315,18 @@ export function JobSearchPanel({
             ? <> · {criteria.employmentHinted.join(" and ")} searched by keyword only — no provider filters for {criteria.employmentHinted.length === 1 ? "it" : "them"}</>
             : null}
           {criteria.providers.length ? <> · via {criteria.providers.join(" + ")}</> : null}
+          {/*
+            * A provider that timed out is not an error the reader can fix, but
+            * it is the reason the page is thinner than it should be — and it
+            * used to be written to the server console and nowhere else.
+            */}
+          {criteria.providerTimeouts?.length ? (
+            <>
+              {" "}· {criteria.providerTimeouts
+                .map((entry) => `${entry.name} timed out ${entry.count} time${entry.count === 1 ? "" : "s"}`)
+                .join(", ")}
+            </>
+          ) : null}
           {criteria.providerErrors?.length ? (
             <span style={{ color: "#e0b061" }}>
               {" "}· provider note: {criteria.providerErrors.join("; ")}

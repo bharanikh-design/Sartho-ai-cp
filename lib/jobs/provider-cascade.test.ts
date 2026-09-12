@@ -164,3 +164,44 @@ describe("provider cascade", () => {
     expect(providerLabel("adzuna")).toBe("Adzuna");
   });
 });
+
+/*
+ * A timeout used to go to the server console and nowhere else, so the deep
+ * provider dropping out of a search was invisible: the page just showed
+ * shallower results from the fallback with no explanation, which reads exactly
+ * like a market with nothing in it.
+ */
+describe("timeouts are counted, not just logged", () => {
+  function timeoutError() {
+    const error = new Error("timed out");
+    error.name = "TimeoutError";
+    return error;
+  }
+
+  it("counts each timeout against the provider that had it", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { search } = recorder({
+      jsearch: async () => { throw timeoutError(); },
+      adzuna: async () => [result("https://b")],
+    });
+    const cascade = createProviderCascade(BOTH, { search, failuresBeforeDead: 5 });
+
+    await cascade.run(query);
+    await cascade.run(query);
+
+    expect(cascade.timeouts.get("Google for Jobs")).toBe(2);
+    expect(cascade.timeouts.has("Adzuna")).toBe(false);
+    /* Still not phrased at the reader as something they did wrong. */
+    expect(cascade.errors).toEqual([]);
+    warn.mockRestore();
+  });
+
+  it("reports nothing when everything answered in time", async () => {
+    const { search } = recorder({ jsearch: async () => [result("https://a")] });
+    const cascade = createProviderCascade(BOTH, { search });
+
+    await cascade.run(query);
+
+    expect(cascade.timeouts.size).toBe(0);
+  });
+});

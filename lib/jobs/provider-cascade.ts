@@ -49,6 +49,17 @@ export type ProviderCascade = {
   errors: string[];
   /** Providers that actually answered, by display name. */
   used: Set<string>;
+  /**
+   * How many times each provider ran out of time, by display name.
+   *
+   * Separate from errors because it is a different thing to say. An error is
+   * usually a misconfiguration the reader can fix; a timeout is the provider
+   * being slow, and the only thing to do about it is know it happened. It was
+   * previously logged to the server console and nowhere else, which made the
+   * deep provider dropping out of a search completely invisible — the page
+   * simply showed shallower results with no explanation.
+   */
+  timeouts: Map<string, number>;
 };
 
 /** One spelling of each provider's name, for criteria lines and error text. */
@@ -67,6 +78,7 @@ export function createProviderCascade(
   const failures = new Map<JobSearchProviderName, number>();
   const errors: string[] = [];
   const used = new Set<string>();
+  const timeouts = new Map<string, number>();
 
   function recordFailure(provider: JobSearchProviderName, caught: unknown) {
     /*
@@ -90,7 +102,9 @@ export function createProviderCascade(
      * across a page that did find roles.
      */
     if (caught instanceof Error && (caught.name === "TimeoutError" || caught.name === "AbortError")) {
-      console.warn(`${providerLabel(provider)} timed out on a query`);
+      const label = providerLabel(provider);
+      timeouts.set(label, (timeouts.get(label) ?? 0) + 1);
+      console.warn(`${label} timed out on a query`);
       return;
     }
     errors.push(`${providerLabel(provider)}: ${caught instanceof Error ? caught.message : "unknown error"}`);
@@ -128,5 +142,6 @@ export function createProviderCascade(
     exhausted: () => providers.every((provider) => dead.has(provider)),
     errors,
     used,
+    timeouts,
   };
 }

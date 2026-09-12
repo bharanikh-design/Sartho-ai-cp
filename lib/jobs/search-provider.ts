@@ -404,6 +404,18 @@ export function buildJSearchParams(query: JobSearchQuery): URLSearchParams {
   return params;
 }
 
+/*
+ * Long enough for a healthy JSearch call, short enough that two dead ones do
+ * not spend the search.
+ *
+ * It was 12 seconds against a 28-second whole-search budget, and a provider is
+ * retired after two failures — so a slow JSearch could burn 24 of those 28
+ * seconds before the fallback got a turn, and the run ended with "queries
+ * skipped (time limit)" and results from one provider. Eight seconds is well
+ * past this API's normal response time and leaves the budget usable.
+ */
+const JSEARCH_TIMEOUT_MS = 8_000;
+
 let cachedJSearchEndpoint: "search" | "search-v2" | null = "search-v2";
 
 async function searchJSearch(query: JobSearchQuery): Promise<JobSearchResult[]> {
@@ -422,7 +434,7 @@ async function searchJSearch(query: JobSearchQuery): Promise<JobSearchResult[]> 
   let response = await fetch(`https://jsearch.p.rapidapi.com/${endpoint}?${searchParams}`, {
     method: "GET",
     headers,
-    signal: AbortSignal.timeout(12_000),
+    signal: AbortSignal.timeout(JSEARCH_TIMEOUT_MS),
   });
 
   if (response.status === 404 && endpoint === "search-v2") {
@@ -430,7 +442,7 @@ async function searchJSearch(query: JobSearchQuery): Promise<JobSearchResult[]> 
     response = await fetch(`https://jsearch.p.rapidapi.com/search?${searchParams}`, {
       method: "GET",
       headers,
-      signal: AbortSignal.timeout(12_000),
+      signal: AbortSignal.timeout(JSEARCH_TIMEOUT_MS),
     });
   } else if (response.ok && cachedJSearchEndpoint === null) {
     cachedJSearchEndpoint = "search-v2";
@@ -584,3 +596,51 @@ export async function searchWithProvider(
 }
 
 
+
+
+export type JobProviderProbe = {
+  provider: JobSearchProviderName;
+  name: string;
+  configured: boolean;
+  /** The env vars this provider reads, by name only — never a value. */
+  reads: string[];
+  reachable: boolean;
+  results: number;
+  elapsedMs: number;
+  error: string | null;
+};
+
+/*
+ * One real query against one provider, reported without secrets.
+ *
+ * Every provider problem reaches the person as the same empty page: a key that
+ * was never set, a key that was rejected, a plan out of quota, an API that is
+ * simply slow. Telling those apart from the outside is guesswork, and guesswork
+ * is what turned a one-line configuration fault into an afternoon.
+ */
+export async function probeJobProvider(provider: JobSearchProviderName): Promise<JobProviderProbe> {
+  const name = provider === "jsearch" ? "Google for Jobs" : "Adzuna";
+  const reads = provider === "jsearch"
+    ? ["JSEARCH_RAPIDAPI_KEY", "RAPIDAPI_KEY", "JSEARCH_MAX_PAGES"]
+    : ["ADZUNA_APP_ID", "ADZUNA_APP_KEY"];
+  const configured = provider === "jsearch" ? Boolean(jsearchConfig()) : Boolean(adzunaConfig());
+
+  if (!configured) {
+    return { provider, name, configured, reads, reachable: false, results: 0, elapsedMs: 0, error: "No key configured." };
+  }
+
+  const startedAt = Date.now();
+  try {
+    const results = await searchWithProvider(provider, {
+      keywords: "project manager",
+      country: "sg",
+      limit: 10,
+    });
+    return { provider, name, configured, reads, reachable: true, results: results.length, elapsedMs: Date.now() - startedAt, error: null };
+  } catch (caught) {
+    const error = caught instanceof Error
+      ? (caught.name === "TimeoutError" || caught.name === "AbortError" ? "Timed out." : caught.message)
+      : "Unknown error.";
+    return { provider, name, configured, reads, reachable: false, results: 0, elapsedMs: Date.now() - startedAt, error };
+  }
+}
