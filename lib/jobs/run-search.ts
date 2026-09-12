@@ -20,7 +20,7 @@ import { fetchAdvertText } from "@/lib/jobs/advert-text";
 import { scoreOpportunity } from "@/lib/matching/opportunity-score";
 import { candidateSeniority, isEntryLevelTitle } from "@/lib/matching/title-fit";
 import { seniorityReach } from "@/lib/matching/seniority-reach";
-import { searchEmployerDirectly } from "@/lib/jobs/company-careers/registry";
+import { findEmployerPortal, searchEmployerDirectly } from "@/lib/jobs/company-careers/registry";
 import { deduplicateSearchResults, isMarketLocationConsistent } from "@/lib/jobs/location-guard";
 import { createProviderCascade } from "@/lib/jobs/provider-cascade";
 import {
@@ -156,6 +156,12 @@ export type SearchCriteria = {
    * market with nothing in it.
    */
   providerTimeouts?: Array<{ name: string; count: number }>;
+  /**
+   * Each named employer's own careers portal, and what came of it. Free,
+   * unmetered and aimed exactly where the person pointed it — and until now the
+   * least visible part of a search.
+   */
+  employerPortals?: Array<{ employer: string; status: "searched" | "empty" | "failed" | "unknown"; found: number }>;
   queriesRun: number;
   queriesSkipped: number;
 };
@@ -392,6 +398,14 @@ export async function runBriefSearch(
   let lastQueryEndedAt = 0;
 
   /*
+   * What each named employer's own careers portal actually did. "unknown" means
+   * the registry has no configuration for that company at all — the commonest
+   * outcome, and previously indistinguishable from a portal that was searched
+   * and had nothing.
+   */
+  const employerPortals: Array<{ employer: string; status: "searched" | "empty" | "failed" | "unknown"; found: number }> = [];
+
+  /*
    * Providers are tried in order, not all at once.
    *
    * Every query used to fan out to both providers in parallel and merge the
@@ -455,7 +469,24 @@ export async function runBriefSearch(
       ? (entryLevelTermsFor(country)[0] ?? "graduate")
       : (activeLanes[0]?.name ? toSearchKeywords(activeLanes[0].name) : "analyst");
 
+    /*
+     * Said out loud, per employer, because this is the one source that is free,
+     * unmetered and aimed exactly where the person pointed it — and it was the
+     * least visible thing in the search.
+     *
+     * Every failure went into an empty catch with a note calling it non-fatal
+     * because the aggregator covers it. Two of those three words were wrong: an
+     * employer the registry has never heard of returns an empty list rather
+     * than throwing, so it was not caught at all, and an aggregator that cannot
+     * see a company's own careers page does not cover it. A brief naming four
+     * employers could have every one of them silently contribute nothing, and
+     * the page would look exactly the same as if they had all been searched.
+     */
     const directQueries = brief.companies.slice(0, 6).map(async (employer) => {
+      if (!findEmployerPortal(employer)) {
+        employerPortals.push({ employer, status: "unknown", found: 0 });
+        return;
+      }
       try {
         const directMatches = await searchEmployerDirectly(employer, {
           employer,
@@ -467,8 +498,14 @@ export async function runBriefSearch(
           if (!byUrl.has(item.url)) byUrl.set(item.url, item);
         }
         if (directMatches.length) cascade.used.add("Company Careers");
-      } catch {
-        // Direct ATS query failure is non-fatal; aggregator covers it.
+        employerPortals.push({
+          employer,
+          status: directMatches.length ? "searched" : "empty",
+          found: directMatches.length,
+        });
+      } catch (caught) {
+        console.error("Employer careers portal failed", { employer, error: caught });
+        employerPortals.push({ employer, status: "failed", found: 0 });
       }
     });
 
@@ -778,6 +815,7 @@ export async function runBriefSearch(
     remoteOnly: preferences.remotePreferences.length === 1 && preferences.remotePreferences[0] === "Remote",
     providers: Array.from(cascade.used),
     providerErrors: cascade.errors.length ? [...new Set(cascade.errors)] : undefined,
+    employerPortals: employerPortals.length ? employerPortals : undefined,
     providerTimeouts: cascade.timeouts.size
       ? [...cascade.timeouts].map(([name, count]) => ({ name, count }))
       : undefined,
