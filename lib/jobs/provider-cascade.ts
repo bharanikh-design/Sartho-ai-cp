@@ -87,6 +87,16 @@ export type ProviderCascade = {
    * simply showed shallower results with no explanation.
    */
   timeouts: Map<string, number>;
+  /**
+   * The longest any one call was given before it timed out, by display name.
+   *
+   * A timeout count on its own says the provider was slow; it does not say
+   * slow compared to what. "Timed out 2 times" against a six-second wait is a
+   * budget that was too tight, and against a twenty-second wait it is a
+   * provider that is genuinely not answering — opposite diagnoses, and the
+   * page could not tell them apart.
+   */
+  timeoutWaits: Map<string, number>;
 };
 
 /** One spelling of each provider's name, for criteria lines and error text. */
@@ -109,7 +119,9 @@ export function createProviderCascade(
   const failedAt: Array<{ provider: JobSearchProviderName; message: string }> = [];
   const used = new Set<string>();
   const timeouts = new Map<string, number>();
+  const timeoutWaits = new Map<string, number>();
   let lastCalled = new Set<JobSearchProviderName>();
+  let lastAllowedMs = 0;
 
   function recordFailure(provider: JobSearchProviderName, caught: unknown) {
     /*
@@ -135,7 +147,8 @@ export function createProviderCascade(
     if (caught instanceof Error && (caught.name === "TimeoutError" || caught.name === "AbortError")) {
       const label = providerLabel(provider);
       timeouts.set(label, (timeouts.get(label) ?? 0) + 1);
-      console.warn(`${label} timed out on a query`);
+      timeoutWaits.set(label, Math.max(timeoutWaits.get(label) ?? 0, lastAllowedMs));
+      console.warn(`${label} timed out on a query after ${lastAllowedMs}ms`);
       return;
     }
     record(provider, `${providerLabel(provider)}: ${caught instanceof Error ? caught.message : "unknown error"}`);
@@ -147,23 +160,55 @@ export function createProviderCascade(
   }
 
   /*
+   * The same failure, phrased for the person rather than for the log.
+   *
+   * Providers explain their refusals in their own interest. RapidAPI answers a
+   * spent allowance with "Upgrade your plan at https://rapidapi.com/..." — and
+   * because that string was passed through untouched, a working search printed
+   * a vendor's upsell link underneath somebody's job results, for a provider
+   * that is not even the one they pay. Nobody reading a list of roles is going
+   * to go and buy an API subscription, so the link is not information, it is an
+   * advertisement Sartho was relaying for free.
+   *
+   * The sentence naming the cause is kept. The link and the sales copy after
+   * it are not, and the full text still goes to the server log.
+   */
+  function readable(message: string): string {
+    const hadLink = /https?:\/\/\S+/.test(message);
+    const withoutLinks = message.replace(/https?:\/\/\S+/g, "").replace(/\s{2,}/g, " ").trim();
+
+    /*
+     * The clause that existed only to carry the link goes with it — "Upgrade
+     * your plan at", "See" — or the sentence is left dangling on a preposition.
+     * Applied only when a link was actually removed, so an error that happens
+     * to end on the word "see" keeps its meaning.
+     */
+    const trimmed = hadLink
+      ? withoutLinks.replace(
+          /[\s.,;:—-]*\b(?:upgrade(?:\s+your\s+plan)?|subscribe|sign\s+up|get\s+started|see|visit|go\s+to|available\s+at|more\s+at|details\s+at|learn\s+more)\b[^.!?]*$/i,
+          "",
+        )
+      : withoutLinks;
+
+    return trimmed.replace(/[\s.,;:—-]+$/, "").trim();
+  }
+
+  /*
    * Where the results came from, as a position in the order. Everything that
    * failed ahead of it changed what the person got; everything behind it was
    * never reached.
    */
   function errorsThatCostResults(): string[] {
     const answeredAt = providers.findIndex((provider) => used.has(providerLabel(provider)));
-    if (answeredAt < 0) return [...new Set(errors)];
-    return [
-      ...new Set(
-        failedAt
-          .filter((failure) => providers.indexOf(failure.provider) < answeredAt)
-          .map((failure) => failure.message),
-      ),
-    ];
+    const relevant = answeredAt < 0
+      ? failedAt
+      : failedAt.filter((failure) => providers.indexOf(failure.provider) < answeredAt);
+    return [...new Set(relevant.map((failure) => readable(failure.message)))].filter(Boolean);
   }
 
   async function run(query: JobSearchQuery): Promise<JobSearchResult[]> {
+    /* Remembered for the timeout report: what this call was actually allowed. */
+    lastAllowedMs = query.timeoutMs ?? 0;
     const called = new Set<JobSearchProviderName>();
     lastCalled = called;
     for (const provider of providers) {
@@ -214,5 +259,6 @@ export function createProviderCascade(
     errorsThatCostResults,
     used,
     timeouts,
+    timeoutWaits,
   };
 }

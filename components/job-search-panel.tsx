@@ -341,7 +341,16 @@ export function JobSearchPanel({
           {criteria.providerTimeouts?.length ? (
             <>
               {" "}· {criteria.providerTimeouts
-                .map((entry) => `${entry.name} timed out ${entry.count} time${entry.count === 1 ? "" : "s"}`)
+                .map((entry) => {
+                  const times = `${entry.count} time${entry.count === 1 ? "" : "s"}`;
+                  /*
+                   * The wait is named, because the count alone reads the same
+                   * whether the budget was too tight or the provider is down.
+                   */
+                  return entry.waitedMs
+                    ? `${entry.name} timed out ${times} after ${Math.round(entry.waitedMs / 1000)}s`
+                    : `${entry.name} timed out ${times}`;
+                })
                 .join(", ")}
             </>
           ) : null}

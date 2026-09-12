@@ -156,7 +156,15 @@ export type SearchCriteria = {
    * provider quietly dropping out is indistinguishable, from the page, from a
    * market with nothing in it.
    */
-  providerTimeouts?: Array<{ name: string; count: number }>;
+  /*
+   * How often a provider ran out of time, and how long it was given.
+   *
+   * The wait is carried because a count alone cannot be read: "timed out 2
+   * times" against six seconds is a budget that was too tight, and against
+   * twenty seconds it is a provider that is genuinely not answering. Opposite
+   * diagnoses from the same sentence.
+   */
+  providerTimeouts?: Array<{ name: string; count: number; waitedMs: number }>;
   /**
    * Each named employer's own careers portal, and what came of it. Free,
    * unmetered and aimed exactly where the person pointed it — and until now the
@@ -213,7 +221,7 @@ export const DEFAULT_SEARCH_BUDGET_MS = 75_000;
  * happened when SerpApi took the lead: 6,000ms sat comfortably above JSearch's
  * 3.4 seconds and below SerpApi's 8.7.
  */
-const MAX_CALL_MS = 15_000;
+const MAX_CALL_MS = 20_000;
 
 const MAX_ADVERTS_READ = 24;
 const ADVERT_CONCURRENCY = 6;
@@ -543,8 +551,9 @@ export async function runBriefSearch(
   }
 
   if (!byUrl.size && cascade.errors.length) {
+    /* The log keeps every word; the person gets the cause without the sales copy. */
     console.error("Jobs search failed", cascade.errors);
-    return { ok: false, code: "provider_error", error: `Jobs provider error: ${[...new Set(cascade.errors)].join("; ")}` };
+    return { ok: false, code: "provider_error", error: `Jobs provider error: ${cascade.errorsThatCostResults().join("; ")}` };
   }
 
   const score = (result: JobSearchResult): ScoredJobMatch => {
@@ -855,7 +864,7 @@ export async function runBriefSearch(
     })(),
     employerPortals: employerPortals.length ? employerPortals : undefined,
     providerTimeouts: cascade.timeouts.size
-      ? [...cascade.timeouts].map(([name, count]) => ({ name, count }))
+      ? [...cascade.timeouts].map(([name, count]) => ({ name, count, waitedMs: cascade.timeoutWaits.get(name) ?? 0 }))
       : undefined,
     queriesRun,
     queriesSkipped,

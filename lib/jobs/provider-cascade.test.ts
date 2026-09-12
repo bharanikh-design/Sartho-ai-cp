@@ -429,3 +429,101 @@ describe("which providers are named as sources", () => {
     expect([...cascade.used].sort()).toEqual(["Adzuna", "Google for Jobs (SerpApi)"]);
   });
 });
+
+/*
+ * A provider explains its refusal in its own interest. RapidAPI answers a
+ * spent allowance with "Upgrade your plan at https://rapidapi.com/..." — and
+ * passed through untouched, that printed a vendor's upsell link under somebody
+ * else's job results, for a provider they do not even pay for.
+ */
+describe("what a provider's own error text is allowed to say", () => {
+  const ORDER: JobSearchProviderName[] = ["serpapi", "jsearch", "adzuna"];
+
+  async function noteFor(message: string) {
+    const { search } = recorder({
+      serpapi: async () => { throw new Error(message); },
+      adzuna: async () => [result("https://c")],
+    });
+    const cascade = createProviderCascade(ORDER, { search });
+    await cascade.run(query);
+    return { note: cascade.errorsThatCostResults()[0], logged: cascade.errors[0] };
+  }
+
+  it("keeps the cause and drops the sales pitch", async () => {
+    const { note } = await noteFor(
+      "429 — You have exceeded the MONTHLY quota for Requests on your current plan, BASIC. Upgrade your plan at https://rapidapi.com/letscrape/api/jsearch",
+    );
+    expect(note).toContain("exceeded the MONTHLY quota");
+    expect(note).not.toContain("rapidapi.com");
+    expect(note).not.toMatch(/upgrade/i);
+  });
+
+  it("does not leave a sentence dangling on the word that carried the link", async () => {
+    const { note } = await noteFor("Your account has run out of searches. See https://serpapi.com/pricing");
+    expect(note).toBe("Google for Jobs (SerpApi): Your account has run out of searches");
+  });
+
+  /*
+   * The clause strip only fires when a link was actually removed, so an error
+   * that happens to end on one of those words keeps its meaning.
+   */
+  it("leaves an error with no link exactly as it was", async () => {
+    const { note } = await noteFor("could not see the country");
+    expect(note).toBe("Google for Jobs (SerpApi): could not see the country");
+  });
+
+  it("still logs every word for the server", async () => {
+    const { logged } = await noteFor("429 — quota gone. Upgrade at https://rapidapi.com/x");
+    expect(logged).toContain("rapidapi.com");
+  });
+});
+
+/*
+ * "Timed out 2 times" reads the same whether the budget was too tight or the
+ * provider is down — opposite diagnoses from one sentence. The wait is what
+ * separates them, and a search that gave SerpApi six seconds reported the
+ * identical line to one that gave it twenty.
+ */
+describe("how long a timed-out call was given", () => {
+  function timeoutError() {
+    const error = new Error("timed out");
+    error.name = "TimeoutError";
+    return error;
+  }
+
+  it("remembers the wait alongside the count", async () => {
+    const { search } = recorder({
+      serpapi: async () => { throw timeoutError(); },
+      adzuna: async () => [result("https://c")],
+    });
+    const cascade = createProviderCascade(["serpapi", "adzuna"], { search, failuresBeforeDead: 5 });
+
+    await cascade.run({ ...query, timeoutMs: 20_000 });
+
+    expect(cascade.timeouts.get("Google for Jobs (SerpApi)")).toBe(1);
+    expect(cascade.timeoutWaits.get("Google for Jobs (SerpApi)")).toBe(20_000);
+  });
+
+  /* The longest wait, so a tight late query cannot understate what it was given. */
+  it("keeps the longest wait rather than the last", async () => {
+    const { search } = recorder({
+      serpapi: async () => { throw timeoutError(); },
+      adzuna: async () => [result("https://c")],
+    });
+    const cascade = createProviderCascade(["serpapi", "adzuna"], { search, failuresBeforeDead: 5 });
+
+    await cascade.run({ ...query, timeoutMs: 20_000 });
+    await cascade.run({ ...query, timeoutMs: 6_000 });
+
+    expect(cascade.timeoutWaits.get("Google for Jobs (SerpApi)")).toBe(20_000);
+  });
+
+  it("reports nothing for a provider that answered in time", async () => {
+    const { search } = recorder({ serpapi: async () => [result("https://a")] });
+    const cascade = createProviderCascade(["serpapi", "adzuna"], { search });
+
+    await cascade.run({ ...query, timeoutMs: 20_000 });
+
+    expect(cascade.timeoutWaits.size).toBe(0);
+  });
+});
