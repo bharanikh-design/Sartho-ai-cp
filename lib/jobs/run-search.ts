@@ -176,6 +176,18 @@ export const MIN_STRONG_BEFORE_WIDENING = 3;
  * than are about to be shown — reading the twenty-first advert to decide
  * whether to hide it from a list of twenty is work for nobody.
  */
+/*
+ * The wall-clock budget for the query loop.
+ *
+ * Twenty-eight seconds against a route that allows sixty, with a plan that can
+ * reach thirteen queries once a brief names employers — so two thirds of a
+ * search regularly never ran, and the page said "9 queries skipped (time
+ * limit)" beside results from one provider. The route's ceiling is raised to
+ * match the other AI routes, and this leaves room for the advert reads and the
+ * screening pass that follow it.
+ */
+export const DEFAULT_SEARCH_BUDGET_MS = 45_000;
+
 const MAX_ADVERTS_READ = 24;
 const ADVERT_CONCURRENCY = 6;
 const ADVERT_BUDGET_MS = 12_000;
@@ -349,7 +361,20 @@ export async function runBriefSearch(
    * surface an error when nothing came back at all.
    */
   const startedAt = Date.now();
-  const budgetMs = options.budgetMs ?? 28_000;
+  const budgetMs = options.budgetMs ?? DEFAULT_SEARCH_BUDGET_MS;
+  const remainingMs = () => Math.max(0, (startedAt + budgetMs) - Date.now());
+
+  /*
+   * What one provider call may spend, given what is left.
+   *
+   * A fixed timeout is the wrong shape under a whole-search budget. Two JSearch
+   * timeouts at eight seconds each used to spend sixteen of twenty-eight
+   * seconds before the fallback had answered anything, and the run ended having
+   * skipped most of its own plan. Capping each call at a third of what remains
+   * means a stalled provider can never take the search with it: the first call
+   * of a run still gets its full patience, the last gets what is affordable.
+   */
+  const callTimeoutMs = () => Math.max(3_000, Math.min(8_000, Math.round(remainingMs() / 3)));
   const byUrl = new Map<string, JobSearchResult>();
   let queriesRun = 0;
   let queriesSkipped = 0;
@@ -381,7 +406,7 @@ export async function runBriefSearch(
         await new Promise((resolve) => setTimeout(resolve, delay));
       }
 
-      for (const result of await cascade.run(list[index])) {
+      for (const result of await cascade.run({ ...list[index], timeoutMs: callTimeoutMs() })) {
         if (!byUrl.has(result.url)) byUrl.set(result.url, result);
       }
       queriesRun++;

@@ -3,7 +3,7 @@ import { getAuthenticatedUser } from "@/lib/auth";
 import { runBriefSearch } from "@/lib/jobs/run-search";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 /*
  * "Search now": run the person's saved brief through the shared search engine
@@ -23,7 +23,7 @@ export async function POST() {
     const { supabase, user } = await getAuthenticatedUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const budgetMs = process.env.SEARCH_BUDGET_MS ? Number(process.env.SEARCH_BUDGET_MS) : 28_000;
+    const budgetMs = process.env.SEARCH_BUDGET_MS ? Number(process.env.SEARCH_BUDGET_MS) : undefined;
     const outcome = await runBriefSearch(supabase, user.id, { budgetMs });
     if (!outcome.ok) {
       return NextResponse.json({ error: outcome.error, code: outcome.code }, { status: STATUS[outcome.code] ?? 500 });

@@ -57,6 +57,15 @@ export type JobSearchQuery = {
    * extra required word would empty the page.
    */
   entryLevelTerms?: string[];
+  /**
+   * How long this one call may take, when the caller knows what it can afford.
+   *
+   * A fixed provider timeout is wrong under a whole-search budget: the last
+   * query of a run has far less to spend than the first, and a call that
+   * overruns what is left produces nothing and takes the remaining time with
+   * it. Absent means the provider's own default.
+   */
+  timeoutMs?: number;
   /** 
    * Skills or strengths from the user's resume/evidence. 
    * Used to heavily contextualize generic job titles (e.g., 'Business Analyst' + 'SQL, Python').
@@ -246,7 +255,9 @@ async function searchAdzuna(query: JobSearchQuery): Promise<JobSearchResult[]> {
     throw new Error(`Adzuna does not cover ${country.toUpperCase()}.`);
   }
 
-  const response = await fetch(buildAdzunaUrl(query, config), { signal: AbortSignal.timeout(20_000) });
+  const response = await fetch(buildAdzunaUrl(query, config), {
+    signal: AbortSignal.timeout(query.timeoutMs ?? ADZUNA_TIMEOUT_MS),
+  });
   if (!response.ok) {
     throw new Error(`Adzuna search failed (${response.status}).`);
   }
@@ -416,6 +427,9 @@ export function buildJSearchParams(query: JobSearchQuery): URLSearchParams {
  */
 const JSEARCH_TIMEOUT_MS = 8_000;
 
+/* Adzuna answers in well under a second; this is the ceiling, not the norm. */
+const ADZUNA_TIMEOUT_MS = 12_000;
+
 let cachedJSearchEndpoint: "search" | "search-v2" | null = "search-v2";
 
 async function searchJSearch(query: JobSearchQuery): Promise<JobSearchResult[]> {
@@ -434,7 +448,7 @@ async function searchJSearch(query: JobSearchQuery): Promise<JobSearchResult[]> 
   let response = await fetch(`https://jsearch.p.rapidapi.com/${endpoint}?${searchParams}`, {
     method: "GET",
     headers,
-    signal: AbortSignal.timeout(JSEARCH_TIMEOUT_MS),
+    signal: AbortSignal.timeout(query.timeoutMs ?? JSEARCH_TIMEOUT_MS),
   });
 
   if (response.status === 404 && endpoint === "search-v2") {
@@ -442,7 +456,7 @@ async function searchJSearch(query: JobSearchQuery): Promise<JobSearchResult[]> 
     response = await fetch(`https://jsearch.p.rapidapi.com/search?${searchParams}`, {
       method: "GET",
       headers,
-      signal: AbortSignal.timeout(JSEARCH_TIMEOUT_MS),
+      signal: AbortSignal.timeout(query.timeoutMs ?? JSEARCH_TIMEOUT_MS),
     });
   } else if (response.ok && cachedJSearchEndpoint === null) {
     cachedJSearchEndpoint = "search-v2";
