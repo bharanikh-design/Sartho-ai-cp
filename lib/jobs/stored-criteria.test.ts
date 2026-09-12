@@ -1,5 +1,23 @@
 import { describe, expect, it } from "vitest";
-import { normaliseCriteria, normaliseResults } from "@/lib/jobs/run-search";
+import { normaliseCriteria, normaliseResults, withScreeningInsight } from "@/lib/jobs/run-search";
+
+const stored = {
+  title: "Business Analyst",
+  employer: "PwC",
+  location: "Sydney",
+  url: "https://example.com/jobs/1",
+  salary: null,
+  postedAt: "2026-09-01",
+  source: "Adzuna",
+  description: "Analyse things.",
+  overallMatch: 71,
+  recommendation: "apply",
+  matchedSkills: ["stakeholder management"],
+  titleFit: 80,
+  requirementCoverage: 60,
+  closestTitle: "Business Analyst",
+  missingRequirements: ["sql"],
+};
 
 /*
  * The search_results row is JSON written by whatever version of run-search was
@@ -43,6 +61,9 @@ describe("normaliseCriteria", () => {
     expect(criteria.tooSenior).toBe(17);
     expect(criteria.companies).toEqual(["PwC"]);
     expect(criteria.countrySource).toBe("brief");
+    expect(criteria.targetRolesRequested).toBe(0);
+    expect(criteria.targetRolesSearched).toBe(0);
+    expect(criteria.employersChecked).toBe(0);
   });
 
   it("survives a row that is empty, null, or the wrong shape entirely", () => {
@@ -71,6 +92,17 @@ describe("normaliseCriteria", () => {
     expect(criteria.broadened).toBe(false);
     expect(criteria.countrySource).toBe("default");
   });
+
+  it("preserves provider and employer diagnostics", () => {
+    const criteria = normaliseCriteria({
+      providerErrors: ["temporary failure"],
+      providerTimeouts: [{ name: "provider", count: 2, waitedMs: 8000 }],
+      employerPortals: [{ employer: "Example Co", status: "failed", found: 0 }],
+    });
+    expect(criteria.providerErrors).toEqual(["temporary failure"]);
+    expect(criteria.providerTimeouts).toEqual([{ name: "provider", count: 2, waitedMs: 8000 }]);
+    expect(criteria.employerPortals).toEqual([{ employer: "Example Co", status: "failed", found: 0 }]);
+  });
 });
 
 /*
@@ -80,24 +112,6 @@ describe("normaliseCriteria", () => {
  * been stored, so rows missing them exist in production right now.
  */
 describe("normaliseResults", () => {
-  const stored = {
-    title: "Business Analyst",
-    employer: "PwC",
-    location: "Sydney",
-    url: "https://example.com/jobs/1",
-    salary: null,
-    postedAt: "2026-09-01",
-    source: "Adzuna",
-    description: "Analyse things.",
-    overallMatch: 71,
-    recommendation: "apply",
-    matchedSkills: ["stakeholder management"],
-    titleFit: 80,
-    requirementCoverage: 60,
-    closestTitle: "Business Analyst",
-    missingRequirements: ["sql"],
-  };
-
   it("fills the fields a match stored before them cannot have", () => {
     const [match] = normaliseResults([stored]);
     expect(match.closestIsHeld).toBe(false);
@@ -108,6 +122,7 @@ describe("normaliseResults", () => {
     expect(match.recommendation).toBe("apply");
     expect(match.matchedSkills).toEqual(["stakeholder management"]);
     expect(match.salary).toBeNull();
+    expect(match.screeningInsight).toBeNull();
   });
 
   it("survives a column that is empty, null, or the wrong shape entirely", () => {
@@ -138,5 +153,23 @@ describe("normaliseResults", () => {
     expect(match.overallMatch).toBe(0);
     expect(match.matchedSkills).toEqual(["sql"]);
     expect(match.employer).toBeNull();
+  });
+});
+
+describe("withScreeningInsight", () => {
+  it("annotates without changing the authoritative score or recommendation", () => {
+    const match = normaliseResults([{
+      ...stored,
+      titleFit: 0,
+      overallMatch: 18,
+      recommendation: "skip",
+    }])[0];
+    const annotated = withScreeningInsight(match, "Review the title mismatch before applying.");
+
+    expect(annotated.screeningInsight).toBe("Review the title mismatch before applying.");
+    expect(annotated.overallMatch).toBe(18);
+    expect(annotated.recommendation).toBe("skip");
+    expect(annotated.titleFit).toBe(0);
+    expect(annotated.matchedSkills).toEqual(match.matchedSkills);
   });
 });

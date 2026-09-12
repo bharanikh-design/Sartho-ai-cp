@@ -78,7 +78,7 @@ export async function searchWorkdayPortal(
       signal: AbortSignal.timeout(timeoutMs),
     });
 
-    if (!response.ok) return [];
+    if (!response.ok) throw new Error(`Workday request failed with status ${response.status}`);
 
     const body = (await response.json()) as WorkdaySearchResponse;
     const postings = body.jobPostings ?? [];
@@ -86,7 +86,7 @@ export async function searchWorkdayPortal(
     return postings
       .map((item) => mapWorkdayPosting(item, config))
       .filter((item): item is JobSearchResult => item !== null);
-  } catch {
-    return [];
+  } catch (caught) {
+    throw caught instanceof Error ? caught : new Error("Workday request failed");
   }
 }

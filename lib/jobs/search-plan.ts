@@ -77,12 +77,11 @@ export function sanitiseProviderKeywords(raw: string): string {
  * concrete list of provider queries, in priority order:
  *
  *   1. the top role in each of the first two cities (or nationwide when none);
- *   2. the next priority roles (up to 3 in total) in the first city;
- *   3. one query per target company (top 4), for the top role, country-wide.
+ *   2. every remaining saved role in the first city;
+ *   3. every saved role for every selected company, country-wide.
  *
  * Kept pure so the mapping from brief to queries is testable without a network.
  */
-export const MAX_ROLE_QUERIES = 3;
 export const MAX_LOCATION_QUERIES = 2;
 
 /*
@@ -101,14 +100,6 @@ export const MAX_SUGGESTED_QUERIES = 2;
  * employer queries alone, but it is far above any realistic shortlist.
  */
 export const MAX_COMPANY_QUERIES = 12;
-
-/*
- * Employers are searched against the top two roles rather than only the first.
- * "Deloitte" alone is not what somebody means when they list an employer beside
- * three target roles; the second role roughly doubles useful employer coverage
- * for one extra query each, which the budget absorbs.
- */
-export const COMPANY_ROLE_DEPTH = 2;
 
 export function planSearchQueries(input: {
   roles: string[];
@@ -138,17 +129,24 @@ export function planSearchQueries(input: {
    * exactly this, leaving a brief searched with fewer and worse queries than if
    * the model had never run. A suggestion can now only widen the search.
    */
-  const baseRoles = input.roles.map(toSearchKeywords).filter(Boolean).slice(0, MAX_ROLE_QUERIES);
+  const baseRoles: Array<{ keywords: string; targetRole?: string; suggested?: boolean }> = input.roles.map((targetRole) => ({
+    keywords: toSearchKeywords(targetRole),
+    targetRole,
+  })).filter((role) => role.keywords);
   const suggested = (input.smartKeywords ?? [])
     .map(sanitiseProviderKeywords)
-    .filter((keywords) => keywords.split(" ").length > 1);
+    .filter((keywords) => keywords.split(" ").length > 1)
+    .slice(0, MAX_SUGGESTED_QUERIES);
   const seenRole = new Set<string>();
-  const roles = [...baseRoles, ...suggested].filter((keywords) => {
-    const key = keywords.toLowerCase();
+  const roles = [
+    ...baseRoles,
+    ...suggested.map((keywords) => ({ keywords, targetRole: undefined, suggested: true })),
+  ].filter((role) => {
+    const key = role.keywords.toLowerCase();
     if (seenRole.has(key)) return false;
     seenRole.add(key);
     return true;
-  }).slice(0, MAX_ROLE_QUERIES + MAX_SUGGESTED_QUERIES);
+  });
   const queries: JobSearchQuery[] = [];
   const topRole = roles[0];
   if (!topRole) return queries;
@@ -157,29 +155,26 @@ export function planSearchQueries(input: {
   // radius" asks actually land, and one extra query is affordable.
   if (locations.length) {
     for (const location of locations) {
-      queries.push({ keywords: topRole, country: input.country, location, remoteOnly, employmentTypes, limit: 20 });
+      queries.push({ ...topRole, country: input.country, location, remoteOnly, employmentTypes, limit: 20 });
     }
   } else {
-    queries.push({ keywords: topRole, country: input.country, remoteOnly, employmentTypes, limit: 20 });
+    queries.push({ ...topRole, country: input.country, remoteOnly, employmentTypes, limit: 20 });
   }
-  /*
-   * Employers before the secondary roles, because they are a different kind of
-   * statement.
-   *
-   * A person who types "Accenture, ServiceNow, Deloitte, KPMG" into their brief
-   * has named exactly where they want to work. The roles after the first are
-   * Sartho's own expansion of what they might be called. Under a wall-clock
-   * budget the order decides what actually runs, and company queries used to sit
-   * last: a brief with four employers planned thirteen queries, ran four, and
-   * skipped every employer the person had asked for by name.
-   */
+  // Guarantee one provider call for every saved target before spending budget
+  // on employer combinations, extra cities, or generated title expansions.
+  for (const role of baseRoles.slice(1)) {
+    queries.push({ ...role, country: input.country, location: primaryLocation, remoteOnly, employmentTypes, limit: 20 });
+  }
+  // Once every saved role has a broad search, cover every saved role at every
+  // selected employer. Generated alternatives come afterwards and can widen,
+  // but never displace, the person's explicit choices.
   for (const employer of input.companies.slice(0, MAX_COMPANY_QUERIES)) {
-    for (const keywords of roles.slice(0, COMPANY_ROLE_DEPTH)) {
-      queries.push({ keywords, country: input.country, employer, remoteOnly, employmentTypes, limit: 10 });
+    for (const role of baseRoles) {
+      queries.push({ ...role, country: input.country, employer, remoteOnly, employmentTypes, limit: 10 });
     }
   }
-  for (const keywords of roles.slice(1)) {
-    queries.push({ keywords, country: input.country, location: primaryLocation, remoteOnly, employmentTypes, limit: 20 });
+  for (const role of roles.filter((role) => role.suggested)) {
+    queries.push({ ...role, country: input.country, location: primaryLocation, remoteOnly, employmentTypes, limit: 20 });
   }
 
   /*
@@ -197,9 +192,9 @@ export function planSearchQueries(input: {
   const earlyCareer = earlyCareerSelections(input.employmentTypes ?? []);
   const entryLevelTerms = input.entryLevelTerms?.filter((term) => term.trim()) ?? [];
   if (earlyCareer.length || entryLevelTerms.length) {
-    for (const keywords of roles.slice(0, COMPANY_ROLE_DEPTH)) {
+    for (const role of baseRoles) {
       queries.push({
-        keywords,
+        ...role,
         country: input.country,
         location: primaryLocation,
         remoteOnly,
@@ -210,7 +205,8 @@ export function planSearchQueries(input: {
       });
     }
     for (const employer of input.companies.slice(0, MAX_COMPANY_QUERIES)) {
-      const cohortKeywords = entryLevelTerms[0] ?? "graduate";
+      const cohortKeywords = entryLevelTerms[0];
+      if (!cohortKeywords) continue;
       queries.push({
         keywords: cohortKeywords,
         country: input.country,
