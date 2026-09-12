@@ -35,6 +35,21 @@ export type ProviderCascadeOptions = {
    * shallow one.
    */
   failuresBeforeDead?: number;
+  /**
+   * How many calls each provider may make in one run, when it should be
+   * rationed rather than asked for everything.
+   *
+   * The deep provider is worth having and cannot carry a whole search. SerpApi
+   * on the free plan answers a simple query in 15.6 seconds and sometimes does
+   * not answer at all — against a 25-query plan and a 75-second budget, asking
+   * it everything means it answers nothing and spends the budget failing.
+   *
+   * A ration keeps what it is actually good for: the first queries in a plan
+   * are the bare target roles, and a handful of full adverts for those is worth
+   * more to an evidence-matched score than twenty-five four-line blurbs. The
+   * cheap provider behind it still answers every query.
+   */
+  maxCalls?: Partial<Record<JobSearchProviderName, number>>;
 };
 
 export type ProviderCascade = {
@@ -44,6 +59,25 @@ export type ProviderCascade = {
    */
   run: (query: JobSearchQuery) => Promise<JobSearchResult[]>;
   isDead: (provider: JobSearchProviderName) => boolean;
+  /**
+   * Calls made to each provider this run, by display name.
+   *
+   * Reported rather than kept quiet, because a rationed provider going silent
+   * partway through a run looks exactly like one that broke — and this whole
+   * file exists because that distinction kept being invisible.
+   */
+  calls: Map<string, number>;
+  /**
+   * Whether the next query would actually reach this provider.
+   *
+   * One question with two reasons behind it — retired, or out of ration — and
+   * callers want the answer, not the reason. The call budget and the batch size
+   * in runBriefSearch are both sized for whichever provider leads, and both were
+   * wrong before by reading something that did not move: first the configured
+   * list, then the dead set, which a rationed provider never joins. Asking this
+   * instead means the ration cannot reopen that hole.
+   */
+  willAsk: (provider: JobSearchProviderName) => boolean;
   /**
    * Whether the most recent query actually reached this provider.
    *
@@ -112,6 +146,7 @@ export function createProviderCascade(
 ): ProviderCascade {
   const search = options.search ?? searchWithProvider;
   const failuresBeforeDead = options.failuresBeforeDead ?? 2;
+  const maxCalls = options.maxCalls ?? {};
 
   const dead = new Set<JobSearchProviderName>();
   const failures = new Map<JobSearchProviderName, number>();
@@ -121,6 +156,7 @@ export function createProviderCascade(
   const used = new Set<string>();
   const timeouts = new Map<string, number>();
   const timeoutWaits = new Map<string, number>();
+  const calls = new Map<string, number>();
   let lastCalled = new Set<JobSearchProviderName>();
   let lastAllowedMs = 0;
 
@@ -236,6 +272,14 @@ export function createProviderCascade(
     lastCalled = called;
     for (const provider of providers) {
       if (dead.has(provider)) continue;
+      /*
+       * Out of ration is not out of order. The provider is skipped for the
+       * rest of the run without being marked dead, because nothing went wrong
+       * with it — and calling it dead would put an error on the page about a
+       * provider that was working.
+       */
+      if (!willAsk(provider)) continue;
+      calls.set(providerLabel(provider), (calls.get(providerLabel(provider)) ?? 0) + 1);
       called.add(provider);
       try {
         const results = await search(provider, query);
@@ -273,9 +317,16 @@ export function createProviderCascade(
     return [];
   }
 
+  function willAsk(provider: JobSearchProviderName): boolean {
+    if (dead.has(provider)) return false;
+    const limit = maxCalls[provider];
+    return limit === undefined || (calls.get(providerLabel(provider)) ?? 0) < limit;
+  }
+
   return {
     run,
     isDead: (provider) => dead.has(provider),
+    willAsk,
     calledLast: (provider) => lastCalled.has(provider),
     exhausted: () => providers.every((provider) => dead.has(provider)),
     errors,
@@ -283,5 +334,6 @@ export function createProviderCascade(
     used,
     timeouts,
     timeoutWaits,
+    calls,
   };
 }

@@ -669,3 +669,113 @@ describe("what a full-budget timeout costs", () => {
     expect(cascade.timeoutWaits.get("Google for Jobs (SerpApi)")).toBe(20_000);
   });
 });
+
+/*
+ * The deep provider is worth having and cannot carry a whole search. SerpApi
+ * on the free plan answers a simple query in 15.6 seconds and sometimes not at
+ * all inside sixty — against a 25-query plan in a 75-second budget, asking it
+ * everything means it answers nothing and spends the budget failing.
+ */
+describe("rationing the deep provider", () => {
+  const ORDER: JobSearchProviderName[] = ["serpapi", "adzuna"];
+
+  it("asks it up to its ration and then stops", async () => {
+    const { asked, search } = recorder({
+      serpapi: async () => [result("https://a")],
+      adzuna: async () => [result("https://c")],
+    });
+    const cascade = createProviderCascade(ORDER, { search, maxCalls: { serpapi: 2 } });
+
+    await cascade.run(query);
+    await cascade.run(query);
+    await cascade.run(query);
+
+    expect(asked.filter((provider) => provider === "serpapi")).toHaveLength(2);
+    expect(cascade.calls.get("Google for Jobs (SerpApi)")).toBe(2);
+  });
+
+  /* The query is still answered — by whoever is behind it. */
+  it("falls through to the next provider once the ration is spent", async () => {
+    const { asked, search } = recorder({
+      serpapi: async () => [result("https://a")],
+      adzuna: async () => [result("https://c")],
+    });
+    const cascade = createProviderCascade(ORDER, { search, maxCalls: { serpapi: 1 } });
+
+    await cascade.run(query);
+    await expect(cascade.run(query)).resolves.toHaveLength(1);
+
+    expect(asked).toEqual(["serpapi", "adzuna"]);
+  });
+
+  /*
+   * Out of ration is not out of order. Marking it dead would put an error on
+   * the page about a provider that was working perfectly.
+   */
+  it("does not call a rationed provider dead", async () => {
+    const { search } = recorder({
+      serpapi: async () => [result("https://a")],
+      adzuna: async () => [result("https://c")],
+    });
+    const cascade = createProviderCascade(ORDER, { search, maxCalls: { serpapi: 1 } });
+
+    await cascade.run(query);
+    await cascade.run(query);
+
+    expect(cascade.isDead("serpapi")).toBe(false);
+    expect(cascade.errors).toEqual([]);
+    expect(cascade.exhausted()).toBe(false);
+  });
+
+  /*
+   * willAsk answers one question with two reasons behind it. The call budget
+   * and the batch size in runBriefSearch are both sized for whichever provider
+   * leads; reading the dead set instead would miss a rationed one and leave
+   * three concurrent un-paced calls aimed at a one-per-second provider.
+   */
+  it("says the rationed provider will not be asked again", async () => {
+    const { search } = recorder({
+      serpapi: async () => [result("https://a")],
+      adzuna: async () => [result("https://c")],
+    });
+    const cascade = createProviderCascade(ORDER, { search, maxCalls: { serpapi: 1 } });
+
+    expect(cascade.willAsk("serpapi")).toBe(true);
+    await cascade.run(query);
+    expect(cascade.willAsk("serpapi")).toBe(false);
+    expect(cascade.willAsk("adzuna")).toBe(true);
+  });
+
+  it("says a dead provider will not be asked either", async () => {
+    const { search } = recorder({
+      serpapi: async () => { throw new JobSearchNotConfiguredError(); },
+      adzuna: async () => [result("https://c")],
+    });
+    const cascade = createProviderCascade(ORDER, { search });
+
+    await cascade.run(query);
+
+    expect(cascade.willAsk("serpapi")).toBe(false);
+  });
+
+  it("leaves an unrationed provider alone however many queries run", async () => {
+    const { asked, search } = recorder({ adzuna: async () => [result("https://c")] });
+    const cascade = createProviderCascade(["adzuna"], { search, maxCalls: { serpapi: 1 } });
+
+    await cascade.run(query);
+    await cascade.run(query);
+    await cascade.run(query);
+
+    expect(asked).toHaveLength(3);
+  });
+
+  /* A spent ration is not a reason to stop searching. */
+  it("is not exhausted when only the rationed provider is spent", async () => {
+    const { search } = recorder({ serpapi: async () => [result("https://a")] });
+    const cascade = createProviderCascade(ORDER, { search, maxCalls: { serpapi: 1 } });
+
+    await cascade.run(query);
+
+    expect(cascade.exhausted()).toBe(false);
+  });
+});
