@@ -188,6 +188,16 @@ export const MIN_STRONG_BEFORE_WIDENING = 3;
  */
 export const DEFAULT_SEARCH_BUDGET_MS = 45_000;
 
+/*
+ * Below this there is no point starting another query.
+ *
+ * A call that cannot finish is worse than one not made: it spends what is left,
+ * returns nothing, and counts against the provider that was about to answer.
+ * Sized above Google for Jobs' measured response time so the last query of a
+ * run is either given a fair chance or not begun at all.
+ */
+const MIN_AFFORDABLE_CALL_MS = 6_000;
+
 const MAX_ADVERTS_READ = 24;
 const ADVERT_CONCURRENCY = 6;
 const ADVERT_BUDGET_MS = 12_000;
@@ -367,17 +377,19 @@ export async function runBriefSearch(
   /*
    * What one provider call may spend, given what is left.
    *
-   * A fixed timeout is the wrong shape under a whole-search budget. Two JSearch
-   * timeouts at eight seconds each used to spend sixteen of twenty-eight
-   * seconds before the fallback had answered anything, and the run ended having
-   * skipped most of its own plan. Capping each call at a third of what remains
-   * means a stalled provider can never take the search with it: the first call
-   * of a run still gets its full patience, the last gets what is affordable.
+   * A fixed timeout is the wrong shape under a whole-search budget, but so is
+   * one whose floor sits below what the provider actually takes. Measured from
+   * the diagnostics probe, Google for Jobs answers a healthy query in about
+   * 3.4 seconds — five times Adzuna — so a floor of three seconds aborted
+   * perfectly good calls late in a run, counted each one as a failure, and
+   * retired the deep provider for the rest of the search. The floor is now
+   * comfortably above that measurement rather than below it.
    */
-  const callTimeoutMs = () => Math.max(3_000, Math.min(8_000, Math.round(remainingMs() / 3)));
+  const callTimeoutMs = () => Math.max(MIN_AFFORDABLE_CALL_MS, Math.min(15_000, Math.round(remainingMs() / 2)));
   const byUrl = new Map<string, JobSearchResult>();
   let queriesRun = 0;
   let queriesSkipped = 0;
+  let lastQueryEndedAt = 0;
 
   /*
    * Providers are tried in order, not all at once.
@@ -399,17 +411,30 @@ export async function runBriefSearch(
     for (let index = 0; index < list.length; index++) {
       if (Date.now() - startedAt > budgetMs) { queriesSkipped += list.length - index; break; }
       if (cascade.exhausted()) { queriesSkipped += list.length - index; break; }
+      /*
+       * Nothing left to spend on a query that could finish.
+       */
+      if (remainingMs() < MIN_AFFORDABLE_CALL_MS) { queriesSkipped += list.length - index; break; }
+
       if (queriesRun > 0) {
-        // JSearch (RapidAPI) has a strict 1 req/sec limit.
-        // Pushing faster triggers 429s, causing Google Jobs to silently drop out.
-        const delay = providers.includes("jsearch") && !cascade.isDead("jsearch") ? 1100 : 300;
-        await new Promise((resolve) => setTimeout(resolve, delay));
+        /*
+         * JSearch (RapidAPI) allows one request a second, and the gap is only
+         * owed when the previous query did not already take that long. It used
+         * to be paid unconditionally — a flat 1.1s before every query — while
+         * the call it was spacing takes about 3.4 seconds by itself. Over a
+         * dozen queries that is thirteen seconds of a forty-five second budget
+         * spent waiting for a limit that had already been satisfied.
+         */
+        const gap = providers.includes("jsearch") && !cascade.isDead("jsearch") ? 1100 : 300;
+        const since = Date.now() - lastQueryEndedAt;
+        if (since < gap) await new Promise((resolve) => setTimeout(resolve, gap - since));
       }
 
       for (const result of await cascade.run({ ...list[index], timeoutMs: callTimeoutMs() })) {
         if (!byUrl.has(result.url)) byUrl.set(result.url, result);
       }
       queriesRun++;
+      lastQueryEndedAt = Date.now();
 
       if (byUrl.size >= 25 && index >= activeLanes.length) {
         queriesSkipped += list.length - index - 1;

@@ -419,13 +419,17 @@ export function buildJSearchParams(query: JobSearchQuery): URLSearchParams {
  * Long enough for a healthy JSearch call, short enough that two dead ones do
  * not spend the search.
  *
- * It was 12 seconds against a 28-second whole-search budget, and a provider is
- * retired after two failures — so a slow JSearch could burn 24 of those 28
- * seconds before the fallback got a turn, and the run ended with "queries
- * skipped (time limit)" and results from one provider. Eight seconds is well
- * past this API's normal response time and leaves the budget usable.
+ * Eight seconds looked generous until the diagnostics probe measured the real
+ * thing: a healthy JSearch query answers in about 3.4 seconds, five times what
+ * Adzuna takes, and a cold one exceeds eight. So the ceiling that was meant to
+ * stop a stalled provider spending the run was also aborting working calls, and
+ * two aborts retire the provider — which is how a search came back from Adzuna
+ * alone while JSearch was perfectly healthy.
+ *
+ * The caller passes a timeoutMs sized to what its budget can actually afford;
+ * this is only the ceiling for a caller that does not.
  */
-const JSEARCH_TIMEOUT_MS = 8_000;
+const JSEARCH_TIMEOUT_MS = 15_000;
 
 /* Adzuna answers in well under a second; this is the ceiling, not the norm. */
 const ADZUNA_TIMEOUT_MS = 12_000;
