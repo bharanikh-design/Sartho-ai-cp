@@ -150,6 +150,12 @@ export type SearchCriteria = {
   remoteOnly: boolean;
   providers: string[];
   providerErrors?: string[];
+  /**
+   * Providers that ran out of time, and how often. Said out loud because a
+   * provider quietly dropping out is indistinguishable, from the page, from a
+   * market with nothing in it.
+   */
+  providerTimeouts?: Array<{ name: string; count: number }>;
   queriesRun: number;
   queriesSkipped: number;
 };
@@ -722,6 +728,9 @@ export async function runBriefSearch(
     remoteOnly: preferences.remotePreferences.length === 1 && preferences.remotePreferences[0] === "Remote",
     providers: Array.from(cascade.used),
     providerErrors: cascade.errors.length ? [...new Set(cascade.errors)] : undefined,
+    providerTimeouts: cascade.timeouts.size
+      ? [...cascade.timeouts].map(([name, count]) => ({ name, count }))
+      : undefined,
     queriesRun,
     queriesSkipped,
   };
