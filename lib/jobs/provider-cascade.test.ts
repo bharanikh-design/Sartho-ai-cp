@@ -527,3 +527,72 @@ describe("how long a timed-out call was given", () => {
     expect(cascade.timeoutWaits.size).toBe(0);
   });
 });
+
+/*
+ * Concurrency and pacing have to read the live cascade, not the configured
+ * list. Both were sized once from providers[0] and stayed there after the lead
+ * provider retired — the same shape of bug as a timeout floor sized for
+ * whichever provider happens to be first.
+ */
+describe("what the live lead is", () => {
+  const ORDER: JobSearchProviderName[] = ["serpapi", "jsearch", "adzuna"];
+
+  /** What runBriefSearch does to decide batch size and whether to pace. */
+  const liveLead = (cascade: ReturnType<typeof createProviderCascade>) =>
+    ORDER.find((provider) => !cascade.isDead(provider)) ?? null;
+
+  it("is the configured first provider while it is alive", async () => {
+    const { search } = recorder({ serpapi: async () => [result("https://a")] });
+    const cascade = createProviderCascade(ORDER, { search });
+
+    await cascade.run(query);
+
+    expect(liveLead(cascade)).toBe("serpapi");
+  });
+
+  /*
+   * The bug: after SerpApi retires the lead is JSearch, which allows one
+   * request a second. Anything still reading providers[0] would keep firing
+   * three at a time, un-paced, straight at that limit.
+   */
+  it("moves on once the first provider retires", async () => {
+    const { search } = recorder({
+      serpapi: async () => { throw new Error("bad key"); },
+      jsearch: async () => [result("https://b")],
+    });
+    const cascade = createProviderCascade(ORDER, { search, failuresBeforeDead: 2 });
+
+    await cascade.run(query);
+    await cascade.run(query);
+
+    expect(cascade.isDead("serpapi")).toBe(true);
+    expect(liveLead(cascade)).toBe("jsearch");
+  });
+
+  it("falls through to the last provider standing", async () => {
+    const { search } = recorder({
+      serpapi: async () => { throw new Error("bad key"); },
+      jsearch: async () => { throw new Error("429"); },
+      adzuna: async () => [result("https://c")],
+    });
+    const cascade = createProviderCascade(ORDER, { search, failuresBeforeDead: 1 });
+
+    await cascade.run(query);
+
+    expect(liveLead(cascade)).toBe("adzuna");
+  });
+
+  it("has no lead once everything is dead", async () => {
+    const { search } = recorder({
+      serpapi: async () => { throw new Error("x"); },
+      jsearch: async () => { throw new Error("x"); },
+      adzuna: async () => { throw new Error("x"); },
+    });
+    const cascade = createProviderCascade(ORDER, { search, failuresBeforeDead: 1 });
+
+    await cascade.run(query);
+
+    expect(liveLead(cascade)).toBeNull();
+    expect(cascade.exhausted()).toBe(true);
+  });
+});

@@ -241,6 +241,13 @@ export const DEFAULT_SEARCH_BUDGET_MS = 75_000;
  */
 const MAX_CALL_MS = 20_000;
 
+/*
+ * Queries in flight at once while SerpApi leads. Three, because one call costs
+ * the better part of ten seconds and a 25-query plan cannot otherwise finish
+ * inside the budget. Never applied to a provider that answers in milliseconds.
+ */
+const SERPAPI_CONCURRENCY = 3;
+
 const MAX_ADVERTS_READ = 24;
 const ADVERT_CONCURRENCY = 6;
 const ADVERT_BUDGET_MS = 12_000;
@@ -471,9 +478,30 @@ export async function runBriefSearch(
   };
   const callTimeoutMs = () => Math.max(leadCallBudgetMs(), Math.min(MAX_CALL_MS, Math.round(remainingMs() / 2)));
 
+  /*
+   * How many queries may be in flight at once.
+   *
+   * Read from the live lead, per batch, for the same reason the call budget
+   * above is: it was computed once from the static provider list, so it stayed
+   * at three after SerpApi died. The pacing below is gated on this being one,
+   * which meant three concurrent un-paced calls to JSearch — a provider that
+   * allows one request a second. Masked today only because JSearch is out of
+   * quota and refusing everything; it would have started rate-limiting itself
+   * the moment the monthly allowance reset.
+   *
+   * Only SerpApi gets to run in parallel. It takes the better part of ten
+   * seconds a call, which is what makes the concurrency worth having; Adzuna
+   * answers in under half a second and gains nothing from it.
+   */
+  const batchConcurrency = () => {
+    const lead = providers.find((provider) => !cascade.isDead(provider));
+    return lead === "serpapi" ? SERPAPI_CONCURRENCY : 1;
+  };
+
   async function run(list: JobSearchQuery[]) {
-    const concurrency = providers[0] === "serpapi" ? 3 : 1;
-    for (let index = 0; index < list.length; index += concurrency) {
+    let index = 0;
+    while (index < list.length) {
+      const concurrency = batchConcurrency();
       if (Date.now() - startedAt > budgetMs) { queriesSkipped += list.length - index; break; }
       if (cascade.exhausted()) { queriesSkipped += list.length - index; break; }
       /*
@@ -504,6 +532,7 @@ export async function runBriefSearch(
       }
 
       const batch = list.slice(index, index + concurrency);
+      index += batch.length;
       const timeoutMs = callTimeoutMs();
       const responses = await Promise.all(batch.map(async (query) => ({
         query,
@@ -519,8 +548,8 @@ export async function runBriefSearch(
       }
       lastQueryEndedAt = Date.now();
 
-      if (byUrl.size >= 25 && index + batch.length >= activeLanes.length) {
-        queriesSkipped += list.length - index - batch.length;
+      if (byUrl.size >= 25 && index >= activeLanes.length) {
+        queriesSkipped += list.length - index;
         break;
       }
     }
