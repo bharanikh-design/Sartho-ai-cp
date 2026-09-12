@@ -969,7 +969,12 @@ h2.resume-doc-heading.resume-doc-field { margin-bottom: 0; border-bottom: 1px so
  * a full-length document here would push the drafts, which is where the work
  * happens, off the first screen entirely.
  */
-.studio-master-body { max-height: 560px; overflow-y: auto; border: 1px solid rgba(255,255,255,.07); border-radius: 12px; padding: 4px; }
+/*
+ * The master's badge in the list. It is a résumé like the rest and opens the
+ * same way; this only says which one it is, because "Master résumé" as a title
+ * reads like a role somebody applied for.
+ */
+.studio-draft-badge { margin-left: 8px; border-radius: 999px; padding: 1px 7px; color: #8ab4f8; background: rgba(138,180,248,.14); font-size: var(--text-2xs); font-style: normal; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
 
 /*
  * The sidebar templates, on screen.
