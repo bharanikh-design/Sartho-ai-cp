@@ -10,7 +10,7 @@
  * survives being printed verbatim.
  */
 
-export type AiFailureKind = "credit" | "rate-limit" | "auth" | "timeout" | "model" | "unknown";
+export type AiFailureKind = "credit" | "rate-limit" | "auth" | "timeout" | "model" | "schema" | "unknown";
 
 export function classifyAiFailure(message: string): AiFailureKind {
   const text = message.toLowerCase();
@@ -42,6 +42,14 @@ export function classifyAiFailure(message: string): AiFailureKind {
    */
   if (/invalid.*api key|api key not valid|api_key_invalid|incorrect api key|unauthorized|permission_denied|\b401\b|authentication|has not been used in project|api has not been enabled|accessnotconfigured|api_key_service_blocked/.test(text)) return "auth";
   if (/timed? ?out|timeout|aborted|abort/.test(text)) return "timeout";
+  /*
+   * A schema the provider will not accept. OpenAI's strict structured outputs
+   * answer 400 with "In context=('properties','sections'), 'minItems' is not
+   * permitted", and that sentence matched nothing here — so a deployment-level
+   * fault that made building a résumé fail every time was reported to the
+   * person as an unrecognised provider hiccup they should try again.
+   */
+  if (/is not permitted|invalid schema|response_format|unsupported.*schema|schema.*not supported/.test(text)) return "schema";
   /*
    * Google's retired-model reply is "models/gemini-1.5-pro is not found for
    * API version v1beta", not the tidier "model not found". That wording used
@@ -128,6 +136,8 @@ export function describeAiFailure(message: string, subject: AiFailureSubject = G
       return `Sartho waited as long as it waits and the provider did not answer, so it could not ${action}. Nothing is wrong with ${reassurance} — ${retry}.`;
     case "model":
       return `Sartho's selected AI model is no longer available, so it could not ${action}. Nothing is wrong with ${reassurance}. The administrator needs to set a current model name in the deployment's environment variables.`;
+    case "schema":
+      return `Sartho asked its AI provider for a shape the provider will not accept, so it could not ${action}. Nothing is wrong with ${reassurance} and trying again will not help — this is a fault in Sartho itself and the administrator needs the server log, which records what the provider objected to.`;
     default:
       // The raw provider message is logged server-side for diagnostics; it must
       // never be printed to the person using the product — it reads as a Sartho
@@ -143,6 +153,7 @@ export function shortAiFailure(message: string): string {
     case "rate-limit": return "rate limited";
     case "timeout": return "timed out";
     case "model": return "model no longer available";
+    case "schema": return "schema rejected";
     default: return "provider error";
   }
 }

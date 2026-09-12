@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { classifyAiFailure, describeAiFailure, shortAiFailure } from "./failure";
+import { strictSafeSchema } from "./schema";
 import { AI_ENDPOINTS } from "@/lib/config/ai-endpoints";
 
 export type AiWorkload = "fast" | "quality";
@@ -217,7 +218,13 @@ async function callOpenAI(request: StructuredRequest, apiKey: string, model: str
             type: "json_schema",
             name: request.schemaName,
             strict: true,
-            schema: request.schema,
+            /*
+             * Strict mode 400s on any keyword outside its subset, so the schema
+             * is filtered rather than sent as written. What the keywords asked
+             * for is enforced by the Zod parse on the way back, which is the
+             * only place it was ever actually checked.
+             */
+            schema: strictSafeSchema(request.schema),
           },
         },
       }),

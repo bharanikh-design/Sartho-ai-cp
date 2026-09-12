@@ -188,3 +188,26 @@ describe("what a person is allowed to see", () => {
     expect(describeAiFailure(message)).toContain("environment variables");
   });
 });
+
+/*
+ * A schema the provider refuses is not a hiccup — retrying cannot fix it, and
+ * telling somebody to try again wastes their afternoon. OpenAI's strict
+ * structured outputs return 400 for keywords outside their subset, which is
+ * what made building a tailored résumé fail every time.
+ */
+describe("a rejected schema is a Sartho fault, not a provider mood", () => {
+  const REJECTED = "Invalid schema for response_format 'sartho_tailored_resume': In context=('properties', 'sections'), 'minItems' is not permitted.";
+
+  it("recognises it instead of filing it as unknown", () => {
+    expect(classifyAiFailure(REJECTED)).toBe("schema");
+  });
+
+  it("says trying again will not help, and never leaks the raw message", () => {
+    const spoken = describeAiFailure(REJECTED, RESUME_BUILD_SUBJECT);
+
+    expect(spoken).toContain("build the résumé");
+    expect(spoken).toContain("will not help");
+    expect(spoken).not.toContain("minItems");
+    expect(spoken).not.toContain("response_format");
+  });
+});
