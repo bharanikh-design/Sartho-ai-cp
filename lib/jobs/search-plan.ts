@@ -162,13 +162,24 @@ export function planSearchQueries(input: {
   } else {
     queries.push({ keywords: topRole, country: input.country, remoteOnly, employmentTypes, limit: 20 });
   }
-  for (const keywords of roles.slice(1)) {
-    queries.push({ keywords, country: input.country, location: primaryLocation, remoteOnly, employmentTypes, limit: 20 });
-  }
+  /*
+   * Employers before the secondary roles, because they are a different kind of
+   * statement.
+   *
+   * A person who types "Accenture, ServiceNow, Deloitte, KPMG" into their brief
+   * has named exactly where they want to work. The roles after the first are
+   * Sartho's own expansion of what they might be called. Under a wall-clock
+   * budget the order decides what actually runs, and company queries used to sit
+   * last: a brief with four employers planned thirteen queries, ran four, and
+   * skipped every employer the person had asked for by name.
+   */
   for (const employer of input.companies.slice(0, MAX_COMPANY_QUERIES)) {
     for (const keywords of roles.slice(0, COMPANY_ROLE_DEPTH)) {
       queries.push({ keywords, country: input.country, employer, remoteOnly, employmentTypes, limit: 10 });
     }
+  }
+  for (const keywords of roles.slice(1)) {
+    queries.push({ keywords, country: input.country, location: primaryLocation, remoteOnly, employmentTypes, limit: 20 });
   }
 
   /*

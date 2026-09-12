@@ -265,3 +265,40 @@ describe("model suggestions widen the search rather than replace it", () => {
     expect(keywords.filter((word) => word === "Engagement Manager")).toHaveLength(1);
   });
 });
+
+/*
+ * Order decides what actually runs, because the loop stops at a wall clock.
+ * A brief naming four employers planned thirteen queries, ran four, and skipped
+ * every employer the person had asked for by name — they sat last, behind
+ * Sartho's own expansion of what their roles might also be called.
+ */
+describe("query order under a budget", () => {
+  const brief = {
+    roles: ["ServiceNow Engagement Manager", "Enterprise ITSM Practice Lead", "Delivery Director"],
+    country: "sg",
+    locations: [],
+    companies: ["Accenture", "ServiceNow", "Deloitte", "KPMG"],
+    remotePreferences: [],
+    employmentTypes: ["Full-time"],
+  };
+
+  it("asks for the named employers before the expanded role titles", () => {
+    const queries = planSearchQueries(brief);
+    const firstEmployer = queries.findIndex((query) => query.employer);
+    const secondaryRole = queries.findIndex((query) => !query.employer && query.keywords !== queries[0].keywords);
+
+    expect(firstEmployer).toBeGreaterThan(-1);
+    expect(secondaryRole).toBeGreaterThan(firstEmployer);
+  });
+
+  /* The broadest query still leads — it is the one most likely to return anything. */
+  it("still leads with the top role", () => {
+    const queries = planSearchQueries(brief);
+    expect(queries[0].employer).toBeUndefined();
+  });
+
+  it("asks for every employer the brief named", () => {
+    const employers = planSearchQueries(brief).map((query) => query.employer).filter(Boolean);
+    for (const name of brief.companies) expect(employers).toContain(name);
+  });
+});
