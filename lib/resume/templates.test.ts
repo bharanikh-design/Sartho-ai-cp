@@ -7,13 +7,20 @@ import { parseResumeContent } from "@/lib/resume/content";
 /*
  * The gallery every résumé builder sells is mostly two-column, and a second
  * column is the most common reason an applicant tracking system parses a
- * candidate into nonsense. That constraint is not the same as having no design:
- * the weight of the name, whether a heading sits on a rule or against a bar,
- * and how much air a section gets all happen inside one column.
+ * candidate into nonsense.
+ *
+ * The answer here is not to ban design. The two files a person downloads are
+ * for two different readers: the Word file goes to the parser and is single
+ * column on every template without exception, and the PDF goes to a human and
+ * can be as designed as it likes. `atsSafe` says which is which, out loud.
+ *
+ * These tests were pinned to a count of seven, which is a number rather than a
+ * property — it failed the moment a template was added, which is the one thing
+ * a template list is supposed to allow.
  */
 describe("resume templates", () => {
-  it("offers seven, and every one is real", () => {
-    expect(RESUME_TEMPLATES).toHaveLength(7);
+  it("offers a real choice, and every one of them is finished", () => {
+    expect(RESUME_TEMPLATES.length).toBeGreaterThanOrEqual(6);
     for (const template of RESUME_TEMPLATES) {
       expect(template.name.trim()).not.toBe("");
       expect(template.description.trim()).not.toBe("");
@@ -23,7 +30,73 @@ describe("resume templates", () => {
       expect(template.docx.bodySize).toBeGreaterThan(0);
       expect(template.docx.nameSize).toBeGreaterThan(template.docx.bodySize);
     }
-    expect(new Set(RESUME_TEMPLATES.map((t) => t.id)).size).toBe(7);
+    expect(new Set(RESUME_TEMPLATES.map((t) => t.id)).size).toBe(RESUME_TEMPLATES.length);
+  });
+
+  /*
+   * The promise the whole model rests on. Whatever the PDF does, the file that
+   * reaches an applicant tracking system is safe — so choosing a sidebar can
+   * never quietly cost somebody an application.
+   */
+  it("keeps a Word file for every template, sidebar ones included", () => {
+    for (const template of RESUME_TEMPLATES) {
+      expect(template.docx).toBeTruthy();
+      expect(template.docx.font.trim()).not.toBe("");
+    }
+  });
+
+  it("marks a sidebar template as the one the parser would struggle with", () => {
+    for (const template of RESUME_TEMPLATES) {
+      if (template.pdf.layout === "sidebar") expect(template.atsSafe).toBe(false);
+      else expect(template.atsSafe).toBe(true);
+    }
+  });
+
+  /* A choice with nothing safe in it is not a choice. */
+  it("offers both kinds", () => {
+    expect(RESUME_TEMPLATES.some((template) => template.atsSafe)).toBe(true);
+    expect(RESUME_TEMPLATES.some((template) => !template.atsSafe)).toBe(true);
+  });
+
+  /*
+   * Every token the renderer reads has to be present and sane, because a
+   * missing one does not throw — it draws a page that is subtly wrong and
+   * nobody notices until it has been sent.
+   */
+  it("gives the renderer everything it reads", () => {
+    for (const template of RESUME_TEMPLATES) {
+      const { pdf } = template;
+      expect(["Helvetica", "Times-Roman"]).toContain(pdf.font);
+      expect(["single", "sidebar"]).toContain(pdf.layout);
+      expect(["rule", "doubleRule", "bar", "edge", "plain"]).toContain(pdf.heading);
+      expect(pdf.accent).toMatch(/^#[0-9a-f]{6}$/i);
+      expect(pdf.ink).toMatch(/^#[0-9a-f]{6}$/i);
+      expect(pdf.muted).toMatch(/^#[0-9a-f]{6}$/i);
+      expect(pdf.bodySize).toBeGreaterThan(6);
+      expect(pdf.nameSize).toBeGreaterThan(pdf.bodySize);
+      expect(pdf.lineHeight).toBeGreaterThan(1);
+
+      /* A sidebar has to say how wide it is and what colour its text takes. */
+      if (pdf.layout === "sidebar") {
+        expect(pdf.sidebarWidth ?? 0).toBeGreaterThan(120);
+        expect(pdf.sidebarInk).toMatch(/^#[0-9a-f]{6}$/i);
+        expect(pdf.sidebarMuted).toMatch(/^#[0-9a-f]{6}$/i);
+      }
+    }
+  });
+
+  /*
+   * The failure this rewrite exists for. Seven templates were described in
+   * prose and the renderer read one field of them — the font — so choosing a
+   * template changed the typeface of the thing a person sends and nothing else.
+   * Two templates that differ only in font are one template.
+   */
+  it("does not describe two templates that would draw the same page", () => {
+    const shapes = RESUME_TEMPLATES.map((template) => {
+      const { font, layout, heading, accent, nameAlign, nameCaps } = template.pdf;
+      return [font, layout, heading, accent, nameAlign, nameCaps].join("|");
+    });
+    expect(new Set(shapes).size).toBe(shapes.length);
   });
 
   it("falls back rather than rejecting an id it does not know", () => {
