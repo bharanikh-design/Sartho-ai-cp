@@ -9,7 +9,7 @@ import { DEFAULT_TEMPLATE } from "@/lib/resume/templates";
 import { tailoringGain } from "@/lib/resume/ats";
 import { RESUME_WRITING_RULES } from "@/lib/resume/writing";
 import type { RuleAnalysis } from "@/lib/types";
-import { saveResumeDraft } from "@/lib/resume/save";
+import { resumeVersionName, saveResumeDraft } from "@/lib/resume/save";
 
 // Same reasoning as the deep-analysis route: the declared budget has to cover
 // the 90s the provider adapter is allowed to wait, or the host kills the
@@ -385,7 +385,14 @@ export async function POST(
 
     const { applicationId, error: saveError } = await saveResumeDraft(supabase, {
       jobId: id,
-      versionName: parsed.versionName.trim(),
+      /*
+       * Named the same way every other row in the repository is: the role, and
+       * the moment. The model returns a versionName of its own and it is not
+       * used for this — a repository is searched by what the résumé was for and
+       * when it was written, and a set of rows named by three different schemes
+       * is a set of rows nobody can scan.
+       */
+      versionName: resumeVersionName(jobResult.data.title ?? ""),
       draft,
       changeLog,
       evidenceIds,
