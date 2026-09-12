@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { strictSafeSchema } from "./schema";
+import { geminiOutputBudget } from "./provider";
 import { RESUME_EXTRACTION_SCHEMA } from "@/lib/resume/extraction-schema";
 
 /*
@@ -88,5 +89,37 @@ describe("strictSafeSchema", () => {
     expect(strictSafeSchema(null)).toBeNull();
     expect(strictSafeSchema("string")).toBe("string");
     expect(strictSafeSchema(7)).toBe(7);
+  });
+});
+
+/*
+ * The budget was a ternary whose two branches were the same number, under a
+ * comment explaining that the larger allowance was scoped to one workload. It
+ * gave 8192 to everything — including the tailored résumé draft, the largest
+ * document Sartho asks for, which stops mid-object at that ceiling and fails.
+ */
+describe("geminiOutputBudget", () => {
+  afterEach(() => { delete process.env.GEMINI_MAX_OUTPUT_TOKENS; });
+
+  /*
+   * 8192 stays the default because provider.test.ts calls it the model's legal
+   * limit — a claim about the API, not a preference. Sending more than a model
+   * accepts is refused outright, which would take down every call rather than
+   * the one long document.
+   */
+  it("keeps the documented default", () => {
+    expect(geminiOutputBudget()).toBe(8_192);
+  });
+
+  it("lets a deployment that knows its model's limit raise it", () => {
+    process.env.GEMINI_MAX_OUTPUT_TOKENS = "65536";
+    expect(geminiOutputBudget()).toBe(65_536);
+  });
+
+  it("ignores a value that is not a usable number", () => {
+    for (const bad of ["not a number", "0", "-1", ""]) {
+      process.env.GEMINI_MAX_OUTPUT_TOKENS = bad;
+      expect(geminiOutputBudget()).toBe(8_192);
+    }
   });
 });

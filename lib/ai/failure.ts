@@ -10,7 +10,7 @@
  * survives being printed verbatim.
  */
 
-export type AiFailureKind = "credit" | "rate-limit" | "auth" | "timeout" | "model" | "schema" | "unknown";
+export type AiFailureKind = "credit" | "rate-limit" | "auth" | "timeout" | "model" | "schema" | "too-long" | "unknown";
 
 export function classifyAiFailure(message: string): AiFailureKind {
   const text = message.toLowerCase();
@@ -50,6 +50,12 @@ export function classifyAiFailure(message: string): AiFailureKind {
    * person as an unrecognised provider hiccup they should try again.
    */
   if (/is not permitted|invalid schema|response_format|unsupported.*schema|schema.*not supported/.test(text)) return "schema";
+  /*
+   * A reply that ran out of room. Gemini reports MAX_TOKENS and the document
+   * comes back half-written — which is a ceiling in Sartho's own configuration,
+   * not anything the person can retry their way out of.
+   */
+  if (/output token ceiling|max_tokens|maxoutputtokens|token ceiling|truncated/.test(text)) return "too-long";
   /*
    * Google's retired-model reply is "models/gemini-1.5-pro is not found for
    * API version v1beta", not the tidier "model not found". That wording used
@@ -136,6 +142,8 @@ export function describeAiFailure(message: string, subject: AiFailureSubject = G
       return `Sartho waited as long as it waits and the provider did not answer, so it could not ${action}. Nothing is wrong with ${reassurance} — ${retry}.`;
     case "model":
       return `Sartho's selected AI model is no longer available, so it could not ${action}. Nothing is wrong with ${reassurance}. The administrator needs to set a current model name in the deployment's environment variables.`;
+    case "too-long":
+      return `The draft grew longer than one reply can hold, so it could not ${action}. Nothing is wrong with ${reassurance} and trying again will not change it — the administrator raises the provider's output limit.`;
     case "schema":
       return `Sartho asked its AI provider for a shape the provider will not accept, so it could not ${action}. Nothing is wrong with ${reassurance} and trying again will not help — this is a fault in Sartho itself and the administrator needs the server log, which records what the provider objected to.`;
     default:
@@ -154,6 +162,7 @@ export function shortAiFailure(message: string): string {
     case "timeout": return "timed out";
     case "model": return "model no longer available";
     case "schema": return "schema rejected";
+    case "too-long": return "reply hit its length limit";
     default: return "provider error";
   }
 }

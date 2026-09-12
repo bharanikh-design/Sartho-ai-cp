@@ -310,17 +310,36 @@ async function callAnthropic(request: StructuredRequest, apiKey: string, model: 
   return JSON.parse(extractJson(text)) as unknown;
 }
 
+/*
+ * How much room one reply gets.
+ *
+ * This was a ternary whose two branches held the same number, under a comment
+ * explaining that the larger allowance was scoped to the résumé workload while
+ * every other request kept a tighter guardrail. It did neither — everything got
+ * 8192 — and the comment described an intention nobody had implemented.
+ *
+ * The number stays, because a test calls 8192 the model's legal limit and that
+ * is a claim about the API rather than a preference: sending more than a model
+ * accepts is refused outright, which would take down every call rather than the
+ * one long document. Raising it belongs to whoever can check their model's
+ * published output limit, which is what the environment variable is for.
+ *
+ * What changes is that hitting the ceiling is no longer silent. The tailored
+ * résumé is the largest thing Sartho asks for — a summary, every bullet of
+ * every role, a UUID citation list beside each one, and a change log explaining
+ * every edit — and when it overran, Gemini reported MAX_TOKENS, the message
+ * matched no classifier pattern, and the person was told to try again.
+ */
+const GEMINI_DEFAULT_OUTPUT_TOKENS = 8_192;
+
+export function geminiOutputBudget(): number {
+  const configured = Number(process.env.GEMINI_MAX_OUTPUT_TOKENS);
+  if (Number.isFinite(configured) && configured > 0) return Math.floor(configured);
+  return GEMINI_DEFAULT_OUTPUT_TOKENS;
+}
+
 async function callGemini(request: StructuredRequest, apiKey: string, model: string) {
-  /*
-   * A detailed résumé can legitimately exceed the small default response
-   * budget once every role and evidence claim is represented as JSON. Keep
-   * the larger allowance scoped to that one workload: Gemini bills actual
-   * output, not this ceiling, while every other Sartho request retains the
-   * tighter cost guardrail.
-   */
-  const maxOutputTokens = request.schemaName === "sartho_resume_extraction"
-    ? 8_192
-    : 8_192;
+  const maxOutputTokens = geminiOutputBudget();
 
   const { response, result: unknownResult, startedAt } = await fetchProvider(
     "gemini",
@@ -371,7 +390,7 @@ async function callGemini(request: StructuredRequest, apiKey: string, model: str
   const candidate = result.candidates?.[0];
   if (candidate?.finishReason === "MAX_TOKENS") {
     throw new ProviderRequestError(
-      "The document produced more detail than one reply can hold. Try a shorter résumé.",
+      "The reply hit its output token ceiling before the document was finished, so what came back was incomplete. This is a limit in Sartho's configuration, not a problem with the résumé; GEMINI_MAX_OUTPUT_TOKENS raises it.",
       "terminal",
     );
   }
