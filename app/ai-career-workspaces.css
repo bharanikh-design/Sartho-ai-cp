@@ -918,3 +918,22 @@ h2.resume-doc-heading.resume-doc-field { margin-bottom: 0; border-bottom: 1px so
  */
 .resume-doc-tools button.is-primary { border-color: rgba(125,109,255,.55); color: #a99bff; background: rgba(125,109,255,.10); }
 .resume-doc-tools button.is-primary:hover:not(:disabled) { border-color: #7d6dff; color: #c4baff; background: rgba(125,109,255,.18); }
+
+/*
+ * The deployment block on the admin page: three facts, read at a glance.
+ *
+ * The commit is first because it answers the question that cost this project
+ * two afternoons — a merge is not a deploy, and no other panel could say which
+ * build was actually running.
+ */
+.admin-deployment { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; margin: 0 0 16px; }
+.admin-deployment > div { border: 1px solid rgba(255,255,255,.07); border-radius: 10px; padding: 10px 12px; }
+.admin-deployment dt { margin: 0 0 3px; color: var(--text-tertiary); font-size: var(--text-2xs); font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
+.admin-deployment dd { margin: 0; color: var(--text-primary); font-size: var(--text-sm); }
+.admin-deployment code { font-family: var(--font-mono, ui-monospace, monospace); font-size: var(--text-sm); }
+
+.admin-links { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; }
+.admin-link { display: block; border: 1px solid rgba(255,255,255,.08); border-radius: 10px; padding: 10px 12px; text-decoration: none; }
+.admin-link:hover { border-color: rgba(138,180,248,.45); background: rgba(138,180,248,.07); }
+.admin-link strong { display: block; color: var(--text-primary); font-size: var(--text-xs); font-weight: 700; }
+.admin-link small { display: block; margin-top: 2px; color: var(--text-secondary); font-size: var(--text-2xs); line-height: 1.45; }

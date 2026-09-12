@@ -5,6 +5,7 @@ import {
   getNavigationForPath,
   getPageLabel,
   getPrimaryNavigation,
+  getSettingsNavigation,
   isNavigationItemActive,
   primaryNavigation,
 } from "./navigation";
@@ -38,9 +39,55 @@ describe("primary navigation", () => {
     expect(getNavigationWithGate(true, true).some((item) => item.href === "/extension")).toBe(false);
   });
 
+  /*
+   * Asserted against getPrimaryNavigation rather than the `primaryNavigation`
+   * export, which is an alias for allNavigation — the lookup table every page
+   * label and active-state check reads, not the career rail. A page has to be
+   * in that table to be labelled at all, so testing its absence there was
+   * testing the opposite of the thing the title describes.
+   */
   it("labels supporting workflow pages without adding them to primary navigation", () => {
     expect(getPageLabel("/diagnostics")).toBe("Diagnostics");
-    expect(primaryNavigation.some((item) => item.href === "/diagnostics")).toBe(false);
+    expect(getPrimaryNavigation(true).some((item) => item.href === "/diagnostics")).toBe(false);
+    expect(getNavigationWithGate(true, true).some((item) => item.href === "/diagnostics")).toBe(false);
+  });
+
+  /*
+   * Settings are a second group, so they must not also be appended to the
+   * career rail when one of them is the page being viewed — that would draw
+   * the same destination twice, once in a list it does not belong to.
+   */
+  it("keeps a settings page out of the career rail while you are on it", () => {
+    for (const href of ["/integrations", "/notifications", "/admin", "/diagnostics"]) {
+      expect(getNavigationForPath(true, href).some((item) => item.href === href)).toBe(false);
+    }
+  });
+
+  it("still appends a page that belongs to neither group, so the rail shows where you are", () => {
+    expect(getNavigationForPath(true, "/journey").some((item) => item.href === "/journey")).toBe(true);
+  });
+
+  describe("the settings group", () => {
+    it("offers alerts and integrations to everybody", () => {
+      expect(getSettingsNavigation(false).map((item) => item.href)).toEqual(["/notifications", "/integrations"]);
+    });
+
+    /* A link, never a permission: every admin route checks for itself. */
+    it("adds the operations pages for an administrator", () => {
+      expect(getSettingsNavigation(true).map((item) => item.href)).toEqual([
+        "/notifications",
+        "/integrations",
+        "/admin",
+        "/diagnostics",
+      ]);
+    });
+
+    it("never puts a settings page in the career flow", () => {
+      const flow = getPrimaryNavigation(true).map((item) => item.href);
+      for (const item of getSettingsNavigation(true)) {
+        expect(flow).not.toContain(item.href);
+      }
+    });
   });
 
   it("shows one flat process-order menu, the same before and after activation", () => {

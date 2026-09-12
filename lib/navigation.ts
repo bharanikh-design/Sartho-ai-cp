@@ -7,6 +7,8 @@ export type NavigationIconName =
   | "interview"
   | "applications"
   | "shield"
+  | "gauge"
+  | "link"
   | "bell";
 
 export type NavigationItem = {
@@ -143,6 +145,51 @@ export function getPrimaryNavigation(_activated: boolean): NavigationItem[] {
  */
 export const notificationsDestination = notificationsNavigation;
 
+export const integrationsNavigation: NavigationItem = {
+  label: "Integrations",
+  shortLabel: "Links",
+  href: "/integrations",
+  icon: "link",
+  purpose: "What Sartho is connected to, and how to disconnect it",
+};
+
+export const adminNavigation: NavigationItem = {
+  label: "Admin",
+  shortLabel: "Admin",
+  href: "/admin",
+  icon: "shield",
+  purpose: "Who is using Sartho, and how far they get",
+};
+
+export const diagnosticsNavigation: NavigationItem = {
+  label: "Diagnostics",
+  shortLabel: "Checks",
+  href: "/diagnostics",
+  icon: "gauge",
+  purpose: "What this deployment can actually reach",
+};
+
+/*
+ * Settings, as a second group rather than more items in the career flow.
+ *
+ * Email Alerts and Integrations were in the avatar menu at the bottom of the
+ * rail, two clicks and a guess away from anybody who had not already found
+ * them. They are also not steps: putting them in the flow would say they were,
+ * and the rail is read top to bottom as a sequence.
+ *
+ * A separate labelled group is what the rail is already built for — it carries
+ * a "Your career" heading — so settings get their own heading underneath it.
+ * They are visible without competing, which is the actual requirement.
+ *
+ * Administration joins them when the person is an administrator, because
+ * /admin and /diagnostics are the same kind of thing: not work, but the
+ * controls behind it.
+ */
+export function getSettingsNavigation(isAdmin: boolean): NavigationItem[] {
+  const settings = [notificationsNavigation, integrationsNavigation];
+  return isAdmin ? [...settings, adminNavigation, diagnosticsNavigation] : settings;
+}
+
 /*
  * Everything Sartho does is grounded in approved evidence, so with no résumé
  * uploaded every other page is an empty room. They stay visible — a menu that
@@ -162,6 +209,9 @@ export function getNavigationWithGate(activated: boolean, hasResume: boolean): N
 
 export const allNavigation: NavigationItem[] = [
   journeyNavigation,
+  integrationsNavigation,
+  adminNavigation,
+  diagnosticsNavigation,
   dashboardNavigation,
   analyseNavigation,
   applicationNavigation,
@@ -180,6 +230,15 @@ export function getNavigationForPath(activated: boolean, pathname: string) {
   const navigation = getPrimaryNavigation(activated);
   const current = allNavigation.find((item) => isNavigationItemActive(pathname, item.href));
   if (!current || navigation.some((item) => item.href === current.href)) return navigation;
+  /*
+   * A settings page is already drawn in its own group, so appending it here
+   * would put Integrations in the career rail and in Settings at once — the
+   * same destination twice, one of them in a list it does not belong to.
+   *
+   * This append exists for pages with no home in either group, like a saved
+   * role, so that the rail still shows where you are.
+   */
+  if (getSettingsNavigation(true).some((item) => item.href === current.href)) return navigation;
   return [...navigation, current];
 }
 

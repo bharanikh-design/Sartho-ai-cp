@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ProductPageHeader } from "@/components/product-page-header";
 import { UserActivityTable } from "@/components/user-activity-table";
@@ -48,6 +49,16 @@ export default async function AdminDashboardPage() {
 
   const summary = summariseUserTable(rows);
 
+  /*
+   * Read straight from the build environment. The same values the version
+   * endpoint reports, shown where somebody is already looking rather than at a
+   * URL they have to remember.
+   */
+  const commit = process.env.VERCEL_GIT_COMMIT_SHA?.trim() || null;
+  const shortCommit = commit ? commit.slice(0, 7) : null;
+  const branch = process.env.VERCEL_GIT_COMMIT_REF?.trim() || null;
+  const environment = process.env.VERCEL_ENV?.trim() || "local";
+
   return (
     <div className="page-stack product-page">
       <ProductPageHeader
@@ -83,6 +94,56 @@ export default async function AdminDashboardPage() {
           <FunnelRow label="Started a job search" value={summary.searchStarted} of={summary.total} />
           <FunnelRow label="Turned on email alerts" value={summary.notificationsOn} of={summary.total} />
         </ul>
+      </section>
+
+      {/*
+        * What this deployment is, and where to check what it can reach.
+        *
+        * These are the two questions an operator actually arrives with, and
+        * neither had a home: /admin answered "who is using it" and stopped,
+        * while the commit and the provider checks lived at JSON endpoints
+        * somebody had to know the URL of and read by eye. A whole afternoon
+        * went into pasting that JSON back and forth, and twice into arguing
+        * about whether a fix was even deployed.
+        */}
+      <section className="glass-card content-card">
+        <div className="card-header">
+          <div>
+            <h2 className="section-heading">This deployment</h2>
+            <p className="section-subtitle">
+              What is running, and what it can reach. Check the commit first when a fix
+              appears not to have worked — a merge is not a deploy.
+            </p>
+          </div>
+        </div>
+        <dl className="admin-deployment">
+          <div>
+            <dt>Commit</dt>
+            <dd><code>{shortCommit ?? "not a Vercel deployment"}</code></dd>
+          </div>
+          <div>
+            <dt>Branch</dt>
+            <dd>{branch ?? "—"}</dd>
+          </div>
+          <div>
+            <dt>Environment</dt>
+            <dd>{environment}</dd>
+          </div>
+        </dl>
+        <div className="admin-links">
+          <Link href="/diagnostics" className="admin-link">
+            <strong>Diagnostics</strong>
+            <small>AI and jobs providers, asked rather than assumed</small>
+          </Link>
+          <a href="/api/diagnostics/jobs" className="admin-link">
+            <strong>Jobs providers</strong>
+            <small>Reachability, latency, and the SerpApi account</small>
+          </a>
+          <a href="/api/diagnostics/queries?q=ServiceNow&country=sg" className="admin-link">
+            <strong>Query check</strong>
+            <small>What each provider answers to a real query</small>
+          </a>
+        </div>
       </section>
 
       <section className="glass-card content-card">
