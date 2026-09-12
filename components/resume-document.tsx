@@ -227,24 +227,23 @@ function BulletList({
                 <button type="button" title="Remove this line" aria-label={`Remove bullet ${bulletIndex + 1}`} onClick={() => onRemove(bulletIndex)}>✕</button>
               </span>
 
+              {/*
+                * The bullet row is a three-column grid (14px | 1fr | auto), and
+                * this button is one of its children. Handed inline styles and
+                * no grid-column it was auto-placed into that first 14px track,
+                * which is why its label came out one word per line. The class
+                * it used to carry puts it in column 2 and sizes it to its
+                * content — and it is also where its dashed gold styling is
+                * defined once, rather than re-typed here in hex.
+                */}
               {coach && weakBulletIds.has(bullet.id) && coach.activeId !== bullet.id ? (
-                <div style={{ display: 'block', marginTop: '8px', marginBottom: '16px' }}>
-                  <button type="button" style={{ 
-                    border: "1px dashed rgba(224,176,97,.5)", 
-                    borderRadius: "7px", 
-                    padding: "6px 12px", 
-                    color: "#e0b061", 
-                    background: "rgba(224,176,97,.1)", 
-                    fontFamily: "var(--font-sans)", 
-                    fontSize: "12px", 
-                    cursor: "pointer",
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: "6px"
-                  }} onClick={() => coach.onOpen(bullet.id, bullet.text)}>
-                    <span>✨</span> Add a figure to improve ATS score
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  className="resume-doc-coach-open"
+                  onClick={() => coach.onOpen(bullet.id, bullet.text)}
+                >
+                  ✨ Add a figure to improve ATS score
+                </button>
               ) : null}
 
               {coach && coach.activeId === bullet.id ? (
