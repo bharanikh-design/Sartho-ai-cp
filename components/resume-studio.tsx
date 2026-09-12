@@ -51,6 +51,15 @@ export type TailorableRole = {
  */
 const MASTER_ID = "master-resume";
 
+/*
+ * How many résumés before a grid is worth offering.
+ *
+ * Below this a list and a grid are the same rows in a different shape, and the
+ * toggle is a control that changes nothing a person can feel. Six is roughly
+ * where a page stops being scannable at a glance.
+ */
+const GRID_VIEW_THRESHOLD = 6;
+
 const stateTone: Record<"pass" | "warn" | "fail", string> = {
   pass: "#6bcf93",
   warn: "#e0b061",
@@ -263,7 +272,18 @@ export function ResumeStudio({
     setBusyBullet(key);
     setProposalError((state) => { const next = { ...state }; delete next[key]; return next; });
     try {
-      const response = await fetch(`/api/jobs/${draft.jobId}/resume/improve`, {
+      /*
+       * The master has no job, so it cannot use the job-scoped rewrite route.
+       *
+       * Every "Strengthen this line" and "Improve summary with AI" button on
+       * the master row was fetching /api/jobs/master-resume/resume/improve —
+       * an id that is not a uuid, against a route that rejects one, so every
+       * click 404'd silently. /api/resume/improve is the job-less twin written
+       * for exactly this, and it was orphaned the moment its only other caller
+       * was removed.
+       */
+      const isMaster = draft.jobId === MASTER_ID;
+      const response = await fetch(isMaster ? "/api/resume/improve" : `/api/jobs/${draft.jobId}/resume/improve`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ bullet: bullet.text }),
@@ -428,6 +448,19 @@ export function ResumeStudio({
     } finally {
       setGeneratingId(null);
     }
+  }
+
+  /*
+   * The whole document, written again from approved evidence.
+   *
+   * The master and a tailored draft use the two routes that already exist for
+   * it — the same ones behind "+ Master Résumé" and "Build résumé". Nothing
+   * new is generated here; it is the same capability, reachable from where
+   * somebody is working rather than only from a card header.
+   */
+  async function rewriteWholeDocument(draft: StudioDraft) {
+    if (draft.jobId === MASTER_ID) return generateMaster();
+    return generate(draft.jobId);
   }
 
   async function generate(jobId: string) {
@@ -669,6 +702,35 @@ export function ResumeStudio({
                   ? <>Editing — not saved yet</>
                   : <>Draft — click any line to edit it</>}
             </div>
+            {/*
+              * Let AI write it, where somebody is already looking.
+              *
+              * The AI that writes a whole résumé has existed since the product
+              * did — it is what "Build résumé" and "+ Master Résumé" call. But
+              * both of those live in a card header, outside the editor, so the
+              * only AI visible while actually working on a document was the
+              * per-line coach and the summary rewrite. Somebody inside the
+              * editor had no way to ask for the whole thing, and reasonably
+              * concluded there wasn't one.
+              *
+              * Same routes, put where the work happens.
+              */}
+            <div className="studio-ai-bar">
+              <button
+                type="button"
+                className="studio-ai-write"
+                disabled={Boolean(generatingId)}
+                onClick={() => void rewriteWholeDocument(draft)}
+              >
+                ✨ {generatingId === draft.application.id || generatingId === "master"
+                  ? "Writing…"
+                  : "Let AI write it from your evidence"}
+              </button>
+              <small>
+                Rewrites every line from the career facts you approved. Your current version is kept.
+              </small>
+            </div>
+
 
             <ResumeDocument
               content={content}
@@ -826,6 +888,35 @@ return (
                 ? <>Editing — not saved yet</>
                 : <>Draft — click any line to edit it</>}
           </div>
+          {/*
+            * Let AI write it, where somebody is already looking.
+            *
+            * The AI that writes a whole résumé has existed since the product
+            * did — it is what "Build résumé" and "+ Master Résumé" call. But
+            * both of those live in a card header, outside the editor, so the
+            * only AI visible while actually working on a document was the
+            * per-line coach and the summary rewrite. Somebody inside the
+            * editor had no way to ask for the whole thing, and reasonably
+            * concluded there wasn't one.
+            *
+            * Same routes, put where the work happens.
+            */}
+          <div className="studio-ai-bar">
+            <button
+              type="button"
+              className="studio-ai-write"
+              disabled={Boolean(generatingId)}
+              onClick={() => void rewriteWholeDocument(draft)}
+            >
+              ✨ {generatingId === draft.application.id || generatingId === "master"
+                ? "Writing…"
+                : "Let AI write it from your evidence"}
+            </button>
+            <small>
+              Rewrites every line from the career facts you approved. Your current version is kept.
+            </small>
+          </div>
+
 
           {/*
             * An older version is history and stays readable rather than
@@ -1180,6 +1271,13 @@ return (
   const allDrafts: StudioDraft[] = masterDraft ? [masterDraft, ...drafts] : drafts;
 
   /*
+   * The grid only applies where it is offered. Somebody who chose it with a
+   * dozen résumés and then deleted ten should not be left in a two-tile grid
+   * with no control to leave it.
+   */
+  const showGrid = view === "grid" && allDrafts.length >= GRID_VIEW_THRESHOLD;
+
+  /*
    * Looked up in the full list, master included.
    *
    * It searched `drafts`, which is the tailored ones only — so expanding the
@@ -1225,6 +1323,15 @@ return (
             <button type="button" className="secondary-button" onClick={generateMaster} disabled={generatingId === "master"} style={{ padding: "4px 8px", fontSize: "11px" }}>
               {generatingId === "master" ? "Building..." : "+ Master Résumé"}
             </button>
+            {/*
+              * Offered only once there is enough to look at.
+              *
+              * A list and a grid of three rows are the same three rows, so the
+              * toggle was two buttons that changed nothing anybody could feel —
+              * chrome asking to be understood in exchange for nothing. A grid
+              * starts earning its place when scanning becomes hunting.
+              */}
+            {allDrafts.length >= GRID_VIEW_THRESHOLD ? (
             <div className="studio-view-toggle" role="group" aria-label="How to show your résumés">
               <button
                 type="button"
@@ -1250,12 +1357,13 @@ return (
                 </svg>
               </button>
             </div>
+            ) : null}
             <span className="meta-pill">{allDrafts.length} résumé{allDrafts.length === 1 ? "" : "s"}</span>
           </div>
         </div>
 
         {allDrafts.length ? (
-          <div className={view === "grid" ? "studio-draft-grid" : "studio-draft-list"}>
+          <div className={showGrid ? "studio-draft-grid" : "studio-draft-list"}>
             {allDrafts.map((draft) => {
               const open = openId === draft.application.id;
               /* The collapsed row shows the current version's score, never a draft edit. */
@@ -1273,10 +1381,10 @@ return (
                        * belongs anyway.
                        */
                       onClick={() => {
-                        if (view === "grid") { setOpenId(draft.application.id); setExpandedId(draft.application.id); return; }
+                        if (showGrid) { setOpenId(draft.application.id); setExpandedId(draft.application.id); return; }
                         setOpenId(open ? null : draft.application.id);
                       }}
-                      aria-expanded={view === "grid" ? undefined : open}
+                      aria-expanded={showGrid ? undefined : open}
                     >
                       <span className="studio-draft-name">
                         <strong>
@@ -1321,7 +1429,7 @@ return (
                       <span aria-hidden="true">⤢</span>
                     </button>
 
-                    {view === "grid" ? null : <button
+                    {showGrid ? null : <button
                       type="button"
                       className="studio-draft-chevron"
                       aria-label={open ? "Collapse this draft" : "Expand this draft"}
@@ -1331,7 +1439,7 @@ return (
                     </button>}
                   </div>
 
-                  {open && view !== "grid" ? renderWorkspace(draft) : null}
+                  {open && !showGrid ? renderWorkspace(draft) : null}
                 </article>
               );
             })}
