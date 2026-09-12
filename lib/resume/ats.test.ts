@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { atsVerdict, bulletsIn, scoreAts } from "./ats";
+import { atsVerdict, bulletsIn, scoreAts, tailoringGain } from "./ats";
 import type { RuleAnalysis } from "@/lib/types";
 
 const analysis = (missing: string[], matched: string[]): RuleAnalysis => ({
@@ -391,5 +391,53 @@ describe("calendar years are dates, not achievements", () => {
   it("reads a bare four-digit quantity in year range as a date, as documented", () => {
     const ambiguous = scoreAts(padded("• Held attrition at 2019 basis points."), null);
     expect(ambiguous.weakBullets).toHaveLength(1);
+  });
+});
+
+/*
+ * The comparison the panel could never make. Both documents scored against one
+ * analysis, so "was tailoring worth anything" has a like-for-like answer.
+ */
+describe("what tailoring to a role was worth", () => {
+  const roleAnalysis = analysis([], ["ServiceNow", "ITSM", "incident management", "vendor negotiation"]);
+
+  /*
+   * An absent master is not a master that scored zero. A caller treating it as
+   * one reports a rise from nothing — the whole gain invented out of a missing
+   * document.
+   */
+  it("reports no comparison rather than a rise from nothing", () => {
+    const result = tailoringGain(null, "Led ServiceNow ITSM delivery across four business units.", roleAnalysis);
+    expect(result.before).toBeNull();
+    expect(result.gain).toBeNull();
+    expect(result.after).toBeGreaterThan(0);
+  });
+
+  it("treats an empty master the same as no master", () => {
+    expect(tailoringGain("   ", "Led ServiceNow delivery.", roleAnalysis).gain).toBeNull();
+  });
+
+  it("credits a draft that names what the role asks for and the master did not", () => {
+    const master = "Led delivery programmes for enterprise clients.";
+    const draft = "Led ServiceNow ITSM delivery, incident management and vendor negotiation across four business units.";
+    const result = tailoringGain(master, draft, roleAnalysis);
+    expect(result.before).not.toBeNull();
+    expect(result.gain).toBeGreaterThan(0);
+    expect(result.gain).toBe(result.after - (result.before ?? 0));
+  });
+
+  /*
+   * A draft that reads lower than the master is a real answer, not an error.
+   * Somebody is better off being told to send the master.
+   */
+  it("reports a loss rather than clamping it at zero", () => {
+    const master = "Led ServiceNow ITSM delivery, incident management and vendor negotiation across four business units.";
+    const draft = "Led delivery programmes for enterprise clients.";
+    expect(tailoringGain(master, draft, roleAnalysis).gain).toBeLessThan(0);
+  });
+
+  it("scores both sides against the same analysis", () => {
+    const text = "Led ServiceNow ITSM delivery across four business units.";
+    expect(tailoringGain(text, text, roleAnalysis).gain).toBe(0);
   });
 });

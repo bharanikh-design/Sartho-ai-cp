@@ -433,3 +433,44 @@ export function atsVerdict(ats: AtsScore): AtsVerdict {
   /* Under a point of gain is not a lever, it is a nag. */
   return { headline, lever: best && best.gain >= 1 ? best.lever : null };
 }
+
+/*
+ * What aiming a résumé at one advert was worth.
+ *
+ * The panel has always answered "how does this document read". It has never
+ * answered "did tailoring it to this role change anything" — which is the
+ * question somebody actually has after pressing the button, and the reason the
+ * master résumé and the tailored draft never felt like one flow.
+ *
+ * Both documents are scored against the same analysis, so the difference is
+ * like-for-like rather than two numbers from different questions. Shared by
+ * the drafting route and the studio panel so the API and the page can never
+ * report different gains for the same pair.
+ */
+export type TailoringGain = {
+  /** The master résumé against this role, or null when there is no master. */
+  before: number | null;
+  /** The tailored draft against the same role. */
+  after: number;
+  /**
+   * after − before, or null when there is nothing to compare against.
+   *
+   * Null rather than the raw score, because "there is no master" and "the
+   * master scored zero" are different facts and a caller that treats an absent
+   * comparison as a rise from nothing reports a gain that did not happen.
+   */
+  gain: number | null;
+};
+
+export function tailoringGain(
+  masterText: string | null | undefined,
+  draftText: string,
+  analysis: RuleAnalysis | null,
+): TailoringGain {
+  const after = scoreAts(draftText, analysis).score;
+  const master = (masterText ?? "").trim();
+  if (!master) return { before: null, after, gain: null };
+
+  const before = scoreAts(master, analysis).score;
+  return { before, after, gain: after - before };
+}

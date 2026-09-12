@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { atsVerdict, scoreAts } from "@/lib/resume/ats";
+import { atsVerdict, scoreAts, tailoringGain } from "@/lib/resume/ats";
 import { unfilledBlanks } from "@/lib/resume/bullet-rewrite";
 import { renderResumeText, resumeContentOf, type ResumeContent } from "@/lib/resume/content";
 import { ResumeDocument, type BulletCoach } from "@/components/resume-document";
@@ -85,6 +85,7 @@ export function ResumeStudio({
   hasAnyJobs,
   analysedCount,
   evidenceReady,
+  masterResumeText,
 }: {
   drafts: StudioDraft[];
   /** Roles whose analysis is finished, so a truthful draft can be built. */
@@ -94,6 +95,15 @@ export function ResumeStudio({
   analysedCount: number;
   /** Whether any approved, résumé-safe career fact exists to write from. */
   evidenceReady: boolean;
+  /**
+   * The master résumé as text, when one has been built.
+   *
+   * Here so the studio can answer the question the panel never could: not
+   * "how does this draft read", which it has always shown, but "was tailoring
+   * to this advert worth anything". Both documents are scored against the
+   * same role analysis, so the difference is like-for-like.
+   */
+  masterResumeText: string | null;
 }) {
   const router = useRouter();
   const [openId, setOpenId] = useState<string | null>(drafts[0]?.application.id ?? null);
@@ -410,6 +420,19 @@ export function ResumeStudio({
      * instead of typing into a void.
      */
     const delta = ats.score - scoreAts(storedText, draft.analysis).score;
+
+    /*
+     * What tailoring to this advert was worth.
+     *
+     * The master résumé scored against this role's own requirement vocabulary,
+     * beside the draft written for it. This is the one comparison the panel
+     * could never make: it has always shown how the document in front of you
+     * reads, and never whether aiming it at this advert changed anything.
+     *
+     * Null when there is no master, and that is said rather than shown as a
+     * rise from zero — an absent comparison is not a score of nothing.
+     */
+    const { before: masterScore, gain: tailorGain } = tailoringGain(masterResumeText, text, draft.analysis);
 
     /*
      * The ATS reader works on text and reports positions. renderResumeText
@@ -806,6 +829,24 @@ return (
               </small>
             </div>
           </div>
+
+          {/*
+            * What aiming this at the advert bought, against the same advert.
+            *
+            * Shown only when it is a real comparison — a master exists and the
+            * role has been analysed. Without an analysis both numbers come
+            * from the same handful of format checks and the difference would
+            * be noise dressed as a finding.
+            */}
+          {tailorGain !== null && draft.analysis ? (
+            <p className={`studio-tailor-gain is-${tailorGain > 0 ? "up" : tailorGain < 0 ? "down" : "flat"}`}>
+              {tailorGain > 0
+                ? <>Tailoring to this role is worth <b>+{tailorGain}</b> over your master résumé, which scores {masterScore} here.</>
+                : tailorGain < 0
+                  ? <>This draft reads <b>{tailorGain}</b> against your master résumé, which scores {masterScore} here. Your master may be the better document to send.</>
+                  : <>This draft and your master résumé read the same to this role, both {masterScore}.</>}
+            </p>
+          ) : null}
 
           {/* The single largest gain still available, as one thing to do. */}
           {verdict.lever ? <p className="studio-score-lever">{verdict.lever}</p> : null}

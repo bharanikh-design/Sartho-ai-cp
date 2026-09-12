@@ -2,6 +2,7 @@ import { ProductPageHeader } from "@/components/product-page-header";
 import { ResumeStudio, type StudioDraft, type TailorableRole } from "@/components/resume-studio";
 import { requireUser } from "@/lib/auth";
 import { getJobs } from "@/lib/data/jobs";
+import { renderResumeText, resumeContentOf } from "@/lib/resume/content";
 import type { ApplicationRecord, ResumeVersionRecord } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -21,7 +22,7 @@ export const metadata = constructMetadata("Résumé Studio", "Write tailored ré
 
 export default async function ResumeStudioPage() {
   const { supabase, user } = await requireUser();
-  const [jobs, applicationsResult, approvedResult, versionsResult] = await Promise.all([
+  const [jobs, applicationsResult, approvedResult, versionsResult, masterResult] = await Promise.all([
     getJobs(supabase, user.id),
     supabase
       .from("applications")
@@ -40,6 +41,15 @@ export default async function ResumeStudioPage() {
       .select("*")
       .eq("user_id", user.id)
       .order("version_number", { ascending: false }),
+    /*
+     * The master résumé, so the studio can say what tailoring was worth.
+     *
+     * Its own query rather than two more columns on another select: PostgREST
+     * fails a whole select for one unknown column, and these arrive by a
+     * migration run by hand. Folded in elsewhere, a deployment running ahead
+     * of its schema would lose the page rather than the comparison.
+     */
+    supabase.from("profiles").select("master_resume,master_resume_text").eq("id", user.id).maybeSingle(),
   ]);
 
   if (applicationsResult.error) throw applicationsResult.error;
@@ -72,6 +82,16 @@ export default async function ResumeStudioPage() {
     };
   });
 
+  /*
+   * The master as text, which is all the ATS reader needs. Absent — no master
+   * built, or the migration not run — means the studio shows the draft's score
+   * on its own, exactly as it did before.
+   */
+  const master = masterResult.error
+    ? null
+    : resumeContentOf(masterResult.data?.master_resume, masterResult.data?.master_resume_text ?? null);
+  const masterResumeText = master ? renderResumeText(master) : null;
+
   const draftedJobIds = new Set(applications.map((application) => application.job_id));
   /*
    * Only roles the drafting route will actually accept. Offering a role it
@@ -103,6 +123,7 @@ export default async function ResumeStudioPage() {
         hasAnyJobs={jobs.length > 0}
         analysedCount={analysed.length}
         evidenceReady={(approvedResult.count ?? 0) > 0}
+        masterResumeText={masterResumeText}
       />
     </div>
   );
