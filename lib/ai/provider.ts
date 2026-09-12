@@ -581,6 +581,52 @@ export async function listGeminiModels(apiKey: string): Promise<string[]> {
   }
 }
 
+export type GeminiModelLimit = {
+  name: string;
+  inputTokenLimit: number | null;
+  outputTokenLimit: number | null;
+};
+
+/*
+ * What each Gemini model will actually accept and produce.
+ *
+ * The models endpoint reports both ceilings and listGeminiModels was throwing
+ * them away, so the one number needed to size GEMINI_MAX_OUTPUT_TOKENS — the
+ * limit of the model this deployment is really calling — was only findable by
+ * reading Google's documentation and hoping it matched the model in the
+ * environment variable. It is reported by the API; it should be read from
+ * there.
+ */
+export async function listGeminiModelLimits(apiKey: string): Promise<GeminiModelLimit[]> {
+  try {
+    const response = await fetch(`${AI_ENDPOINTS.GEMINI_BASE}?pageSize=200`, {
+      headers: { "x-goog-api-key": apiKey },
+      signal: AbortSignal.timeout(20_000),
+    });
+    if (!response.ok) return [];
+
+    const body = await response.json() as {
+      models?: Array<{
+        name?: string;
+        supportedGenerationMethods?: string[];
+        inputTokenLimit?: number;
+        outputTokenLimit?: number;
+      }>;
+    };
+    return (body.models ?? [])
+      .filter((model) => model.supportedGenerationMethods?.includes("generateContent"))
+      .map((model) => ({
+        name: (model.name ?? "").replace(/^models\//, ""),
+        inputTokenLimit: model.inputTokenLimit ?? null,
+        outputTokenLimit: model.outputTokenLimit ?? null,
+      }))
+      .filter((model) => model.name.length > 0)
+      .sort((a, b) => a.name.localeCompare(b.name));
+  } catch {
+    return [];
+  }
+}
+
 export type ProviderProbe = {
   name: string;
   envVar: string;
