@@ -2,9 +2,7 @@ import Link from "next/link";
 import { JobAnalyser } from "@/components/job-analyser";
 import { ProductPageHeader } from "@/components/product-page-header";
 import { requireUser } from "@/lib/auth";
-import { getCareerWorkspace } from "@/lib/data/career";
 import { getJobs } from "@/lib/data/jobs";
-import { buildSkillProfile } from "@/lib/matching/skill-profile";
 import { constructMetadata } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
@@ -28,11 +26,13 @@ export const metadata = constructMetadata(
  */
 export default async function AnalyseRolePage() {
   const { supabase, user } = await requireUser();
-  const [workspace, jobs] = await Promise.all([
-    getCareerWorkspace(supabase, user.id),
-    getJobs(supabase, user.id),
-  ]);
-  const skillProfile = buildSkillProfile(workspace.evidence, workspace.roles);
+  /*
+   * Only the pipeline count is read here now. The career workspace was also
+   * fetched, purely to build a skill profile that was handed to JobAnalyser and
+   * never touched — a database round trip and a profile computation on every
+   * load of this page, for a prop nothing read.
+   */
+  const jobs = await getJobs(supabase, user.id);
 
   return (
     <div className="page-stack product-page">
@@ -47,7 +47,7 @@ export default async function AnalyseRolePage() {
         * The list of saved roles is deliberately not repeated here. It has one
         * home, and two places showing the same rows is how they drift.
         */}
-      <JobAnalyser initialJobs={[]} skillProfile={skillProfile} />
+      <JobAnalyser initialJobs={[]} />
 
       <p className="section-subtitle" style={{ textAlign: "center" }}>
         Everything you save appears in <Link href="/applications" className="direction-inline-link">Opportunities</Link>,

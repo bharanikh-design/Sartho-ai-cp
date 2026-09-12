@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import Script from "next/script";
 import localFont from "next/font/local";
 import "./globals.css";
 import "./auth.css";
