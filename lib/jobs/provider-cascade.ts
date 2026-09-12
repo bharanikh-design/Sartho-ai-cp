@@ -55,8 +55,25 @@ export type ProviderCascade = {
   calledLast: (provider: JobSearchProviderName) => boolean;
   /** True once no provider is left worth asking. */
   exhausted: () => boolean;
-  /** Human-readable failures, for the criteria line. Deduplicated by the caller. */
+  /** Human-readable failures. Every one, for the log and the nobody-answered case. */
   errors: string[];
+  /**
+   * The failures that actually cost the person something.
+   *
+   * A provider behind the one that answered can fail all day without changing
+   * a single result — the query was already served by the time it would have
+   * been asked. Reporting those on the page is noise at best: with JSearch
+   * sitting behind SerpApi on a spent RapidAPI allowance, every successful
+   * search would have carried "you have exceeded the MONTHLY quota — upgrade
+   * your plan at rapidapi.com" under its results. That is a vendor's upsell
+   * printed on somebody else's product, for a provider nothing needed.
+   *
+   * A failure ahead of the answering provider is a different matter and is
+   * kept: it means the results came from further down the cascade than they
+   * should have, and Adzuna's blurb where Google's full advert was expected is
+   * something the person should be told about.
+   */
+  errorsThatCostResults: () => string[];
   /** Providers that actually answered, by display name. */
   used: Set<string>;
   /**
@@ -88,6 +105,8 @@ export function createProviderCascade(
   const dead = new Set<JobSearchProviderName>();
   const failures = new Map<JobSearchProviderName, number>();
   const errors: string[] = [];
+  /* Kept beside the message so a failure can be placed in the order later. */
+  const failedAt: Array<{ provider: JobSearchProviderName; message: string }> = [];
   const used = new Set<string>();
   const timeouts = new Map<string, number>();
   let lastCalled = new Set<JobSearchProviderName>();
@@ -100,7 +119,7 @@ export function createProviderCascade(
      */
     if (caught instanceof JobSearchNotConfiguredError) {
       dead.add(provider);
-      errors.push(`${providerLabel(provider)} is not configured.`);
+      record(provider, `${providerLabel(provider)} is not configured.`);
       return;
     }
 
@@ -119,7 +138,29 @@ export function createProviderCascade(
       console.warn(`${label} timed out on a query`);
       return;
     }
-    errors.push(`${providerLabel(provider)}: ${caught instanceof Error ? caught.message : "unknown error"}`);
+    record(provider, `${providerLabel(provider)}: ${caught instanceof Error ? caught.message : "unknown error"}`);
+  }
+
+  function record(provider: JobSearchProviderName, message: string) {
+    errors.push(message);
+    failedAt.push({ provider, message });
+  }
+
+  /*
+   * Where the results came from, as a position in the order. Everything that
+   * failed ahead of it changed what the person got; everything behind it was
+   * never reached.
+   */
+  function errorsThatCostResults(): string[] {
+    const answeredAt = providers.findIndex((provider) => used.has(providerLabel(provider)));
+    if (answeredAt < 0) return [...new Set(errors)];
+    return [
+      ...new Set(
+        failedAt
+          .filter((failure) => providers.indexOf(failure.provider) < answeredAt)
+          .map((failure) => failure.message),
+      ),
+    ];
   }
 
   async function run(query: JobSearchQuery): Promise<JobSearchResult[]> {
@@ -130,7 +171,6 @@ export function createProviderCascade(
       called.add(provider);
       try {
         const results = await search(provider, query);
-        used.add(providerLabel(provider));
         /*
          * A good answer clears the slate. The counter is for a provider that is
          * failing, not for one that has ever failed — otherwise two unrelated
@@ -143,7 +183,21 @@ export function createProviderCascade(
          * JSearch simply carries nothing for this title is exactly when the
          * fallback earns its place.
          */
-        if (results.length) return results;
+        if (!results.length) continue;
+        /*
+         * Counted as used only now that it has supplied something.
+         *
+         * This used to be marked the moment a provider replied without
+         * throwing, empty replies included — and `used` has exactly one
+         * consumer, the "via Google for Jobs + Adzuna" line under the results.
+         * So a provider that carried nothing for any query in the run was
+         * still named as a source of the results on the page, and the one
+         * honest way to ask "did any of this come from Google" gave the wrong
+         * answer. The employer-portal path beside it has always guarded on
+         * results; this now matches it.
+         */
+        used.add(providerLabel(provider));
+        return results;
       } catch (caught) {
         recordFailure(provider, caught);
       }
@@ -157,6 +211,7 @@ export function createProviderCascade(
     calledLast: (provider) => lastCalled.has(provider),
     exhausted: () => providers.every((provider) => dead.has(provider)),
     errors,
+    errorsThatCostResults,
     used,
     timeouts,
   };
