@@ -4,7 +4,7 @@ import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
-import { AUTH_ORIGIN } from "@/lib/site";
+import { AUTH_ORIGIN, isAllowedAuthOrigin, resolveAuthOrigin } from "@/lib/site";
 import sarthoIcon from "@/sartho.png";
 
 /*
@@ -30,7 +30,8 @@ const entryArt =
  * Supabase names the LinkedIn provider "linkedin_oidc"; the bare "linkedin"
  * id is the retired OAuth 2.0 one and is rejected.
  */
-type Provider = "google" | "apple" | "linkedin_oidc";
+const PROVIDERS = ["google", "apple", "linkedin_oidc"] as const;
+type Provider = (typeof PROVIDERS)[number];
 type Mode = "signin" | "reset";
 
 const styles = `
@@ -602,6 +603,16 @@ function friendlyAuthMessage(message: string) {
     return "The provider accepted your account, but Supabase could not complete the secure code exchange. The client secret saved in Supabase does not match this client ID.";
   }
 
+  /*
+   * /auth/callback rewrites this one before it reaches the page, so this branch
+   * is for the copy that never goes through the callback — a failure the
+   * browser client raises on its own.
+   */
+  if (value.includes("code verifier") || value.includes("code_verifier")) {
+    const canonical = AUTH_ORIGIN.replace(/^https?:\/\//, "");
+    return `This sign-in started on a different address than it finished on, so the browser could not prove the round trip was yours. Start again from ${canonical} and it will complete.`;
+  }
+
   return message;
 }
 
@@ -645,6 +656,9 @@ export default function LoginPage() {
       "refresh_token",
       "token_hash",
       "type",
+      // A handoff from another host is mid sign-in too: it leaves for Google
+      // the moment it lands, so a front door here is a door onto nothing.
+      "resume",
     ];
     const query = new URLSearchParams(window.location.search);
     const hash = new URLSearchParams(window.location.hash.replace(/^#/, ""));
@@ -704,6 +718,41 @@ export default function LoginPage() {
     });
   }, [router, supabase]);
 
+  /*
+   * Picks up a sign-in that began on another host.
+   *
+   * signInWithProvider sends the browser here when it cannot finish where it
+   * started, and the click has to survive that move or the user is left staring
+   * at a page that looks exactly like the one they just pressed a button on.
+   * The parameter is cleared from the URL first, so a reload or a back button
+   * never launches a second round trip.
+   */
+  useEffect(() => {
+    const resume = new URLSearchParams(window.location.search).get("resume");
+    if (!resume || !PROVIDERS.includes(resume as Provider)) return;
+
+    const cleaned = new URL(window.location.href);
+    cleaned.searchParams.delete("resume");
+    window.history.replaceState(null, "", cleaned.toString());
+
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setBusy(resume);
+
+    supabase.auth
+      .signInWithOAuth({
+        provider: resume as Provider,
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback?next=/`,
+          queryParams: resume === "google" ? { prompt: "select_account" } : undefined,
+        },
+      })
+      .then(({ error: failure }) => {
+        if (!failure) return;
+        setBusy(null);
+        setError(friendlyAuthMessage(failure.message));
+      });
+  }, [supabase]);
+
   // While the entry screen is up, nothing behind it should be reachable.
   const covered = splash !== "done";
 
@@ -714,15 +763,39 @@ export default function LoginPage() {
     window.setTimeout(() => setSplash("done"), 980);
   }
 
+  /*
+   * Both legs of a sign-in have to run on one origin.
+   *
+   * The redirect target used to be pinned to AUTH_ORIGIN no matter where the
+   * button was pressed. Press it on www.sartho.tech, or on the vercel.app
+   * deployment, and the PKCE code verifier is written into a cookie for that
+   * host while Google returns to the apex, which never receives it — the
+   * callback then fails with "PKCE code verifier not found in storage" and the
+   * user is bounced back here with no way to get past it. Sending the browser
+   * to the canonical origin *before* the round trip starts is the fix; sending
+   * it there afterwards is the bug.
+   */
   async function signInWithProvider(provider: Provider) {
     setBusy(provider);
     setError(null);
     setNotice(null);
 
+    const origin = window.location.origin;
+
+    if (!isAllowedAuthOrigin(origin)) {
+      // Leaves this host entirely, then resumes the same click on the other
+      // side. `resume` is read once on arrival, and the canonical origin is
+      // allowed by definition, so this cannot bounce twice.
+      const handoff = new URL("/login", resolveAuthOrigin(origin));
+      handoff.searchParams.set("resume", provider);
+      window.location.replace(handoff.toString());
+      return;
+    }
+
     const { error: failure } = await supabase.auth.signInWithOAuth({
       provider,
-      options: { 
-        redirectTo: `${AUTH_ORIGIN}/auth/callback?next=/`,
+      options: {
+        redirectTo: `${origin}/auth/callback?next=/`,
         queryParams: provider === "google" ? { prompt: "select_account" } : undefined,
       },
     });
@@ -740,8 +813,10 @@ export default function LoginPage() {
 
     if (mode === "reset") {
       setBusy("reset");
+      // Same rule as OAuth: the recovery link has to land back on the origin
+      // that asked for it, or the session it carries is exchanged nowhere.
       const { error: failure } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${AUTH_ORIGIN}/auth/callback?next=/update-password`,
+        redirectTo: `${resolveAuthOrigin(window.location.origin)}/auth/callback?next=/update-password`,
       });
       setBusy(null);
       if (failure) setError(friendlyAuthMessage(failure.message));
