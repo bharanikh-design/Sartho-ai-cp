@@ -1,5 +1,4 @@
 import { countryName } from "@/lib/jobs/countries";
-import { employmentQueryHints } from "@/lib/jobs/employment-types";
 import type { JobSearchQuery, JobSearchResult } from "@/lib/jobs/search-provider";
 
 /*
@@ -43,28 +42,31 @@ export function buildSerpApiParams(query: JobSearchQuery, apiKey: string): URLSe
   if (query.employer?.trim()) text = `${text} ${query.employer.trim()}`;
 
   /*
-   * Employment type rides in the query text, because SerpApi cannot filter it.
+   * Nothing about employment type goes into the query. It is read back off the
+   * results instead, in keepScheduleTypes below.
    *
-   * This was a `chips` parameter built by hand — `employment_type:FULLTIME`,
-   * the vocabulary JSearch uses — on the reasoning that both providers read
-   * the same Google index so both must filter it the same way. They do not.
-   * A chip is an opaque token Google mints for one particular search and
-   * returns in that response's own filters; it is not a value a caller gets to
-   * compose. Google answered a chip it had never issued the way it answers any
-   * unrecognised filter: with nothing at all.
+   * This has now been wrong twice, in opposite directions, and both times the
+   * whole search returned nothing.
    *
-   * The cost of that was a whole search. The diagnostics probe asks a query
-   * with no employment filter, so it came back with ten results and SerpApi
-   * looked healthy — while every real search, which is filtered to Full-time,
-   * set a chip and got "Google hasn't returned any results for this query".
-   * The provider was working perfectly and answering nothing.
+   * First it was a `chips` parameter built by hand — `employment_type:FULLTIME`,
+   * the vocabulary JSearch uses. But a chip is an opaque token Google mints for
+   * one particular search and hands back in that response; it cannot be
+   * composed by a caller, and a chip Google never issued returns nothing.
    *
-   * Google's free text handles "full time" well, so the selection still
-   * narrows the search; it is a hint rather than a filter, and canFilter says
-   * so, which is what makes the UI tell the truth about it.
+   * Then it was the words "full time" appended to the query, on the reasoning
+   * that Google's free text would handle them. It does handle them — as words
+   * it expects to find. "Servicenow Delivery Director full time" is a four-term
+   * match against a title that is rare to begin with, and Google answered it
+   * exactly as it had answered the bad chip: "Google hasn't returned any
+   * results for this query".
+   *
+   * The lesson both times is that this is a search engine over job titles, and
+   * every term added to a query is a term that must be matched. Employment
+   * type is not a title, so it does not belong in one. Google already reports
+   * each listing's schedule_type, so the filter belongs after the results, not
+   * before them — where it is a real filter rather than a hint, and costs the
+   * query nothing.
    */
-  const hints = employmentQueryHints(query.employmentTypes ?? [], "serpapi");
-  if (hints.length && !query.earlyCareerOnly) text = `${text} ${hints.join(" ")}`;
 
   const params = new URLSearchParams({
     engine: "google_jobs",
@@ -184,6 +186,40 @@ export function extractSerpApiJobs(body: unknown): SerpApiJob[] {
   return Array.isArray(payload.jobs_results) ? (payload.jobs_results as SerpApiJob[]) : [];
 }
 
+/*
+ * Google's own word for the listing's working pattern, as it reports it:
+ * "Full-time", "Part-time", "Contractor", "Internship". Matched loosely
+ * because the spelling varies by market and a hyphen should not lose a job.
+ */
+const SCHEDULE_WORDS: Record<string, string[]> = {
+  "Full-time": ["full time", "fulltime", "permanent"],
+  "Part-time": ["part time", "parttime"],
+  Contract: ["contract", "contractor", "temporary", "temp"],
+  Permanent: ["permanent", "full time", "fulltime"],
+  Internship: ["intern", "internship"],
+  "Graduate programme": ["intern", "internship", "graduate"],
+};
+
+/**
+ * Keep only the listings whose reported schedule matches what was asked for.
+ *
+ * A listing Google says nothing about is kept. Most of them say nothing, and
+ * dropping a job because its advert omitted a field would throw away more than
+ * the filter could ever be worth — the same reasoning as reporting how many
+ * adverts the years filter could actually read, rather than implying it read
+ * them all.
+ */
+export function keepScheduleTypes(jobs: SerpApiJob[], selected: string[]): SerpApiJob[] {
+  const wanted = selected.flatMap((id) => SCHEDULE_WORDS[id] ?? []);
+  if (!wanted.length) return jobs;
+
+  return jobs.filter((job) => {
+    const schedule = (job.detected_extensions?.schedule_type ?? "").toLowerCase().replace(/[\s-]+/g, " ").trim();
+    if (!schedule) return true;
+    return wanted.some((word) => schedule.includes(word));
+  });
+}
+
 export async function searchSerpApi(query: JobSearchQuery): Promise<JobSearchResult[]> {
   const config = serpApiConfig();
   if (!config) throw new Error("SerpApi is not configured.");
@@ -211,7 +247,15 @@ export async function searchSerpApi(query: JobSearchQuery): Promise<JobSearchRes
     throw new Error(`SerpApi returned a non-JSON response (${response.status}).`);
   }
 
-  return extractSerpApiJobs(body)
+  /*
+   * Filtered after the fact, and not on the early-career pass: a full-time
+   * filter and a request for internships cancel each other out, which is the
+   * same reason Adzuna's flags are dropped there.
+   */
+  const jobs = extractSerpApiJobs(body);
+  const kept = query.earlyCareerOnly ? jobs : keepScheduleTypes(jobs, query.employmentTypes ?? []);
+
+  return kept
     .map(mapSerpApiResult)
     .filter((item): item is JobSearchResult => item !== null);
 }

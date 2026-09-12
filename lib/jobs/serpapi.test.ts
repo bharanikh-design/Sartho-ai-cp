@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { buildSerpApiParams, extractSerpApiJobs, mapSerpApiResult, readSerpApiPlatforms, serpApiConfig } from "./serpapi";
+import { keepScheduleTypes, buildSerpApiParams, extractSerpApiJobs, mapSerpApiResult, readSerpApiPlatforms, serpApiConfig } from "./serpapi";
 
 const advert = {
   title: "ServiceNow Engagement Manager",
@@ -56,14 +56,17 @@ describe("buildSerpApiParams", () => {
   });
 
   /*
-   * The bug this file was written with, and the one that cost a whole search.
+   * Employment type has been wrong here twice, in opposite directions, and
+   * both times the whole search returned nothing.
    *
-   * A chip is an opaque token Google mints for one particular search and hands
-   * back in that response. It cannot be composed by a caller, and a chip Google
-   * never issued returns nothing rather than an error — so every real search,
-   * which is filtered to Full-time, got "Google hasn't returned any results for
-   * this query" while the probe, which sets no filter, returned ten results and
-   * made the provider look healthy.
+   * First a hand-built chips parameter, which Google answers with nothing
+   * because a chip is a token it mints rather than one a caller composes.
+   * Then the words "full time" appended to the query, which Google matches as
+   * words it expects to find — turning a rare title into an even rarer
+   * four-term match and returning nothing again.
+   *
+   * Nothing about employment type goes into the query now. It is read back off
+   * the results instead.
    */
   it("never sends a hand-built chip", () => {
     const params = buildSerpApiParams(
@@ -74,44 +77,29 @@ describe("buildSerpApiParams", () => {
     expect(params.toString()).not.toContain("employment_type");
   });
 
-  it("puts the employment type in the query text where Google can read it", () => {
+  it("keeps the query to the title, with no employment words added", () => {
     const params = buildSerpApiParams(
-      { keywords: "Engagement Manager", country: "sg", employmentTypes: ["Full-time"] },
+      { keywords: "ServiceNow Delivery Director", country: "sg", employmentTypes: ["Full-time"] },
       "key",
     );
-    expect(params.get("q")).toBe("Engagement Manager full time");
+    expect(params.get("q")).toBe("ServiceNow Delivery Director");
   });
 
-  it("carries several selections", () => {
+  it("adds nothing for several selections either", () => {
     const params = buildSerpApiParams(
       { keywords: "Analyst", country: "sg", employmentTypes: ["Full-time", "Contract"] },
       "key",
     );
-    expect(params.get("q")).toContain("full time");
-    expect(params.get("q")).toContain("contract");
-  });
-
-  /* A full-time hint and a request for internships cancel each other out. */
-  it("drops the type hint on the early-career pass", () => {
-    const params = buildSerpApiParams(
-      { keywords: "Analyst", country: "sg", employmentTypes: ["Full-time"], earlyCareerOnly: true },
-      "key",
-    );
     expect(params.get("q")).toBe("Analyst");
   });
 
-  it("leaves the query alone when nothing was selected", () => {
-    const params = buildSerpApiParams({ keywords: "Analyst", country: "sg" }, "key");
-    expect(params.get("q")).toBe("Analyst");
-  });
-
-  /* Employer and type together, in the order a person would type them. */
-  it("keeps the employer alongside the type hint", () => {
+  /* Employer still rides in the query, because an employer is part of a search. */
+  it("keeps the employer", () => {
     const params = buildSerpApiParams(
       { keywords: "Engagement Manager", country: "sg", employer: "Accenture", employmentTypes: ["Full-time"] },
       "key",
     );
-    expect(params.get("q")).toBe("Engagement Manager Accenture full time");
+    expect(params.get("q")).toBe("Engagement Manager Accenture");
   });
 });
 
@@ -189,5 +177,50 @@ describe("extractSerpApiJobs", () => {
     expect(extractSerpApiJobs({ jobs_results: [] })).toEqual([]);
     expect(extractSerpApiJobs({})).toEqual([]);
     expect(extractSerpApiJobs(null)).toEqual([]);
+  });
+});
+
+/*
+ * Employment type as a real filter rather than a hint: read off what Google
+ * says about each listing, after the results are back, where it costs the
+ * query nothing.
+ */
+describe("keepScheduleTypes", () => {
+  const job = (schedule?: string) => ({
+    title: "Engagement Manager",
+    description: "A role.",
+    ...(schedule ? { detected_extensions: { schedule_type: schedule } } : {}),
+  });
+
+  it("keeps the listings matching what was asked for", () => {
+    const kept = keepScheduleTypes([job("Full-time"), job("Contractor")], ["Full-time"]);
+    expect(kept).toHaveLength(1);
+    expect(kept[0].detected_extensions?.schedule_type).toBe("Full-time");
+  });
+
+  it("does not mind how the market spells it", () => {
+    expect(keepScheduleTypes([job("Full time"), job("FULLTIME")], ["Full-time"])).toHaveLength(2);
+  });
+
+  /*
+   * Most adverts say nothing about this, and dropping a job because its
+   * listing omitted a field would throw away far more than the filter is
+   * worth.
+   */
+  it("keeps a listing Google said nothing about", () => {
+    expect(keepScheduleTypes([job()], ["Full-time"])).toHaveLength(1);
+    expect(keepScheduleTypes([job("")], ["Full-time"])).toHaveLength(1);
+  });
+
+  it("keeps everything when nothing was selected", () => {
+    expect(keepScheduleTypes([job("Contractor"), job("Full-time")], [])).toHaveLength(2);
+  });
+
+  it("takes several selections together", () => {
+    expect(keepScheduleTypes([job("Full-time"), job("Contractor"), job("Internship")], ["Full-time", "Contract"])).toHaveLength(2);
+  });
+
+  it("ignores a selection it has no words for", () => {
+    expect(keepScheduleTypes([job("Full-time")], ["Something else"])).toHaveLength(1);
   });
 });
