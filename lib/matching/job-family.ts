@@ -44,6 +44,8 @@ export const JOB_FAMILIES: JobFamily[] = [
     id: "Analysis",
     titles: [
       "business analyst", "business analysis", "systems analyst", "process analyst",
+      "business process analyst", "business process architect", "process architect",
+      "business process lead", "business process manager",
       "requirements analyst", "functional analyst", "business systems analyst",
       "operations analyst", "insights analyst", "research analyst", "reporting analyst",
       "business intelligence analyst", "bi analyst", "analyst",
@@ -62,7 +64,8 @@ export const JOB_FAMILIES: JobFamily[] = [
     titles: [
       "consultant", "management consultant", "strategy consultant", "technology consultant",
       "associate consultant", "engagement manager", "advisory", "advisor", "adviser",
-      "principal consultant", "practice lead", "strategist", "strategy manager",
+      "principal consultant", "practice lead", "practice director", "practice manager",
+      "practice head", "delivery principal", "strategist", "strategy manager",
     ],
   },
   {
@@ -83,8 +86,10 @@ export const JOB_FAMILIES: JobFamily[] = [
     id: "Project delivery",
     titles: [
       "project manager", "programme manager", "program manager", "project coordinator",
-      "delivery manager", "scrum master", "agile coach", "pmo analyst", "pmo",
+      "delivery manager", "delivery lead", "delivery director", "delivery head",
+      "scrum master", "agile coach", "pmo analyst", "pmo",
       "project analyst", "portfolio manager", "implementation manager",
+      "implementation lead", "deployment manager", "rollout manager",
     ],
   },
   {
@@ -104,15 +109,52 @@ export const JOB_FAMILIES: JobFamily[] = [
       "technical architect", "devops engineer", "platform engineer", "site reliability",
       "cloud engineer", "systems engineer", "qa engineer", "test engineer",
       "automation engineer", "test analyst", "quality analyst",
+      /*
+       * The ServiceNow build roles sit here, with the other build roles, and
+       * not beside ServiceNow delivery leadership in IT operations. They are
+       * the same platform and a different job, and the distinction is load
+       * bearing: it is what keeps a hands-on developer advert out of a
+       * delivery director's search while "ServiceNow" itself is recognised
+       * everywhere else.
+       */
+      "servicenow developer", "servicenow engineer", "servicenow administrator",
+      "servicenow technical consultant",
     ],
   },
   {
+    /*
+     * Service management, which is the line of work this product was built
+     * around and which its own classifier could not see.
+     *
+     * "ServiceNow" appeared nowhere in this file. A person whose target roles
+     * read "ServiceNow Business Process Architect" and "ServiceNow Delivery
+     * Director" had both classified as nothing at all, so neither contributed
+     * to their reach — and "IT Service Delivery Manager", the most obvious
+     * adjacent role they could be shown, came back hidden as "a different line
+     * of work". The search was refusing to show a ServiceNow professional
+     * ServiceNow jobs.
+     *
+     * The platform names are here deliberately. A title is what it says in the
+     * wild, and in this market it says ServiceNow, ITSM and service management
+     * far more often than it says "it operations".
+     */
     id: "IT operations",
     titles: [
       "service desk", "help desk", "helpdesk", "it support", "desktop support",
       "system administrator", "systems administrator", "network engineer",
       "infrastructure engineer", "it operations", "service delivery manager",
+      "service delivery lead", "service delivery director", "service delivery head",
       "incident manager", "problem manager", "it analyst",
+      "servicenow", "service now", "servicenow consultant",
+      "servicenow architect", "servicenow platform owner",
+      "servicenow delivery director", "servicenow delivery lead",
+      "servicenow delivery manager", "servicenow process owner",
+      "itsm", "itsm lead", "itsm manager", "itsm consultant", "itsm architect",
+      "it service management", "service management", "service management lead",
+      "service management manager", "service manager", "service owner",
+      "itil", "itom", "itbm", "cmdb", "configuration manager",
+      "major incident manager", "change enablement", "release manager",
+      "platform owner", "platform manager",
     ],
   },
   {
@@ -392,11 +434,40 @@ export function reachFrom(heldTitles: string[], targetTitles: string[]): string[
   return [...(targeted.size ? targeted : familiesOf(heldTitles))];
 }
 
+/**
+ * The titles this table has no opinion about.
+ *
+ * Worth asking, because a target role that classifies as nothing contributes
+ * nothing to the reach — silently. Somebody aiming at "ServiceNow Business
+ * Process Architect" and "ServiceNow Delivery Director" had both fall through
+ * and never learned that their search had been narrowed to the three roles the
+ * table happened to recognise.
+ */
+export function unclassifiedTitles(titles: string[]): string[] {
+  return titles.map((title) => title.trim()).filter((title) => title && !familyOfTitle(title));
+}
+
 export function familyFit(jobTitle: string, heldTitles: string[], targetTitles: string[] = []): FamilyFit {
   const jobFamily = familyOfTitle(jobTitle);
   const candidateFamilies = reachFrom(heldTitles, targetTitles);
 
   if (!jobFamily || !candidateFamilies.length) {
+    return { jobFamily, candidateFamilies, withinReach: true, reason: null };
+  }
+
+  /*
+   * A reach built from only some of somebody's target roles is not a reach, it
+   * is a guess — and hiding on a guess is what produced the failure this whole
+   * change exists for. So when any target role fell through the table, the
+   * filter stands down and nothing is hidden on family alone.
+   *
+   * This is not a workaround for a thin vocabulary. However many titles are
+   * added, somebody's specialism will eventually not be among them, and the
+   * right behaviour then is to show them the roles and say the picture is
+   * incomplete — never to quietly decide they work somewhere else. Showing one
+   * irrelevant advert costs a glance; hiding the job they wanted costs the job.
+   */
+  if (targetTitles.length && unclassifiedTitles(targetTitles).length) {
     return { jobFamily, candidateFamilies, withinReach: true, reason: null };
   }
 

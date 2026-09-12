@@ -14,7 +14,7 @@ import {
   yearsForSeniority,
   type ExperienceBandId,
 } from "@/lib/jobs/experience";
-import { familyFit, reachFrom } from "@/lib/matching/job-family";
+import { familyFit, reachFrom, unclassifiedTitles } from "@/lib/matching/job-family";
 import { demandsMoreExperience, requiredExperienceIn } from "@/lib/matching/required-experience";
 import { fetchAdvertText } from "@/lib/jobs/advert-text";
 import { scoreOpportunity } from "@/lib/matching/opportunity-score";
@@ -136,6 +136,16 @@ export type SearchCriteria = {
   advertsRead: number;
   /** Roles dropped as a different line of work, and the families kept. */
   offFamily: number;
+  /**
+   * Target roles the family table could not place.
+   *
+   * Reported because an unrecognised target role used to narrow somebody's
+   * search in silence: it contributed nothing to their reach, and the roles it
+   * would have unlocked were hidden as a different line of work. The filter
+   * now stands down when this is non-empty, and saying which titles fell
+   * through is what lets a person fix it.
+   */
+  unrecognisedTargets?: string[];
   /** Dropped as belonging to another country's market. */
   offMarket?: number;
   families: string[];
@@ -834,6 +844,7 @@ export async function runBriefSearch(
     earlyCareerPass,
     advertsRead,
     offFamily,
+    unrecognisedTargets: unclassifiedTitles(roleNames).length ? unclassifiedTitles(roleNames) : undefined,
     offMarket,
     families: reachFrom(heldTitles, roleNames),
     countryName: countryLabel,

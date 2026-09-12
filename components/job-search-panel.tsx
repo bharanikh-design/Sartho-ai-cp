@@ -401,6 +401,21 @@ export function JobSearchPanel({
             </>
           ) : null}
           {/*
+            * A target role Sartho could not place.
+            *
+            * It used to narrow the search in silence: the title contributed
+            * nothing to the reach, and the roles it should have unlocked were
+            * hidden as a different line of work. Nothing is hidden on family
+            * while this is showing, so the sentence explains both what Sartho
+            * did not understand and why the list is wider than usual.
+            */}
+          {criteria.unrecognisedTargets?.length ? (
+            <span style={{ color: "#e0b061" }}>
+              {" "}· Sartho does not recognise {criteria.unrecognisedTargets.map((title) => `"${title}"`).join(" or ")} as
+              {" "}a line of work, so nothing was filtered out for being one
+            </span>
+          ) : null}
+          {/*
             * The location guard, for the same reason as the two above it. It
             * dropped matches without counting them, so an aggregator
             * misindexing a whole batch of overseas postings into this market

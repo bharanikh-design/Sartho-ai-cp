@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   FAMILY_EDGES,
+  unclassifiedTitles,
   JOB_FAMILIES,
   adjacentFamilies,
   familiesOf,
@@ -183,8 +184,14 @@ describe("every target role counts toward reach, not just the first few", () => 
   const held = ["ServiceNow Business Process SME", "Senior Engagement Manager"];
 
   it("reaches IT operations from the whole brief but not from its first three roles", () => {
-    expect(reachFrom(held, brief.slice(0, 3))).toEqual(["Consulting"]);
+    /*
+     * Stated as what the two reaches contain rather than as the exact list.
+     * The exact list is a property of the title vocabulary, which grows — this
+     * test is about truncation, and pinning the vocabulary here only made it
+     * fail the next time a title was learned.
+     */
     expect(reachFrom(held, brief)).toEqual(expect.arrayContaining(["Consulting", "Change", "Project delivery"]));
+    expect(reachFrom(held, brief.slice(0, 3)).length).toBeLessThan(reachFrom(held, brief).length);
 
     expect(reachableFamilies(reachFrom(held, brief.slice(0, 3))).has("IT operations")).toBe(false);
     expect(reachableFamilies(reachFrom(held, brief)).has("IT operations")).toBe(true);
@@ -201,5 +208,96 @@ describe("every target role counts toward reach, not just the first few", () => 
   /* Still a different job: these are hands-on build roles, not delivery leadership. */
   it("still turns down a hands-on engineering role", () => {
     expect(familyFit("ServiceNow Developer", held, brief).withinReach).toBe(false);
+  });
+});
+
+/*
+ * The failure this vocabulary was extended for, kept as the exact case.
+ *
+ * A person whose target roles were Engagement Manager, ServiceNow Business
+ * Process Architect, Practice Lead, ServiceNow Delivery Director and ITSM
+ * Transformation Manager ran a nationwide Singapore search and got one role,
+ * with five hidden as "a different line of work from Consulting, Change,
+ * Project delivery". The word "ServiceNow" appeared nowhere in this file, so
+ * two of their five target roles classified as nothing, contributed nothing to
+ * their reach, and the search then hid the service-management jobs they were
+ * asking for.
+ */
+describe("a ServiceNow and ITSM career", () => {
+  const TARGETS = [
+    "Engagement Manager",
+    "ServiceNow Business Process Architect",
+    "Practice Lead",
+    "ServiceNow Delivery Director",
+    "ITSM Transformation Manager",
+  ];
+
+  it("recognises every one of those target roles", () => {
+    expect(unclassifiedTitles(TARGETS)).toEqual([]);
+  });
+
+  it("reaches service management from them", () => {
+    expect(reachFrom([], TARGETS)).toContain("IT operations");
+  });
+
+  it.each([
+    "ServiceNow Developer",
+    "ServiceNow Technical Consultant",
+    "ServiceNow Platform Architect",
+    "ITSM Process Manager",
+    "Service Management Lead",
+    "IT Service Delivery Manager",
+    "Major Incident Manager",
+    "Release Manager",
+  ])("shows them %j", (title) => {
+    expect(familyFit(title, [], TARGETS).withinReach).toBe(true);
+  });
+
+  /*
+   * The filter still does the job it was built for. A gym's membership-sales
+   * advert reaching an analyst is the case that created this file, and
+   * widening the vocabulary must not undo it.
+   */
+  it.each(["Retail Sales Assistant", "Gym Membership Consultant"])("still hides %j", (title) => {
+    expect(familyFit(title, [], TARGETS).withinReach).toBe(false);
+  });
+});
+
+/*
+ * A reach built from only some of somebody's target roles is a guess, and
+ * hiding on a guess is what produced the failure above. However many titles
+ * this table learns, somebody's specialism will eventually not be among them.
+ */
+describe("when a target role falls through the table", () => {
+  const PARTLY_KNOWN = ["Engagement Manager", "Chief Vibes Officer"];
+
+  it("names the title it could not place", () => {
+    expect(unclassifiedTitles(PARTLY_KNOWN)).toEqual(["Chief Vibes Officer"]);
+  });
+
+  it("hides nothing on family alone", () => {
+    /* Sales is not reachable from Consulting, and is shown anyway. */
+    expect(familyFit("Retail Sales Assistant", [], PARTLY_KNOWN).withinReach).toBe(true);
+  });
+
+  it("still filters when every target role was understood", () => {
+    expect(familyFit("Retail Sales Assistant", [], ["Engagement Manager"]).withinReach).toBe(false);
+  });
+
+  /*
+   * Held titles are not target roles. They are not a deliberate statement
+   * about what somebody wants, so an unrecognised one does not stand the
+   * filter down — otherwise one odd job from years ago disables it for good.
+   */
+  it("is not stood down by an unrecognised held title", () => {
+    expect(familyFit("Retail Sales Assistant", ["Chief Vibes Officer"], ["Engagement Manager"]).withinReach).toBe(false);
+  });
+
+  it("says nothing about a list it understood completely", () => {
+    expect(unclassifiedTitles(["Engagement Manager", "Practice Lead"])).toEqual([]);
+  });
+
+  it("ignores blanks rather than calling them unrecognised", () => {
+    expect(unclassifiedTitles(["Engagement Manager", "  ", ""])).toEqual([]);
   });
 });
