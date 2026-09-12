@@ -43,6 +43,14 @@ export type TailorableRole = {
   employer: string | null;
 };
 
+/*
+ * The master résumé's row id. Not a uuid, so it can never collide with an
+ * application id, and one constant rather than the string "master" repeated —
+ * the save path branches on it and a typo there would silently POST a master
+ * résumé to a job that does not exist.
+ */
+const MASTER_ID = "master-resume";
+
 const stateTone: Record<"pass" | "warn" | "fail", string> = {
   pass: "#6bcf93",
   warn: "#e0b061",
@@ -159,7 +167,15 @@ export function ResumeStudio({
   masterUpdatedAt: string | null;
 }) {
   const router = useRouter();
-  const [openId, setOpenId] = useState<string | null>(drafts[0]?.application.id ?? null);
+  /*
+   * Nothing open on arrival.
+   *
+   * The first draft expanded itself, so the page opened as one document with a
+   * list hidden under it — and after the master card was added it opened as two
+   * documents. A repository's job is to show you what you have; you open the
+   * one you came for.
+   */
+  const [openId, setOpenId] = useState<string | null>(null);
   /* Which saved version is being read, by draft id. Absent means the current one. */
   const [viewing, setViewing] = useState<Record<string, string>>({});
   const [generatingId, setGeneratingId] = useState<string | null>(null);
@@ -257,8 +273,14 @@ export function ResumeStudio({
     setSavingId(draft.application.id);
     setError(null);
     try {
-      const response = await fetch(`/api/jobs/${draft.jobId}/resume/version`, {
-        method: "POST",
+      /*
+       * The master saves over itself; a tailored draft saves a new version.
+       * That is the one genuine difference between them — a master résumé has
+       * no advert to have been version two for.
+       */
+      const isMaster = draft.jobId === MASTER_ID;
+      const response = await fetch(isMaster ? "/api/resume/master" : `/api/jobs/${draft.jobId}/resume/version`, {
+        method: isMaster ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         /*
          * Named on the way in, by the role and the moment.
@@ -268,7 +290,9 @@ export function ResumeStudio({
          * rows that all said "Tailored résumé". The client is the side that
          * knows which role this is.
          */
-        body: JSON.stringify({ content, changes, versionName: resumeVersionName(draft.jobTitle) }),
+        body: isMaster
+          ? JSON.stringify({ content })
+          : JSON.stringify({ content, changes, versionName: resumeVersionName(draft.jobTitle) }),
       });
       const result = await response.json() as { error?: string };
       if (!response.ok) throw new Error(result.error ?? "Sartho could not save this version.");
@@ -938,7 +962,7 @@ return (
             * from the same handful of format checks and the difference would
             * be noise dressed as a finding.
             */}
-          {tailorGain !== null && draft.analysis ? (
+          {tailorGain !== null && draft.analysis && draft.jobId !== MASTER_ID ? (
             <p className={`studio-tailor-gain is-${tailorGain > 0 ? "up" : tailorGain < 0 ? "down" : "flat"}`}>
               {tailorGain > 0
                 ? <>Tailoring to this role is worth <b>+{tailorGain}</b> over your master résumé, which scores {masterScore} here.</>
@@ -1085,12 +1109,55 @@ return (
   }));
 
   /*
-   * Said as a date rather than "Saved", because the only question anybody has
-   * about a master résumé is whether it still reflects them.
+   * The master résumé as a row in the list, not a card above it.
+   *
+   * It had a section of its own, permanently expanded, read-only, sitting on
+   * top of the drafts — so the page said "here is a document you cannot edit"
+   * before it said "here are your résumés", and the master obeyed different
+   * rules from everything below it.
+   *
+   * It is a résumé. It belongs in the list of résumés, opening in the same
+   * window, with the same template picker, the same editor and the same
+   * actions. The synthetic application row is what lets renderWorkspace treat
+   * it identically rather than growing a second code path — and a second code
+   * path is exactly how the two drifted apart in the first place.
    */
-  const masterUpdatedLabel = masterUpdatedAt
-    ? `Built ${new Date(masterUpdatedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}`
-    : "Built from your approved evidence";
+  const masterDraft: StudioDraft | null = master
+    ? {
+        application: {
+          id: MASTER_ID,
+          user_id: "",
+          job_id: MASTER_ID,
+          status: "saved",
+          resume_version: "Master résumé",
+          resume_draft: masterResumeText,
+          resume_content: master,
+          resume_change_log: [],
+          resume_evidence_ids: [],
+          resume_generated_at: masterUpdatedAt,
+          outcome_stage: null,
+          outcome_reason: null,
+          outcome_note: null,
+          outcome_recorded_at: null,
+          cover_note: null,
+          submitted_at: null,
+          confirmation_reference: null,
+          next_action: null,
+          next_action_date: null,
+          created_at: masterUpdatedAt ?? "",
+          updated_at: masterUpdatedAt ?? "",
+        } as ApplicationRecord,
+        jobId: MASTER_ID,
+        jobTitle: "Master résumé",
+        employer: null,
+        /* No advert, so no requirement vocabulary to score against. */
+        analysis: null,
+        history: [],
+      }
+    : null;
+
+  /* One list. The master first, because every tailored version comes off it. */
+  const allDrafts: StudioDraft[] = masterDraft ? [masterDraft, ...drafts] : drafts;
 
   const canBuild = evidenceReady && tailorable.length > 0;
 
@@ -1116,66 +1183,25 @@ return (
     <>
       {error ? <div className="inline-error" role="alert">{error}</div> : null}
 
-      {/*
-        * The master résumé, which had nowhere to be read.
-        *
-        * It was built by a button, written to profiles.master_resume, loaded by
-        * this page — and used for exactly one thing: scoring a tailored draft
-        * against it. Somebody pressed "Build master résumé", a spinner stopped,
-        * and there was no page anywhere in the product showing what had been
-        * built. The one document that is the source of every other one was the
-        * only one you could not look at.
-        *
-        * It sits above the tailored drafts because that is the order the work
-        * happens in: the master is written once and the role-specific versions
-        * come off it.
-        */}
-      {master ? (
-        <section className="glass-card content-card" id="master">
-          <div className="card-header">
-            <div>
-              <h2 className="section-heading">Your master résumé</h2>
-              <p className="section-subtitle">
-                Everything you can evidence, aimed at no particular advert. Every tailored draft below starts from this.
-              </p>
-            </div>
-            <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-              <button
-                type="button"
-                className="secondary-button"
-                onClick={generateMaster}
-                disabled={generatingId === "master"}
-                style={{ padding: "4px 10px", fontSize: "11px" }}
-              >
-                {generatingId === "master" ? "Rebuilding…" : "Rebuild"}
-              </button>
-              <span className="meta-pill">{masterUpdatedLabel}</span>
-            </div>
-          </div>
-
-          <div className="studio-master-body">
-            <ResumeDocument content={master} onChange={() => {}} weakBulletIds={new Set()} readOnly />
-          </div>
-        </section>
-      ) : null}
-
       <section className="glass-card content-card" id="drafts">
         <div className="card-header">
           <div>
             <h2 className="section-heading">Your résumés</h2>
-            <p className="section-subtitle">Each draft is built only from evidence you approved. Every version is kept, so you can compare and go back.</p>
+            <p className="section-subtitle">
+              Your master and every version written for a role, newest work first. Open one to edit it — they all open the same way.
+            </p>
           </div>
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             <button type="button" className="secondary-button" onClick={generateMaster} disabled={generatingId === "master"} style={{ padding: "4px 8px", fontSize: "11px" }}>
               {generatingId === "master" ? "Building..." : "+ Master Résumé"}
             </button>
-            <span className="meta-pill">{drafts.length} draft{drafts.length === 1 ? "" : "s"}</span>
+            <span className="meta-pill">{allDrafts.length} résumé{allDrafts.length === 1 ? "" : "s"}</span>
           </div>
         </div>
 
-        {drafts.length ? (
+        {allDrafts.length ? (
           <div className="studio-draft-list">
-            {drafts.map((draft) => {
+            {allDrafts.map((draft) => {
               const open = openId === draft.application.id;
               /* The collapsed row shows the current version's score, never a draft edit. */
               const currentAts = scoreAts(draft.application.resume_draft ?? "", draft.analysis);
@@ -1189,11 +1215,26 @@ return (
                       aria-expanded={open}
                     >
                       <span className="studio-draft-name">
-                        <strong>{draft.application.resume_version ?? draft.jobTitle}</strong>
+                        <strong>
+                          {draft.application.resume_version ?? draft.jobTitle}
+                          {draft.jobId === MASTER_ID ? <em className="studio-draft-badge">Master</em> : null}
+                        </strong>
+                        {/*
+                          * What each row is, in its own terms. A master résumé
+                          * has no employer and no change log, so printing
+                          * "Employer not recorded · 0 changes logged" under it
+                          * was three facts about a document of a different kind.
+                          */}
                         <small>
-                          {draft.employer ?? "Employer not recorded"}
-                          {draft.history.length > 1 ? <> · {draft.history.length} versions</> : null}
-                          {" · "}{draft.application.resume_change_log.length} changes logged
+                          {draft.jobId === MASTER_ID ? (
+                            <>Everything you can evidence · every tailored version starts here</>
+                          ) : (
+                            <>
+                              {draft.employer ?? "Employer not recorded"}
+                              {draft.history.length > 1 ? <> · {draft.history.length} versions</> : null}
+                              {" · "}{draft.application.resume_change_log.length} changes logged
+                            </>
+                          )}
                         </small>
                       </span>
                       <span className="studio-ats-badge" style={{ color: stateTone[currentAts.score >= 70 ? "pass" : currentAts.score >= 40 ? "warn" : "fail"] }}>

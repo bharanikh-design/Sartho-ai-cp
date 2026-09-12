@@ -5,6 +5,7 @@ import { aiQuotaResponse, checkAiQuota } from "@/lib/ai/quota";
 import { getAuthenticatedUser } from "@/lib/auth";
 import {
   evidenceIdsIn,
+  parseResumeContent,
   renderResumeText,
   type ResumeBullet,
   type ResumeContent,
@@ -230,4 +231,49 @@ export async function POST() {
       : "Sartho could not build your master résumé. Your evidence is unchanged.";
     return NextResponse.json({ error: message }, { status: 500 });
   }
+}
+
+/*
+ * Saving an edited master résumé.
+ *
+ * The master is a résumé like any other: it opens in the same editor as every
+ * tailored draft, so it has to save like one. Without this it was the only
+ * document in the product you could open, change, and not keep — which is what
+ * made it feel like a read-only artefact rather than the source document it is.
+ *
+ * No AI, no evidence check, no grounding pass. This is a person editing their
+ * own words, and the grounding rules exist to stop a model inventing, not to
+ * stop somebody writing their own sentence.
+ */
+export async function PUT(request: Request) {
+  const { supabase, user } = await getAuthenticatedUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const body = await request.json().catch(() => null) as { content?: unknown } | null;
+  const content = parseResumeContent(body?.content);
+  if (!content) {
+    return NextResponse.json({ error: "Sartho could not read that résumé." }, { status: 400 });
+  }
+
+  const { error: saveError } = await supabase
+    .from("profiles")
+    .update({
+      master_resume: content,
+      master_resume_text: renderResumeText(content),
+      master_resume_updated_at: new Date().toISOString(),
+    })
+    .eq("id", user.id);
+
+  if (isMissingColumn(saveError)) {
+    return NextResponse.json(
+      { error: "This deployment is missing the master_resume columns. The administrator needs to run the 20260912080000_master_resume migration." },
+      { status: 503 },
+    );
+  }
+  if (saveError) {
+    console.error("Saving the master résumé failed", saveError);
+    return NextResponse.json({ error: "Sartho could not save your master résumé." }, { status: 500 });
+  }
+
+  return NextResponse.json({ ok: true });
 }
