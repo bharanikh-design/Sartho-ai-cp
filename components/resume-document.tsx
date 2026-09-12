@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type CSSProperties } from "react";
 import { contactLine, roleDates, roleWhere, type ResumeBullet, type ResumeContact, type ResumeContent, type ResumeRole, type ResumeSection } from "@/lib/resume/content";
+import { resumeTemplate } from "@/lib/resume/templates";
 
 /*
  * The résumé, as a document you can type into.
@@ -297,6 +298,36 @@ const nextId = (prefix: string) => `${prefix}-new-${(added += 1)}`;
  * A line somebody is about to write is theirs, so it starts edited and with no
  * evidence ids. It must never inherit a backing it never had.
  */
+/*
+ * The template's own colours and shape, handed to the stylesheet.
+ *
+ * The on-screen document and the PDF were two descriptions of the same eight
+ * templates that had drifted apart. The stylesheet hardcoded one green — 39
+ * occurrences of #6bcf93 and its relatives — for every template, while the PDF
+ * had teal, navy, blue, orange, brown and grey. So Impact was orange on the
+ * page a person sends and green on the page they edit, and nobody could tell
+ * from the editor what they were choosing.
+ *
+ * Two of the eight had no on-screen styling at all: the sidebar templates
+ * added most recently fell through to the base look, so choosing Innovator
+ * showed a generic document and the teal sidebar existed only in the PDF.
+ *
+ * One source of truth, rendered twice. The tokens come from the same object
+ * the PDF reads, so the two cannot disagree again.
+ */
+function templateTokens(content: ResumeContent) {
+  return resumeTemplate(content.template).pdf;
+}
+
+function templateVars(content: ResumeContent): CSSProperties {
+  const pdf = templateTokens(content);
+  return {
+    "--tpl-accent": pdf.accent,
+    "--tpl-accent-soft": `${pdf.accent}26`,
+    "--tpl-sidebar-width": `${pdf.sidebarWidth ?? 178}px`,
+  } as CSSProperties;
+}
+
 function blankBullet(prefix: string): ResumeBullet {
   return { id: nextId(`${prefix}b`), text: "", evidenceIds: [], edited: true };
 }
@@ -367,7 +398,13 @@ export function ResumeDocument({
   if (readOnly) {
     const contact = contactLine(content.contact);
     return (
-      <article className="resume-doc is-readonly" data-template={content.template} aria-label="Résumé draft">
+      <article
+        className="resume-doc is-readonly"
+        data-template={content.template}
+        data-layout={templateTokens(content).layout}
+        style={templateVars(content)}
+        aria-label="Résumé draft"
+      >
         <header className="resume-doc-identity">
           <h1 className="resume-doc-name">{content.name}</h1>
           {content.targetRole ? <p className="resume-doc-target">{content.targetRole}</p> : null}
@@ -433,7 +470,13 @@ export function ResumeDocument({
   }
 
   return (
-    <article className="resume-doc" data-template={content.template} aria-label="Résumé draft, editable">
+    <article
+      className="resume-doc"
+      data-template={content.template}
+      data-layout={templateTokens(content).layout}
+      style={templateVars(content)}
+      aria-label="Résumé draft, editable"
+    >
       <header className="resume-doc-identity">
         <AutoTextarea
           className="resume-doc-name resume-doc-field"

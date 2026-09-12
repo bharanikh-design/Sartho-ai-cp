@@ -204,3 +204,39 @@ describe("the Word file follows the template", () => {
     expect(await build("editorial")).not.toContain("WORK");
   });
 });
+
+/*
+ * The on-screen document and the PDF are two renderings of one template, and
+ * they had drifted into two different designs: the stylesheet hardcoded one
+ * green for all eight while the PDF had teal, navy, blue, orange, brown and
+ * grey. Impact was orange on the page a person sends and green on the page
+ * they edit.
+ *
+ * Both now read these tokens, so the only way they can disagree again is if a
+ * token stops being readable.
+ */
+describe("one template, rendered twice", () => {
+  it("gives every template an accent the stylesheet can use", () => {
+    for (const template of RESUME_TEMPLATES) {
+      /* Emitted as a CSS custom property, and appended to for the soft tint. */
+      expect(template.pdf.accent).toMatch(/^#[0-9a-f]{6}$/i);
+    }
+  });
+
+  it("gives every sidebar template a width the grid can use", () => {
+    for (const template of RESUME_TEMPLATES.filter((item) => item.pdf.layout === "sidebar")) {
+      expect(Number.isFinite(template.pdf.sidebarWidth)).toBe(true);
+      expect(template.pdf.sidebarWidth ?? 0).toBeGreaterThan(120);
+    }
+  });
+
+  /*
+   * Distinct accents, because the accent is the fastest thing a person reads
+   * off a template chip. Two templates sharing one would be two chips that
+   * look the same.
+   */
+  it("does not give two templates the same accent", () => {
+    const accents = RESUME_TEMPLATES.map((template) => template.pdf.accent.toLowerCase());
+    expect(new Set(accents).size).toBe(accents.length);
+  });
+});
