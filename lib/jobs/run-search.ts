@@ -35,6 +35,7 @@ import {
   isJobSearchConfigured,
   configuredJobSearchProviders,
   defaultJobMarket,
+  providerCallBudgetMs,
   providersForCountry,
   type JobSearchQuery,
   type JobSearchResult,
@@ -183,26 +184,36 @@ export const MIN_STRONG_BEFORE_WIDENING = 3;
  * whether to hide it from a list of twenty is work for nobody.
  */
 /*
- * The wall-clock budget for the query loop.
+ * The wall-clock budget for the query loop, and everything the loop pays for.
  *
- * Twenty-eight seconds against a route that allows sixty, with a plan that can
- * reach thirteen queries once a brief names employers — so two thirds of a
- * search regularly never ran, and the page said "9 queries skipped (time
- * limit)" beside results from one provider. The route's ceiling is raised to
- * match the other AI routes, and this leaves room for the advert reads and the
- * screening pass that follow it.
+ * It was twenty-eight seconds against a route that allows sixty, with a plan
+ * reaching thirteen queries once a brief names employers — so two thirds of a
+ * search regularly never ran and the page said "9 queries skipped (time
+ * limit)" beside results from one provider. Forty-five fixed that against a
+ * provider answering in three and a half seconds.
+ *
+ * SerpApi answers in nearly nine, which is the price of the full advert rather
+ * than a marketing blurb, and it buys back far more than it costs downstream.
+ * But at that rate forty-five seconds is five queries, and five queries is the
+ * thin result set this was all meant to fix.
+ *
+ * Seventy-five is sized against the route's own ceiling of 120 seconds, not
+ * picked for roundness: the advert reads take at most twelve, the screening
+ * pass at most eight, and the writes after them are small — leaving around
+ * thirty seconds of margin under the limit.
  */
-export const DEFAULT_SEARCH_BUDGET_MS = 45_000;
+export const DEFAULT_SEARCH_BUDGET_MS = 75_000;
 
 /*
- * Below this there is no point starting another query.
+ * The longest any single call is given, however much budget is left.
  *
- * A call that cannot finish is worse than one not made: it spends what is left,
- * returns nothing, and counts against the provider that was about to answer.
- * Sized above Google for Jobs' measured response time so the last query of a
- * run is either given a fair chance or not begun at all.
+ * There is no matching floor constant. The floor is whatever the provider at
+ * the front of the live cascade needs, read from providerCallBudgetMs — a
+ * fixed one goes stale the moment the order changes, which is exactly what
+ * happened when SerpApi took the lead: 6,000ms sat comfortably above JSearch's
+ * 3.4 seconds and below SerpApi's 8.7.
  */
-const MIN_AFFORDABLE_CALL_MS = 6_000;
+const MAX_CALL_MS = 15_000;
 
 const MAX_ADVERTS_READ = 24;
 const ADVERT_CONCURRENCY = 6;
@@ -380,18 +391,6 @@ export async function runBriefSearch(
   const budgetMs = options.budgetMs ?? DEFAULT_SEARCH_BUDGET_MS;
   const remainingMs = () => Math.max(0, (startedAt + budgetMs) - Date.now());
 
-  /*
-   * What one provider call may spend, given what is left.
-   *
-   * A fixed timeout is the wrong shape under a whole-search budget, but so is
-   * one whose floor sits below what the provider actually takes. Measured from
-   * the diagnostics probe, Google for Jobs answers a healthy query in about
-   * 3.4 seconds — five times Adzuna — so a floor of three seconds aborted
-   * perfectly good calls late in a run, counted each one as a failure, and
-   * retired the deep provider for the rest of the search. The floor is now
-   * comfortably above that measurement rather than below it.
-   */
-  const callTimeoutMs = () => Math.max(MIN_AFFORDABLE_CALL_MS, Math.min(15_000, Math.round(remainingMs() / 2)));
   const byUrl = new Map<string, JobSearchResult>();
   let queriesRun = 0;
   let queriesSkipped = 0;
@@ -421,14 +420,40 @@ export async function runBriefSearch(
    */
   const cascade = createProviderCascade(providers);
 
+  /*
+   * What one provider call may spend, given what is left.
+   *
+   * A fixed timeout is the wrong shape under a whole-search budget, but so is
+   * one whose floor sits below what the provider actually takes. A floor of
+   * three seconds once aborted perfectly good JSearch calls late in a run,
+   * counted each abort as a failure, retired the deep provider after two, and
+   * finished the search on the shallow one — and raising it to six seconds
+   * only moved the same trap to the next provider, because SerpApi needs
+   * nearly nine.
+   *
+   * So the floor follows the front of the cascade and cannot drift out of step
+   * with the order again. It also falls as providers retire: once the slow
+   * deep provider is dead, the rest of the run is spent on one that answers in
+   * under half a second, and reserving twelve seconds a query for it would
+   * throw away most of what is left.
+   */
+  const leadCallBudgetMs = () => {
+    const lead = providers.find((provider) => !cascade.isDead(provider));
+    return lead ? providerCallBudgetMs(lead) : MAX_CALL_MS;
+  };
+  const callTimeoutMs = () => Math.max(leadCallBudgetMs(), Math.min(MAX_CALL_MS, Math.round(remainingMs() / 2)));
+
   async function run(list: JobSearchQuery[]) {
     for (let index = 0; index < list.length; index++) {
       if (Date.now() - startedAt > budgetMs) { queriesSkipped += list.length - index; break; }
       if (cascade.exhausted()) { queriesSkipped += list.length - index; break; }
       /*
-       * Nothing left to spend on a query that could finish.
+       * Nothing left to spend on a query that could finish. A call that cannot
+       * finish is worse than one not made: it spends what is left, returns
+       * nothing, and counts a failure against the provider that was about to
+       * answer.
        */
-      if (remainingMs() < MIN_AFFORDABLE_CALL_MS) { queriesSkipped += list.length - index; break; }
+      if (remainingMs() < leadCallBudgetMs()) { queriesSkipped += list.length - index; break; }
 
       if (queriesRun > 0) {
         /*
@@ -819,7 +844,15 @@ export async function runBriefSearch(
     roles: [...new Set(queries.filter((query) => !query.earlyCareerOnly).map((query) => query.keywords))],
     remoteOnly: preferences.remotePreferences.length === 1 && preferences.remotePreferences[0] === "Remote",
     providers: Array.from(cascade.used),
-    providerErrors: cascade.errors.length ? [...new Set(cascade.errors)] : undefined,
+    /*
+     * Only the failures that changed what came back. A provider behind the one
+     * that answered was never reached, so its trouble is a server-log fact
+     * rather than a note under somebody's results.
+     */
+    providerErrors: (() => {
+      const costly = cascade.errorsThatCostResults();
+      return costly.length ? costly : undefined;
+    })(),
     employerPortals: employerPortals.length ? employerPortals : undefined,
     providerTimeouts: cascade.timeouts.size
       ? [...cascade.timeouts].map(([name, count]) => ({ name, count }))

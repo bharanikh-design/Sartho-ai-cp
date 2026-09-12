@@ -650,6 +650,33 @@ export function providersForCountry(country: string, configured = configuredJobS
   return configured.filter((provider) => provider !== "adzuna" || adzunaCoversCountry(country));
 }
 
+/*
+ * What one call to this provider needs to have a fair chance, in milliseconds.
+ *
+ * Measured from the diagnostics probe against the live deployment, which asks
+ * all three at once so the figures are comparable rather than one warm and two
+ * cold:
+ *
+ *   SerpApi    8,706ms    Google for Jobs, bought from the vendor
+ *   JSearch    3,436ms    the same index through RapidAPI
+ *   Adzuna       412ms    the shallow fallback
+ *
+ * These exist because a single global floor silently goes stale the moment the
+ * cascade order changes. The floor was 6,000ms — sized comfortably above
+ * JSearch's 3.4 seconds, and below SerpApi's 8.7. So putting the better
+ * provider in front would have aborted it late in every run, counted each
+ * abort as a failure, retired it after two, and quietly finished the search on
+ * Adzuna's blurbs: the exact failure the new provider was bought to end.
+ *
+ * Each figure carries headroom over its measurement rather than sitting on it.
+ * A measurement is one sample of a network.
+ */
+export function providerCallBudgetMs(provider: JobSearchProviderName): number {
+  if (provider === "serpapi") return 12_000;
+  if (provider === "jsearch") return 6_000;
+  return 3_000;
+}
+
 export async function searchWithProvider(
   provider: JobSearchProviderName,
   query: JobSearchQuery,

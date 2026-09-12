@@ -272,3 +272,160 @@ describe("which providers the last query actually reached", () => {
     expect(cascade.calledLast("jsearch")).toBe(true);
   });
 });
+
+/*
+ * A provider behind the one that answered can fail all day without changing a
+ * single result. Reporting it under the person's results is noise — and with
+ * JSearch sitting behind SerpApi on a spent RapidAPI allowance it was worse
+ * than noise: every successful search would have carried "you have exceeded
+ * the MONTHLY quota, upgrade your plan at rapidapi.com" beneath it.
+ */
+describe("which failures are worth telling the person about", () => {
+  const ORDER: JobSearchProviderName[] = ["serpapi", "jsearch", "adzuna"];
+
+  it("says nothing about a provider the answer made unnecessary", async () => {
+    const { search } = recorder({
+      serpapi: async () => [result("https://a")],
+      jsearch: async () => { throw new Error("429 — MONTHLY quota exceeded, upgrade at rapidapi.com"); },
+    });
+    const cascade = createProviderCascade(ORDER, { search });
+
+    await cascade.run(query);
+
+    expect(cascade.errorsThatCostResults()).toEqual([]);
+  });
+
+  /*
+   * A failure ahead of the answer is different: the results came from further
+   * down the cascade than they should have, and a blurb where a full advert
+   * was expected is something the person should know about.
+   */
+  it("reports a failure that pushed the answer further down the cascade", async () => {
+    const { search } = recorder({
+      serpapi: async () => { throw new Error("bad key"); },
+      jsearch: async () => [result("https://b")],
+    });
+    const cascade = createProviderCascade(ORDER, { search });
+
+    await cascade.run(query);
+
+    expect(cascade.errorsThatCostResults()).toEqual(["Google for Jobs (SerpApi): bad key"]);
+  });
+
+  /* Nobody answered, so every failure is the reason there is nothing to show. */
+  it("reports everything when no provider answered", async () => {
+    const { search } = recorder({
+      serpapi: async () => { throw new Error("bad key"); },
+      jsearch: async () => { throw new Error("429"); },
+      adzuna: async () => { throw new Error("500"); },
+    });
+    const cascade = createProviderCascade(ORDER, { search });
+
+    await cascade.run(query);
+
+    expect(cascade.errorsThatCostResults()).toHaveLength(3);
+  });
+
+  /*
+   * The full list is still kept, for the log and for the nobody-answered case.
+   *
+   * Reaching JSearch at all takes a query the lead provider had nothing for —
+   * empty is not failure, so the cascade carries on rather than stopping. Once
+   * any other query has been answered by the lead, its 429 stops being the
+   * reason anybody's results look the way they do.
+   */
+  it("keeps every failure in errors regardless", async () => {
+    let firstQuery = true;
+    const { search } = recorder({
+      serpapi: async () => (firstQuery ? [] : [result("https://a")]),
+      jsearch: async () => { throw new Error("429"); },
+      adzuna: async () => [result("https://c")],
+    });
+    const cascade = createProviderCascade(ORDER, { search, failuresBeforeDead: 5 });
+
+    await cascade.run(query);
+    firstQuery = false;
+    await cascade.run(query);
+
+    expect(cascade.errors).toEqual(["Google for Jobs: 429"]);
+    expect(cascade.errorsThatCostResults()).toEqual([]);
+  });
+
+  /*
+   * Reaching the fallback is not the same as the lead provider being broken.
+   * A market where SerpApi simply carries nothing for one title is exactly
+   * when the fallback earns its place, and it is not worth a warning.
+   */
+  it("stays quiet when the lead was merely empty rather than failing", async () => {
+    const { search } = recorder({
+      serpapi: async () => [],
+      jsearch: async () => { throw new Error("429 — upgrade at rapidapi.com"); },
+      adzuna: async () => [result("https://c")],
+    });
+    const cascade = createProviderCascade(ORDER, { search });
+
+    await cascade.run(query);
+
+    /* JSearch sat ahead of the answer, so this one did cost the deeper advert. */
+    expect(cascade.errorsThatCostResults()).toEqual(["Google for Jobs: 429 — upgrade at rapidapi.com"]);
+  });
+
+  it("does not repeat the same failure across queries", async () => {
+    const { search } = recorder({
+      serpapi: async () => { throw new Error("bad key"); },
+      jsearch: async () => [result("https://b")],
+    });
+    const cascade = createProviderCascade(ORDER, { search, failuresBeforeDead: 5 });
+
+    await cascade.run(query);
+    await cascade.run(query);
+
+    expect(cascade.errorsThatCostResults()).toEqual(["Google for Jobs (SerpApi): bad key"]);
+  });
+});
+
+/*
+ * `used` has one consumer: the "via Google for Jobs + Adzuna" line under the
+ * results. It is a claim about where the roles on the page came from, so a
+ * provider that supplied none of them must not appear in it.
+ */
+describe("which providers are named as sources", () => {
+  const ORDER: JobSearchProviderName[] = ["serpapi", "jsearch", "adzuna"];
+
+  it("does not name a provider that carried nothing", async () => {
+    const { search } = recorder({
+      serpapi: async () => [],
+      adzuna: async () => [result("https://c")],
+    });
+    const cascade = createProviderCascade(ORDER, { search });
+
+    await cascade.run(query);
+
+    expect([...cascade.used]).toEqual(["Adzuna"]);
+  });
+
+  it("names a provider once it has supplied a result", async () => {
+    const { search } = recorder({ serpapi: async () => [result("https://a")] });
+    const cascade = createProviderCascade(ORDER, { search });
+
+    await cascade.run(query);
+
+    expect([...cascade.used]).toEqual(["Google for Jobs (SerpApi)"]);
+  });
+
+  /* Both, when different queries were answered by different providers. */
+  it("names every provider that supplied something across the run", async () => {
+    let firstQuery = true;
+    const { search } = recorder({
+      serpapi: async () => (firstQuery ? [] : [result("https://a")]),
+      adzuna: async () => [result("https://c")],
+    });
+    const cascade = createProviderCascade(ORDER, { search });
+
+    await cascade.run(query);
+    firstQuery = false;
+    await cascade.run(query);
+
+    expect([...cascade.used].sort()).toEqual(["Adzuna", "Google for Jobs (SerpApi)"]);
+  });
+});
