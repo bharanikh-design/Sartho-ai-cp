@@ -40,6 +40,18 @@ export async function GET(request: Request) {
 
   const url = new URL(request.url);
   const country = (url.searchParams.get("country") ?? "sg").trim().toLowerCase();
+  /*
+   * How patient to be, so the real latency can be measured rather than guessed.
+   *
+   * A search gives SerpApi twenty seconds and every query came back "aborted
+   * due to timeout" at exactly 20,000ms — which says it needs more than twenty
+   * and says nothing about how much more. A timeout is a floor on a latency,
+   * never a measurement of one, and picking the next timeout off a floor is how
+   * this has been got wrong twice already.
+   */
+  const patience = Number(url.searchParams.get("timeoutMs") ?? 0);
+  const timeoutMs = Number.isFinite(patience) && patience > 0 ? Math.min(patience, 90_000) : null;
+
   const queries = (url.searchParams.get("q") ?? "")
     .split("|")
     .map((value) => value.trim())
@@ -49,7 +61,7 @@ export async function GET(request: Request) {
   if (!queries.length) {
     return NextResponse.json({
       error: "Pass the queries to try, separated by | — for example ?q=ServiceNow|ITSM manager|Engagement Manager&country=sg",
-      note: "These are sent verbatim, exactly as a provider would receive them, so the answer is the one a real search would get.",
+      note: "These are sent verbatim, exactly as a provider would receive them, so the answer is the one a real search would get. Add &timeoutMs=60000 to be more patient than a search would be, which is how a provider's real latency gets measured rather than guessed.",
     }, { status: 400 });
   }
 
@@ -69,7 +81,7 @@ export async function GET(request: Request) {
           keywords,
           country,
           limit: 10,
-          timeoutMs: providerCallBudgetMs(provider),
+          timeoutMs: timeoutMs ?? providerCallBudgetMs(provider),
         });
         rows.push({
           query: keywords,
@@ -101,6 +113,8 @@ export async function GET(request: Request) {
       summary: `${queries.length} quer${queries.length === 1 ? "y" : "ies"} against ${providers.length} provider${providers.length === 1 ? "" : "s"}: `
         + `${rows.length - empty.length - failed.length} answered, ${empty.length} came back empty, ${failed.length} failed.`,
       country,
+      /* Null means each provider was given exactly what a real search gives it. */
+      timeoutMs,
       order: providers,
       rows,
       checkedAt: new Date().toISOString(),
