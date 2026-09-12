@@ -10,7 +10,7 @@ import { resumeVersionName } from "@/lib/resume/save";
 import { suggestResumeFor, type PastResume } from "@/lib/resume/suggest";
 import { renderResumeText, resumeContentOf, type ResumeContent } from "@/lib/resume/content";
 import { ResumeDocument, type BulletCoach } from "@/components/resume-document";
-import { RESUME_TEMPLATES, resumeTemplate } from "@/lib/resume/templates";
+import { RESUME_TEMPLATES, resumeTemplate, type ResumeTemplate } from "@/lib/resume/templates";
 import { ResumeWorkbench } from "@/components/resume-workbench";
 import { ResumePdfRenderer } from "@/components/resume-pdf-templates";
 import { LivePdfPreview } from "@/components/live-pdf-preview";
@@ -80,6 +80,47 @@ function ToolIcon({ name }: { name: "save" | "pdf" | "word" | "print" | "copy" |
     case "discard":
       return <svg {...toolIcon}><path d="M3 12a9 9 0 1 0 3.2-6.9" /><path d="M3 4v5h5" /></svg>;
   }
+}
+
+/*
+ * One template, with its colour and its cost.
+ *
+ * The picker was eight identical text buttons, which is a list of words for a
+ * choice that is entirely visual — somebody had to select one and look at the
+ * preview to learn anything. The accent swatch is the fastest true thing that
+ * can be said about a template at this size.
+ *
+ * The ATS note is the part no competitor shows. A sidebar template is not
+ * hidden or discouraged: the Word file beside it is single column whatever is
+ * chosen here, so the only thing at stake is which of the two files to attach
+ * where — and that is said at the moment of choosing rather than discovered
+ * afterwards.
+ */
+function TemplateChip({
+  template,
+  selected,
+  onSelect,
+}: {
+  template: ResumeTemplate;
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={selected}
+      className={`studio-template-chip${selected ? " is-selected" : ""}`}
+      title={`${template.description} ${template.bestFor}`}
+      onClick={onSelect}
+    >
+      <span className="studio-template-swatch" style={{ background: template.pdf.accent }} aria-hidden="true">
+        {template.pdf.layout === "sidebar" ? <i /> : null}
+      </span>
+      <span className="studio-template-name">{template.name}</span>
+      {!template.atsSafe ? <span className="studio-template-flag" title="Send the Word file to an applicant tracking system">Designed</span> : null}
+    </button>
+  );
 }
 
 export function ResumeStudio({
@@ -643,17 +684,12 @@ export function ResumeStudio({
             {!isOlderVersion ? (
               <div className="studio-templates" role="radiogroup" aria-label="Résumé template" style={{ padding: '16px', background: 'rgba(0,0,0,0.2)', borderBottom: '1px solid var(--line)', margin: 0 }}>
                 {RESUME_TEMPLATES.map((template) => (
-                  <button
+                  <TemplateChip
                     key={template.id}
-                    type="button"
-                    role="radio"
-                    aria-checked={content.template === template.id}
-                    className={content.template === template.id ? "is-selected" : ""}
-                    title={`${template.description} ${template.bestFor}`}
-                    onClick={() => setContent({ ...content, template: template.id })}
-                  >
-                    {template.name}
-                  </button>
+                    template={template}
+                    selected={content.template === template.id}
+                    onSelect={() => setContent({ ...content, template: template.id })}
+                  />
                 ))}
               </div>
             ) : null}
@@ -709,17 +745,12 @@ return (
           {!isOlderVersion && !isExpanded ? (
             <div className="studio-templates" role="radiogroup" aria-label="Résumé template">
               {RESUME_TEMPLATES.map((template) => (
-                <button
+                <TemplateChip
                   key={template.id}
-                  type="button"
-                  role="radio"
-                  aria-checked={content.template === template.id}
-                  className={content.template === template.id ? "is-selected" : ""}
-                  title={`${template.description} ${template.bestFor}`}
-                  onClick={() => setContent({ ...content, template: template.id })}
-                >
-                  {template.name}
-                </button>
+                  template={template}
+                  selected={content.template === template.id}
+                  onSelect={() => setContent({ ...content, template: template.id })}
+                />
               ))}
               {/*
                 * The chosen one described in full, under the row. A tooltip is
