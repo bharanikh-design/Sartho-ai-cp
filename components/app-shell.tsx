@@ -15,6 +15,7 @@ import { isPublicPath } from "@/lib/public-paths";
 import {
   getMobileNavigation,
   getNavigationForPath,
+  getSettingsNavigation,
   isNavigationItemActive,
   type NavigationIconName,
   type NavigationItem,
@@ -29,6 +30,14 @@ type JourneyStatus = {
   hasResume: boolean;
   /* Per step, so a finished one can be congratulated the moment it lands. */
   steps?: Array<{ id: string; label: string; complete: boolean }>;
+  /**
+   * Whether this person is an operations administrator.
+   *
+   * Decided by the server, which owns the definition — the allowlist behind
+   * isOperationsAdmin is an environment variable the browser cannot see. It
+   * gates a link, never access: every admin route checks for itself.
+   */
+  isAdmin?: boolean;
 };
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -53,6 +62,11 @@ export function AppShell({ children }: { children: ReactNode }) {
   const navigation = getNavigationForPath(activated, pathname)
     .map((item) => (hasResume || item.href === "/" ? item : { ...item, lockedReason: "Upload your résumé first" }));
   const mobileNavigation = getMobileNavigation(activated);
+  /*
+   * Administration comes from the server, which owns the definition, rather
+   * than from an email address compared in the browser.
+   */
+  const settingsNavigation = getSettingsNavigation(journeyStatus?.isAdmin ?? false);
 
   useEffect(() => {
     // The inline script in the document head already applied this before paint;
@@ -243,20 +257,32 @@ export function AppShell({ children }: { children: ReactNode }) {
         </Link>
 
         <div className="rail-section-label">Your career</div>
-        <nav className="rail-nav">
-          
-              {session?.user?.email === "bharanik.h@gmail.com" && (
-                <li style={{ marginTop: "16px", paddingTop: "16px", borderTop: "1px solid rgba(255,255,255,0.08)" }}>
-                  <Link
-                    href="/admin"
-                    className={`as-nav-link${isNavigationItemActive(pathname, "/admin") ? " is-active" : ""}`}
-                  >
-                    <Icon name="shield" />
-                    <span>Admin</span>
-                  </Link>
-                </li>
-              )}
-{navigation.map((item) => (
+        <nav className="rail-nav" aria-label="Your career">
+          {navigation.map((item) => (
+            <NavItem key={item.href} item={item} active={isNavigationItemActive(pathname, item.href)} />
+          ))}
+        </nav>
+
+        {/*
+          * Settings, as a group of their own.
+          *
+          * Email Alerts and Integrations were in the avatar menu at the bottom
+          * of the rail — two clicks and a guess away from anybody who had not
+          * already found them. They are also not steps, and the career rail is
+          * read top to bottom as a sequence, so putting them in it would say
+          * they were.
+          *
+          * The Admin link that used to live here was broken in every way a
+          * link can be. It was gated on a hardcoded email address compiled
+          * into the browser bundle; it rendered an <li> with no list around it
+          * while every other item renders a <Link>; it carried the class
+          * "as-nav-link", which appears in no stylesheet, so it drew with no
+          * styling at all; and its inline border was meant to separate it from
+          * the items below, which it sat above.
+          */}
+        <div className="rail-section-label rail-section-label-settings">Settings</div>
+        <nav className="rail-nav" aria-label="Settings">
+          {settingsNavigation.map((item) => (
             <NavItem key={item.href} item={item} active={isNavigationItemActive(pathname, item.href)} />
           ))}
         </nav>
@@ -304,8 +330,13 @@ export function AppShell({ children }: { children: ReactNode }) {
               </div>
               <div className="profile-menu-divider" />
               <Link href="/career-truth" className="profile-menu-link" role="menuitem"><span><strong>Upload résumé</strong><small>Add or replace your source résumé</small></span><b aria-hidden="true">→</b></Link>
-              <Link href="/notifications" className="profile-menu-link" role="menuitem" onClick={() => setProfileOpen(false)}><span><strong>Email alerts</strong><small>Daily new matches and the pipeline summary</small></span><b aria-hidden="true">→</b></Link>
-              <Link href="/integrations" className="profile-menu-link" role="menuitem" onClick={() => setProfileOpen(false)}><span><strong>Integrations</strong><small>What Sartho is connected to, and how to disconnect it</small></span><b aria-hidden="true">→</b></Link>
+              {/*
+                * Email alerts and Integrations have moved to the Settings
+                * group in the rail, where they are visible rather than behind
+                * a click on an avatar. What is left here is what genuinely
+                * belongs to an account menu: who you are, your data, and the
+                * way out.
+                */}
               <button type="button" className="profile-menu-action" role="menuitem" onClick={openAccountPanel}><span><strong>Data & privacy</strong><small>Manage or remove your information</small></span><b aria-hidden="true">→</b></button>
               <button type="button" className="profile-menu-action profile-menu-signout" role="menuitem" onClick={() => void signOut()}><span><strong>Log out</strong><small>End this secure session</small></span></button>
             </div>
@@ -464,5 +495,11 @@ function Icon({ name }: { name: NavigationIconName }) {
       return <svg {...common}><path d="M12 3 5 6v5c0 4.4 2.9 7.4 7 9 4.1-1.6 7-4.6 7-9V6l-7-3Z" /><path d="M9.5 12.2 11 13.7l3.7-4" /></svg>;
     case "bell":
       return <svg {...common}><path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15l1.5-2Z" /><path d="M10 20.5a2 2 0 0 0 4 0" /></svg>;
+    /* Two links of a chain: what Sartho is connected to. */
+    case "link":
+      return <svg {...common}><path d="M10 13.5a4 4 0 0 0 5.7.3l2.6-2.6a4 4 0 0 0-5.7-5.7l-1.5 1.5" /><path d="M14 10.5a4 4 0 0 0-5.7-.3l-2.6 2.6a4 4 0 0 0 5.7 5.7l1.5-1.5" /></svg>;
+    /* A dial, for the page that reports what this deployment can reach. */
+    case "gauge":
+      return <svg {...common}><path d="M12 14.5 16 9" /><path d="M4 18a9 9 0 1 1 16 0" /><circle cx="12" cy="18" r="1.4" /></svg>;
   }
 }

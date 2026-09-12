@@ -205,6 +205,20 @@ button:focus-visible, a:focus-visible, textarea:focus-visible, input:focus-visib
   letter-spacing: .14em;
   text-transform: uppercase;
 }
+
+/*
+ * Settings sit below the career flow, separated by a rule rather than a gap.
+ *
+ * The rail is read top to bottom as a sequence, so the two groups have to look
+ * like two groups: a gap alone reads as spacing, and these are a different kind
+ * of destination. Quiet, because settings are visited rarely and the flow above
+ * them is the work.
+ */
+.rail-section-label-settings {
+  margin-top: 10px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border-subtle, rgba(255,255,255,.08));
+}
 .rail-nav { display: grid; gap: 6px; }
 .rail-link {
   position: relative;

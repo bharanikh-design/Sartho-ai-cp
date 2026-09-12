@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getAuthenticatedUser } from "@/lib/auth";
+import { getAuthenticatedUser, isOperationsAdmin } from "@/lib/auth";
 import { loadProductJourneyStatus } from "@/lib/journey/load-product-journey";
 
 export const dynamic = "force-dynamic";
@@ -26,6 +26,21 @@ export async function GET() {
          * finished, and "which thing" is the whole content of the message.
          */
         steps: journey.steps.map((step) => ({ id: step.id, label: step.label, complete: step.complete })),
+        /*
+         * Whether this person is an operations administrator.
+         *
+         * Answered here because the shell is a client component and the
+         * allowlist behind isOperationsAdmin is a server environment variable.
+         * The rail used to decide it with a hardcoded email address compiled
+         * into the browser bundle, which was wrong three ways: it shipped a
+         * personal address to every visitor, it disagreed with the check the
+         * /admin page itself performs, and a second administrator added to the
+         * allowlist could reach the page but never see a link to it.
+         *
+         * It is not a permission — every admin route checks for itself. It
+         * only decides whether a link is worth drawing.
+         */
+        isAdmin: isOperationsAdmin(user),
       },
       { headers: { "Cache-Control": "private, no-store" } },
     );
