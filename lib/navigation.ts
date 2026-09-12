@@ -153,6 +153,25 @@ export const integrationsNavigation: NavigationItem = {
   purpose: "What Sartho is connected to, and how to disconnect it",
 };
 
+/*
+ * The browser extension.
+ *
+ * It was reachable from one pill on Opportunities, shown only to people who had
+ * not installed it — so somebody who dismissed it, or who wanted to install it
+ * on a second machine, had nowhere to go. A downloadable extension nobody can
+ * find is a feature that does not exist.
+ *
+ * In Settings rather than the career flow: installing it is a one-off, not a
+ * step in finding a job.
+ */
+export const extensionNavigation: NavigationItem = {
+  label: "Browser Extension",
+  shortLabel: "Extension",
+  href: "/extension",
+  icon: "link",
+  purpose: "Save a role straight from LinkedIn, Seek or an employer's own site",
+};
+
 export const adminNavigation: NavigationItem = {
   label: "Admin",
   shortLabel: "Admin",
@@ -186,7 +205,7 @@ export const diagnosticsNavigation: NavigationItem = {
  * controls behind it.
  */
 export function getSettingsNavigation(isAdmin: boolean): NavigationItem[] {
-  const settings = [notificationsNavigation, integrationsNavigation];
+  const settings = [notificationsNavigation, integrationsNavigation, extensionNavigation];
   return isAdmin ? [...settings, adminNavigation, diagnosticsNavigation] : settings;
 }
 
@@ -210,6 +229,7 @@ export function getNavigationWithGate(activated: boolean, hasResume: boolean): N
 export const allNavigation: NavigationItem[] = [
   journeyNavigation,
   integrationsNavigation,
+  extensionNavigation,
   adminNavigation,
   diagnosticsNavigation,
   dashboardNavigation,

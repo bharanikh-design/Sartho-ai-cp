@@ -1046,3 +1046,25 @@ h2.resume-doc-heading.resume-doc-field { margin-bottom: 0; border-bottom: 1px so
   .resume-doc[data-layout="sidebar"] .resume-doc-skills,
   .resume-doc[data-layout="sidebar"] .resume-doc-education { grid-column: 1; color: inherit; margin-inline: 22px; }
 }
+
+/*
+ * What Sartho does, as four ways in rather than four claims.
+ *
+ * Each tile names something the product does and links to the page that does
+ * it. The tint is per tile so the four read as four rather than as a list, and
+ * it is a border and a wash rather than a filled card: this sits under the
+ * next-step nudge and must not outshout it.
+ */
+.platform-hero-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(238px, 1fr)); gap: 12px; margin: 0; padding: 0; list-style: none; }
+
+.platform-hero-tile { display: flex; flex-direction: column; border: 1px solid rgba(255,255,255,.08); border-left-width: 3px; border-radius: 12px; padding: 14px 15px; background: rgba(255,255,255,.02); }
+.platform-hero-tile h3 { margin: 0 0 6px; color: var(--text-primary); font-size: var(--text-sm); font-weight: 700; }
+.platform-hero-tile p { flex-grow: 1; margin: 0 0 11px; color: var(--text-secondary); font-size: var(--text-xs); line-height: 1.55; }
+
+.platform-hero-action { align-self: flex-start; color: var(--tile-accent, #8ab4f8); font-size: var(--text-xs); font-weight: 700; text-decoration: none; }
+.platform-hero-action:hover { text-decoration: underline; }
+
+.platform-hero-tile[data-tone="evidence"]  { --tile-accent: #6bcf93; border-left-color: rgba(107,207,147,.6); }
+.platform-hero-tile[data-tone="search"]    { --tile-accent: #8ab4f8; border-left-color: rgba(138,180,248,.6); }
+.platform-hero-tile[data-tone="resume"]    { --tile-accent: #e0b061; border-left-color: rgba(224,176,97,.6); }
+.platform-hero-tile[data-tone="extension"] { --tile-accent: #c8a2f8; border-left-color: rgba(200,162,248,.6); }
