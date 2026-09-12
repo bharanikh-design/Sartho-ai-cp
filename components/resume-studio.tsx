@@ -11,7 +11,7 @@ import { suggestResumeFor, type PastResume } from "@/lib/resume/suggest";
 import { renderResumeText, resumeContentOf, type ResumeContent } from "@/lib/resume/content";
 import { ResumeDocument, type BulletCoach } from "@/components/resume-document";
 import { RESUME_TEMPLATES, resumeTemplate, type ResumeTemplate } from "@/lib/resume/templates";
-import { ResumeWorkbench } from "@/components/resume-workbench";
+import { ResumeImport } from "@/components/resume-import";
 import { ResumePdfRenderer } from "@/components/resume-pdf-templates";
 import { LivePdfPreview } from "@/components/live-pdf-preview";
 import type { ApplicationRecord, ResumeChange, ResumeVersionRecord, RuleAnalysis } from "@/lib/types";
@@ -140,6 +140,7 @@ export function ResumeStudio({
   masterResumeText,
   master,
   masterUpdatedAt,
+  driveConnected,
 }: {
   drafts: StudioDraft[];
   /** Roles whose analysis is finished, so a truthful draft can be built. */
@@ -165,6 +166,8 @@ export function ResumeStudio({
   master: ResumeContent | null;
   /** When it was last built, so "is this current?" has an answer on the page. */
   masterUpdatedAt: string | null;
+  /** Decided on the server, so the Drive picker does not flash a prompt. */
+  driveConnected: boolean;
 }) {
   const router = useRouter();
   /*
@@ -191,6 +194,24 @@ export function ResumeStudio({
    * edit costs nothing either.
    */
   const [documents, setDocuments] = useState<Record<string, ResumeContent>>({});
+
+  /* Whether the next upload also becomes the master. Off by default: replacing
+   * the document every other one is built from is not a thing to do by accident. */
+  const [makeMaster, setMakeMaster] = useState(false);
+
+  /*
+   * List or grid.
+   *
+   * A list is the better default: it is scannable, it fits the score and the
+   * subtitle on one line, and a résumé is chosen by what it was written for
+   * rather than by how it looks. The grid is for somebody with a dozen of them
+   * who is looking for one by shape.
+   *
+   * Expanding in place only makes sense in the list — a row opening inside a
+   * grid cell would push every tile after it down the page — so the grid opens
+   * straight into the full-window editor instead.
+   */
+  const [view, setView] = useState<"list" | "grid">("list");
 
   const [openBullet, setOpenBullet] = useState<string | null>(null);
   /*
@@ -1092,7 +1113,6 @@ return (
     );
   }
 
-  const expanded = drafts.find((draft) => draft.application.id === expandedId) ?? null;
 
   /* Whether there is a role a truthful draft could be written for right now. */
   /*
@@ -1159,6 +1179,16 @@ return (
   /* One list. The master first, because every tailored version comes off it. */
   const allDrafts: StudioDraft[] = masterDraft ? [masterDraft, ...drafts] : drafts;
 
+  /*
+   * Looked up in the full list, master included.
+   *
+   * It searched `drafts`, which is the tailored ones only — so expanding the
+   * master row found nothing, the overlay never rendered, and the button did
+   * nothing at all. The master became a row in that list and this was left
+   * pointing at the old one.
+   */
+  const expanded = allDrafts.find((draft) => draft.application.id === expandedId) ?? null;
+
   const canBuild = evidenceReady && tailorable.length > 0;
 
   /*
@@ -1195,12 +1225,37 @@ return (
             <button type="button" className="secondary-button" onClick={generateMaster} disabled={generatingId === "master"} style={{ padding: "4px 8px", fontSize: "11px" }}>
               {generatingId === "master" ? "Building..." : "+ Master Résumé"}
             </button>
+            <div className="studio-view-toggle" role="group" aria-label="How to show your résumés">
+              <button
+                type="button"
+                className={view === "list" ? "is-selected" : ""}
+                aria-pressed={view === "list"}
+                onClick={() => setView("list")}
+                title="List"
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" aria-hidden="true">
+                  <path d="M4 7h16M4 12h16M4 17h16" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                className={view === "grid" ? "is-selected" : ""}
+                aria-pressed={view === "grid"}
+                onClick={() => setView("grid")}
+                title="Grid"
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" aria-hidden="true">
+                  <rect x="4" y="4" width="7" height="7" rx="1.5" /><rect x="13" y="4" width="7" height="7" rx="1.5" />
+                  <rect x="4" y="13" width="7" height="7" rx="1.5" /><rect x="13" y="13" width="7" height="7" rx="1.5" />
+                </svg>
+              </button>
+            </div>
             <span className="meta-pill">{allDrafts.length} résumé{allDrafts.length === 1 ? "" : "s"}</span>
           </div>
         </div>
 
         {allDrafts.length ? (
-          <div className="studio-draft-list">
+          <div className={view === "grid" ? "studio-draft-grid" : "studio-draft-list"}>
             {allDrafts.map((draft) => {
               const open = openId === draft.application.id;
               /* The collapsed row shows the current version's score, never a draft edit. */
@@ -1211,8 +1266,17 @@ return (
                     <button
                       type="button"
                       className="studio-draft-head"
-                      onClick={() => setOpenId(open ? null : draft.application.id)}
-                      aria-expanded={open}
+                      /*
+                       * In the grid a row cannot expand in place — it would push
+                       * every tile after it down the page — so it opens the
+                       * full-window editor, which is where that much document
+                       * belongs anyway.
+                       */
+                      onClick={() => {
+                        if (view === "grid") { setOpenId(draft.application.id); setExpandedId(draft.application.id); return; }
+                        setOpenId(open ? null : draft.application.id);
+                      }}
+                      aria-expanded={view === "grid" ? undefined : open}
                     >
                       <span className="studio-draft-name">
                         <strong>
@@ -1257,17 +1321,17 @@ return (
                       <span aria-hidden="true">⤢</span>
                     </button>
 
-                    <button
+                    {view === "grid" ? null : <button
                       type="button"
                       className="studio-draft-chevron"
                       aria-label={open ? "Collapse this draft" : "Expand this draft"}
                       onClick={() => setOpenId(open ? null : draft.application.id)}
                     >
                       <span aria-hidden="true">{open ? "▲" : "▼"}</span>
-                    </button>
+                    </button>}
                   </div>
 
-                  {open ? renderWorkspace(draft) : null}
+                  {open && view !== "grid" ? renderWorkspace(draft) : null}
                 </article>
               );
             })}
@@ -1314,17 +1378,51 @@ return (
         * "Build a new one" tailors to a role you are applying for; this takes
         * the CV you already have and makes it better. Neither invents.
         */}
-      <section className="glass-card content-card" id="improve">
+      <section className="glass-card content-card" id="add">
         <div className="card-header">
           <div>
-            <h2 className="section-heading">Improve a résumé you already have</h2>
+            <h2 className="section-heading">Add a résumé</h2>
             <p className="section-subtitle">
-              Paste it or read it in from a file. Sartho scores it, names the lines carrying no measurable
-              result, and rewrites those around a figure you supply — it will not invent one.
+              PDF, Word or plain text. Sartho reads it into the career facts everything else is built from,
+              then deletes the file.
             </p>
           </div>
         </div>
-        <ResumeWorkbench />
+
+        {/*
+          * An upload, not a paste box.
+          *
+          * This was "Improve a résumé you already have": a textarea, a "read
+          * from a file" button, and a separate scoring and rewriting loop that
+          * did not touch anything else in the product. So a résumé improved
+          * there existed nowhere afterwards — not in the list, not as a master,
+          * not as evidence. It was a second résumé tool living inside the first
+          * one, with its own idea of what a résumé is.
+          *
+          * The same import that runs on Career Truth runs here, because there
+          * should be exactly one way a document gets into Sartho. What is added
+          * is the checkbox: whether this one also becomes the master.
+          */}
+        <label className="studio-master-flag">
+          <input
+            type="checkbox"
+            checked={makeMaster}
+            onChange={(event) => setMakeMaster(event.target.checked)}
+          />
+          <span>
+            <strong>Make this my master résumé</strong>
+            <small>
+              Rebuilds the master from what Sartho reads out of this file. Every tailored version starts from it.
+            </small>
+          </span>
+        </label>
+
+        <ResumeImport
+          hasEvidence
+          showLead={false}
+          driveConnected={driveConnected}
+          onImported={makeMaster ? generateMaster : undefined}
+        />
       </section>
 
       {/*

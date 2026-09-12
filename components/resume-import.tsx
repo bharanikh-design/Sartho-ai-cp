@@ -40,6 +40,7 @@ export function ResumeImport({
   showLead = true,
   continueHref,
   driveConnected = false,
+  onImported,
 }: {
   hasEvidence: boolean;
   /**
@@ -62,6 +63,15 @@ export function ResumeImport({
    * person is left wondering where their résumé went.
    */
   continueHref?: string;
+  /**
+   * Run after a successful import, before the page refreshes.
+   *
+   * Résumé Studio uses it to rebuild the master from what was just uploaded.
+   * A callback rather than a flag on this component, because importing and
+   * deciding what to do afterwards are two different jobs and only the caller
+   * knows the second one.
+   */
+  onImported?: () => Promise<void> | void;
 }) {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
@@ -187,6 +197,7 @@ export function ResumeImport({
 
       setResult(finished);
       window.dispatchEvent(new Event("sartho:journey-changed"));
+      if (onImported) await onImported();
       // Brings the newly extracted claims into the review list below. Where the
       // review is on another page, the result and its link have to survive.
       if (!continueHref) router.refresh();
