@@ -22,11 +22,11 @@ import { candidateSeniority, isEntryLevelTitle } from "@/lib/matching/title-fit"
 import { seniorityReach } from "@/lib/matching/seniority-reach";
 import { searchEmployerDirectly } from "@/lib/jobs/company-careers/registry";
 import { deduplicateSearchResults, isMarketLocationConsistent } from "@/lib/jobs/location-guard";
+import { createProviderCascade } from "@/lib/jobs/provider-cascade";
 import {
   MAX_COMPANY_QUERIES,
   MAX_LOCATION_QUERIES,
   MAX_ROLE_QUERIES,
-  planSearchQueries,
   planSmartSearchQueries,
   toSearchKeywords,
   widenToCountry,
@@ -36,9 +36,6 @@ import {
   configuredJobSearchProviders,
   defaultJobMarket,
   providersForCountry,
-  searchWithProvider,
-  JobSearchNotConfiguredError,
-  type JobSearchProviderName,
   type JobSearchQuery,
   type JobSearchResult,
 } from "@/lib/jobs/search-provider";
@@ -138,6 +135,8 @@ export type SearchCriteria = {
   advertsRead: number;
   /** Roles dropped as a different line of work, and the families kept. */
   offFamily: number;
+  /** Dropped as belonging to another country's market. */
+  offMarket?: number;
   families: string[];
   /** All markets, named. */
   countryName: string;
@@ -325,62 +324,50 @@ export async function runBriefSearch(
    * tripped by a parallel burst, under a wall-clock budget that leaves room to
    * score and respond inside the caller's limit. A single query failing does
    * not sink the whole search — we keep whatever the others returned and only
-   * surface an error when nothing came back at all. A provider that fails once
-   * is skipped for the rest of this run.
+   * surface an error when nothing came back at all.
    */
   const startedAt = Date.now();
   const budgetMs = options.budgetMs ?? 28_000;
-  const dead = new Set<JobSearchProviderName>();
   const byUrl = new Map<string, JobSearchResult>();
-  const errors: string[] = [];
-  const providersUsed = new Set<string>();
   let queriesRun = 0;
   let queriesSkipped = 0;
+
+  /*
+   * Providers are tried in order, not all at once.
+   *
+   * Every query used to fan out to both providers in parallel and merge the
+   * two answers. That is not the fall-back configuredJobSearchProviders
+   * describes, and it cost twice: every search spent two API calls per query
+   * where one would do — halving a metered JSearch allowance — and it mixed
+   * Adzuna's truncated blurbs into a pool scored on requirement coverage,
+   * where a short description reads as a weak match rather than as a short
+   * description. JSearch leads because it returns the whole advert and reaches
+   * LinkedIn, Indeed and company career pages; Adzuna is what answers when
+   * JSearch cannot, which is the only time its shallower records are better
+   * than nothing.
+   */
+  const cascade = createProviderCascade(providers);
 
   async function run(list: JobSearchQuery[]) {
     for (let index = 0; index < list.length; index++) {
       if (Date.now() - startedAt > budgetMs) { queriesSkipped += list.length - index; break; }
+      if (cascade.exhausted()) { queriesSkipped += list.length - index; break; }
       if (queriesRun > 0) {
-        // JSearch (RapidAPI) has a strict 1 req/sec limit. 
+        // JSearch (RapidAPI) has a strict 1 req/sec limit.
         // Pushing faster triggers 429s, causing Google Jobs to silently drop out.
-        const delay = providers.includes("jsearch") ? 1100 : 300;
+        const delay = providers.includes("jsearch") && !cascade.isDead("jsearch") ? 1100 : 300;
         await new Promise((resolve) => setTimeout(resolve, delay));
       }
-      const outcomes = await Promise.allSettled(
-        providers.map(async (provider) => {
-          if (dead.has(provider)) return;
-          const batch = await searchWithProvider(provider, list[index]);
-          return { provider, batch };
-        })
-      );
 
+      for (const result of await cascade.run(list[index])) {
+        if (!byUrl.has(result.url)) byUrl.set(result.url, result);
+      }
       queriesRun++;
 
-      for (const outcome of outcomes) {
-        if (outcome.status === "fulfilled" && outcome.value) {
-          const { provider, batch } = outcome.value;
-          providersUsed.add(provider === "jsearch" ? "Google for Jobs" : "Adzuna");
-          for (const result of batch) {
-            if (!byUrl.has(result.url)) byUrl.set(result.url, result);
-          }
-        } else if (outcome.status === "rejected") {
-          const caught = outcome.reason;
-          if (caught instanceof Error && (caught.name === "TimeoutError" || caught.name === "AbortError")) {
-            console.warn("Provider timed out on query");
-          } else if (caught && typeof caught === "object" && caught.name === "JobSearchNotConfiguredError") {
-            // Usually we'd dead.add(provider) but we can't easily extract provider name here, so just log it.
-            errors.push(`API key is not configured for a provider`);
-          } else {
-            errors.push(`Provider Error: ${caught instanceof Error ? caught.message : "unknown error"}`);
-            console.error(`[DEBUG] Provider error:`, caught);
-          }
-        }
-      }
       if (byUrl.size >= 25 && index >= activeLanes.length) {
         queriesSkipped += list.length - index - 1;
         break;
       }
-      if (dead.size === providers.length) { queriesSkipped += list.length - index - 1; break; }
     }
   }
 
@@ -407,7 +394,7 @@ export async function runBriefSearch(
         for (const item of directMatches) {
           if (!byUrl.has(item.url)) byUrl.set(item.url, item);
         }
-        if (directMatches.length) providersUsed.add("Company Careers");
+        if (directMatches.length) cascade.used.add("Company Careers");
       } catch {
         // Direct ATS query failure is non-fatal; aggregator covers it.
       }
@@ -416,9 +403,9 @@ export async function runBriefSearch(
     await Promise.allSettled(directQueries);
   }
 
-  if (!byUrl.size && errors.length) {
-    console.error("Jobs search failed", errors);
-    return { ok: false, code: "provider_error", error: `Jobs provider error: ${[...new Set(errors)].join("; ")}` };
+  if (!byUrl.size && cascade.errors.length) {
+    console.error("Jobs search failed", cascade.errors);
+    return { ok: false, code: "provider_error", error: `Jobs provider error: ${[...new Set(cascade.errors)].join("; ")}` };
   }
 
   const score = (result: JobSearchResult): ScoredJobMatch => {
@@ -465,7 +452,7 @@ export async function runBriefSearch(
 
   const usedLocations = brief.locations.slice(0, MAX_LOCATION_QUERIES);
   let broadened = false;
-  if (usedLocations.length && strongCount() < MIN_STRONG_BEFORE_WIDENING && dead.size < providers.length && (Date.now() - startedAt < budgetMs - 2_500)) {
+  if (usedLocations.length && strongCount() < MIN_STRONG_BEFORE_WIDENING && !cascade.exhausted() && (Date.now() - startedAt < budgetMs - 2_500)) {
     broadened = true;
     const before = new Set(byUrl.keys());
     await run(widenToCountry(queries));
@@ -488,6 +475,7 @@ export async function runBriefSearch(
   const withinReach: ScoredJobMatch[] = [];
   let tooSenior = 0;
   let offFamily = 0;
+  let offMarket = 0;
   let tooMuchExperience = 0;
 
   /*
@@ -524,7 +512,13 @@ export async function runBriefSearch(
   for (const match of scoredByUrl.values()) {
     if (!seniorityReach(match.title, heldTitles, seniorityYears).withinReach) { tooSenior += 1; continue; }
     if (!familyFit(match.title, heldTitles, roleNames).withinReach) { offFamily += 1; continue; }
-    if (!isMarketLocationConsistent(match, country)) continue;
+    /*
+     * Counted like the other two. This one dropped matches silently, so a
+     * misindexed batch that removed the entire page looked identical to a
+     * search that found nothing — the one filter whose over-reach left no
+     * trace at all.
+     */
+    if (!isMarketLocationConsistent(match, country)) { offMarket += 1; continue; }
     survivors.push(match);
   }
   survivors.sort((a, b) => b.overallMatch - a.overallMatch);
@@ -678,16 +672,26 @@ export async function runBriefSearch(
     earlyCareerPass,
     advertsRead,
     offFamily,
+    offMarket,
     families: reachFrom(heldTitles, roleNames),
     countryName: countryLabel,
     countrySource: preferences.country ? "brief" : profile?.country ? "resume" : "default",
     locations: usedLocations,
     broadened,
     companies: brief.companies.slice(0, MAX_COMPANY_QUERIES),
-    roles: activeLanes.map((lane) => toSearchKeywords(lane.name)),
+    /*
+     * The keywords that were actually sent, read back off the queries.
+     *
+     * This line used to recompute toSearchKeywords over the lane names, which
+     * is a different calculation from the one the search ran: when the planner
+     * widened or rewrote a term, the brief on screen still listed the tidy
+     * version, so the page confidently described a search that never happened
+     * and there was no way to tell from the UI what had been asked for.
+     */
+    roles: [...new Set(queries.filter((query) => !query.earlyCareerOnly).map((query) => query.keywords))],
     remoteOnly: preferences.remotePreferences.length === 1 && preferences.remotePreferences[0] === "Remote",
-    providers: Array.from(providersUsed),
-    providerErrors: errors.length ? errors : undefined,
+    providers: Array.from(cascade.used),
+    providerErrors: cascade.errors.length ? [...new Set(cascade.errors)] : undefined,
     queriesRun,
     queriesSkipped,
   };

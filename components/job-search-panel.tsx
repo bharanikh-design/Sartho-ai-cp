@@ -361,6 +361,15 @@ export function JobSearchPanel({
               {" "}(<Link href="/career-direction#priorities">change your target roles</Link>)
             </>
           ) : null}
+          {/*
+            * The location guard, for the same reason as the two above it. It
+            * dropped matches without counting them, so an aggregator
+            * misindexing a whole batch of overseas postings into this market
+            * looked exactly like a market with no jobs in it.
+            */}
+          {criteria.offMarket ? (
+            <> · {criteria.offMarket} hidden as listed in another country</>
+          ) : null}
           {criteria.queriesSkipped > 0 ? <> · {criteria.queriesSkipped} queries skipped (time limit)</> : null}
         </p>
       ) : null}
