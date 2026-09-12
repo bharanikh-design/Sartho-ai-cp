@@ -670,9 +670,23 @@ export function providersForCountry(country: string, configured = configuredJobS
  *
  * Each figure carries headroom over its measurement rather than sitting on it.
  * A measurement is one sample of a network.
+ *
+ * SerpApi's headroom is wide, and deliberately. The probe asks "project
+ * manager" — two common words — while a real search asks "ServiceNow Business
+ * Process Architect" with an employer attached, and Google takes longer over a
+ * rare phrase than a common one. A run that gave it twelve seconds still
+ * reported "Google for Jobs (SerpApi) timed out 2 times" and finished on
+ * Adzuna, so the probe's figure is a floor on its latency rather than a
+ * typical value.
+ *
+ * Twenty seconds is a third of the query budget for one call, which is the
+ * honest price of a provider that returns the whole advert. Sartho scores a
+ * person against the requirements it can read, so three deep results beat
+ * twelve four-line blurbs — and the shallow provider behind it still fills the
+ * breadth for free.
  */
 export function providerCallBudgetMs(provider: JobSearchProviderName): number {
-  if (provider === "serpapi") return 12_000;
+  if (provider === "serpapi") return 20_000;
   if (provider === "jsearch") return 6_000;
   return 3_000;
 }
