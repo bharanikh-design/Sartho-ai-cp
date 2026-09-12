@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { approvedEvidenceIds, keepGroundedIds } from "@/lib/ai/grounding";
 import { createSafetyIdentifier, generateStructuredJson } from "@/lib/ai/provider";
 import { aiQuotaResponse, checkAiQuota } from "@/lib/ai/quota";
@@ -10,8 +11,10 @@ import {
   type ResumeBullet,
   type ResumeContent,
   type ResumeRole,
+  type ResumeSection,
 } from "@/lib/resume/content";
 import { MASTER_RESUME_RULES, MASTER_RESUME_SCHEMA, masterResumeOutput } from "@/lib/resume/master";
+import { REPAIR_RULES, REPAIR_SCHEMA, acceptRepairs, linesNeedingRepair, remainingFaults } from "@/lib/resume/polish";
 import { DEFAULT_TEMPLATE } from "@/lib/resume/templates";
 
 /*
@@ -160,12 +163,69 @@ export async function POST() {
      * being lost because the model mistyped an id.
      */
     const known = new Set(careerRoles.map((role) => role.id));
-    const sections = [];
+    const sections: ResumeSection[] = [];
     const orphaned = parsed.experience.filter((entry) => !known.has(entry.roleId)).flatMap((entry) => entry.bullets);
     if (orphaned.length) {
       const bullets = groundBullets(orphaned, "s0");
       if (bullets.length) sections.push({ id: "s0", heading: "Experience", bullets });
     }
+
+    /*
+     * The draft, checked against the rules that produced it, and repaired.
+     *
+     * Until now the writing standard was stated in the prompt above and
+     * verified nowhere: the model wrote, the draft was saved, and the panel
+     * afterwards told the person which lines broke rules the model had already
+     * been handed. A rule a machine can check is a rule the machine should fix
+     * before anybody reads it.
+     *
+     * Best effort. A failed repair pass leaves the first draft exactly as it
+     * was — this improves a résumé, it is not allowed to cost one.
+     */
+    const flat = [...roles.flatMap((role) => role.bullets), ...sections.flatMap((section) => section.bullets)]
+      .map((bullet) => ({ id: bullet.id, text: bullet.text }));
+    const faulty = linesNeedingRepair(flat);
+
+    let repaired = 0;
+    if (faulty.length) {
+      try {
+        const fixes = await generateStructuredJson({
+          workload: "fast",
+          safetyIdentifier: createSafetyIdentifier(user.id),
+          schemaName: "sartho_resume_repair",
+          schema: REPAIR_SCHEMA,
+          system: REPAIR_RULES,
+          prompt: JSON.stringify({ linesToRepair: faulty }),
+        });
+
+        const returned = z
+          .object({ lines: z.array(z.object({ id: z.string(), text: z.string() })) })
+          .parse(fixes).lines;
+
+        const outcome = acceptRepairs(flat, returned);
+        repaired = outcome.accepted;
+
+        /* Accepted repairs go back onto the bullets they came from. */
+        const byId = new Map(outcome.lines.map((entry) => [entry.id, entry.text]));
+        for (const role of roles) {
+          for (const bullet of role.bullets) bullet.text = byId.get(bullet.id) ?? bullet.text;
+        }
+        for (const section of sections) {
+          for (const bullet of section.bullets) bullet.text = byId.get(bullet.id) ?? bullet.text;
+        }
+      } catch (caught) {
+        console.warn("The résumé repair pass failed; keeping the first draft", caught);
+      }
+    }
+
+    /*
+     * Read back off the bullets rather than off `flat`, which holds copies
+     * taken before the repair ran — reporting what is left from those would
+     * describe the draft that no longer exists.
+     */
+    const finalLines = () =>
+      [...roles.flatMap((role) => role.bullets), ...sections.flatMap((section) => section.bullets)]
+        .map((bullet) => ({ id: bullet.id, text: bullet.text }));
 
     if (!roles.length && !sections.length) {
       return NextResponse.json(
@@ -223,6 +283,13 @@ export async function POST() {
       content,
       evidenceIds: evidenceIdsIn(content),
       bulletCount: roles.reduce((total, role) => total + role.bullets.length, 0),
+      /*
+       * What the second pass did, so the work is visible rather than magic.
+       * `remaining` is usually a line where the checker is wrong — a bullet
+       * that needs the passive voice because the actor is not the person — and
+       * those belong to the reader, not to another round of rewriting.
+       */
+      writing: { flagged: faulty.length, repaired, remaining: remainingFaults(finalLines()).length },
     });
   } catch (caught) {
     console.error("Master résumé drafting failed", caught);
