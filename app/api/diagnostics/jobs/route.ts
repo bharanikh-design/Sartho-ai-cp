@@ -22,7 +22,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-const ALL_PROVIDERS: JobSearchProviderName[] = ["jsearch", "adzuna"];
+const ALL_PROVIDERS: JobSearchProviderName[] = ["serpapi", "jsearch", "adzuna"];
 
 export async function GET() {
   const { user } = await getAuthenticatedUser();

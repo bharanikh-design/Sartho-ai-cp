@@ -18,6 +18,7 @@
  */
 
 import { countryName } from "@/lib/jobs/countries";
+import { searchSerpApi, serpApiConfig } from "@/lib/jobs/serpapi";
 import { adzunaEmploymentParams, employmentQueryHints, jsearchEmploymentTypes } from "@/lib/jobs/employment-types";
 
 export type JobSearchResult = {
@@ -74,7 +75,7 @@ export type JobSearchQuery = {
   limit?: number;
 };
 
-export type JobSearchProviderName = "adzuna" | "jsearch";
+export type JobSearchProviderName = "adzuna" | "jsearch" | "serpapi";
 
 // Adzuna scopes every query to a country in the URL path, so a bad value 404s.
 const ADZUNA_COUNTRIES = new Set([
@@ -620,6 +621,13 @@ export function configuredJobSearchProviders(): JobSearchProviderName[] {
   // meaningful, and it reaches company career pages. Adzuna — whose short
   // blurbs flatten every score — stays on as the fallback.
   const configured: JobSearchProviderName[] = [];
+  /*
+   * SerpApi leads where it is configured. It reads the same Google for Jobs
+   * index as JSearch and sells it directly, without the marketplace layer that
+   * answered a spent allowance by stalling rather than refusing — which cost a
+   * day of treating an exhausted quota as a slow network.
+   */
+  if (serpApiConfig()) configured.push("serpapi");
   if (jsearchConfig()) configured.push("jsearch");
   if (adzunaConfig()) configured.push("adzuna");
 
@@ -627,7 +635,7 @@ export function configuredJobSearchProviders(): JobSearchProviderName[] {
   // tried first, but every other configured provider stays on as a fallback so
   // one provider being down can never take search down.
   const pin = process.env.JOBS_SEARCH_PROVIDER?.trim().toLowerCase();
-  if ((pin === "jsearch" || pin === "adzuna") && configured.includes(pin)) {
+  if ((pin === "jsearch" || pin === "adzuna" || pin === "serpapi") && configured.includes(pin)) {
     return [pin, ...configured.filter((provider) => provider !== pin)];
   }
   return configured;
@@ -646,6 +654,7 @@ export async function searchWithProvider(
   provider: JobSearchProviderName,
   query: JobSearchQuery,
 ): Promise<JobSearchResult[]> {
+  if (provider === "serpapi") return searchSerpApi(query);
   if (provider === "jsearch") return searchJSearch(query);
   return searchAdzuna(query);
 }
@@ -677,11 +686,15 @@ export type JobProviderProbe = {
  * is what turned a one-line configuration fault into an afternoon.
  */
 export async function probeJobProvider(provider: JobSearchProviderName): Promise<JobProviderProbe> {
-  const name = provider === "jsearch" ? "Google for Jobs" : "Adzuna";
-  const reads = provider === "jsearch"
-    ? ["JSEARCH_RAPIDAPI_KEY", "RAPIDAPI_KEY", "JSEARCH_MAX_PAGES"]
-    : ["ADZUNA_APP_ID", "ADZUNA_APP_KEY"];
-  const configured = provider === "jsearch" ? Boolean(jsearchConfig()) : Boolean(adzunaConfig());
+  const name = provider === "serpapi" ? "Google for Jobs (SerpApi)" : provider === "jsearch" ? "Google for Jobs" : "Adzuna";
+  const reads = provider === "serpapi"
+    ? ["SERPAPI_KEY", "SERPAPI_API_KEY"]
+    : provider === "jsearch"
+      ? ["JSEARCH_RAPIDAPI_KEY", "RAPIDAPI_KEY", "JSEARCH_MAX_PAGES"]
+      : ["ADZUNA_APP_ID", "ADZUNA_APP_KEY"];
+  const configured = provider === "serpapi"
+    ? Boolean(serpApiConfig())
+    : provider === "jsearch" ? Boolean(jsearchConfig()) : Boolean(adzunaConfig());
 
   if (!configured) {
     return { provider, name, configured, reads, reachable: false, results: 0, elapsedMs: 0, error: "No key configured." };

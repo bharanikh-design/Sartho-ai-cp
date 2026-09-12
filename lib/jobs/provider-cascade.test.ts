@@ -205,3 +205,70 @@ describe("timeouts are counted, not just logged", () => {
     expect(cascade.timeouts.size).toBe(0);
   });
 });
+
+/*
+ * The rate-limit gap in runBriefSearch asks the cascade which providers a query
+ * actually reached. It used to ask which were configured, which is a different
+ * question the moment a provider ahead of JSearch in the order starts
+ * answering: SerpApi replies, JSearch is never called, and the run still pays
+ * RapidAPI's one-second spacing on every query out of a 45-second budget.
+ */
+describe("which providers the last query actually reached", () => {
+  const ORDER: JobSearchProviderName[] = ["serpapi", "jsearch", "adzuna"];
+
+  it("does not count a provider the first one made unnecessary", async () => {
+    const { search } = recorder({ serpapi: async () => [result("https://a")] });
+    const cascade = createProviderCascade(ORDER, { search });
+
+    await cascade.run(query);
+
+    expect(cascade.calledLast("serpapi")).toBe(true);
+    expect(cascade.calledLast("jsearch")).toBe(false);
+    expect(cascade.calledLast("adzuna")).toBe(false);
+  });
+
+  it("counts a provider reached because the one before it was empty", async () => {
+    const { search } = recorder({
+      serpapi: async () => [],
+      jsearch: async () => [result("https://b")],
+    });
+    const cascade = createProviderCascade(ORDER, { search });
+
+    await cascade.run(query);
+
+    expect(cascade.calledLast("jsearch")).toBe(true);
+    expect(cascade.calledLast("adzuna")).toBe(false);
+  });
+
+  /* Each query answers for itself: a reach last time is not a reach this time. */
+  it("forgets the previous query", async () => {
+    let firstQuery = true;
+    const { search } = recorder({
+      serpapi: async () => (firstQuery ? [] : [result("https://c")]),
+      jsearch: async () => [result("https://b")],
+    });
+    const cascade = createProviderCascade(ORDER, { search });
+
+    await cascade.run(query);
+    expect(cascade.calledLast("jsearch")).toBe(true);
+
+    firstQuery = false;
+    await cascade.run(query);
+    expect(cascade.calledLast("jsearch")).toBe(false);
+  });
+
+  it("skips a provider that is already dead", async () => {
+    const { search } = recorder({
+      serpapi: async () => { throw new JobSearchNotConfiguredError(); },
+      jsearch: async () => [result("https://b")],
+    });
+    const cascade = createProviderCascade(ORDER, { search });
+
+    await cascade.run(query);
+    expect(cascade.calledLast("serpapi")).toBe(true);
+
+    await cascade.run(query);
+    expect(cascade.calledLast("serpapi")).toBe(false);
+    expect(cascade.calledLast("jsearch")).toBe(true);
+  });
+});
