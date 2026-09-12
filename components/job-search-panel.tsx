@@ -320,6 +320,24 @@ export function JobSearchPanel({
             * it is the reason the page is thinner than it should be — and it
             * used to be written to the server console and nowhere else.
             */}
+          {/*
+            * Per employer, because "we have no configuration for ServiceNow"
+            * and "ServiceNow's careers page had nothing this week" are
+            * different findings with different fixes, and both used to look
+            * identical: a company named in the brief and absent from the page.
+            */}
+          {criteria.employerPortals?.length ? (
+            <>
+              {" "}· careers pages: {criteria.employerPortals
+                .map((portal) => {
+                  if (portal.status === "searched") return `${portal.employer} (${portal.found})`;
+                  if (portal.status === "empty") return `${portal.employer} (none listed)`;
+                  if (portal.status === "failed") return `${portal.employer} (unreachable)`;
+                  return `${portal.employer} (not connected)`;
+                })
+                .join(", ")}
+            </>
+          ) : null}
           {criteria.providerTimeouts?.length ? (
             <>
               {" "}· {criteria.providerTimeouts
