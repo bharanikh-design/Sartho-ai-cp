@@ -176,6 +176,8 @@ export type SearchCriteria = {
    * diagnoses from the same sentence.
    */
   providerTimeouts?: Array<{ name: string; count: number; waitedMs: number }>;
+  /** Queries each provider was actually asked, so "via X + Y" has a proportion. */
+  providerCalls?: Array<{ name: string; count: number }>;
   /**
    * Each named employer's own careers portal, and what came of it. Free,
    * unmetered and aimed exactly where the person pointed it — and until now the
@@ -247,6 +249,15 @@ const MAX_CALL_MS = 20_000;
  * inside the budget. Never applied to a provider that answers in milliseconds.
  */
 const SERPAPI_CONCURRENCY = 3;
+
+/*
+ * How many queries the deep provider answers per run.
+ *
+ * Three, which is one batch at the concurrency above — so the ration is spent
+ * in a single round and the rest of the plan runs at the cheap provider's
+ * half-second pace rather than waiting on twenty-second calls.
+ */
+const MAX_DEEP_PROVIDER_CALLS = 3;
 
 const MAX_ADVERTS_READ = 24;
 const ADVERT_CONCURRENCY = 6;
@@ -453,7 +464,27 @@ export async function runBriefSearch(
    * JSearch cannot, which is the only time its shallower records are better
    * than nothing.
    */
-  const cascade = createProviderCascade(providers);
+  /*
+   * SerpApi is rationed rather than asked for everything.
+   *
+   * Measured on the live deployment: the account is healthy — free plan, 227 of
+   * 250 searches left, no rate limit, status Active — and it still answers a
+   * simple query in 15.6 seconds and sometimes not at all inside sixty. That is
+   * the free plan's priority, not a fault, and no timeout setting fixes it.
+   *
+   * Against a 25-query plan in a 75-second budget that arithmetic never closes,
+   * so asking it everything means it answers nothing and spends the budget
+   * failing: three timeouts left twenty-one of twenty-five queries unrun and
+   * the search carried entirely by the shallow provider.
+   *
+   * Rationed, it does the one thing it is better at. The first queries in a
+   * plan are the bare target roles, and a handful of full adverts for those is
+   * worth more to a score built on "how much of this advert can Sartho read"
+   * than a page of four-line blurbs. Adzuna still answers all 25.
+   */
+  const cascade = createProviderCascade(providers, {
+    maxCalls: { serpapi: MAX_DEEP_PROVIDER_CALLS },
+  });
 
   /*
    * What one provider call may spend, given what is left.
@@ -473,7 +504,7 @@ export async function runBriefSearch(
    * throw away most of what is left.
    */
   const leadCallBudgetMs = () => {
-    const lead = providers.find((provider) => !cascade.isDead(provider));
+    const lead = providers.find((provider) => cascade.willAsk(provider));
     return lead ? providerCallBudgetMs(lead) : MAX_CALL_MS;
   };
   const callTimeoutMs = () => Math.max(leadCallBudgetMs(), Math.min(MAX_CALL_MS, Math.round(remainingMs() / 2)));
@@ -494,7 +525,7 @@ export async function runBriefSearch(
    * answers in under half a second and gains nothing from it.
    */
   const batchConcurrency = () => {
-    const lead = providers.find((provider) => !cascade.isDead(provider));
+    const lead = providers.find((provider) => cascade.willAsk(provider));
     return lead === "serpapi" ? SERPAPI_CONCURRENCY : 1;
   };
 
@@ -897,6 +928,16 @@ export async function runBriefSearch(
       return costly.length ? costly : undefined;
     })(),
     employerPortals: employerPortals.length ? employerPortals : undefined,
+    /*
+     * How many queries each provider actually answered.
+     *
+     * "via Google for Jobs (SerpApi) + Adzuna" is true but says nothing about
+     * proportion, and a rationed provider that answered three of twenty-five
+     * queries reads exactly like one that answered all of them. Depth is the
+     * reason the deep provider is there, so how much of the page came from it
+     * is the thing worth knowing.
+     */
+    providerCalls: cascade.calls.size ? [...cascade.calls].map(([name, count]) => ({ name, count })) : undefined,
     providerTimeouts: cascade.timeouts.size
       ? [...cascade.timeouts].map(([name, count]) => ({ name, count, waitedMs: cascade.timeoutWaits.get(name) ?? 0 }))
       : undefined,

@@ -350,6 +350,14 @@ export function JobSearchPanel({
                 .join(", ")}
             </>
           ) : null}
+          {/*
+            * How many queries each provider answered. A provider rationed to
+            * three of twenty-five reads exactly like one that answered all of
+            * them, and depth is the whole reason the slow one is there.
+            */}
+          {criteria.providerCalls?.length && criteria.providerCalls.length > 1 ? (
+            <> · queries answered: {criteria.providerCalls.map((entry) => `${entry.name} ${entry.count}`).join(", ")}</>
+          ) : null}
           {criteria.providerTimeouts?.length ? (
             <>
               {" "}· {criteria.providerTimeouts
