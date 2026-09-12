@@ -4,9 +4,11 @@ import { approvedEvidenceIds, keepGroundedIds } from "@/lib/ai/grounding";
 import { createSafetyIdentifier, generateStructuredJson } from "@/lib/ai/provider";
 import { aiQuotaResponse, checkAiQuota } from "@/lib/ai/quota";
 import { getAuthenticatedUser } from "@/lib/auth";
-import { evidenceIdsIn, renderResumeText, type ResumeBullet, type ResumeContent, type ResumeRole } from "@/lib/resume/content";
+import { evidenceIdsIn, renderResumeText, resumeContentOf, type ResumeBullet, type ResumeContent, type ResumeRole } from "@/lib/resume/content";
 import { DEFAULT_TEMPLATE } from "@/lib/resume/templates";
+import { tailoringGain } from "@/lib/resume/ats";
 import { RESUME_WRITING_RULES } from "@/lib/resume/writing";
+import type { RuleAnalysis } from "@/lib/types";
 import { saveResumeDraft } from "@/lib/resume/save";
 
 // Same reasoning as the deep-analysis route: the declared budget has to cover
@@ -133,7 +135,7 @@ export async function POST(
   const { id } = await context.params;
   if (!z.string().uuid().safeParse(id).success) return NextResponse.json({ error: "Opportunity not found." }, { status: 404 });
 
-  const [jobResult, requirementsResult, evidenceResult, rolesResult, profileResult] = await Promise.all([
+  const [jobResult, requirementsResult, evidenceResult, rolesResult, profileResult, masterResult] = await Promise.all([
     supabase.from("jobs").select("*").eq("id", id).eq("user_id", user.id).maybeSingle(),
     supabase.from("job_requirements").select("*").eq("job_id", id),
     supabase
@@ -158,6 +160,24 @@ export async function POST(
       .eq("user_id", user.id)
       .order("start_date", { ascending: false }),
     supabase.from("profiles").select("full_name,location,phone,linkedin_url,website_url").eq("id", user.id).maybeSingle(),
+    /*
+     * The master résumé, asked for separately and allowed to fail.
+     *
+     * Tailoring used to rebuild the document from raw evidence every time, so
+     * the master was a dead end: somebody spent an afternoon getting their own
+     * wording right and the first tailored draft threw all of it away and
+     * started again from the database. The two were never a flow, they were
+     * two buttons that happened to read the same table.
+     *
+     * It is its own query rather than two more columns on the one above,
+     * because PostgREST fails a whole select for one unknown column and these
+     * columns arrive by a migration run by hand in the SQL editor. Folded in,
+     * a deployment running ahead of its schema would lose the name and the
+     * contact block too — it would stop being able to draft a résumé at all,
+     * to add a feature it does not have yet. Here the worst case is no master,
+     * which is how this route worked for its whole life.
+     */
+    supabase.from("profiles").select("master_resume,master_resume_text").eq("id", user.id).maybeSingle(),
   ]);
 
   const error = jobResult.error ?? requirementsResult.error ?? evidenceResult.error;
@@ -183,6 +203,19 @@ export async function POST(
     is_current: boolean | null;
   };
   const careerRoles: CareerRole[] = (rolesResult.data ?? []) as CareerRole[];
+
+  /*
+   * The person's own master résumé, if they have built one.
+   *
+   * `resumeContentOf` is the same reader the studio uses, so a master saved
+   * before the structured column existed is still recovered from its text
+   * rather than treated as absent. An error here — the missing-column case —
+   * is silently no master.
+   */
+  const master = masterResult.error
+    ? null
+    : resumeContentOf(masterResult.data?.master_resume, masterResult.data?.master_resume_text ?? null);
+  const masterText = master ? renderResumeText(master) : "";
 
   const quota = await checkAiQuota(supabase, "resume_draft");
   if (!quota.allowed) return aiQuotaResponse(quota);
@@ -211,6 +244,8 @@ export async function POST(
         "Put a bullet in sections[] only when it genuinely belongs to no supplied role, such as a project or a certification.",
         RESUME_WRITING_RULES,
         "Aligning to the advert means choosing which true things to lead with and naming them in the advert's own vocabulary where the evidence already means the same thing. It never means claiming something the evidence does not carry.",
+        "If a master résumé the candidate wrote is supplied, it is your starting document, not a reference. Keep its wording wherever that wording already serves this advert, and change a line only where the advert gives you a reason to. Their phrasing is theirs; a rewrite that says the same thing in different words costs them their voice and gains nothing.",
+        "Say in the change log what you changed and why the advert asked for it. A line you left alone needs no entry.",
         "The change log must explain every material emphasis, rewording, omission or movement.",
       ].join(" "),
       prompt: JSON.stringify({
@@ -220,6 +255,12 @@ export async function POST(
           description: jobResult.data.raw_description,
         },
         requirementMapping: requirementsResult.data,
+        /*
+         * Omitted entirely when there is none, rather than sent as null. A key
+         * whose value is "there is nothing here" is still an instruction to
+         * think about it.
+         */
+        ...(master ? { masterResumeTheCandidateWrote: master } : {}),
         approvedResumeEvidence: evidenceResult.data,
         employmentHistory: careerRoles.map((role) => ({
           roleId: role.id,
@@ -352,12 +393,29 @@ export async function POST(
     });
     if (saveError) throw saveError;
 
+    /*
+     * What tailoring was worth, against the same advert.
+     *
+     * The studio has always scored the draft in front of it, which answers
+     * "how does this read" and never "did the button do anything". Both sides
+     * are scored here against one analysis, so the difference is a like-for-
+     * like comparison rather than two numbers from different questions.
+     *
+     * `before` is null when there is no master to compare against. That is a
+     * different thing from a score of zero and is said as one — an absent
+     * comparison must never render as a drop from nothing.
+     */
+    const signal = tailoringGain(masterText, draft, (jobResult.data.rule_analysis ?? null) as RuleAnalysis | null);
+
     return NextResponse.json({
       applicationId,
       versionName: parsed.versionName.trim(),
       draft,
       changeLog,
       evidenceIds,
+      /* Whether this draft started from the person's own document or from the evidence. */
+      tailoredFromMaster: Boolean(masterText),
+      signal,
     });
   } catch (caught) {
     console.error("Résumé drafting failed", caught);

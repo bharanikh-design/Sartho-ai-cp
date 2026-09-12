@@ -433,6 +433,21 @@ h2.resume-doc-heading.resume-doc-field { margin-bottom: 0; border-bottom: 1px so
 /* The largest gain still on the table, as one thing to do. */
 .studio-score-lever { margin: 0 0 12px; color: var(--text-secondary); font-size: var(--text-xs); line-height: 1.5; }
 
+/*
+ * What tailoring to this advert was worth, against the master résumé.
+ *
+ * Toned rather than coloured-in: it is a finding beside the score, not a
+ * second score competing with it. The "down" case keeps a warm tone rather
+ * than a red one — a draft reading lower than the master is useful
+ * information, not a fault.
+ */
+.studio-tailor-gain { margin: 0 0 12px; padding: 8px 10px; border-left: 2px solid var(--border-subtle, rgba(255,255,255,.12)); color: var(--text-secondary); font-size: var(--text-xs); line-height: 1.5; }
+.studio-tailor-gain b { color: var(--text-primary); }
+.studio-tailor-gain.is-up { border-left-color: rgba(107,207,147,.6); }
+.studio-tailor-gain.is-up b { color: #6bcf93; }
+.studio-tailor-gain.is-down { border-left-color: rgba(224,176,97,.6); }
+.studio-tailor-gain.is-down b { color: #e0b061; }
+
 .studio-fix-start { display: block; width: 100%; margin-bottom: 16px; border: 1px solid rgba(224,176,97,.4); border-radius: 10px; padding: 10px 12px; color: #e0b061; background: rgba(224,176,97,.08); font-family: var(--font-sans); font-size: var(--text-xs); font-weight: 700; text-align: left; cursor: pointer; }
 .studio-fix-start:hover { border-color: rgba(224,176,97,.75); background: rgba(224,176,97,.14); }
 
