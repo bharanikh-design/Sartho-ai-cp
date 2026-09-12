@@ -229,7 +229,23 @@ export function buildAdzunaUrl(query: JobSearchQuery, credentials: { appId: stri
     if (terms.length) params.set("what_or", terms.join(" "));
   }
   if (query.location?.trim()) params.set("where", query.location.trim());
-  if (query.employer?.trim()) params.set("company", query.employer.trim());
+  /*
+   * The employer rides inside `what`, not in a parameter of its own.
+   *
+   * Adzuna's documented search parameters are what, what_and, what_or,
+   * what_exclude, title_only, where, distance, the employment-type flags,
+   * salary bounds, category, max_days_old, sort_by and results_per_page.
+   * `company` is not among them, and sending it answered 400 — which nobody
+   * saw for as long as employer queries sat last in the plan and were skipped
+   * by the time budget. Moving them earlier made a brief naming four employers
+   * fail every one of those queries instead of silently dropping them.
+   *
+   * JSearch already folds the employer into its query text for the same
+   * reason; this makes the two providers agree.
+   */
+  if (query.employer?.trim()) {
+    params.set("what", `${query.keywords} ${query.employer.trim()}`.trim());
+  }
   // Adzuna has no remote flag; "remote" as a location term is the documented
   // workaround and matches how listings there are labelled.
   if (query.remoteOnly && !query.location?.trim()) params.set("where", "remote");
@@ -259,7 +275,19 @@ async function searchAdzuna(query: JobSearchQuery): Promise<JobSearchResult[]> {
     signal: AbortSignal.timeout(query.timeoutMs ?? ADZUNA_TIMEOUT_MS),
   });
   if (!response.ok) {
-    throw new Error(`Adzuna search failed (${response.status}).`);
+    /*
+     * Adzuna explains its refusals in the body, and reporting only the status
+     * turned a one-line fix into an afternoon: "400" says a parameter is wrong
+     * but never which one.
+     */
+    let detail = "";
+    try {
+      const errorBody = (await response.json()) as { exception?: string; doc?: string; display?: string };
+      detail = [errorBody?.exception, errorBody?.display, errorBody?.doc].filter(Boolean).join(" — ");
+    } catch {
+      /* A non-JSON error body still leaves the status worth reporting. */
+    }
+    throw new Error(`Adzuna search failed (${response.status})${detail ? ` — ${detail}` : ""}.`);
   }
 
   let body: { results?: AdzunaResult[] };
@@ -475,11 +503,20 @@ async function searchJSearch(query: JobSearchQuery): Promise<JobSearchResult[]> 
     } catch {
       // non-JSON error body; the status alone still helps.
     }
-    // A masked key fingerprint (never the full value) so a bad paste is
-    // diagnosable: a real RapidAPI key is 50 chars. Anything else is the cause.
+    /*
+     * The masked key fingerprint goes to the server log, not into the error.
+     * Provider errors are rendered on the search page, so it was being shown to
+     * the person using the product — who can do nothing with it — alongside
+     * whatever else the provider said. A bad paste is still diagnosable; it is
+     * diagnosable by the administrator, where it belongs.
+     */
     const key = config.key;
-    const keyHint = `key ${key.length}ch ${key.slice(0, 3)}…${key.slice(-3)}`;
-    throw new Error(`JSearch returned ${response.status}${detail ? ` — ${detail}` : ""} [${keyHint}]`);
+    console.error("JSearch request refused", {
+      status: response.status,
+      detail,
+      keyHint: `${key.length}ch ${key.slice(0, 3)}…${key.slice(-3)}`,
+    });
+    throw new Error(`JSearch returned ${response.status}${detail ? ` — ${detail}` : ""}`);
   }
 
   let body: unknown;
