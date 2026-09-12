@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { classifyAiFailure, describeAiFailure, shortAiFailure } from "./failure";
+import { strictSafeSchema } from "./schema";
 import { AI_ENDPOINTS } from "@/lib/config/ai-endpoints";
 
 export type AiWorkload = "fast" | "quality";
@@ -217,7 +218,13 @@ async function callOpenAI(request: StructuredRequest, apiKey: string, model: str
             type: "json_schema",
             name: request.schemaName,
             strict: true,
-            schema: request.schema,
+            /*
+             * Strict mode 400s on any keyword outside its subset, so the schema
+             * is filtered rather than sent as written. What the keywords asked
+             * for is enforced by the Zod parse on the way back, which is the
+             * only place it was ever actually checked.
+             */
+            schema: strictSafeSchema(request.schema),
           },
         },
       }),
@@ -303,17 +310,36 @@ async function callAnthropic(request: StructuredRequest, apiKey: string, model: 
   return JSON.parse(extractJson(text)) as unknown;
 }
 
+/*
+ * How much room one reply gets.
+ *
+ * This was a ternary whose two branches held the same number, under a comment
+ * explaining that the larger allowance was scoped to the résumé workload while
+ * every other request kept a tighter guardrail. It did neither — everything got
+ * 8192 — and the comment described an intention nobody had implemented.
+ *
+ * The number stays, because a test calls 8192 the model's legal limit and that
+ * is a claim about the API rather than a preference: sending more than a model
+ * accepts is refused outright, which would take down every call rather than the
+ * one long document. Raising it belongs to whoever can check their model's
+ * published output limit, which is what the environment variable is for.
+ *
+ * What changes is that hitting the ceiling is no longer silent. The tailored
+ * résumé is the largest thing Sartho asks for — a summary, every bullet of
+ * every role, a UUID citation list beside each one, and a change log explaining
+ * every edit — and when it overran, Gemini reported MAX_TOKENS, the message
+ * matched no classifier pattern, and the person was told to try again.
+ */
+const GEMINI_DEFAULT_OUTPUT_TOKENS = 8_192;
+
+export function geminiOutputBudget(): number {
+  const configured = Number(process.env.GEMINI_MAX_OUTPUT_TOKENS);
+  if (Number.isFinite(configured) && configured > 0) return Math.floor(configured);
+  return GEMINI_DEFAULT_OUTPUT_TOKENS;
+}
+
 async function callGemini(request: StructuredRequest, apiKey: string, model: string) {
-  /*
-   * A detailed résumé can legitimately exceed the small default response
-   * budget once every role and evidence claim is represented as JSON. Keep
-   * the larger allowance scoped to that one workload: Gemini bills actual
-   * output, not this ceiling, while every other Sartho request retains the
-   * tighter cost guardrail.
-   */
-  const maxOutputTokens = request.schemaName === "sartho_resume_extraction"
-    ? 8_192
-    : 8_192;
+  const maxOutputTokens = geminiOutputBudget();
 
   const { response, result: unknownResult, startedAt } = await fetchProvider(
     "gemini",
@@ -364,7 +390,7 @@ async function callGemini(request: StructuredRequest, apiKey: string, model: str
   const candidate = result.candidates?.[0];
   if (candidate?.finishReason === "MAX_TOKENS") {
     throw new ProviderRequestError(
-      "The document produced more detail than one reply can hold. Try a shorter résumé.",
+      "The reply hit its output token ceiling before the document was finished, so what came back was incomplete. This is a limit in Sartho's configuration, not a problem with the résumé; GEMINI_MAX_OUTPUT_TOKENS raises it.",
       "terminal",
     );
   }
@@ -550,6 +576,52 @@ export async function listGeminiModels(apiKey: string): Promise<string[]> {
       .map((model) => (model.name ?? "").replace(/^models\//, ""))
       .filter((name) => name.length > 0)
       .sort();
+  } catch {
+    return [];
+  }
+}
+
+export type GeminiModelLimit = {
+  name: string;
+  inputTokenLimit: number | null;
+  outputTokenLimit: number | null;
+};
+
+/*
+ * What each Gemini model will actually accept and produce.
+ *
+ * The models endpoint reports both ceilings and listGeminiModels was throwing
+ * them away, so the one number needed to size GEMINI_MAX_OUTPUT_TOKENS — the
+ * limit of the model this deployment is really calling — was only findable by
+ * reading Google's documentation and hoping it matched the model in the
+ * environment variable. It is reported by the API; it should be read from
+ * there.
+ */
+export async function listGeminiModelLimits(apiKey: string): Promise<GeminiModelLimit[]> {
+  try {
+    const response = await fetch(`${AI_ENDPOINTS.GEMINI_BASE}?pageSize=200`, {
+      headers: { "x-goog-api-key": apiKey },
+      signal: AbortSignal.timeout(20_000),
+    });
+    if (!response.ok) return [];
+
+    const body = await response.json() as {
+      models?: Array<{
+        name?: string;
+        supportedGenerationMethods?: string[];
+        inputTokenLimit?: number;
+        outputTokenLimit?: number;
+      }>;
+    };
+    return (body.models ?? [])
+      .filter((model) => model.supportedGenerationMethods?.includes("generateContent"))
+      .map((model) => ({
+        name: (model.name ?? "").replace(/^models\//, ""),
+        inputTokenLimit: model.inputTokenLimit ?? null,
+        outputTokenLimit: model.outputTokenLimit ?? null,
+      }))
+      .filter((model) => model.name.length > 0)
+      .sort((a, b) => a.name.localeCompare(b.name));
   } catch {
     return [];
   }

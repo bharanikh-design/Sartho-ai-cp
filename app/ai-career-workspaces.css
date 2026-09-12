@@ -868,3 +868,11 @@ h2.resume-doc-heading.resume-doc-field { margin-bottom: 0; border-bottom: 1px so
 .resume-doc-tools button svg { width: 17px; height: 17px; }
 /* The destructive-ish one sits apart, after a hairline, so it is never a slip. */
 .resume-doc-tools .resume-doc-tools-split { width: 1px; height: 22px; background: var(--line); margin-inline: 4px; }
+
+/*
+ * The save control, lit only while there is something to save. Disabled it
+ * still holds its place and its tooltip, so "already saved" is a state you can
+ * read rather than an absence you have to infer.
+ */
+.resume-doc-tools button.is-primary { border-color: rgba(125,109,255,.55); color: #a99bff; background: rgba(125,109,255,.10); }
+.resume-doc-tools button.is-primary:hover:not(:disabled) { border-color: #7d6dff; color: #c4baff; background: rgba(125,109,255,.18); }

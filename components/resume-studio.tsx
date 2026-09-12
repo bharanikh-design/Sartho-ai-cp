@@ -60,8 +60,10 @@ const toolIcon = {
   strokeWidth: 1.8, strokeLinecap: "round" as const, strokeLinejoin: "round" as const, "aria-hidden": true,
 };
 
-function ToolIcon({ name }: { name: "pdf" | "word" | "print" | "copy" | "regenerate" | "discard" }) {
+function ToolIcon({ name }: { name: "save" | "pdf" | "word" | "print" | "copy" | "regenerate" | "discard" }) {
   switch (name) {
+    case "save":
+      return <svg {...toolIcon}><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z" /><path d="M17 21v-8H7v8" /><path d="M7 3v5h8" /></svg>;
     case "pdf":
       return <svg {...toolIcon}><path d="M12 3v11" /><path d="m8 10.5 4 3.5 4-3.5" /><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" /></svg>;
     case "word":
@@ -704,6 +706,24 @@ return (
               * the résumé out in points on a real page.
               */}
             <span className="resume-doc-tools">
+              {/*
+                * Saving leads the row, and is shown whether or not there are
+                * edits — a control that vanishes when there is nothing to do
+                * cannot tell you that there is nothing to do. Disabled with a
+                * tooltip says "this version is already in your library"; absent
+                * says nothing at all.
+                */}
+              <button
+                type="button"
+                className={dirty ? "is-primary" : ""}
+                title={dirty ? `Save as a new version of ${draft.jobTitle}` : "Saved — no unsaved edits"}
+                aria-label={dirty ? `Save as a new version of ${draft.jobTitle}` : "Saved. No unsaved edits."}
+                disabled={!dirty || savingId === draft.application.id}
+                onClick={() => void saveVersion(draft, documentKey, content, changesFor(content))}
+              >
+                <ToolIcon name="save" />
+              </button>
+              <span className="resume-doc-tools-split" aria-hidden="true" />
               <button type="button" title="Download PDF" aria-label="Download PDF" onClick={() => void downloadPdf(draft, content)}>
                 <ToolIcon name="pdf" />
               </button>
