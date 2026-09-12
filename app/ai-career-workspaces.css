@@ -823,3 +823,16 @@ h2.resume-doc-heading.resume-doc-field { margin-bottom: 0; border-bottom: 1px so
   /* One inch, the margin every reviewer expects — and the same as the Word file. */
   @page { margin: 1in; }
 }
+
+/*
+ * The "Your résumés" empty state.
+ *
+ * Written inline with hardcoded #a0aec0 and "white", which ignored the theme
+ * tokens every other surface uses and meant the panel did not follow the rest
+ * of the page. The shape is the same; the colours now come from one place.
+ */
+.studio-empty { display: grid; justify-items: center; gap: 10px; padding: 40px 20px; text-align: center; }
+.studio-empty h3 { margin: 0; color: var(--text); font-size: 18px; font-weight: 650; }
+.studio-empty p { margin: 0; max-width: 52ch; color: var(--text-secondary); font-size: var(--text-sm); line-height: 1.6; }
+.studio-empty p a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+.studio-empty-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 6px; }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { planSearchQueries, toSearchKeywords, widenToCountry } from "@/lib/jobs/search-plan";
+import { planSearchQueries, sanitiseProviderKeywords, toSearchKeywords, widenToCountry } from "@/lib/jobs/search-plan";
 
 describe("toSearchKeywords", () => {
   it("reduces a person's phrasing to the primary title", () => {
@@ -147,5 +147,121 @@ describe("widenToCountry", () => {
 
   it("has nothing to widen when the brief was already nationwide", () => {
     expect(widenToCountry(planSearchQueries({ roles: ["BA"], country: "in", locations: [], companies: [], remotePreferences: [] }))).toEqual([]);
+  });
+});
+
+/*
+ * The bug these exist for: the planner asked a model for Boolean search syntax
+ * and handed it to two providers that parse none. Adzuna ANDs every term in
+ * `what`, so `(Engagement Manager OR Delivery Director) -(Junior OR Associate)`
+ * demanded an advert containing the literal words "OR", "Junior" and
+ * "Associate" — no advert at all. A brief came back empty while both providers
+ * answered normally, and nothing on screen said why.
+ */
+describe("provider keyword sanitising", () => {
+  it("reduces a Boolean string to the plain title underneath it", () => {
+    expect(sanitiseProviderKeywords("(Engagement Manager OR Delivery Director)"))
+      .toBe("Engagement Manager Delivery Director");
+  });
+
+  /*
+   * Negatives are removed, not unwrapped. Leaving the words behind would ask
+   * for postings that DO say "Junior" — the exact opposite of the intent.
+   */
+  it("removes negative terms rather than turning them into demands", () => {
+    const cleaned = sanitiseProviderKeywords(
+      "ServiceNow Engagement Manager -(Junior OR Associate OR Assistant)",
+    );
+    expect(cleaned).toBe("ServiceNow Engagement Manager");
+    expect(cleaned).not.toMatch(/junior|associate|assistant/i);
+  });
+
+  it("removes a bare negative term", () => {
+    expect(sanitiseProviderKeywords("Practice Lead -Sales")).toBe("Practice Lead");
+  });
+
+  /*
+   * Operators are stripped as whole words only. "Oracle" and "Android" are job
+   * vocabulary, and a sanitiser that ate their first two letters would quietly
+   * do more damage than the syntax it was cleaning up.
+   */
+  it("does not damage real words that contain an operator", () => {
+    expect(sanitiseProviderKeywords("Oracle Android Engineer")).toBe("Oracle Android Engineer");
+    expect(sanitiseProviderKeywords("Notary Andover Manager")).toBe("Notary Andover Manager");
+  });
+
+  it("keeps the punctuation that belongs in a job title", () => {
+    expect(sanitiseProviderKeywords("C++ Developer")).toBe("C++ Developer");
+    expect(sanitiseProviderKeywords("C# .NET Engineer")).toBe("C# .NET Engineer");
+  });
+
+  it("leaves an ordinary title untouched and survives nonsense", () => {
+    expect(sanitiseProviderKeywords("Enterprise ITSM Practice Lead")).toBe("Enterprise ITSM Practice Lead");
+    expect(sanitiseProviderKeywords("")).toBe("");
+    expect(sanitiseProviderKeywords("-(AND OR NOT)")).toBe("");
+  });
+});
+
+describe("model suggestions widen the search rather than replace it", () => {
+  const brief = {
+    roles: ["ServiceNow Senior Engagement Manager", "Enterprise ITSM Practice Lead"],
+    country: "sg",
+    locations: [],
+    companies: [],
+    remotePreferences: [],
+    employmentTypes: ["Full-time"],
+  };
+
+  /*
+   * The old behaviour swapped the deterministic titles out for the model's
+   * string, so one bad generation threw away toSearchKeywords and the
+   * market-title mapping and searched with strictly less than it would have
+   * without any model at all.
+   */
+  it("always searches the person's own titles, whatever the model returns", () => {
+    const keywords = planSearchQueries({
+      ...brief,
+      smartKeywords: ["(Delivery Director OR Programme Director)"],
+    }).map((query) => query.keywords);
+
+    expect(keywords).toContain("Engagement Manager");
+    expect(keywords).toContain("Practice Lead");
+  });
+
+  it("adds the suggested titles alongside them, sanitised", () => {
+    const keywords = planSearchQueries({
+      ...brief,
+      smartKeywords: ["Delivery Director", "-(Junior OR Associate)"],
+    }).map((query) => query.keywords);
+
+    expect(keywords).toContain("Delivery Director");
+    // Nothing survives that one but negatives, so it must not become a query.
+    expect(keywords.some((word) => /junior|associate/i.test(word))).toBe(false);
+  });
+
+  it("never sends Boolean syntax to a provider", () => {
+    const keywords = planSearchQueries({
+      ...brief,
+      smartKeywords: ["(Engagement Manager OR Delivery Director) AND ServiceNow -(Junior)"],
+    }).map((query) => query.keywords);
+
+    for (const keyword of keywords) {
+      expect(keyword).not.toMatch(/[()]|\bOR\b|\bAND\b|-\(/);
+    }
+  });
+
+  it("produces at least as many queries as it would with no model at all", () => {
+    const plain = planSearchQueries(brief).length;
+    const widened = planSearchQueries({ ...brief, smartKeywords: ["Delivery Director"] }).length;
+    expect(widened).toBeGreaterThanOrEqual(plain);
+  });
+
+  it("does not duplicate a suggestion that repeats a title already searched", () => {
+    const keywords = planSearchQueries({
+      ...brief,
+      smartKeywords: ["Engagement Manager"],
+    }).map((query) => query.keywords);
+
+    expect(keywords.filter((word) => word === "Engagement Manager")).toHaveLength(1);
   });
 });

@@ -173,11 +173,14 @@ export function ResumeWorkbench() {
 
           <ul className="studio-ats-checks">
             {/*
-              * The first check needs a role to compare against and says so
-              * rather than inventing an opinion; this résumé is aimed at
-              * nothing in particular yet.
+              * Only the checks that can actually be judged. This résumé is
+              * aimed at nothing in particular yet, so the evidence check has
+              * no role to compare against and is left out — of the list and,
+              * since the scorer renormalises, of the number too. It used to be
+              * dropped here by position while its zero stayed in the score,
+              * which is how a clean résumé came out at 8 out of 100.
               */}
-            {ats.checks.slice(1).map((check) => (
+            {ats.checks.filter((check) => check.applicable).map((check) => (
               <li key={check.label}>
                 <span aria-hidden="true">{check.state === "pass" ? "✓" : check.state === "warn" ? "!" : "×"}</span>
                 <div><strong>{check.label}</strong><small>{check.detail}</small></div>

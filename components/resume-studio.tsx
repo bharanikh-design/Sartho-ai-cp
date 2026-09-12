@@ -94,6 +94,15 @@ export function ResumeStudio({
   const [savingId, setSavingId] = useState<string | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   /* The draft being printed, so only that one is put on the page. */
+  /*
+   * Which draft, if any, is currently rendered into the print-only markup.
+   *
+   * The @media print rules hide `body *` and reveal only `.resume-print`, and
+   * that element is only in the DOM while this is set. Nothing ever set it, so
+   * the rules did fire on Ctrl+P and found nothing to reveal — the page printed
+   * blank. It is cleared again as soon as the dialog closes so the hidden copy
+   * is not left in the accessibility tree.
+   */
   const [printingId, setPrintingId] = useState<string | null>(null);
   /*
    * The expanded editor. The inline panel is a squeezed two-column strip; a
@@ -224,6 +233,20 @@ export function ResumeStudio({
    * a clean read-only copy of the document on the page and hides everything
    * else, so what prints is the résumé and not the editor around it.
    */
+  /*
+   * A frame between committing the markup and opening the dialog. window.print
+   * snapshots the document synchronously, so calling it in the same tick as the
+   * state change prints the page as it was before React rendered the résumé.
+   */
+  useEffect(() => {
+    if (!printingId) return;
+    const frame = requestAnimationFrame(() => {
+      window.print();
+      setPrintingId(null);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [printingId]);
+
   async function downloadPdf(draft: StudioDraft, content: ResumeContent) {
     try {
       const { pdf } = await import("@react-pdf/renderer");
@@ -628,6 +651,19 @@ return (
             >
               {downloadingId === draft.application.id ? "Building…" : "Download Word"}
             </button>
+            {/*
+              * Printing is not the PDF download in another hat: it goes through
+              * the print stylesheet, which is the only path that lays the
+              * résumé out in points on a real page.
+              */}
+            <button
+              type="button"
+              className="secondary-button"
+              disabled={printingId !== null}
+              onClick={() => setPrintingId(draft.application.id)}
+            >
+              Print
+            </button>
             <button type="button" className="secondary-button" onClick={() => void copy(text, draft.application.id)}>
               {copiedId === draft.application.id ? "Copied ✓" : "Copy draft"}
             </button>
@@ -698,6 +734,11 @@ return (
             * anyone who wants it, behind the row rather than in front of it.
             */}
           <ul className="studio-ats-checks">
+            {/*
+              * Every check here, inapplicable ones included: this draft is
+              * aimed at a real advert, so "run the analysis" is an action the
+              * person can take rather than noise.
+              */}
             {ats.checks.map((check) => (
               <li key={check.label}>
                 <details>
@@ -855,21 +896,35 @@ return (
           /*
            * The guidance lives here, where the absence is, rather than in a
            * card of its own further down the page.
+           *
+           * blockedReason says which of four different situations this is —
+           * no approved evidence, no saved roles, none analysed, or every
+           * analysed role already drafted — and each one is a different next
+           * step. It was computed and then never rendered, so an empty page
+           * offered "Build Master Résumé" to somebody whose evidence was not
+           * ready and whose click could only fail. The generic line is the
+           * fallback for when nothing is actually blocked.
            */
-          <div className="empty-inline-state" style={{ textAlign: "center", padding: "40px 20px" }}>
-            <h3 style={{ fontSize: "18px", color: "white", marginBottom: "10px" }}>Ready to unlock the Resume Templates?</h3>
-            <p style={{ color: "#a0aec0", marginBottom: "20px" }}>
-              Sartho&apos;s templates (including the 2-column ATS-safe designs) are powered by your Career Evidence.
+          <div className="studio-empty">
+            <h3>{blockedReason ? "Not yet — here is why" : "Ready to unlock the résumé templates?"}</h3>
+            <p>
+              {blockedReason ?? <>Sartho&apos;s templates, including the two-column ATS-safe designs, are built from your approved career evidence.</>}
             </p>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "10px", justifyContent: "center" }}>
-              <button type="button" className="primary-button" onClick={generateMaster} disabled={generatingId === "master"}>
-                {generatingId === "master" ? "Building Master Résumé..." : "Build Master Résumé"}
-              </button>
+            <div className="studio-empty-actions">
+              {/*
+                * Offered only when it can succeed. A primary button that is
+                * guaranteed to error is worse than no button.
+                */}
+              {canBuild ? (
+                <button type="button" className="primary-button" onClick={generateMaster} disabled={generatingId === "master"}>
+                  {generatingId === "master" ? "Building master résumé…" : "Build master résumé"}
+                </button>
+              ) : null}
               <Link href="/applications" className="secondary-button">
-                Find a Job in Opportunities
+                Find a role in Opportunities
               </Link>
             </div>
-            {error && generatingId === null && <p style={{ color: 'red', fontSize: '12px', marginTop: '10px' }}>{error}</p>}
+            {error && generatingId === null ? <p className="inline-error" role="alert">{error}</p> : null}
           </div>
         )}
       </section>

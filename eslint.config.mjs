@@ -13,6 +13,22 @@ export default defineConfig([
      * the version outright skips that detection path entirely.
      */
     settings: { react: { version: "19.2.8" } },
+    rules: {
+      /*
+       * An underscore means "deliberately unused", and the codebase already
+       * uses it that way — getPrimaryNavigation keeps its `_activated`
+       * parameter because its tests assert the navigation is the same either
+       * way, which is a decision worth holding in the signature.
+       *
+       * Without this, that placeholder was reported alongside genuinely dead
+       * code, and a warning list that contains things nobody intends to fix is
+       * a warning list people stop reading.
+       */
+      "@typescript-eslint/no-unused-vars": [
+        "warn",
+        { argsIgnorePattern: "^_", varsIgnorePattern: "^_", caughtErrorsIgnorePattern: "^_" },
+      ],
+    },
   },
   globalIgnores([".next/**", "out/**", "build/**", "next-env.d.ts"]),
 ]);

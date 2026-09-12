@@ -13,7 +13,6 @@ import { OnboardingCarousel } from "@/components/onboarding-carousel";
 import { StepCelebration } from "@/components/step-celebration";
 import { isPublicPath } from "@/lib/public-paths";
 import {
-  getPageLabel,
   getMobileNavigation,
   getNavigationForPath,
   isNavigationItemActive,
@@ -39,9 +38,6 @@ export function AppShell({ children }: { children: ReactNode }) {
   const profileMenuRef = useRef<HTMLDivElement>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
-  const [scrolled, setScrolled] = useState(false);
-  const [showWelcome, setShowWelcome] = useState(true);
-
   const [profileOpen, setProfileOpen] = useState(false);
   const [accountPanelOpen, setAccountPanelOpen] = useState(false);
   const [accountAction, setAccountAction] = useState<AccountAction | null>(null);
@@ -50,7 +46,6 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [accountError, setAccountError] = useState<string | null>(null);
   const [theme, setTheme] = useState<"dark" | "light">("dark");
   const [journeyStatus, setJourneyStatus] = useState<JourneyStatus | null>(null);
-  const currentPage = getPageLabel(pathname);
   const activated = journeyStatus?.activated ?? false;
   // Until the journey status arrives, assume a résumé exists: flashing a locked
   // menu at someone who has one would be worse than a moment of optimism.
@@ -108,21 +103,6 @@ export function AppShell({ children }: { children: ReactNode }) {
       listener.subscription.unsubscribe();
     };
   }, [refreshJourneyStatus, supabase]);
-
-  useEffect(() => {
-    // Determine the scroll state
-    const handleScroll = () => setScrolled(window.scrollY > 0);
-    handleScroll();
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    
-    // Auto-dismiss welcome toast after 4 seconds
-    const timer = setTimeout(() => setShowWelcome(false), 4000);
-    
-    return () => {
-      window.removeEventListener("scroll", handleScroll);
-      clearTimeout(timer);
-    };
-  }, []);
 
   useEffect(() => {
     window.addEventListener("sartho:journey-changed", refreshJourneyStatus);
@@ -184,7 +164,6 @@ export function AppShell({ children }: { children: ReactNode }) {
   }
 
   const fullName = (session.user.user_metadata?.full_name as string | undefined) || session.user.email?.split("@")[0] || "User";
-  const firstName = fullName.split(" ")[0];
   const initials = fullName.split(" ").slice(0, 2).map((part) => part[0]?.toUpperCase()).join("") || "U";
 
   async function signOut() {
@@ -461,13 +440,6 @@ function NavItem({ item, active }: { item: NavigationItem; active: boolean }) {
       {active ? <span className="active-pip" aria-hidden="true" /> : null}
     </Link>
   );
-}
-
-function getGreeting() {
-  const hour = new Date().getHours();
-  if (hour < 12) return "Good morning";
-  if (hour < 18) return "Good afternoon";
-  return "Good evening";
 }
 
 function Icon({ name }: { name: NavigationIconName }) {

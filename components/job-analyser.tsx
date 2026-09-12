@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { JobAnalysis } from "@/lib/matching/analyse-job";
-import type { SkillProfile } from "@/lib/matching/skill-profile";
 import type { JobRecord } from "@/lib/types";
 
 const recommendationStyles: Record<JobAnalysis["recommendation"], string> = {
@@ -17,7 +16,7 @@ const recommendationStyles: Record<JobAnalysis["recommendation"], string> = {
 // save persists, so what you see here is what gets stored.
 type PreviewAnalysis = JobAnalysis & { primaryLane?: string };
 
-export function JobAnalyser({ initialJobs, skillProfile }: { initialJobs: JobRecord[]; skillProfile?: SkillProfile }) {
+export function JobAnalyser({ initialJobs }: { initialJobs: JobRecord[] }) {
   const router = useRouter();
   const [title, setTitle] = useState("");
   const [employer, setEmployer] = useState("");

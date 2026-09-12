@@ -33,6 +33,45 @@ export function toSearchKeywords(role: string): string {
 }
 
 /*
+ * Strip search-engine syntax out of a keyword string.
+ *
+ * Neither provider speaks Boolean. Adzuna ANDs every term in `what` — its own
+ * note above `what_or` says so — and JSearch takes one free-text phrase. So a
+ * string like `(Engagement Manager OR Delivery Director) -(Junior OR Associate)`
+ * is not a clever query there, it is a demand for adverts containing the literal
+ * words "OR", "Junior" and "Associate", which is no advert at all. That is the
+ * whole reason a brief could come back with nothing while both providers
+ * answered normally.
+ *
+ * Negative terms are removed rather than kept, because there is no way to
+ * express them: leaving `-(Junior)` in would ask for postings that DO say
+ * "Junior", the exact opposite of the intent. Dropping a term a provider cannot
+ * honour loses a refinement; keeping it loses every result.
+ *
+ * This is the safety net, not the fix. The prompt in planSmartSearchQueries
+ * asks for plain titles precisely so this has nothing to do.
+ */
+export function sanitiseProviderKeywords(raw: string): string {
+  if (!raw) return "";
+  const withoutNegatives = raw
+    /* `-(Junior OR Associate)` and `-Junior`, before anything unwraps them. */
+    .replace(/[-\u2013\u2014]\s*\([^)]*\)/g, " ")
+    .replace(/(^|\s)[-\u2013\u2014][A-Za-z][\w'']*/g, " ");
+
+  return withoutNegatives
+    /* Whatever is left of a group is just words; the brackets are not. */
+    .replace(/[()[\]{}"']/g, " ")
+    /* Operators as standalone words only, so "Android" and "Oracle" survive. */
+    .replace(/\b(?:AND|OR|NOT|TO|NEAR)\b/g, " ")
+    .replace(/[^A-Za-z0-9+#.\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .split(" ")
+    .slice(0, 6)
+    .join(" ");
+}
+
+/*
  * The brief is applied as a hierarchy — country, then geography, then target
  * companies, then roles, then work model. This turns a saved brief into the
  * concrete list of provider queries, in priority order:
@@ -45,6 +84,14 @@ export function toSearchKeywords(role: string): string {
  */
 export const MAX_ROLE_QUERIES = 3;
 export const MAX_LOCATION_QUERIES = 2;
+
+/*
+ * How many model-suggested titles may ride along on top of the person's own.
+ * Two is enough for the semantic expansion that is worth having ("Engagement
+ * Manager" also posted as "Delivery Manager") without letting a generation
+ * spend the whole time budget on guesses.
+ */
+export const MAX_SUGGESTED_QUERIES = 2;
 
 /*
  * Every employer a person lists gets searched — the cap used to be four, so
@@ -82,7 +129,26 @@ export function planSearchQueries(input: {
   const employmentTypes = input.employmentTypes?.length ? input.employmentTypes : undefined;
   const locations = input.locations.map((item) => item.trim()).filter(Boolean).slice(0, MAX_LOCATION_QUERIES);
   const primaryLocation = locations[0];
-  const roles = input.smartKeywords ? input.smartKeywords.slice(0, MAX_ROLE_QUERIES) : input.roles.map(toSearchKeywords).filter(Boolean).slice(0, MAX_ROLE_QUERIES);
+  /*
+   * The deterministic titles are the floor, and the model's suggestions are
+   * added to them — never swapped in for them.
+   *
+   * Replacing was the old behaviour, and it meant one bad generation silently
+   * threw away toSearchKeywords and the market-title mapping written to fix
+   * exactly this, leaving a brief searched with fewer and worse queries than if
+   * the model had never run. A suggestion can now only widen the search.
+   */
+  const baseRoles = input.roles.map(toSearchKeywords).filter(Boolean).slice(0, MAX_ROLE_QUERIES);
+  const suggested = (input.smartKeywords ?? [])
+    .map(sanitiseProviderKeywords)
+    .filter((keywords) => keywords.split(" ").length > 1);
+  const seenRole = new Set<string>();
+  const roles = [...baseRoles, ...suggested].filter((keywords) => {
+    const key = keywords.toLowerCase();
+    if (seenRole.has(key)) return false;
+    seenRole.add(key);
+    return true;
+  }).slice(0, MAX_ROLE_QUERIES + MAX_SUGGESTED_QUERIES);
   const queries: JobSearchQuery[] = [];
   const topRole = roles[0];
   if (!topRole) return queries;
@@ -167,6 +233,17 @@ export function widenToCountry(queries: JobSearchQuery[]): JobSearchQuery[] {
     });
 }
 
+/*
+ * The same plan, widened with alternative job titles for the same work.
+ *
+ * This used to ask for "Boolean/Semantic keyword strings" with negative terms,
+ * and handed the result straight to providers that parse neither — see
+ * sanitiseProviderKeywords for what that cost. It now asks for the only thing a
+ * jobs API can actually use, a title an employer would post, and whatever comes
+ * back is sanitised and added to the deterministic queries rather than put in
+ * their place. A failed or empty generation is not a degraded search: it is the
+ * same search that would have run without it.
+ */
 export async function planSmartSearchQueries(input: Parameters<typeof planSearchQueries>[0]): Promise<JobSearchQuery[]> {
   if (!input.resumeSkills || input.resumeSkills.length === 0 || !input.roles || input.roles.length === 0) {
     return planSearchQueries(input);
@@ -176,7 +253,16 @@ export async function planSmartSearchQueries(input: Parameters<typeof planSearch
     const response = await Promise.race([
       generateStructuredJson({
         workload: "fast",
-        system: "You are an Executive Talent Acquisition specialist.\nGiven a list of target roles and a list of resume skills, generate 3 highly targeted Boolean/Semantic keyword strings that blend the target roles with the most relevant resume skills.\nCRITICAL INSTRUCTIONS:\n1. Include NEGATIVE KEYWORDS to exclude junior/garbage roles (e.g. if the user is senior, append -(Junior OR Associate OR Assistant)).\n2. Exclude Sales/Pre-sales if the skills are purely delivery (e.g. -(Sales OR Account Executive)).\n3. Use regional semantic expansions for titles (e.g. Engagement Manager OR Delivery Director).\nOutput them as a JSON object with a single array property \"keywords\" containing exactly 3 strings.",
+        system: [
+          "You expand a candidate's target roles into the other job titles employers post for the same work.",
+          "Return job titles exactly as an employer would write them in a posting headline.",
+          "RULES:",
+          "1. Plain titles only. No Boolean operators (AND, OR, NOT), no parentheses, no quotes, no minus signs, no wildcards.",
+          "2. One title per string, 2 to 5 words. Not a sentence, not a keyword list.",
+          "3. Give alternative titles for the SAME level and line of work — a senior delivery role expands to 'Delivery Director' or 'Programme Director', never to a junior or a sales title.",
+          "4. Do not repeat a title the candidate already gave you.",
+          "Output JSON: an object with one array property \"keywords\" holding up to 3 strings.",
+        ].join("\n"),
         prompt: `Roles: ${input.roles.join(", ")}\nSkills: ${input.resumeSkills.join(", ")}`,
         schemaName: "smart_search_queries",
         schema: {

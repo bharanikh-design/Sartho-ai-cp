@@ -38,6 +38,20 @@ export type AtsCheck = {
   /** Whether this passed, or "warn" when it is worth a look but not wrong. */
   state: "pass" | "warn" | "fail";
   detail: string;
+  /** This check's share of the score. The applicable weights are renormalised. */
+  weight: number;
+  /**
+   * False when there is nothing to judge the draft against — currently only the
+   * evidence check, which needs a role analysis to have run.
+   *
+   * An inapplicable check is left out of the score rather than scored zero, and
+   * that distinction is the whole point. The workbench always scores with no
+   * analysis, so the evidence check could never pass there; it was still worth
+   * 60% of the number, which capped a flawless résumé at 40 out of 100 and made
+   * the panel hide a check whose zero it was still counting. A question nobody
+   * has been asked is not a question they got wrong.
+   */
+  applicable: boolean;
 };
 
 /** A line the draft would be stronger for quantifying. */
@@ -97,6 +111,32 @@ export type AtsVerdict = {
  */
 const METRIC_SOURCE = /(?:[$£€]\s?\d[\d,.]*\s?(?:k|m|bn|b)?|\d+(?:\.\d+)?\s?%|\b\d+(?:[.,]\d+)*\s?(?:k|m|bn)?\b)/gi;
 
+/*
+ * A calendar year is a date, not a result.
+ *
+ * Every bare number counted as a figure, so "Led the ITSM rollout in 2019" read
+ * as a quantified achievement and a career history full of dates reported a
+ * third of itself as measurable when almost none of it was. The advice built on
+ * that count then told people to add numbers to the wrong lines.
+ *
+ * Currency and percentages are protected, so "$2,000" and "2019%" still count —
+ * a figure that carries a unit was never ambiguous.
+ *
+ * The known limit: a bare quantity that happens to land between 1900 and 2099
+ * and carries no symbol or comma — "2019 basis points" — is read as a date and
+ * not counted. That is the right way round to be wrong. A four-digit number in
+ * that range is a year in almost every résumé that contains one, quantities
+ * large enough to reach it are nearly always written with a separator ("2,400
+ * tickets"), and the cost of the miss is one line being offered a figure it
+ * already has — against a career history that otherwise reports most of its
+ * dates as achievements.
+ */
+const CALENDAR_YEAR = /(?<![$£€]\s?)\b(?:19|20)\d{2}\b(?!\s?%)/g;
+
+function withoutYears(value: string) {
+  return value.replace(CALENDAR_YEAR, " ");
+}
+
 const WEAK_VERBS = /^(?:worked|helped|assisted|responsible for|duties included|handled|did|made)\b/i;
 const PASSIVE_VOICE = /\b(?:was|were|is|are|am|be|been|being)\b\s+\w+ed\b/i;
 
@@ -105,7 +145,7 @@ const PASSIVE_VOICE = /\b(?:was|were|is|are|am|be|been|being)\b\s+\w+ed\b/i;
  * so reusing one across bullets silently skips every other line.
  */
 function hasMetric(line: string) {
-  return new RegExp(METRIC_SOURCE.source, "i").test(line);
+  return new RegExp(METRIC_SOURCE.source, "i").test(withoutYears(line));
 }
 
 function normalise(value: string) {
@@ -138,6 +178,27 @@ export function bulletsIn(draft: string): string[] {
   return strictBullets;
 }
 
+const stateScore = (state: AtsCheck["state"]) => (state === "pass" ? 100 : state === "warn" ? 55 : 0);
+
+/*
+ * A check's contribution, 0-100. The evidence check reports its own coverage
+ * rather than a banded pass/warn/fail, because it is a proportion already and
+ * rounding it to three steps threw away the difference between "half your
+ * strengths" and "almost all of them".
+ */
+function checkValue(check: AtsCheck, strengthCoverage: number): number {
+  return check.label === "Evidence you can back, used" ? strengthCoverage : stateScore(check.state);
+}
+
+function scoreFromChecks(checks: AtsCheck[], strengthCoverage: number): number {
+  const applicable = checks.filter((check) => check.applicable);
+  /* Nothing to judge at all — an empty draft with no analysis. */
+  if (!applicable.length) return 0;
+  const total = applicable.reduce((sum, check) => sum + check.weight, 0);
+  const earned = applicable.reduce((sum, check) => sum + check.weight * checkValue(check, strengthCoverage), 0);
+  return Math.round(earned / total);
+}
+
 export function scoreAts(draft: string, analysis: RuleAnalysis | null): AtsScore {
   const text = draft.trim();
   const haystack = normalise(text);
@@ -164,7 +225,7 @@ export function scoreAts(draft: string, analysis: RuleAnalysis | null): AtsScore
   const weakBullets = bullets
     .map((bullet, index) => ({ index, text: bullet }))
     .filter((bullet) => !hasMetric(bullet.text));
-  const metricsFound = text.match(new RegExp(METRIC_SOURCE.source, "gi"))?.length ?? 0;
+  const metricsFound = withoutYears(text).match(new RegExp(METRIC_SOURCE.source, "gi"))?.length ?? 0;
 
   /*
    * Judged per bullet, not per document.
@@ -178,9 +239,31 @@ export function scoreAts(draft: string, analysis: RuleAnalysis | null): AtsScore
   const quantifiedBullets = bullets.length - weakBullets.length;
   const bulletCoverage = bullets.length ? Math.round((quantifiedBullets / bullets.length) * 100) : 0;
 
+  /*
+   * The two checks every résumé tool runs and this one had written down but
+   * never wired up: both regexes sat here unused, so a draft opening six
+   * bullets with "Responsible for" scored exactly the same as one opening them
+   * with "Cut", "Led" and "Shipped".
+   */
+  const weakVerbBullets = bullets.filter((bullet) => WEAK_VERBS.test(bullet));
+  const passiveBullets = bullets.filter((bullet) => PASSIVE_VOICE.test(bullet));
+  const strongVerbShare = bullets.length
+    ? Math.round(((bullets.length - weakVerbBullets.length) / bullets.length) * 100)
+    : 0;
+  const activeVoiceShare = bullets.length
+    ? Math.round(((bullets.length - passiveBullets.length) / bullets.length) * 100)
+    : 0;
+
   const checks: AtsCheck[] = [
     {
       label: "Evidence you can back, used",
+      weight: 0.5,
+      /*
+       * The only check that can be inapplicable. Without a role analysis there
+       * is no list of strengths to look for, which is a different thing from
+       * looking and finding none.
+       */
+      applicable: evidenced.length > 0,
       state: strengthCoverage >= 80 ? "pass" : strengthCoverage >= 50 ? "warn" : "fail",
       /*
        * The caveat has to be in the sentence, not only in the score.
@@ -203,6 +286,8 @@ export function scoreAts(draft: string, analysis: RuleAnalysis | null): AtsScore
     },
     {
       label: "Quantified achievement",
+      weight: 0.2,
+      applicable: true,
       state: !bullets.length ? "fail" : bulletCoverage >= 70 ? "pass" : bulletCoverage >= 40 ? "warn" : "fail",
       detail: !bullets.length
         ? "No bullet points found, so there is nothing to quantify."
@@ -212,23 +297,49 @@ export function scoreAts(draft: string, analysis: RuleAnalysis | null): AtsScore
     },
     {
       label: "Length",
+      weight: 0.12,
+      applicable: true,
       state: wordCount >= 350 && wordCount <= 900 ? "pass" : wordCount ? "warn" : "fail",
       detail: wordCount
         ? `${wordCount} words. Most parsers and most readers do best between 350 and 900.`
         : "The draft is empty.",
     },
+    {
+      label: "Strong opening verbs",
+      weight: 0.1,
+      applicable: bullets.length > 0,
+      state: !bullets.length ? "fail" : strongVerbShare >= 90 ? "pass" : strongVerbShare >= 70 ? "warn" : "fail",
+      detail: !bullets.length
+        ? "No bullet points found, so there is nothing to check."
+        : weakVerbBullets.length
+          ? `${weakVerbBullets.length} of ${bullets.length} line${bullets.length === 1 ? "" : "s"} open with a verb that describes a duty rather than a result — "responsible for", "helped", "worked on".`
+          : `All ${bullets.length} lines open on something you did.`,
+    },
+    {
+      label: "Active voice",
+      weight: 0.08,
+      applicable: bullets.length > 0,
+      state: !bullets.length ? "fail" : activeVoiceShare >= 85 ? "pass" : activeVoiceShare >= 65 ? "warn" : "fail",
+      detail: !bullets.length
+        ? "No bullet points found, so there is nothing to check."
+        : passiveBullets.length
+          ? `${passiveBullets.length} of ${bullets.length} line${bullets.length === 1 ? "" : "s"} are written in the passive voice, which hides who did the work.`
+          : `All ${bullets.length} lines say who did the work.`,
+    },
   ];
 
   /*
    * Weighted toward vocabulary because that is what gates an automated screen;
-   * the other two matter to the person who reads it afterwards.
+   * the rest matter to the person who reads it afterwards.
+   *
+   * Renormalised over the checks that apply, so the number always answers the
+   * same question — "how good is this draft, out of everything that could be
+   * judged about it" — whether or not a role analysis has run. Scoring an
+   * unanswerable check as zero instead made a flawless résumé in the workbench
+   * top out at 40, and the resulting red number was read as a verdict on the
+   * résumé rather than on the missing analysis.
    */
-  const stateScore = (state: AtsCheck["state"]) => (state === "pass" ? 100 : state === "warn" ? 55 : 0);
-  const score = Math.round(
-    strengthCoverage * 0.6
-    + stateScore(checks[1].state) * 0.25
-    + stateScore(checks[2].state) * 0.15,
-  );
+  const score = scoreFromChecks(checks, strengthCoverage);
 
   return { score, unusedStrengths, unbackedRequirements, weakBullets, bulletCount: bullets.length, metricsFound, wordCount, strengthCoverage, checks };
 }
@@ -255,34 +366,64 @@ export function atsVerdict(ats: AtsScore): AtsVerdict {
         ? "Getting there"
         : "Needs work";
 
-  const stateScore = (state: AtsCheck["state"]) => (state === "pass" ? 100 : state === "warn" ? 55 : 0);
+  /*
+   * The biggest lever is arithmetic, not opinion: the score is a weighted mean,
+   * so the check with the most weight still on the table is the one worth
+   * fixing first. Reading the weights off the checks themselves means this can
+   * no longer drift from the scoring — it used to repeat 0.6/0.25/0.15 as
+   * literals beside a scorer that owned the same three numbers.
+   */
+  const total = ats.checks.filter((check) => check.applicable).reduce((sum, check) => sum + check.weight, 0) || 1;
 
-  const gains: Array<{ gain: number; lever: string }> = [
-    {
-      gain: (100 - ats.strengthCoverage) * 0.6,
-      lever: ats.unusedStrengths.length
-        ? `Work in ${ats.unusedStrengths.length} strength${ats.unusedStrengths.length === 1 ? "" : "s"} your evidence already backs`
-        : "Run the role analysis so there is something to check the draft against",
-    },
-    {
-      gain: (100 - stateScore(ats.checks[1].state)) * 0.25,
-      lever: ats.bulletCount
-        ? `Put a figure in ${ats.weakBullets.length} line${ats.weakBullets.length === 1 ? "" : "s"} that carry none`
-        : "Break the draft into bullet points",
-    },
-    {
-      gain: (100 - stateScore(ats.checks[2].state)) * 0.15,
-      lever: !ats.wordCount
-        ? "Write something to score"
-        : ats.wordCount < 350
-          ? `Add about ${350 - ats.wordCount} more words`
-          : ats.wordCount > 900
-            ? `Cut about ${ats.wordCount - 900} words`
-            : "Length is fine",
-    },
-  ];
+  const leverFor = (check: AtsCheck): string => {
+    switch (check.label) {
+      case "Evidence you can back, used":
+        return ats.unusedStrengths.length
+          ? `Work in ${ats.unusedStrengths.length} strength${ats.unusedStrengths.length === 1 ? "" : "s"} your evidence already backs`
+          : "Run the role analysis so there is something to check the draft against";
+      case "Quantified achievement":
+        return ats.bulletCount
+          ? `Put a figure in ${ats.weakBullets.length} line${ats.weakBullets.length === 1 ? "" : "s"} that carry none`
+          : "Break the draft into bullet points";
+      case "Length":
+        return !ats.wordCount
+          ? "Write something to score"
+          : ats.wordCount < 350
+            ? `Add about ${350 - ats.wordCount} more words`
+            : ats.wordCount > 900
+              ? `Cut about ${ats.wordCount - 900} words`
+              : "Length is fine";
+      case "Strong opening verbs":
+        return "Open each line with what you did, not what you were responsible for";
+      case "Active voice":
+        return "Rewrite the passive lines so they say who did the work";
+      default:
+        return check.label;
+    }
+  };
 
-  const best = gains.reduce((worst, entry) => (entry.gain > worst.gain ? entry : worst));
+  const best = ats.checks
+    .filter((check) => check.applicable)
+    .map((check) => ({
+      /* Normalised the same way the score is, so the two always agree. */
+      gain: ((100 - checkValue(check, ats.strengthCoverage)) * check.weight) / total,
+      lever: leverFor(check),
+    }))
+    .reduce<{ gain: number; lever: string } | null>(
+      (worst, entry) => (worst === null || entry.gain > worst.gain ? entry : worst),
+      null,
+    );
+
+  /*
+   * The one check that is worth naming even though it scores nothing: without a
+   * role analysis half the score simply does not exist, and a person looking at
+   * the number deserves to know that before they rewrite anything.
+   */
+  const evidence = ats.checks.find((check) => check.label === "Evidence you can back, used");
+  if (evidence && !evidence.applicable) {
+    return { headline, lever: "Analyse a role to score this draft against it — half the score is waiting on that" };
+  }
+
   /* Under a point of gain is not a lever, it is a nag. */
-  return { headline, lever: best.gain >= 1 ? best.lever : null };
+  return { headline, lever: best && best.gain >= 1 ? best.lever : null };
 }

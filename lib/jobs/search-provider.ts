@@ -353,6 +353,29 @@ export function mapJSearchResult(raw: JSearchResult): JobSearchResult | null {
   };
 }
 
+/*
+ * How many pages of ten to ask JSearch for.
+ *
+ * `limit` was accepted on every query and then dropped on the floor here, so a
+ * query asking for 20 results got JSearch's default single page of ten however
+ * it was written — half the roles the planner believed it had requested, with
+ * nothing anywhere saying so.
+ *
+ * The ceiling is an environment setting rather than a constant because it is a
+ * billing question, not an engineering one: num_pages above 1 is a paid RapidAPI
+ * feature, and a deployment on the free tier asking for two gets an error
+ * instead of more jobs. Default 1 keeps that deployment working; raising
+ * JSEARCH_MAX_PAGES is how a paid plan buys the depth it is already paying for.
+ */
+export function jsearchPages(limit: number | undefined): number {
+  const ceiling = Math.max(1, Math.min(20, Number(process.env.JSEARCH_MAX_PAGES) || 1));
+  const wanted = Math.ceil(Math.max(1, limit ?? 10) / JSEARCH_RESULTS_PER_PAGE);
+  return Math.min(ceiling, wanted);
+}
+
+/** JSearch returns ten records per page; the API exposes no page-size control. */
+const JSEARCH_RESULTS_PER_PAGE = 10;
+
 /**
  * The JSearch request parameters for a query — pure, so the criteria mapping
  * is testable. JSearch takes one free-text query: the employer and city ride
@@ -370,7 +393,7 @@ export function buildJSearchParams(query: JobSearchQuery): URLSearchParams {
   const params = new URLSearchParams({
     query: text,
     page: "1",
-    num_pages: "1",
+    num_pages: String(jsearchPages(query.limit)),
     country: resolveCountry(query),
   });
   if (query.remoteOnly) params.set("work_from_home", "true");
@@ -560,10 +583,4 @@ export async function searchWithProvider(
   return searchAdzuna(query);
 }
 
-/** Query the active provider. Throws JobSearchNotConfiguredError when none is set. */
-export async function searchJobs(query: JobSearchQuery): Promise<JobSearchResult[]> {
-  const provider = activeJobSearchProvider();
-  if (provider === "jsearch") return searchJSearch(query);
-  if (provider === "adzuna") return searchAdzuna(query);
-  throw new JobSearchNotConfiguredError();
-}
+

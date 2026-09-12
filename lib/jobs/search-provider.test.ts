@@ -1,9 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import {
   adzunaCoversCountry,
   buildAdzunaUrl,
   buildJSearchParams,
   extractJSearchJobs,
+  jsearchPages,
   mapAdzunaResult,
   mapJSearchResult,
   normaliseAdzunaCountry,
@@ -327,5 +328,46 @@ describe("extractJSearchJobs", () => {
         data: { error: "Access forbidden" },
       }),
     ).toThrow("Access forbidden");
+  });
+});
+
+/*
+ * `limit` was accepted on every query and then dropped here, so a query asking
+ * for 20 roles got JSearch's default single page of ten however it was written.
+ * The ceiling stays an environment setting because it is a billing question:
+ * num_pages above 1 is a paid RapidAPI feature, and a free-tier deployment
+ * asking for two gets an error instead of more jobs.
+ */
+describe("JSearch paging", () => {
+  afterEach(() => {
+    delete process.env.JSEARCH_MAX_PAGES;
+  });
+
+  it("asks for one page by default, whatever the query wanted", () => {
+    delete process.env.JSEARCH_MAX_PAGES;
+    expect(jsearchPages(20)).toBe(1);
+    expect(jsearchPages(undefined)).toBe(1);
+  });
+
+  it("buys the depth a paid plan allows, without exceeding what was asked for", () => {
+    process.env.JSEARCH_MAX_PAGES = "5";
+    expect(jsearchPages(20)).toBe(2);
+    expect(jsearchPages(10)).toBe(1);
+    expect(jsearchPages(100)).toBe(5);
+  });
+
+  it("never asks for less than one page, or more than the API allows", () => {
+    process.env.JSEARCH_MAX_PAGES = "0";
+    expect(jsearchPages(20)).toBe(1);
+    process.env.JSEARCH_MAX_PAGES = "999";
+    expect(jsearchPages(1000)).toBe(20);
+    process.env.JSEARCH_MAX_PAGES = "nonsense";
+    expect(jsearchPages(50)).toBe(1);
+  });
+
+  it("carries the page count into the request", () => {
+    process.env.JSEARCH_MAX_PAGES = "3";
+    const params = buildJSearchParams({ keywords: "Engagement Manager", country: "sg", limit: 30 });
+    expect(params.get("num_pages")).toBe("3");
   });
 });
