@@ -109,14 +109,19 @@ export default async function DashboardPage() {
         metric={{ value: pendingSteps.length.toString(), label: pendingSteps.length === 1 ? "action required" : "actions required", href: "/journey" }}
       />
 
-      <JourneyNudgeCard progress={journey.progress} isActivated={journey.activated} steps={journey.steps} />
-
       {/*
-        * Below the nudge, not above it: somebody mid-flow wants their next step
-        * first. This is for the four things they have not reached yet, and for
-        * the browser extension, which had no home a person could find.
+        * Directly under the header, above the nudge.
+        *
+        * It was below the nudge on the reasoning that somebody mid-flow wants
+        * their next step first. That is true and it made the card the third
+        * thing on a long page — which for anybody who had not already found
+        * the extension or the master résumé meant they never did. A four-tile
+        * card is read in two seconds; the next step is still immediately under
+        * it.
         */}
       <PlatformHero />
+
+      <JourneyNudgeCard progress={journey.progress} isActivated={journey.activated} steps={journey.steps} />
 
       <ProfileScorecard steps={journey.steps} progress={journey.progress} activated={journey.activated} />
 

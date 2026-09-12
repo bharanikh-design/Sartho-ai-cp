@@ -17,7 +17,8 @@
     "test:watch": "vitest",
     "check:ai": "NODE_USE_ENV_PROXY=1 LIVE_AI_CHECK=1 vitest run lib/ai/gemini-live.test.ts lib/ai/openai-live.test.ts",
     "extension:zip": "node scripts/build-extension-zip.mjs",
-    "prebuild": "node scripts/build-extension-zip.mjs"
+    "prebuild": "node scripts/build-extension-zip.mjs && node scripts/verify-extension-zip.mjs",
+    "extension:verify": "node scripts/verify-extension-zip.mjs"
   },
   "dependencies": {
     "@react-pdf/renderer": "^4.9.0",

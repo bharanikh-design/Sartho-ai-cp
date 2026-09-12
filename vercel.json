@@ -1,5 +1,5 @@
 {
-  "buildCommand": "next build --webpack",
+  "buildCommand": "npm run prebuild && next build --webpack",
   "crons": [
     {
       "path": "/api/cron/daily-digest",
