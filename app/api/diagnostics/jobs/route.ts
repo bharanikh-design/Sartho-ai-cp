@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAuthenticatedUser, isOperationsAdmin } from "@/lib/auth";
 import { configuredJobSearchProviders, probeJobProvider, type JobSearchProviderName } from "@/lib/jobs/search-provider";
+import { serpApiAccount, serpApiConfig } from "@/lib/jobs/serpapi";
 
 /*
  * Which jobs providers this deployment can actually reach.
@@ -39,6 +40,21 @@ export async function GET() {
   const order = configuredJobSearchProviders();
   const providers = await Promise.all(ALL_PROVIDERS.map((provider) => probeJobProvider(provider)));
 
+  /*
+   * SerpApi's own account, asked separately from any search.
+   *
+   * A search that hangs says nothing about why it hung — a spent monthly
+   * allowance and a tripped hourly rate limit both look exactly like a slow
+   * network from the outside, and that confusion has cost this project a day
+   * twice. The allowance is not in a search response; it is here.
+   */
+  let serpapi: Awaited<ReturnType<typeof serpApiAccount>> | { error: string } | null = null;
+  if (serpApiConfig()) {
+    serpapi = await serpApiAccount().catch((caught) => ({
+      error: caught instanceof Error ? caught.message : "Could not read the SerpApi account.",
+    }));
+  }
+
   const working = providers.filter((provider) => provider.reachable);
   const preferred = order[0] ? providers.find((provider) => provider.provider === order[0]) : undefined;
 
@@ -53,6 +69,7 @@ export async function GET() {
       /* The order the cascade tries them in, so a surprise is visible as one. */
       order: order.length ? order : null,
       providers,
+      serpapi,
     },
     { headers: { "cache-control": "no-store" } },
   );

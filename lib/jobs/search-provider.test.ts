@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import {
   adzunaCoversCountry,
+  configuredJobSearchProviders,
   buildAdzunaUrl,
   buildJSearchParams,
   extractJSearchJobs,
@@ -415,5 +416,75 @@ describe("Adzuna employer queries", () => {
   it("agrees with how JSearch folds an employer into its query", () => {
     expect(buildJSearchParams(employerQuery).get("query")).toContain("Accenture");
     expect(new URL(buildAdzunaUrl(employerQuery, credentials)).searchParams.get("what")).toContain("Accenture");
+  });
+});
+
+/*
+ * A provider can stop answering while its key stays perfectly valid, and then
+ * it is not neutral — it is a cost. A SerpApi that never returns still takes
+ * its full twenty seconds out of a seventy-five second budget before anything
+ * else is asked, which measurably left twenty-one of twenty-five queries unrun.
+ */
+describe("turning a provider off without deleting its key", () => {
+  const env = { ...process.env };
+  afterEach(() => { process.env = { ...env }; });
+
+  function configure() {
+    process.env.SERPAPI_KEY = "serp";
+    process.env.JSEARCH_RAPIDAPI_KEY = "rapid";
+    process.env.ADZUNA_APP_ID = "id";
+    process.env.ADZUNA_APP_KEY = "key";
+  }
+
+  it("leaves the order alone when nothing is disabled", () => {
+    configure();
+    delete process.env.JOBS_DISABLED_PROVIDERS;
+    expect(configuredJobSearchProviders()).toEqual(["serpapi", "jsearch", "adzuna"]);
+  });
+
+  it("drops the named provider and keeps its key", () => {
+    configure();
+    process.env.JOBS_DISABLED_PROVIDERS = "serpapi";
+    expect(configuredJobSearchProviders()).toEqual(["jsearch", "adzuna"]);
+    expect(process.env.SERPAPI_KEY).toBe("serp");
+  });
+
+  it("takes several, comma or space separated", () => {
+    configure();
+    process.env.JOBS_DISABLED_PROVIDERS = "serpapi, jsearch";
+    expect(configuredJobSearchProviders()).toEqual(["adzuna"]);
+    process.env.JOBS_DISABLED_PROVIDERS = "serpapi jsearch";
+    expect(configuredJobSearchProviders()).toEqual(["adzuna"]);
+  });
+
+  it("does not mind casing or stray whitespace", () => {
+    configure();
+    process.env.JOBS_DISABLED_PROVIDERS = "  SerpApi  ";
+    expect(configuredJobSearchProviders()).toEqual(["jsearch", "adzuna"]);
+  });
+
+  /*
+   * Search going dark because of a typo in an environment variable is worse
+   * than one slow provider, so disabling everything is read as the mistake it
+   * is rather than obeyed.
+   */
+  it("refuses to disable every provider", () => {
+    configure();
+    process.env.JOBS_DISABLED_PROVIDERS = "serpapi,jsearch,adzuna";
+    expect(configuredJobSearchProviders()).toEqual(["serpapi", "jsearch", "adzuna"]);
+  });
+
+  it("ignores a name that is not a provider", () => {
+    configure();
+    process.env.JOBS_DISABLED_PROVIDERS = "linkedin";
+    expect(configuredJobSearchProviders()).toEqual(["serpapi", "jsearch", "adzuna"]);
+  });
+
+  /* A pin to a disabled provider is ignored rather than resurrecting it. */
+  it("does not let the pin override the disable", () => {
+    configure();
+    process.env.JOBS_DISABLED_PROVIDERS = "serpapi";
+    process.env.JOBS_SEARCH_PROVIDER = "serpapi";
+    expect(configuredJobSearchProviders()).toEqual(["jsearch", "adzuna"]);
   });
 });
