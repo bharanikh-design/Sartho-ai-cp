@@ -199,10 +199,25 @@ export async function runBriefSearch(
     getSearchPreferences(supabase, userId),
   ]);
 
-  const activeLanes = lanes
+  /*
+   * Two different questions, which were being answered with one list.
+   *
+   * How many roles to SEARCH for is a budget: each one costs a provider call,
+   * so it is capped. What line of work a person is IN is not a budget at all —
+   * it is who they are, and every target role they set is part of the answer.
+   *
+   * Sharing the capped list between the two silently discarded the tail of the
+   * brief before the family filter ever saw it. Somebody with five target roles
+   * whose fourth and fifth were "EUC and ITSM Transformation Lead" and "IT
+   * Infrastructure & Cloud Migration Program Manager" had those dropped, so the
+   * filter concluded they worked in Consulting and nothing else — and then hid
+   * every IT operations role it found as "a different line of work". The brief
+   * said IT infrastructure twice and the search refused to show any.
+   */
+  const targetedLanes = lanes
     .filter((lane) => lane.active)
-    .sort((a, b) => a.priority - b.priority)
-    .slice(0, MAX_ROLE_QUERIES);
+    .sort((a, b) => a.priority - b.priority);
+  const activeLanes = targetedLanes.slice(0, MAX_ROLE_QUERIES);
   if (!activeLanes.length) {
     return {
       ok: false,
@@ -242,7 +257,8 @@ export async function runBriefSearch(
   // Employers typed into the cities list (before companies had a field) are
   // treated as companies here too, so an unsaved brief still searches sensibly.
   const brief = splitMisfiledCompanies(preferences.targetLocations, preferences.targetCompanies);
-  const roleNames = activeLanes.map((lane) => lane.name);
+  /* Every target role, because this decides reach rather than spend. */
+  const roleNames = targetedLanes.map((lane) => lane.name);
   // Extract the most common domains/skills from the user's evidence to contextualize the search.
   const domainCounts = new Map<string, number>();
   for (const record of (evidence || [])) {
@@ -623,12 +639,12 @@ export async function runBriefSearch(
           new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 8000))
         ]) as { score: number; recommendation: "apply" | "review" | "skip"; justification: string };
 
-        // We map the LLM reasoning directly to the match object
-        // We use closestTitle field as a hack to pass the justification to the UI since it's an existing string field
-        // Wait, closestTitle is already used. Let's just override missingRequirements or matchedSkills with the justification as a single item list so the UI displays it.
-        // Actually, missingRequirements is rendered as an array of red X strings. matchedSkills is rendered as green checks.
-        // We will just replace matchedSkills with the justification.
-        
+        /*
+         * The justification rides in matchedSkills because that is the field the
+         * card renders as a green tick beside the role. It is a borrowed slot,
+         * not a good one — a screening opinion is not a matched skill — and it
+         * should get a field of its own the next time this shape changes.
+         */
         return {
           ...match,
           overallMatch: response.score,
@@ -642,10 +658,24 @@ export async function runBriefSearch(
     })
   );
   
-  // Filter out skipped jobs from the final results and re-sort by LLM score
-  const results: ScoredJobMatch[] = llmScreenedResults
-    .filter(r => r.recommendation !== "skip")
-    .sort((a, b) => b.overallMatch - a.overallMatch);
+  /*
+   * The screen ranks; it is not allowed to empty the page.
+   *
+   * Every role here has already survived the deterministic filters — seniority,
+   * line of work, market, stated years — each of which counts what it removed
+   * and can say why. This last pass is a single unvalidated model call per role
+   * with no such account, and it held a veto: a model in a strict mood returned
+   * "skip" across the board and the page said "no live matches for your brief",
+   * indistinguishable from a search that found nothing at all.
+   *
+   * So its opinion sorts and annotates, and removes only while something
+   * survives it. When it would reject everything, the roles are shown with its
+   * reasoning attached and the person decides — which is the whole promise of
+   * the product, and strictly better than an empty page nobody can argue with.
+   */
+  const sorted = [...llmScreenedResults].sort((a, b) => b.overallMatch - a.overallMatch);
+  const kept = sorted.filter((match) => match.recommendation !== "skip");
+  const results: ScoredJobMatch[] = kept.length ? kept : sorted;
 
 
   const criteria: SearchCriteria = {
