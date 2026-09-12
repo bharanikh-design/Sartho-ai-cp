@@ -26,7 +26,6 @@ import { createProviderCascade } from "@/lib/jobs/provider-cascade";
 import {
   MAX_COMPANY_QUERIES,
   MAX_LOCATION_QUERIES,
-  MAX_ROLE_QUERIES,
   planSmartSearchQueries,
   toSearchKeywords,
   widenToCountry,
@@ -84,6 +83,8 @@ export type ScoredJobMatch = {
    */
   platforms: string[];
   applyDirect: boolean;
+  /** Optional model commentary; it never changes the evidence-grounded score. */
+  screeningInsight?: string | null;
 };
 
 /* What was actually searched, so the page (or email) can say so. */
@@ -183,6 +184,9 @@ export type SearchCriteria = {
   employerPortals?: Array<{ employer: string; status: "searched" | "empty" | "failed" | "unknown"; found: number }>;
   queriesRun: number;
   queriesSkipped: number;
+  targetRolesRequested?: number;
+  targetRolesSearched?: number;
+  employersChecked?: number;
 };
 
 export type BriefSearchFailureCode = "not_configured" | "no_targets" | "country_unsupported" | "provider_error";
@@ -190,6 +194,10 @@ export type BriefSearchFailureCode = "not_configured" | "no_targets" | "country_
 export type BriefSearchOutcome =
   | { ok: true; results: ScoredJobMatch[]; criteria: SearchCriteria }
   | { ok: false; code: BriefSearchFailureCode; error: string };
+
+export function withScreeningInsight(match: ScoredJobMatch, insight: string): ScoredJobMatch {
+  return { ...match, screeningInsight: insight };
+}
 
 /** Fewer strong matches than this from the cities alone triggers a country-wide pass. */
 export const MIN_STRONG_BEFORE_WIDENING = 3;
@@ -280,7 +288,7 @@ export async function runBriefSearch(
   const targetedLanes = lanes
     .filter((lane) => lane.active)
     .sort((a, b) => a.priority - b.priority);
-  const activeLanes = targetedLanes.slice(0, MAX_ROLE_QUERIES);
+  const activeLanes = targetedLanes;
   if (!activeLanes.length) {
     return {
       ok: false,
@@ -412,6 +420,8 @@ export async function runBriefSearch(
   const byUrl = new Map<string, JobSearchResult>();
   let queriesRun = 0;
   let queriesSkipped = 0;
+  const searchedTargetRoles = new Set<string>();
+  const searchedEmployers = new Set<string>();
   let lastQueryEndedAt = 0;
 
   /*
@@ -462,7 +472,8 @@ export async function runBriefSearch(
   const callTimeoutMs = () => Math.max(leadCallBudgetMs(), Math.min(MAX_CALL_MS, Math.round(remainingMs() / 2)));
 
   async function run(list: JobSearchQuery[]) {
-    for (let index = 0; index < list.length; index++) {
+    const concurrency = providers[0] === "serpapi" ? 3 : 1;
+    for (let index = 0; index < list.length; index += concurrency) {
       if (Date.now() - startedAt > budgetMs) { queriesSkipped += list.length - index; break; }
       if (cascade.exhausted()) { queriesSkipped += list.length - index; break; }
       /*
@@ -473,7 +484,7 @@ export async function runBriefSearch(
        */
       if (remainingMs() < leadCallBudgetMs()) { queriesSkipped += list.length - index; break; }
 
-      if (queriesRun > 0) {
+      if (queriesRun > 0 && concurrency === 1) {
         /*
          * JSearch (RapidAPI) allows one request a second, and the gap is only
          * owed when the previous query did not already take that long. It used
@@ -492,14 +503,24 @@ export async function runBriefSearch(
         if (since < gap) await new Promise((resolve) => setTimeout(resolve, gap - since));
       }
 
-      for (const result of await cascade.run({ ...list[index], timeoutMs: callTimeoutMs() })) {
-        if (!byUrl.has(result.url)) byUrl.set(result.url, result);
+      const batch = list.slice(index, index + concurrency);
+      const timeoutMs = callTimeoutMs();
+      const responses = await Promise.all(batch.map(async (query) => ({
+        query,
+        results: await cascade.run({ ...query, timeoutMs }),
+      })));
+      for (const { query, results } of responses) {
+        for (const result of results) {
+          if (!byUrl.has(result.url)) byUrl.set(result.url, result);
+        }
+        queriesRun++;
+        if (query.targetRole) searchedTargetRoles.add(query.targetRole.toLowerCase());
+        if (query.employer) searchedEmployers.add(query.employer.toLowerCase());
       }
-      queriesRun++;
       lastQueryEndedAt = Date.now();
 
-      if (byUrl.size >= 25 && index >= activeLanes.length) {
-        queriesSkipped += list.length - index - 1;
+      if (byUrl.size >= 25 && index + batch.length >= activeLanes.length) {
+        queriesSkipped += list.length - index - batch.length;
         break;
       }
     }
@@ -513,10 +534,6 @@ export async function runBriefSearch(
    * authentic first-party listings with direct apply links and 0 CAPTCHAs.
    */
   if (brief.companies.length) {
-    const directTerm = earlyCareerPass
-      ? (entryLevelTermsFor(country)[0] ?? "graduate")
-      : (activeLanes[0]?.name ? toSearchKeywords(activeLanes[0].name) : "analyst");
-
     /*
      * Said out loud, per employer, because this is the one source that is free,
      * unmetered and aimed exactly where the person pointed it — and it was the
@@ -530,22 +547,24 @@ export async function runBriefSearch(
      * employers could have every one of them silently contribute nothing, and
      * the page would look exactly the same as if they had all been searched.
      */
-    const directQueries = brief.companies.slice(0, 6).map(async (employer) => {
+    const directQueries = brief.companies.slice(0, MAX_COMPANY_QUERIES).map(async (employer) => {
       if (!findEmployerPortal(employer)) {
         employerPortals.push({ employer, status: "unknown", found: 0 });
         return;
       }
       try {
-        const directMatches = await searchEmployerDirectly(employer, {
-          employer,
-          searchText: directTerm,
-          country,
-          limit: 10,
-        });
+        const terms = earlyCareerPass
+          ? entryLevelTermsFor(country).slice(0, 1)
+          : activeLanes.map((lane) => toSearchKeywords(lane.name)).filter(Boolean);
+        const batches = await Promise.all(terms.map((searchText) => searchEmployerDirectly(employer, {
+          employer, searchText, country, limit: 10,
+        })));
+        const directMatches = deduplicateSearchResults(batches.flat());
         for (const item of directMatches) {
           if (!byUrl.has(item.url)) byUrl.set(item.url, item);
         }
         if (directMatches.length) cascade.used.add("Company Careers");
+        searchedEmployers.add(employer.toLowerCase());
         employerPortals.push({
           employer,
           status: directMatches.length ? "searched" : "empty",
@@ -595,6 +614,7 @@ export async function runBriefSearch(
       ...readRequirement(`${result.title}. ${result.description}`),
       platforms: result.platforms,
       applyDirect: result.applyDirect,
+      screeningInsight: null,
     };
   };
 
@@ -746,11 +766,11 @@ export async function runBriefSearch(
   }
 
   const deduplicated = deduplicateSearchResults(withinReach);
-  
+
   const preLlmResults: ScoredJobMatch[] = deduplicated.slice(0, options.maxResults ?? 20);
-  
-  // Phase 2: LLM Screening Pipeline
-  // Fire the top results into Gemini Flash in parallel for true semantic HR screening.
+
+  // Add optional semantic context to the deterministic assessment. The model
+  // cannot alter the score, recommendation, matched evidence, or ordering.
   const llmScreenedResults = await Promise.all(
     preLlmResults.map(async (match) => {
       try {
@@ -760,61 +780,35 @@ export async function runBriefSearch(
           candidateSkills: resumeSkills.join(", "),
           candidateLevel: level,
         };
-        
+
         const response = await Promise.race([
           generateStructuredJson({
             workload: "fast",
-            system: "You are a ruthless HR Gatekeeper screening candidates. Read the Job Description and the Candidate's Profile. Determine if they are a strong match. Throw out garbage roles (e.g. pure sales if they are delivery, or entry-level if they are senior). Provide a score (0-100), recommendation (apply, review, skip), and a 1-sentence human justification.",
+            system: "Compare the job description with the candidate context. Return one concise, evidence-based observation that helps the candidate assess the role. Do not calculate a score or recommendation.",
             prompt: JSON.stringify(payload),
             schemaName: "hr_screening",
             schema: {
               type: "object",
               properties: {
-                score: { type: "number" },
-                recommendation: { type: "string", enum: ["apply", "review", "skip"] },
                 justification: { type: "string" }
               },
-              required: ["score", "recommendation", "justification"],
+              required: ["justification"],
               additionalProperties: false,
             }
           }),
           new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 8000))
-        ]) as { score: number; recommendation: "apply" | "review" | "skip"; justification: string };
+        ]) as { justification: string };
 
-        /*
-         * The justification rides in matchedSkills because that is the field the
-         * card renders as a green tick beside the role. It is a borrowed slot,
-         * not a good one — a screening opinion is not a matched skill — and it
-         * should get a field of its own the next time this shape changes.
-         */
-        return {
-          ...match,
-          overallMatch: response.score,
-          recommendation: response.recommendation,
-          matchedSkills: [`HR Insight: ${response.justification}`]
-        };
+        return withScreeningInsight(match, response.justification);
       } catch (error) {
         console.warn("LLM Screening failed for a job, falling back to heuristic score", error);
         return match; // Fallback to heuristic
       }
     })
   );
-  
-  /*
-   * The screen ranks; it is not allowed to empty the page.
-   *
-   * Every role here has already survived the deterministic filters — seniority,
-   * line of work, market, stated years — each of which counts what it removed
-   * and can say why. This last pass is a single unvalidated model call per role
-   * with no such account, and it held a veto: a model in a strict mood returned
-   * "skip" across the board and the page said "no live matches for your brief",
-   * indistinguishable from a search that found nothing at all.
-   *
-   * So its opinion sorts and annotates, and removes only while something
-   * survives it. When it would reject everything, the roles are shown with its
-   * reasoning attached and the person decides — which is the whole promise of
-   * the product, and strictly better than an empty page nobody can argue with.
-   */
+
+  // Filtering and ordering remain entirely evidence-driven; model output is
+  // display-only context attached to the same deterministic result.
   const sorted = [...llmScreenedResults].sort((a, b) => b.overallMatch - a.overallMatch);
   const kept = sorted.filter((match) => match.recommendation !== "skip");
   const results: ScoredJobMatch[] = kept.length ? kept : sorted;
@@ -879,6 +873,9 @@ export async function runBriefSearch(
       : undefined,
     queriesRun,
     queriesSkipped,
+    targetRolesRequested: activeLanes.length,
+    targetRolesSearched: searchedTargetRoles.size,
+    employersChecked: searchedEmployers.size,
   };
 
   /*
@@ -973,6 +970,7 @@ export function normaliseResults(stored: unknown): ScoredJobMatch[] {
       requiredEvidence: nullableText(value.requiredEvidence),
       platforms: strings(value.platforms),
       applyDirect: value.applyDirect === true,
+      screeningInsight: nullableText(value.screeningInsight),
     }];
   });
 }
@@ -1020,7 +1018,25 @@ export function normaliseCriteria(stored: unknown): SearchCriteria {
     roles: strings(value.roles),
     remoteOnly: value.remoteOnly === true,
     providers: strings(value.providers),
+    providerErrors: strings(value.providerErrors),
+    providerTimeouts: Array.isArray(value.providerTimeouts)
+      ? value.providerTimeouts.filter((entry) => entry && typeof entry.name === "string").map((entry) => ({
+          name: entry.name,
+          count: count(entry.count),
+          waitedMs: count(entry.waitedMs),
+        }))
+      : undefined,
+    employerPortals: Array.isArray(value.employerPortals)
+      ? value.employerPortals.filter((entry) => entry && typeof entry.employer === "string").map((entry) => ({
+          employer: entry.employer,
+          status: entry.status === "searched" || entry.status === "empty" || entry.status === "failed" ? entry.status : "unknown",
+          found: count(entry.found),
+        }))
+      : undefined,
     queriesRun: count(value.queriesRun),
     queriesSkipped: count(value.queriesSkipped),
+    targetRolesRequested: count(value.targetRolesRequested),
+    targetRolesSearched: count(value.targetRolesSearched),
+    employersChecked: count(value.employersChecked),
   };
 }

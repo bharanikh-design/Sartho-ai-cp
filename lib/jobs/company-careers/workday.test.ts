@@ -1,7 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { findEmployerPortal } from "./registry";
-import { buildWorkdayApiUrl, buildWorkdayJobUrl, mapWorkdayPosting, type WorkdayPosting } from "./workday";
+import { buildWorkdayApiUrl, buildWorkdayJobUrl, mapWorkdayPosting, searchWorkdayPortal, type WorkdayPosting } from "./workday";
 import type { EmployerPortalConfig } from "./types";
+
+afterEach(() => vi.restoreAllMocks());
 
 describe("findEmployerPortal", () => {
   it("matches known employers by exact name or alias", () => {
@@ -74,5 +76,21 @@ describe("mapWorkdayPosting", () => {
   it("drops malformed postings without title or path", () => {
     expect(mapWorkdayPosting({}, config)).toBeNull();
     expect(mapWorkdayPosting({ title: "Incomplete" }, config)).toBeNull();
+  });
+});
+
+describe("searchWorkdayPortal", () => {
+  const config: EmployerPortalConfig = {
+    id: "example",
+    name: "Example",
+    aliases: ["example"],
+    type: "workday",
+    tenant: "example",
+  };
+
+  it("does not report an HTTP failure as an empty careers site", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 503 })));
+    await expect(searchWorkdayPortal(config, { employer: "Example", searchText: "Engineer" }))
+      .rejects.toThrow("status 503");
   });
 });

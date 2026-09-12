@@ -45,6 +45,10 @@ export type JobSearchQuery = {
   location?: string;
   /** Restrict to one employer — a targeted company search. */
   employer?: string;
+  /** The saved target role this query guarantees coverage for. */
+  targetRole?: string;
+  /** Model-generated expansions never count as coverage of a saved role. */
+  suggested?: boolean;
   /** Only remote / work-from-home listings. */
   remoteOnly?: boolean;
   /** Full-time, Part-time, Contract… applied as a real provider filter. */

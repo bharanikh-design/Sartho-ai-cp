@@ -36,6 +36,7 @@ type SearchResult = {
   /** The boards carrying this advert, and whether the employer's site is one. */
   platforms?: string[];
   applyDirect?: boolean;
+  screeningInsight?: string | null;
 };
 
 /* What the server actually searched — echoed back so nobody has to guess. */
@@ -172,6 +173,11 @@ export function JobSearchPanel({
             {result.salary ? <span style={{ fontSize: "0.8125rem", color: "var(--text-tertiary)" }}>{result.salary}</span> : null}
             <span style={{ fontSize: "0.75rem", color: "var(--text-tertiary)" }}>{result.source}</span>
           </div>
+          {result.screeningInsight ? (
+            <p style={{ margin: "6px 0", color: "var(--text-secondary)", fontSize: "0.8125rem" }}>
+              Screening insight: {result.screeningInsight}
+            </p>
+          ) : null}
           {/*
             * Where else this advert is listed.
             *
@@ -315,6 +321,12 @@ export function JobSearchPanel({
             ? <> · {criteria.employmentHinted.join(" and ")} searched by keyword only — no provider filters for {criteria.employmentHinted.length === 1 ? "it" : "them"}</>
             : null}
           {criteria.providers.length ? <> · via {criteria.providers.join(" + ")}</> : null}
+          {criteria.targetRolesRequested ? (
+            <> · {criteria.targetRolesSearched}/{criteria.targetRolesRequested} target roles searched</>
+          ) : null}
+          {criteria.companiesRequested ? (
+            <> · {criteria.employersChecked}/{criteria.companiesRequested} employers checked</>
+          ) : null}
           {/*
             * A provider that timed out is not an error the reader can fix, but
             * it is the reason the page is thinner than it should be — and it

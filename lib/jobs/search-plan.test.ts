@@ -38,13 +38,14 @@ describe("planSearchQueries", () => {
     expect(queries.every((query) => query.country === "au")).toBe(true);
   });
 
-  it("searches the top role in the first two cities and the other roles in the first", () => {
+  it("searches the top role in the first two cities and every other role in the first", () => {
     const roleQueries = planSearchQueries(brief).filter((query) => !query.employer);
     expect(roleQueries.map((query) => [query.keywords, query.location])).toEqual([
       ["Business Analyst", "Sydney"],
       ["Business Analyst", "Melbourne"],
       ["Data Analyst", "Sydney"],
       ["Risk Analyst", "Sydney"],
+      ["Fourth Role", "Sydney"],
     ]);
   });
 
@@ -53,12 +54,12 @@ describe("planSearchQueries", () => {
    * selected employers meant five were never queried, and the criteria line
    * still read "companies: PwC, KPMG, Deloitte, EY" as if that were the list.
    */
-  it("searches every employer, against the top two roles, country-wide", () => {
+  it("searches every employer against every saved role, country-wide", () => {
     const companyQueries = planSearchQueries(brief).filter((query) => query.employer);
     expect([...new Set(companyQueries.map((query) => query.employer))])
       .toEqual(["PwC", "Deloitte", "KPMG", "Accenture", "BCG"]);
     expect([...new Set(companyQueries.map((query) => query.keywords))])
-      .toEqual(["Business Analyst", "Data Analyst"]);
+      .toEqual(["Business Analyst", "Data Analyst", "Risk Analyst", "Fourth Role"]);
     expect(companyQueries.every((query) => query.location === undefined)).toBe(true);
   });
 
@@ -74,7 +75,7 @@ describe("planSearchQueries", () => {
       employmentTypes: ["Full-time", "Permanent", "Internship", "Graduate programme"],
     });
     const early = withEarly.filter((query) => query.earlyCareerOnly);
-    expect(early.map((query) => query.keywords)).toEqual(["Business Analyst", "Data Analyst"]);
+    expect(early.map((query) => query.keywords)).toEqual(["Business Analyst", "Data Analyst", "Risk Analyst", "Fourth Role"]);
 
     const withoutEarly = planSearchQueries({
       ...brief,
@@ -97,7 +98,7 @@ describe("planSearchQueries", () => {
       entryLevelTerms: ["graduate program", "entry level"],
     });
     const early = queries.filter((query) => query.earlyCareerOnly);
-    expect(early.map((query) => query.keywords)).toEqual(["Business Analyst", "Data Analyst"]);
+    expect(early.map((query) => query.keywords)).toEqual(["Business Analyst", "Data Analyst", "Risk Analyst", "Fourth Role"]);
     expect(early[0].entryLevelTerms).toEqual(["graduate program", "entry level"]);
   });
 
@@ -118,7 +119,7 @@ describe("planSearchQueries", () => {
 
   it("searches the whole country when no city is set", () => {
     const queries = planSearchQueries({ ...brief, locations: [], companies: [] });
-    expect(queries).toHaveLength(3);
+    expect(queries).toHaveLength(4);
     expect(queries.every((query) => query.location === undefined)).toBe(true);
   });
 
@@ -282,13 +283,13 @@ describe("query order under a budget", () => {
     employmentTypes: ["Full-time"],
   };
 
-  it("asks for the named employers before the expanded role titles", () => {
+  it("asks for every saved role before the named employers", () => {
     const queries = planSearchQueries(brief);
     const firstEmployer = queries.findIndex((query) => query.employer);
     const secondaryRole = queries.findIndex((query) => !query.employer && query.keywords !== queries[0].keywords);
 
     expect(firstEmployer).toBeGreaterThan(-1);
-    expect(secondaryRole).toBeGreaterThan(firstEmployer);
+    expect(secondaryRole).toBeLessThan(firstEmployer);
   });
 
   /* The broadest query still leads — it is the one most likely to return anything. */
