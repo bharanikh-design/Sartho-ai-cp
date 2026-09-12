@@ -113,6 +113,43 @@ function ToolIcon({ name }: { name: "save" | "pdf" | "word" | "print" | "copy" |
  * where — and that is said at the moment of choosing rather than discovered
  * afterwards.
  */
+/*
+ * The wand.
+ *
+ * An emoji sparkle is what every product uses and it renders differently on
+ * every platform — on some it is a flat grey asterisk, which is a poor mark for
+ * the most capable thing on the page. This is drawn, so it looks the same
+ * everywhere and can move: the sparks drift while the wand is working, and sit
+ * still when it is not.
+ */
+function MagicWand() {
+  return (
+    <svg className="studio-wand" width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M4 20 14.5 9.5"
+        stroke="currentColor"
+        strokeWidth="2.1"
+        strokeLinecap="round"
+      />
+      <path
+        d="M16.8 3.4l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7.7-2Z"
+        fill="currentColor"
+        className="studio-wand-spark studio-wand-spark-one"
+      />
+      <path
+        d="M20.4 10.1l.45 1.25 1.25.45-1.25.45-.45 1.25-.45-1.25-1.25-.45 1.25-.45.45-1.25Z"
+        fill="currentColor"
+        className="studio-wand-spark studio-wand-spark-two"
+      />
+      <path
+        d="M11.6 3.2l.4 1.1 1.1.4-1.1.4-.4 1.1-.4-1.1-1.1-.4 1.1-.4.4-1.1Z"
+        fill="currentColor"
+        className="studio-wand-spark studio-wand-spark-three"
+      />
+    </svg>
+  );
+}
+
 function TemplateChip({
   template,
   selected,
@@ -718,13 +755,16 @@ export function ResumeStudio({
             <div className="studio-ai-bar">
               <button
                 type="button"
-                className="studio-ai-write"
+                className={`studio-ai-write${generatingId === draft.application.id || generatingId === "master" ? " is-working" : ""}`}
                 disabled={Boolean(generatingId)}
                 onClick={() => void rewriteWholeDocument(draft)}
               >
-                ✨ {generatingId === draft.application.id || generatingId === "master"
-                  ? "Writing…"
-                  : "Let AI write it from your evidence"}
+                <MagicWand />
+                <span>
+                  {generatingId === draft.application.id || generatingId === "master"
+                    ? "Writing your résumé…"
+                    : "Write it for me"}
+                </span>
               </button>
               <small>
                 Rewrites every line from the career facts you approved. Your current version is kept.

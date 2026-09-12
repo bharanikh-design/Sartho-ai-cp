@@ -1114,19 +1114,64 @@ h2.resume-doc-heading.resume-doc-field { margin-bottom: 0; border-bottom: 1px so
 .studio-draft-grid .studio-ats-badge { display: block; margin-top: 10px; }
 
 /*
- * Let AI write it, inside the editor.
+ * The wand, and the button it sits in.
  *
- * The AI that writes a whole résumé has always existed — it is what "Build
- * résumé" calls — but it lived in a card header, outside the document. The only
- * AI visible while actually working was the per-line coach, so somebody in the
- * editor reasonably concluded there was nothing else.
- *
- * Given weight, because it is the most capable thing on the page and was the
- * hardest to find.
+ * This is the most capable thing on the page and it was a text chip with an
+ * emoji on it — the emoji rendering as a flat grey asterisk on some platforms,
+ * which is a poor mark for "rewrite my entire résumé". Drawn instead, so it
+ * looks the same everywhere and can move.
  */
-.studio-ai-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 0 0 14px; }
-.studio-ai-bar small { flex: 1 1 220px; color: var(--text-secondary); font-size: var(--text-2xs); line-height: 1.5; }
+.studio-ai-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 0 0 14px; }
+.studio-ai-bar small { flex: 1 1 200px; color: var(--text-secondary); font-size: var(--text-2xs); line-height: 1.5; }
 
-.studio-ai-write { border: 1px solid rgba(200,162,248,.45); border-radius: 10px; padding: 9px 14px; color: #e7d9ff; background: linear-gradient(135deg, rgba(200,162,248,.22), rgba(138,180,248,.18)); font-family: var(--font-sans); font-size: var(--text-xs); font-weight: 700; cursor: pointer; }
-.studio-ai-write:hover:not(:disabled) { border-color: rgba(200,162,248,.85); background: linear-gradient(135deg, rgba(200,162,248,.34), rgba(138,180,248,.26)); }
-.studio-ai-write:disabled { opacity: .55; cursor: progress; }
+.studio-ai-write {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  overflow: hidden;
+  border: 1px solid rgba(200,162,248,.5);
+  border-radius: 11px;
+  padding: 10px 16px;
+  color: #f0e6ff;
+  background: linear-gradient(135deg, rgba(200,162,248,.26), rgba(138,180,248,.2));
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color .18s, background .18s, transform .12s;
+}
+.studio-ai-write:hover:not(:disabled) { border-color: rgba(200,162,248,.95); background: linear-gradient(135deg, rgba(200,162,248,.4), rgba(138,180,248,.3)); }
+.studio-ai-write:active:not(:disabled) { transform: translateY(1px); }
+.studio-ai-write:disabled { cursor: progress; }
+
+/*
+ * A sheen that crosses the button while it is working, so a rewrite that takes
+ * fifteen seconds looks like something happening rather than something stuck.
+ */
+.studio-ai-write.is-working::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 20%, rgba(255,255,255,.22) 50%, transparent 80%);
+  animation: studio-ai-sheen 1.5s linear infinite;
+}
+@keyframes studio-ai-sheen { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+
+/* The sparks drift while it works, and hold still when it does not. */
+.studio-wand { flex: 0 0 auto; }
+.studio-wand-spark { transform-origin: center; opacity: .9; }
+.studio-ai-write.is-working .studio-wand-spark { animation: studio-wand-twinkle 1.3s ease-in-out infinite; }
+.studio-ai-write.is-working .studio-wand-spark-two { animation-delay: .28s; }
+.studio-ai-write.is-working .studio-wand-spark-three { animation-delay: .55s; }
+@keyframes studio-wand-twinkle {
+  0%, 100% { opacity: .45; transform: scale(.82); }
+  50% { opacity: 1; transform: scale(1.12); }
+}
+
+/* A wand that never stops moving is a distraction, not a signal. */
+@media (prefers-reduced-motion: reduce) {
+  .studio-ai-write.is-working::after,
+  .studio-ai-write.is-working .studio-wand-spark { animation: none; }
+}
+
