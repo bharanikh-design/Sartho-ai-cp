@@ -39,9 +39,17 @@ export const EMPLOYMENT_TYPES: EmploymentType[] = [
   { id: "Graduate programme", queryHint: "graduate program" },
 ];
 
-export type ProviderName = "adzuna" | "jsearch";
+export type ProviderName = "adzuna" | "jsearch" | "serpapi";
 
-/** Whether this provider can filter for a type, rather than only hint at it. */
+/**
+ * Whether this provider can filter for a type, rather than only hint at it.
+ *
+ * SerpApi reads the same Google for Jobs index as JSearch and takes the same
+ * employment vocabulary — FULLTIME, CONTRACTOR, INTERN — through Google's
+ * `chips` parameter rather than a field of its own. So the answer to "can this
+ * be filtered" is the same for both, and only the spelling of the request
+ * differs.
+ */
 export function canFilter(type: EmploymentType, provider: ProviderName): boolean {
   return provider === "adzuna" ? Boolean(type.adzunaParam) : Boolean(type.jsearchValue);
 }

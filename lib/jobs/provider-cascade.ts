@@ -43,6 +43,16 @@ export type ProviderCascade = {
    */
   run: (query: JobSearchQuery) => Promise<JobSearchResult[]>;
   isDead: (provider: JobSearchProviderName) => boolean;
+  /**
+   * Whether the most recent query actually reached this provider.
+   *
+   * A rate limit is owed for a request that was made, not for a provider that
+   * happens to be configured. JSearch sits behind RapidAPI's one-request-a-
+   * second rule, but once SerpApi leads the cascade and answers, JSearch is
+   * never called — and pacing a provider nobody asked spends a second of the
+   * budget per query to satisfy a limit that was never approached.
+   */
+  calledLast: (provider: JobSearchProviderName) => boolean;
   /** True once no provider is left worth asking. */
   exhausted: () => boolean;
   /** Human-readable failures, for the criteria line. Deduplicated by the caller. */
@@ -64,6 +74,7 @@ export type ProviderCascade = {
 
 /** One spelling of each provider's name, for criteria lines and error text. */
 export function providerLabel(provider: JobSearchProviderName): string {
+  if (provider === "serpapi") return "Google for Jobs (SerpApi)";
   return provider === "jsearch" ? "Google for Jobs" : "Adzuna";
 }
 
@@ -79,6 +90,7 @@ export function createProviderCascade(
   const errors: string[] = [];
   const used = new Set<string>();
   const timeouts = new Map<string, number>();
+  let lastCalled = new Set<JobSearchProviderName>();
 
   function recordFailure(provider: JobSearchProviderName, caught: unknown) {
     /*
@@ -111,8 +123,11 @@ export function createProviderCascade(
   }
 
   async function run(query: JobSearchQuery): Promise<JobSearchResult[]> {
+    const called = new Set<JobSearchProviderName>();
+    lastCalled = called;
     for (const provider of providers) {
       if (dead.has(provider)) continue;
+      called.add(provider);
       try {
         const results = await search(provider, query);
         used.add(providerLabel(provider));
@@ -139,6 +154,7 @@ export function createProviderCascade(
   return {
     run,
     isDead: (provider) => dead.has(provider),
+    calledLast: (provider) => lastCalled.has(provider),
     exhausted: () => providers.every((provider) => dead.has(provider)),
     errors,
     used,

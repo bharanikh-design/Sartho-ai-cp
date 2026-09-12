@@ -438,8 +438,13 @@ export async function runBriefSearch(
          * the call it was spacing takes about 3.4 seconds by itself. Over a
          * dozen queries that is thirteen seconds of a forty-five second budget
          * spent waiting for a limit that had already been satisfied.
+         *
+         * And it is owed only if the previous query actually reached JSearch.
+         * With SerpApi leading the cascade and answering, JSearch is never
+         * called at all, so pacing it would spend that second per query on a
+         * limit nothing approached.
          */
-        const gap = providers.includes("jsearch") && !cascade.isDead("jsearch") ? 1100 : 300;
+        const gap = cascade.calledLast("jsearch") ? 1100 : 300;
         const since = Date.now() - lastQueryEndedAt;
         if (since < gap) await new Promise((resolve) => setTimeout(resolve, gap - since));
       }
