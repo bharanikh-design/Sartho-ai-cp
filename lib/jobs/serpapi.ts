@@ -220,6 +220,55 @@ export function keepScheduleTypes(jobs: SerpApiJob[], selected: string[]): SerpA
   });
 }
 
+/*
+ * What SerpApi says about the account itself, rather than about a search.
+ *
+ * A search that never returns says nothing about why. Three queries were given
+ * twenty seconds each and aborted at exactly the ceiling; one was given sixty
+ * and aborted at exactly sixty. A provider that behaved that way after
+ * answering a first probe in 8.7 seconds is not slow, and no amount of staring
+ * at search responses will say what it is — because the answer is not in them.
+ *
+ * It is here. SerpApi publishes the plan, the monthly allowance, what is left
+ * of it, and the hourly rate limit with the last hour's usage against it. A
+ * spent allowance and a tripped hourly limit are different problems with
+ * different fixes, and both look exactly like a slow network from the outside.
+ * That confusion has now cost this project a day twice, once on RapidAPI and
+ * once here.
+ */
+export type SerpApiAccount = {
+  plan: string | null;
+  searchesPerMonth: number | null;
+  searchesLeft: number | null;
+  usedThisMonth: number | null;
+  ratePerHour: number | null;
+  usedLastHour: number | null;
+  status: string | null;
+};
+
+export async function serpApiAccount(): Promise<SerpApiAccount> {
+  const config = serpApiConfig();
+  if (!config) throw new Error("SerpApi is not configured.");
+
+  const response = await fetch(`https://serpapi.com/account.json?api_key=${encodeURIComponent(config.key)}`, {
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!response.ok) throw new Error(`SerpApi account check returned ${response.status}`);
+
+  const body = (await response.json()) as Record<string, unknown>;
+  const num = (key: string) => (typeof body[key] === "number" ? (body[key] as number) : null);
+
+  return {
+    plan: typeof body.plan_name === "string" ? body.plan_name : null,
+    searchesPerMonth: num("searches_per_month"),
+    searchesLeft: num("total_searches_left") ?? num("plan_searches_left"),
+    usedThisMonth: num("this_month_usage"),
+    ratePerHour: num("account_rate_limit_per_hour"),
+    usedLastHour: num("last_hour_searches"),
+    status: typeof body.account_status === "string" ? body.account_status : null,
+  };
+}
+
 export async function searchSerpApi(query: JobSearchQuery): Promise<JobSearchResult[]> {
   const config = serpApiConfig();
   if (!config) throw new Error("SerpApi is not configured.");

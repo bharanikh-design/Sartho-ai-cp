@@ -635,14 +635,44 @@ export function configuredJobSearchProviders(): JobSearchProviderName[] {
   if (jsearchConfig()) configured.push("jsearch");
   if (adzunaConfig()) configured.push("adzuna");
 
+  /*
+   * JOBS_DISABLED_PROVIDERS turns one off without touching its key.
+   *
+   * A provider can stop answering while its key stays perfectly valid, and
+   * when that happens it is not neutral — it is a cost. A SerpApi that never
+   * returns still takes its full twenty seconds out of a seventy-five second
+   * budget before anything else is asked, which measurably left twenty-one of
+   * twenty-five queries unrun.
+   *
+   * Deleting the key would work and is the wrong tool: the key is not the
+   * problem, it is how the provider is switched back on when the account is
+   * sorted out, and a masked Vercel variable is hard to put back. This is a
+   * setting whose whole purpose is to be reversed.
+   */
+  const disabled = new Set(
+    (process.env.JOBS_DISABLED_PROVIDERS ?? "")
+      .split(/[,\s]+/)
+      .map((name) => name.trim().toLowerCase())
+      .filter(Boolean),
+  );
+  const live = disabled.size ? configured.filter((provider) => !disabled.has(provider)) : configured;
+
+  /*
+   * Never all of them. Disabling every provider is a configuration mistake
+   * rather than a request for a search that cannot run, and search going dark
+   * because of a typo in an environment variable is worse than one slow
+   * provider.
+   */
+  if (!live.length) return configured;
+
   // JOBS_SEARCH_PROVIDER is a *preference*, not a lock: the named provider is
   // tried first, but every other configured provider stays on as a fallback so
   // one provider being down can never take search down.
   const pin = process.env.JOBS_SEARCH_PROVIDER?.trim().toLowerCase();
-  if ((pin === "jsearch" || pin === "adzuna" || pin === "serpapi") && configured.includes(pin)) {
-    return [pin, ...configured.filter((provider) => provider !== pin)];
+  if ((pin === "jsearch" || pin === "adzuna" || pin === "serpapi") && live.includes(pin)) {
+    return [pin, ...live.filter((provider) => provider !== pin)];
   }
-  return configured;
+  return live;
 }
 
 /**
