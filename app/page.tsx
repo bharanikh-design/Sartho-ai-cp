@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PlatformHero } from "@/components/platform-hero";
 import { ProductPageHeader } from "@/components/product-page-header";
 import { JourneyNudgeCard } from "@/components/journey-nudge-card";
 import { ProfileScorecard } from "@/components/profile-scorecard";
@@ -66,7 +67,9 @@ export default async function DashboardPage() {
           description="Everything Sartho does is grounded in evidence you approve. Upload one strong résumé and it reads every role and achievement into your career profile — no line-by-line confirmation."
         />
 
-        <section className="glass-card content-card" id="resume">
+        <PlatformHero />
+
+      <section className="glass-card content-card" id="resume">
           <div className="card-header">
             <div>
               <h2 className="section-heading">Upload your résumé</h2>
@@ -107,6 +110,13 @@ export default async function DashboardPage() {
       />
 
       <JourneyNudgeCard progress={journey.progress} isActivated={journey.activated} steps={journey.steps} />
+
+      {/*
+        * Below the nudge, not above it: somebody mid-flow wants their next step
+        * first. This is for the four things they have not reached yet, and for
+        * the browser extension, which had no home a person could find.
+        */}
+      <PlatformHero />
 
       <ProfileScorecard steps={journey.steps} progress={journey.progress} activated={journey.activated} />
 

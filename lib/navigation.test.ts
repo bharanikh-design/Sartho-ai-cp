@@ -29,14 +29,25 @@ describe("primary navigation", () => {
   });
 
   /*
-   * The install page described a download that did not exist, and the autofill
-   * it advertised filled in a hardcoded identity. It is off the rail until
-   * there is a packaged, published extension to point at.
+   * The extension was off the rail because the install page described a
+   * download that did not exist. That condition is met now: scripts/
+   * build-extension-zip.mjs runs on every prebuild and writes a real
+   * public/sartho-extension.zip, and the install page links to it.
+   *
+   * It is in Settings rather than the career flow, because installing it is a
+   * one-off and the flow is a sequence. Before this it was reachable from one
+   * pill on Opportunities shown only to people who had not installed it — so
+   * anybody who dismissed it, or wanted it on a second machine, had nowhere to
+   * go. A downloadable extension nobody can find is a feature that does not
+   * exist.
    */
-  it("does not offer the browser extension as a destination", () => {
-    expect(primaryNavigation.some((item) => item.href === "/extension")).toBe(false);
+  it("keeps the browser extension out of the career flow", () => {
     expect(getPrimaryNavigation(true).some((item) => item.href === "/extension")).toBe(false);
     expect(getNavigationWithGate(true, true).some((item) => item.href === "/extension")).toBe(false);
+  });
+
+  it("offers the browser extension in settings, where it can be found", () => {
+    expect(getSettingsNavigation(false).some((item) => item.href === "/extension")).toBe(true);
   });
 
   /*
@@ -58,7 +69,7 @@ describe("primary navigation", () => {
    * the same destination twice, once in a list it does not belong to.
    */
   it("keeps a settings page out of the career rail while you are on it", () => {
-    for (const href of ["/integrations", "/notifications", "/admin", "/diagnostics"]) {
+    for (const href of ["/integrations", "/notifications", "/extension", "/admin", "/diagnostics"]) {
       expect(getNavigationForPath(true, href).some((item) => item.href === href)).toBe(false);
     }
   });
@@ -68,8 +79,12 @@ describe("primary navigation", () => {
   });
 
   describe("the settings group", () => {
-    it("offers alerts and integrations to everybody", () => {
-      expect(getSettingsNavigation(false).map((item) => item.href)).toEqual(["/notifications", "/integrations"]);
+    it("offers alerts, integrations and the extension to everybody", () => {
+      expect(getSettingsNavigation(false).map((item) => item.href)).toEqual([
+        "/notifications",
+        "/integrations",
+        "/extension",
+      ]);
     });
 
     /* A link, never a permission: every admin route checks for itself. */
@@ -77,6 +92,7 @@ describe("primary navigation", () => {
       expect(getSettingsNavigation(true).map((item) => item.href)).toEqual([
         "/notifications",
         "/integrations",
+        "/extension",
         "/admin",
         "/diagnostics",
       ]);
