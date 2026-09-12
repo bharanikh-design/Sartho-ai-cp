@@ -74,9 +74,28 @@ export const SITE_DESCRIPTION =
  * An origin belongs here only once it is also in the Supabase dashboard's
  * Redirect URLs list, which is the other half of the same agreement: Supabase
  * refuses a `redirectTo` it has not been shown and falls back to the project's
- * Site URL, which lands the round trip on the wrong host all over again. The
- * env var is how a preview or a local port joins the list without a code
- * change — NEXT_PUBLIC_AUTH_ORIGINS="http://localhost:3000,https://www.sartho.tech".
+ * Site URL, which lands the round trip on the wrong host all over again.
+ *
+ * These three are the stable hosts that already serve the product and are
+ * already in that dashboard list, so they are named here rather than left to a
+ * deployment to remember. They are the ones a real visitor can arrive on: the
+ * apex, the www host that SITE_URL advertises to search engines and shared
+ * links, and the Vercel domain. Getting this wrong is not a degraded sign-in,
+ * it is a locked door, so the default covers every door rather than the one
+ * that happens to be canonical.
+ *
+ * Preview deployments are deliberately not wildcarded. A branch URL that is not
+ * in the dashboard list would have its `redirectTo` refused and be bounced to
+ * the Site URL, which is the failure this whole mechanism exists to prevent —
+ * whereas an undeclared origin simply hands off to the apex and works. Add a
+ * preview to both lists, or to neither.
+ */
+const DEFAULT_AUTH_ORIGINS = [PRODUCTION_APP_ORIGIN, "https://www.sartho.tech", "https://sartho.vercel.app"];
+
+/*
+ * Anything else that belongs to a particular deployment: a preview branch, or a
+ * local port during development.
+ * NEXT_PUBLIC_AUTH_ORIGINS="http://localhost:3000,https://sartho-git-x.vercel.app"
  */
 const CONFIGURED_AUTH_ORIGINS = (process.env.NEXT_PUBLIC_AUTH_ORIGINS ?? "")
   .split(",")
@@ -84,7 +103,7 @@ const CONFIGURED_AUTH_ORIGINS = (process.env.NEXT_PUBLIC_AUTH_ORIGINS ?? "")
   .filter(Boolean);
 
 /** Every origin allowed to host both legs of a sign-in, canonical one included. */
-export const AUTH_ORIGINS = [AUTH_ORIGIN, ...CONFIGURED_AUTH_ORIGINS.filter((o) => o !== AUTH_ORIGIN)];
+export const AUTH_ORIGINS = [...new Set([AUTH_ORIGIN, ...DEFAULT_AUTH_ORIGINS, ...CONFIGURED_AUTH_ORIGINS])];
 
 export function isAllowedAuthOrigin(origin: string | null | undefined) {
   if (!origin) return false;
