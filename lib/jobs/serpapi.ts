@@ -1,5 +1,5 @@
 import { countryName } from "@/lib/jobs/countries";
-import { jsearchEmploymentTypes } from "@/lib/jobs/employment-types";
+import { employmentQueryHints } from "@/lib/jobs/employment-types";
 import type { JobSearchQuery, JobSearchResult } from "@/lib/jobs/search-provider";
 
 /*
@@ -42,6 +42,30 @@ export function buildSerpApiParams(query: JobSearchQuery, apiKey: string): URLSe
   let text = query.keywords.trim();
   if (query.employer?.trim()) text = `${text} ${query.employer.trim()}`;
 
+  /*
+   * Employment type rides in the query text, because SerpApi cannot filter it.
+   *
+   * This was a `chips` parameter built by hand — `employment_type:FULLTIME`,
+   * the vocabulary JSearch uses — on the reasoning that both providers read
+   * the same Google index so both must filter it the same way. They do not.
+   * A chip is an opaque token Google mints for one particular search and
+   * returns in that response's own filters; it is not a value a caller gets to
+   * compose. Google answered a chip it had never issued the way it answers any
+   * unrecognised filter: with nothing at all.
+   *
+   * The cost of that was a whole search. The diagnostics probe asks a query
+   * with no employment filter, so it came back with ten results and SerpApi
+   * looked healthy — while every real search, which is filtered to Full-time,
+   * set a chip and got "Google hasn't returned any results for this query".
+   * The provider was working perfectly and answering nothing.
+   *
+   * Google's free text handles "full time" well, so the selection still
+   * narrows the search; it is a hint rather than a filter, and canFilter says
+   * so, which is what makes the UI tell the truth about it.
+   */
+  const hints = employmentQueryHints(query.employmentTypes ?? [], "serpapi");
+  if (hints.length && !query.earlyCareerOnly) text = `${text} ${hints.join(" ")}`;
+
   const params = new URLSearchParams({
     engine: "google_jobs",
     q: text,
@@ -52,22 +76,6 @@ export function buildSerpApiParams(query: JobSearchQuery, apiKey: string): URLSe
   const place = query.location?.trim() || countryName(query.country ?? "") || "";
   if (place) params.set("location", place);
   if (query.country?.trim()) params.set("gl", query.country.trim().toLowerCase());
-
-  /*
-   * Employment type goes through Google's `chips`, which takes the same
-   * vocabulary JSearch exposes as employment_types — so the two providers
-   * filter identically and only the spelling of the request differs.
-   *
-   * Skipped on the early-career pass for the reason Adzuna's flags are: a
-   * full-time filter and a request for internships cancel each other out, and
-   * selecting both returned neither.
-   */
-  if (!query.earlyCareerOnly) {
-    const employment = jsearchEmploymentTypes(query.employmentTypes ?? []);
-    if (employment) {
-      params.set("chips", employment.split(",").map((value) => `employment_type:${value}`).join(","));
-    }
-  }
 
   return params;
 }

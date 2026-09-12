@@ -44,13 +44,20 @@ export type ProviderName = "adzuna" | "jsearch" | "serpapi";
 /**
  * Whether this provider can filter for a type, rather than only hint at it.
  *
- * SerpApi reads the same Google for Jobs index as JSearch and takes the same
- * employment vocabulary — FULLTIME, CONTRACTOR, INTERN — through Google's
- * `chips` parameter rather than a field of its own. So the answer to "can this
- * be filtered" is the same for both, and only the spelling of the request
- * differs.
+ * SerpApi cannot, and the claim that it could cost a whole search. It reads
+ * the same Google for Jobs index as JSearch, so it looked obvious that it must
+ * take the same employment vocabulary — but JSearch exposes a field of its own
+ * and SerpApi exposes Google's `chips`, which is not a field at all. A chip is
+ * an opaque token Google mints for one particular search and hands back in
+ * that response; it cannot be composed by a caller, and a chip Google never
+ * issued returns nothing rather than an error.
+ *
+ * So for SerpApi this is always false, and the selection reaches Google as
+ * words in the query instead. A hint is weaker than a filter, and saying which
+ * one each provider gave is the entire job of this function.
  */
 export function canFilter(type: EmploymentType, provider: ProviderName): boolean {
+  if (provider === "serpapi") return false;
   return provider === "adzuna" ? Boolean(type.adzunaParam) : Boolean(type.jsearchValue);
 }
 

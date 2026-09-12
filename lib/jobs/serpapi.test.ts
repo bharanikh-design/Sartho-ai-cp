@@ -55,21 +55,63 @@ describe("buildSerpApiParams", () => {
     expect(params.get("employer")).toBeNull();
   });
 
-  it("filters employment type through Google's chips", () => {
+  /*
+   * The bug this file was written with, and the one that cost a whole search.
+   *
+   * A chip is an opaque token Google mints for one particular search and hands
+   * back in that response. It cannot be composed by a caller, and a chip Google
+   * never issued returns nothing rather than an error — so every real search,
+   * which is filtered to Full-time, got "Google hasn't returned any results for
+   * this query" while the probe, which sets no filter, returned ten results and
+   * made the provider look healthy.
+   */
+  it("never sends a hand-built chip", () => {
     const params = buildSerpApiParams(
       { keywords: "Engagement Manager", country: "sg", employmentTypes: ["Full-time"] },
       "key",
     );
-    expect(params.get("chips")).toContain("employment_type:FULLTIME");
+    expect(params.get("chips")).toBeNull();
+    expect(params.toString()).not.toContain("employment_type");
   });
 
-  /* A full-time filter and a request for internships cancel each other out. */
-  it("drops the type filter on the early-career pass", () => {
+  it("puts the employment type in the query text where Google can read it", () => {
+    const params = buildSerpApiParams(
+      { keywords: "Engagement Manager", country: "sg", employmentTypes: ["Full-time"] },
+      "key",
+    );
+    expect(params.get("q")).toBe("Engagement Manager full time");
+  });
+
+  it("carries several selections", () => {
+    const params = buildSerpApiParams(
+      { keywords: "Analyst", country: "sg", employmentTypes: ["Full-time", "Contract"] },
+      "key",
+    );
+    expect(params.get("q")).toContain("full time");
+    expect(params.get("q")).toContain("contract");
+  });
+
+  /* A full-time hint and a request for internships cancel each other out. */
+  it("drops the type hint on the early-career pass", () => {
     const params = buildSerpApiParams(
       { keywords: "Analyst", country: "sg", employmentTypes: ["Full-time"], earlyCareerOnly: true },
       "key",
     );
-    expect(params.get("chips")).toBeNull();
+    expect(params.get("q")).toBe("Analyst");
+  });
+
+  it("leaves the query alone when nothing was selected", () => {
+    const params = buildSerpApiParams({ keywords: "Analyst", country: "sg" }, "key");
+    expect(params.get("q")).toBe("Analyst");
+  });
+
+  /* Employer and type together, in the order a person would type them. */
+  it("keeps the employer alongside the type hint", () => {
+    const params = buildSerpApiParams(
+      { keywords: "Engagement Manager", country: "sg", employer: "Accenture", employmentTypes: ["Full-time"] },
+      "key",
+    );
+    expect(params.get("q")).toBe("Engagement Manager Accenture full time");
   });
 });
 
