@@ -159,3 +159,47 @@ describe("the September search regression", () => {
     expect(marketTitleIn("Chief Vibes Officer")).toBeNull();
   });
 });
+
+/*
+ * A regression from a real brief that came back empty.
+ *
+ * Five target roles were set. runBriefSearch capped its lane list at three —
+ * a budget, because each role costs a provider call — and then reused that
+ * same capped list to decide what line of work the person was in. The fourth
+ * and fifth roles carried Change and Project delivery, so truncating left only
+ * Consulting, IT operations fell out of reach, and every IT service role the
+ * search found was hidden as "a different line of work from Consulting".
+ *
+ * The brief named IT infrastructure twice and the page showed none of it.
+ */
+describe("every target role counts toward reach, not just the first few", () => {
+  const brief = [
+    "ServiceNow Senior Engagement Manager",
+    "ServiceNow Business Process Architect / Lead",
+    "Enterprise ITSM Practice Lead",
+    "EUC and ITSM Transformation Lead",
+    "IT Infrastructure & Cloud Migration Program Manager",
+  ];
+  const held = ["ServiceNow Business Process SME", "Senior Engagement Manager"];
+
+  it("reaches IT operations from the whole brief but not from its first three roles", () => {
+    expect(reachFrom(held, brief.slice(0, 3))).toEqual(["Consulting"]);
+    expect(reachFrom(held, brief)).toEqual(expect.arrayContaining(["Consulting", "Change", "Project delivery"]));
+
+    expect(reachableFamilies(reachFrom(held, brief.slice(0, 3))).has("IT operations")).toBe(false);
+    expect(reachableFamilies(reachFrom(held, brief)).has("IT operations")).toBe(true);
+  });
+
+  it.each([
+    "IT Service Delivery Manager",
+    "Service Desk Manager",
+    "IT Operations Manager",
+  ])("keeps %s for this brief", (title) => {
+    expect(familyFit(title, held, brief).withinReach).toBe(true);
+  });
+
+  /* Still a different job: these are hands-on build roles, not delivery leadership. */
+  it("still turns down a hands-on engineering role", () => {
+    expect(familyFit("ServiceNow Developer", held, brief).withinReach).toBe(false);
+  });
+});
