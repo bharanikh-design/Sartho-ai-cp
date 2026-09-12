@@ -209,12 +209,24 @@ describe("country-aware provider selection", () => {
 describe("query → provider request mapping", () => {
   const credentials = { appId: "id", appKey: "key" };
 
-  it("puts the country in Adzuna's path and the city, employer in its params", () => {
+  /*
+   * The employer moved out of its own parameter and into `what`.
+   *
+   * This asserted `company=PwC`, which is not one of Adzuna's documented search
+   * parameters — those are what, what_and, what_or, what_exclude, title_only,
+   * where, distance, the employment-type flags, salary bounds, category,
+   * max_days_old, sort_by and results_per_page. Live searches began returning
+   * "Adzuna search failed (400)" in the same run that employer queries first
+   * ran early enough to survive the time budget, having previously always been
+   * skipped. The response body is now reported too, so the next 400 names its
+   * own cause rather than leaving this to inference.
+   */
+  it("puts the country in Adzuna's path, the city in where, and the employer in what", () => {
     const url = new URL(buildAdzunaUrl({ keywords: "Business Analyst", country: "au", location: "Sydney", employer: "PwC" }, credentials));
     expect(url.pathname).toBe("/v1/api/jobs/au/search/1");
-    expect(url.searchParams.get("what")).toBe("Business Analyst");
+    expect(url.searchParams.get("what")).toBe("Business Analyst PwC");
     expect(url.searchParams.get("where")).toBe("Sydney");
-    expect(url.searchParams.get("company")).toBe("PwC");
+    expect(url.searchParams.get("company")).toBeNull();
   });
 
   /*
@@ -369,5 +381,39 @@ describe("JSearch paging", () => {
     process.env.JSEARCH_MAX_PAGES = "3";
     const params = buildJSearchParams({ keywords: "Engagement Manager", country: "sg", limit: 30 });
     expect(params.get("num_pages")).toBe("3");
+  });
+});
+
+/*
+ * Adzuna's documented search parameters are what, what_and, what_or,
+ * what_exclude, title_only, where, distance, the employment-type flags, salary
+ * bounds, category, max_days_old, sort_by and results_per_page. `company` is
+ * not among them, and sending it answered 400 — invisible for as long as
+ * employer queries sat last in the plan and were skipped by the time budget.
+ */
+describe("Adzuna employer queries", () => {
+  const credentials = { appId: "ID", appKey: "KEY" };
+  const employerQuery = { keywords: "Engagement Manager", country: "sg", employer: "Accenture", limit: 10 };
+
+  it("never sends a company parameter", () => {
+    const url = new URL(buildAdzunaUrl(employerQuery, credentials));
+    expect(url.searchParams.get("company")).toBeNull();
+  });
+
+  it("puts the employer in the search text, where Adzuna reads it", () => {
+    const url = new URL(buildAdzunaUrl(employerQuery, credentials));
+    expect(url.searchParams.get("what")).toBe("Engagement Manager Accenture");
+  });
+
+  it("leaves an ordinary query alone", () => {
+    const url = new URL(buildAdzunaUrl({ keywords: "Practice Lead", country: "sg" }, credentials));
+    expect(url.searchParams.get("what")).toBe("Practice Lead");
+    expect(url.searchParams.get("company")).toBeNull();
+  });
+
+  /* Both providers should describe an employer search the same way. */
+  it("agrees with how JSearch folds an employer into its query", () => {
+    expect(buildJSearchParams(employerQuery).get("query")).toContain("Accenture");
+    expect(new URL(buildAdzunaUrl(employerQuery, credentials)).searchParams.get("what")).toContain("Accenture");
   });
 });
