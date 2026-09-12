@@ -1,6 +1,7 @@
 import { ProductPageHeader } from "@/components/product-page-header";
 import { ResumeStudio, type StudioDraft, type TailorableRole } from "@/components/resume-studio";
 import { requireUser } from "@/lib/auth";
+import { connectionStatus } from "@/lib/integrations/store";
 import { getJobs } from "@/lib/data/jobs";
 import { renderResumeText, resumeContentOf } from "@/lib/resume/content";
 import type { ApplicationRecord, ResumeVersionRecord } from "@/lib/types";
@@ -22,6 +23,8 @@ export const metadata = constructMetadata("Résumé Studio", "Write tailored ré
 
 export default async function ResumeStudioPage() {
   const { supabase, user } = await requireUser();
+  /* Decided here so the Drive picker does not flash a "connect Drive" prompt. */
+  const driveConnected = (await connectionStatus(user.id)).connected;
   const [jobs, applicationsResult, approvedResult, versionsResult, masterResult] = await Promise.all([
     getJobs(supabase, user.id),
     supabase
@@ -126,6 +129,7 @@ export default async function ResumeStudioPage() {
         masterResumeText={masterResumeText}
         master={master}
         masterUpdatedAt={masterResult.error ? null : (masterResult.data?.master_resume_updated_at ?? null)}
+        driveConnected={driveConnected}
       />
     </div>
   );
