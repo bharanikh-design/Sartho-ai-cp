@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { atsVerdict, scoreAts, tailoringGain } from "@/lib/resume/ats";
 import { unfilledBlanks } from "@/lib/resume/bullet-rewrite";
 import { overusedOpeners, reviewWriting } from "@/lib/resume/writing";
+import { resumeVersionName } from "@/lib/resume/save";
 import { suggestResumeFor, type PastResume } from "@/lib/resume/suggest";
 import { renderResumeText, resumeContentOf, type ResumeContent } from "@/lib/resume/content";
 import { ResumeDocument, type BulletCoach } from "@/components/resume-document";
@@ -209,7 +210,15 @@ export function ResumeStudio({
       const response = await fetch(`/api/jobs/${draft.jobId}/resume/version`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content, changes }),
+        /*
+         * Named on the way in, by the role and the moment.
+         *
+         * The route defaults to the previous version's name when none is
+         * given, so every save inherited one and the repository filled with
+         * rows that all said "Tailored résumé". The client is the side that
+         * knows which role this is.
+         */
+        body: JSON.stringify({ content, changes, versionName: resumeVersionName(draft.jobTitle) }),
       });
       const result = await response.json() as { error?: string };
       if (!response.ok) throw new Error(result.error ?? "Sartho could not save this version.");
@@ -670,11 +679,17 @@ return (
                     key={version.id}
                     className={`studio-version${isShown ? " is-shown" : ""}`}
                     aria-pressed={isShown}
+                    title={version.version_name ?? `Version ${version.version_number}`}
                     onClick={() => setViewing((state) => ({ ...state, [draft.application.id]: version.id }))}
                   >
                     <strong>v{version.version_number}</strong>
                     <small>{versionAts.score} ATS</small>
-                    <small>{new Date(version.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}</small>
+                    {/*
+                      * The time as well as the day. Two saves on one afternoon
+                      * showed the same "12 Sep" and were indistinguishable,
+                      * which is the whole thing a version list is for.
+                      */}
+                    <small>{new Date(version.created_at).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false })}</small>
                   </button>
                 );
               })}

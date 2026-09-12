@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { saveResumeDraft } from "@/lib/resume/save";
+import { resumeVersionName, saveResumeDraft } from "@/lib/resume/save";
 import { emptyContent, type ResumeContent } from "@/lib/resume/content";
 
 const content: ResumeContent = {
@@ -82,5 +82,45 @@ describe("saveResumeDraft", () => {
 
     expect(result.error).toBe(fallbackError);
     expect(result.structureStored).toBe(false);
+  });
+});
+
+/*
+ * Every version used to be named "Tailored résumé", or whatever the previous
+ * save was called. A repository whose rows all say the same thing is not a
+ * repository, it is a pile — and the point of keeping them is being able to
+ * find the one written for a particular role on a particular day.
+ */
+describe("what a saved résumé is called", () => {
+  const at = new Date("2026-09-12T12:17:00.000Z");
+
+  it("leads with the role, which is what a person searches by", () => {
+    expect(resumeVersionName("ServiceNow Delivery Director", at)).toMatch(/^ServiceNow Delivery Director · /);
+  });
+
+  /*
+   * The month is matched loosely. Node renders en-GB September as "Sept" and
+   * other ICU builds as "Sep"; pinning the spelling tests the platform's
+   * locale data rather than this function.
+   */
+  it("carries the day and the time, so two saves on one day are told apart", () => {
+    const name = resumeVersionName("Engagement Manager", at);
+    expect(name).toMatch(/12 Sept? 2026/);
+    expect(name).toMatch(/\d{2}:\d{2}/);
+  });
+
+  it("distinguishes two saves an hour apart", () => {
+    const morning = resumeVersionName("Engagement Manager", new Date("2026-09-12T01:00:00.000Z"));
+    const evening = resumeVersionName("Engagement Manager", new Date("2026-09-12T13:00:00.000Z"));
+    expect(morning).not.toBe(evening);
+  });
+
+  it("falls back to something readable when the role is missing", () => {
+    expect(resumeVersionName("", at)).toMatch(/^Tailored résumé · /);
+    expect(resumeVersionName("   ", at)).toMatch(/^Tailored résumé · /);
+  });
+
+  it("trims a role that arrived with whitespace", () => {
+    expect(resumeVersionName("  Practice Lead  ", at)).toMatch(/^Practice Lead · /);
   });
 });

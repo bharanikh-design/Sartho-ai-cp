@@ -66,3 +66,35 @@ export async function saveResumeDraft(
     structureStored: false,
   };
 }
+
+/*
+ * What a saved résumé is called in the repository.
+ *
+ * Every version was named `existing?.resume_version ?? "Tailored résumé"` — so
+ * a save inherited the previous name, and a first save got a generic one. The
+ * repository filled up with rows that all said the same thing, which is not a
+ * repository, it is a pile. Somebody looking for the résumé they wrote for a
+ * ServiceNow delivery role in March had a list of identical labels to pick
+ * from.
+ *
+ * The role and the moment, because those are the two things a person searches
+ * by. The timestamp is in the row already as created_at; it is repeated here
+ * because a name has to be readable on its own, in a dropdown or a filename,
+ * away from the row it came from.
+ *
+ * Local time, deliberately: somebody scanning their own résumés is reading
+ * clock time they remember, not an instant on a server.
+ */
+export function resumeVersionName(jobTitle: string, at: Date = new Date()): string {
+  const role = jobTitle.trim() || "Tailored résumé";
+  const stamp = at.toLocaleString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+  /* "ServiceNow Delivery Director · 12 Sep 2026, 20:17" */
+  return `${role} · ${stamp}`;
+}
