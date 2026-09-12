@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { classifyAiFailure, describeAiFailure, REWRITE_SUBJECT } from "./failure";
+import { classifyAiFailure, describeAiFailure, DOCUMENT_SUBJECT, RESUME_BUILD_SUBJECT, REWRITE_SUBJECT } from "./failure";
 
 /*
  * The strings here are the ones the providers actually sent, copied from a
@@ -49,9 +49,10 @@ describe("describeAiFailure", () => {
     expect(spoken).not.toContain("quota");
   });
 
-  it("says the résumé is not the problem, because it is not", () => {
-    expect(describeAiFailure(OVER_QUOTA)).toContain("Nothing is wrong with your résumé");
-    expect(describeAiFailure("Rate limit reached")).toContain("Nothing is wrong with your résumé");
+  it("says the person's own work is not the problem, because it is not", () => {
+    expect(describeAiFailure(OVER_QUOTA, DOCUMENT_SUBJECT)).toContain("Nothing is wrong with your résumé");
+    expect(describeAiFailure(OVER_QUOTA)).toContain("Nothing is wrong with your data");
+    expect(describeAiFailure("Rate limit reached")).toContain("Nothing is wrong with your data");
   });
 
   it("names the lever for the person who owns the deployment", () => {
@@ -62,7 +63,7 @@ describe("describeAiFailure", () => {
   it("never passes an unrecognised provider message through to the user", () => {
     const odd = "upstream exploded with request abc-123 at https://provider.example/internal";
     const spoken = describeAiFailure(odd);
-    expect(spoken).toContain("could not read the document");
+    expect(spoken).toContain("could not finish that request");
     expect(spoken).not.toContain("abc-123");
     expect(spoken).not.toContain("provider.example");
   });
@@ -70,6 +71,7 @@ describe("describeAiFailure", () => {
   it("does not print Google's retired-model diagnostics on the upload screen", () => {
     const spoken = describeAiFailure(
       "models/gemini-1.5-pro is not found for API version v1beta, or is not supported for generateContent. (model: gemini-1.5-pro)",
+      DOCUMENT_SUBJECT,
     );
     expect(spoken).toContain("no longer available");
     expect(spoken).toContain("Nothing is wrong with your résumé");
@@ -126,9 +128,24 @@ describe("describeAiFailure, said about a line rather than a document", () => {
     expect(spoken).not.toContain("provider.example");
   });
 
-  it("keeps the document wording when no subject is given", () => {
-    expect(describeAiFailure(OUT_OF_CREDIT)).toContain("read the document");
-    expect(describeAiFailure(OUT_OF_CREDIT)).toContain("Nothing is wrong with your résumé");
+  /*
+   * The default used to be the document wording, and lib/ai/provider formats
+   * every failure it raises — so a résumé that could not be BUILT told the
+   * person Sartho "could not read the document" and to "upload it again".
+   * There was no document, and uploading one would not have helped.
+   */
+  it("does not talk about documents when the caller never mentioned one", () => {
+    const spoken = describeAiFailure(OUT_OF_CREDIT);
+    expect(spoken).not.toContain("read the document");
+    expect(spoken).not.toContain("upload it again");
+    expect(spoken).toContain("finish that request");
+  });
+
+  it("fits the sentence to what was actually being done", () => {
+    expect(describeAiFailure(OUT_OF_CREDIT, RESUME_BUILD_SUBJECT)).toContain("build the résumé");
+    expect(describeAiFailure(OUT_OF_CREDIT, RESUME_BUILD_SUBJECT)).toContain("Nothing is wrong with your evidence");
+    expect(describeAiFailure(OUT_OF_CREDIT, DOCUMENT_SUBJECT)).toContain("read the document");
+    expect(describeAiFailure(OUT_OF_CREDIT, REWRITE_SUBJECT)).toContain("rewrite that line");
   });
 });
 

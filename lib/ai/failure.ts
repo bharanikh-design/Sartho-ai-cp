@@ -80,6 +80,31 @@ export const DOCUMENT_SUBJECT: AiFailureSubject = {
   retry: "upload it again",
 };
 
+/*
+ * The default, and deliberately about nothing in particular.
+ *
+ * DOCUMENT_SUBJECT used to hold this slot, and lib/ai/provider formats every
+ * failure it raises — so a résumé that could not be *built*, an advert that
+ * could not be analysed and a line that could not be rewritten all told the
+ * person that Sartho "could not read the document" and that they should
+ * "upload it again". The noun was wrong and the instruction did nothing: there
+ * was no document, and uploading one would not have helped.
+ *
+ * A caller that knows what it was doing passes its own subject and gets a
+ * sentence that fits. A caller that does not gets one that is at least true.
+ */
+export const GENERIC_SUBJECT: AiFailureSubject = {
+  action: "finish that request",
+  reassurance: "your data",
+  retry: "try again",
+};
+
+export const RESUME_BUILD_SUBJECT: AiFailureSubject = {
+  action: "build the résumé",
+  reassurance: "your evidence",
+  retry: "try again",
+};
+
 export const REWRITE_SUBJECT: AiFailureSubject = {
   action: "rewrite that line",
   reassurance: "your draft",
@@ -90,7 +115,7 @@ export const REWRITE_SUBJECT: AiFailureSubject = {
  * The reader is the person who owns the deployment, so the message names the
  * lever they actually have rather than apologising in the abstract.
  */
-export function describeAiFailure(message: string, subject: AiFailureSubject = DOCUMENT_SUBJECT): string {
+export function describeAiFailure(message: string, subject: AiFailureSubject = GENERIC_SUBJECT): string {
   const { action, reassurance, retry } = subject;
   switch (classifyAiFailure(message)) {
     case "credit":
