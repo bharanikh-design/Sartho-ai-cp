@@ -1,5 +1,6 @@
 import {
   JobSearchNotConfiguredError,
+  providerCallBudgetMs,
   searchWithProvider,
   type JobSearchProviderName,
   type JobSearchQuery,
@@ -149,6 +150,28 @@ export function createProviderCascade(
       timeouts.set(label, (timeouts.get(label) ?? 0) + 1);
       timeoutWaits.set(label, Math.max(timeoutWaits.get(label) ?? 0, lastAllowedMs));
       console.warn(`${label} timed out on a query after ${lastAllowedMs}ms`);
+
+      /*
+       * A timeout is not free, and the deep provider's timeout is the most
+       * expensive thing in a search.
+       *
+       * "A single timeout is weather" was written when a call cost a couple of
+       * seconds. SerpApi is given twenty, and a measured run spent sixty of a
+       * seventy-five second budget on three of them before retiring it —
+       * leaving twenty-one of twenty-five queries unrun and the whole search
+       * carried by the shallow fallback. The second chance cost more than the
+       * provider was worth.
+       *
+       * So a timeout that consumed the entire call budget retires the provider
+       * at once. It is a different fact from an error: the provider was given
+       * everything it asked for and still said nothing, and the next call has
+       * no reason to go better. A timeout that was cut short by a tight budget
+       * late in a run still gets the usual two chances, because that one really
+       * is weather.
+       */
+      if (lastAllowedMs && lastAllowedMs >= providerCallBudgetMs(provider)) {
+        dead.add(provider);
+      }
       return;
     }
     record(provider, `${providerLabel(provider)}: ${caught instanceof Error ? caught.message : "unknown error"}`);

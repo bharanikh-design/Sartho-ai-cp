@@ -596,3 +596,76 @@ describe("what the live lead is", () => {
     expect(cascade.exhausted()).toBe(true);
   });
 });
+
+/*
+ * A timeout is not free, and the deep provider's timeout is the most expensive
+ * thing in a search. A measured run spent sixty seconds of a seventy-five
+ * second budget on three SerpApi timeouts before retiring it, leaving
+ * twenty-one of twenty-five queries unrun.
+ */
+describe("what a full-budget timeout costs", () => {
+  function timeoutError() {
+    const error = new Error("The operation was aborted due to timeout");
+    error.name = "TimeoutError";
+    return error;
+  }
+
+  const ORDER: JobSearchProviderName[] = ["serpapi", "adzuna"];
+
+  it("retires a provider that was given everything and still said nothing", async () => {
+    const { search } = recorder({
+      serpapi: async () => { throw timeoutError(); },
+      adzuna: async () => [result("https://c")],
+    });
+    const cascade = createProviderCascade(ORDER, { search });
+
+    /* 20_000 is SerpApi's full call budget: it asked for all of it and timed out. */
+    await cascade.run({ ...query, timeoutMs: 20_000 });
+
+    expect(cascade.isDead("serpapi")).toBe(true);
+  });
+
+  /*
+   * A timeout cut short by a tight budget late in a run really is weather, and
+   * still gets the usual two chances.
+   */
+  it("gives a short-budget timeout the usual second chance", async () => {
+    const { search } = recorder({
+      serpapi: async () => { throw timeoutError(); },
+      adzuna: async () => [result("https://c")],
+    });
+    const cascade = createProviderCascade(ORDER, { search });
+
+    await cascade.run({ ...query, timeoutMs: 4_000 });
+    expect(cascade.isDead("serpapi")).toBe(false);
+
+    await cascade.run({ ...query, timeoutMs: 4_000 });
+    expect(cascade.isDead("serpapi")).toBe(true);
+  });
+
+  /* An error is still an error: two chances, however long the call was given. */
+  it("does not retire a fast failure on the first attempt", async () => {
+    const { search } = recorder({
+      serpapi: async () => { throw new Error("500 from upstream"); },
+      adzuna: async () => [result("https://c")],
+    });
+    const cascade = createProviderCascade(ORDER, { search });
+
+    await cascade.run({ ...query, timeoutMs: 20_000 });
+
+    expect(cascade.isDead("serpapi")).toBe(false);
+  });
+
+  it("still counts the timeout and the wait for the report", async () => {
+    const { search } = recorder({
+      serpapi: async () => { throw timeoutError(); },
+      adzuna: async () => [result("https://c")],
+    });
+    const cascade = createProviderCascade(ORDER, { search });
+
+    await cascade.run({ ...query, timeoutMs: 20_000 });
+
+    expect(cascade.timeouts.get("Google for Jobs (SerpApi)")).toBe(1);
+    expect(cascade.timeoutWaits.get("Google for Jobs (SerpApi)")).toBe(20_000);
+  });
+});
