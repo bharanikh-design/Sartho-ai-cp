@@ -180,6 +180,7 @@ function BulletList({
   ownerLabel,
   tracked,
   weakBulletIds,
+  bulletNotes,
   coach,
   onEdit,
   onRemove,
@@ -191,6 +192,8 @@ function BulletList({
   ownerLabel: string;
   tracked: boolean;
   weakBulletIds: Set<string>;
+  /** Why a particular line was flagged, when there is something specific to say. */
+  bulletNotes?: Map<string, string>;
   coach?: BulletCoach;
   onEdit: (index: number, text: string) => void;
   onRemove: (index: number) => void;
@@ -253,7 +256,16 @@ function BulletList({
                   className={`resume-doc-coach-open${weakBulletIds.has(bullet.id) ? " is-weak" : ""}`}
                   onClick={() => coach.onOpen(bullet.id, bullet.text)}
                 >
-                  {weakBulletIds.has(bullet.id) ? "✨ Strengthen this line — it states no result" : "✨ Strengthen this line"}
+                  {/*
+                    * The reason this line was flagged, in its own words.
+                    *
+                    * Every flagged bullet used to read "it states no result",
+                    * which is one rule out of ten and was wrong about most of
+                    * them — a line marked for the passive voice or for a claim
+                    * no reader can check was told it needed a number.
+                    */}
+                  {bulletNotes?.get(bullet.id)
+                    ?? (weakBulletIds.has(bullet.id) ? "✨ Strengthen this line — it states no result" : "✨ Strengthen this line")}
                 </button>
               ) : null}
 
@@ -302,6 +314,7 @@ export function ResumeDocument({
   content,
   onChange,
   weakBulletIds,
+  bulletNotes,
   coach,
   readOnly = false,
 }: {
@@ -309,6 +322,8 @@ export function ResumeDocument({
   onChange: (next: ResumeContent) => void;
   /** Bullets the ATS reader found no figure in, so the page can mark them. */
   weakBulletIds: Set<string>;
+  /** Why a particular line was flagged, when there is something specific to say. */
+  bulletNotes?: Map<string, string>;
   coach?: BulletCoach;
   readOnly?: boolean;
 }) {
@@ -528,6 +543,7 @@ export function ResumeDocument({
             ownerLabel={role.employer || role.title || `role ${roleIndex + 1}`}
             tracked={tracked}
             weakBulletIds={weakBulletIds}
+            bulletNotes={bulletNotes}
             coach={coach}
             {...bulletHandlers(role.bullets, role.id, (bullets) => editRole(roleIndex, (current) => ({ ...current, bullets })))}
           />
@@ -557,6 +573,7 @@ export function ResumeDocument({
             ownerLabel={section.heading || `section ${sectionIndex + 1}`}
             tracked={tracked}
             weakBulletIds={weakBulletIds}
+            bulletNotes={bulletNotes}
             coach={coach}
             {...bulletHandlers(section.bullets, section.id, (bullets) => editSection(sectionIndex, (current) => ({ ...current, bullets })))}
           />

@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { atsVerdict, scoreAts, tailoringGain } from "@/lib/resume/ats";
 import { unfilledBlanks } from "@/lib/resume/bullet-rewrite";
+import { overusedOpeners, reviewWriting } from "@/lib/resume/writing";
 import { suggestResumeFor, type PastResume } from "@/lib/resume/suggest";
 import { renderResumeText, resumeContentOf, type ResumeContent } from "@/lib/resume/content";
 import { ResumeDocument, type BulletCoach } from "@/components/resume-document";
@@ -451,6 +452,47 @@ export function ResumeStudio({
     const weakBulletIds = new Set(weak.map((entry) => entry.bullet.id));
 
     /*
+     * What is wrong with each line, beyond whether it carries a number.
+     *
+     * The panel could only ever say "this line has no figure", which is one
+     * rule out of ten and the least interesting of them — and it is why the
+     * coaching read as a machine asking for percentages. A weak opener, the
+     * passive voice, a claim no reader can check, a pronoun, a bullet that has
+     * become a paragraph: these are what a person would actually fix, and the
+     * house standard has been able to find them since it was written.
+     *
+     * Free, instant and deterministic. No model, no call, no waiting — the
+     * rules are the same ones the drafting routes are given, so the page can
+     * only ever flag something Sartho itself asked for.
+     */
+    const findings = reviewWriting(flatBullets.map((bullet) => bullet.text))
+      .map((finding) => ({ ...finding, bullet: flatBullets[finding.index] }))
+      .filter((finding) => Boolean(finding.bullet));
+
+    /*
+     * Repetition is judged per role, not across the document. Two bullets in
+     * one job opening on "Led" reads as a theme; six across a career reads as
+     * a vocabulary of one, and the roles are where a reader notices it.
+     */
+    const repeated = content.roles.flatMap((role) =>
+      overusedOpeners(role.bullets.map((bullet) => bullet.text), 2)
+        .map((entry) => ({ role: role.title || role.employer || "this role", ...entry })),
+    );
+
+    /*
+     * The mark on the document, and the reason beside it.
+     *
+     * Both sets of findings put the same mark on a line — a reader does not
+     * care which check caught it — but the note says which, because "it states
+     * no result" was being shown on lines whose problem was the passive voice.
+     */
+    const bulletNotes = new Map<string, string>();
+    for (const finding of findings) {
+      if (!bulletNotes.has(finding.bullet.id)) bulletNotes.set(finding.bullet.id, `✨ ${finding.detail}`);
+    }
+    const markedBulletIds = new Set([...weakBulletIds, ...findings.map((finding) => finding.bullet.id)]);
+
+    /*
      * The rewrite loop, handed to the document so the proposal opens under the
      * line it rewrites. The rail used to reprint every weak bullet in full,
      * which is a column of small text restating the page beside it — most of
@@ -527,7 +569,8 @@ export function ResumeStudio({
             <ResumeDocument
               content={content}
               onChange={setContent}
-              weakBulletIds={weakBulletIds}
+              weakBulletIds={markedBulletIds}
+              bulletNotes={bulletNotes}
               coach={isOlderVersion ? undefined : coach}
               readOnly={isOlderVersion}
             />
@@ -692,7 +735,8 @@ return (
           <ResumeDocument
             content={content}
             onChange={setContent}
-            weakBulletIds={weakBulletIds}
+            weakBulletIds={markedBulletIds}
+            bulletNotes={bulletNotes}
             coach={isOlderVersion ? undefined : coach}
             readOnly={isOlderVersion}
           />
@@ -864,6 +908,45 @@ return (
             >
               Fix {weak.length} line{weak.length === 1 ? "" : "s"} with no figure →
             </button>
+          ) : null}
+
+          {/*
+            * Named faults, one line each, each opening the bullet it is about.
+            *
+            * Listed rather than counted: "3 lines need work" is a number, and
+            * "opens on 'helped', which reports being near the work" is
+            * something a person can act on in the next ten seconds. Capped at
+            * six, because a rail listing every fault on a long résumé is the
+            * wall of grey text this panel was rewritten to stop being.
+            */}
+          {findings.length ? (
+            <div className="studio-writing-findings">
+              <strong>{findings.length} line{findings.length === 1 ? "" : "s"} worth rewording</strong>
+              <ul>
+                {findings.slice(0, 6).map((finding) => (
+                  <li key={`${finding.bullet.id}-${finding.kind}`}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        openBulletAt(draft, { id: finding.bullet.id, text: finding.bullet.text });
+                        document.getElementById(`bullet-${finding.bullet.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+                      }}
+                    >
+                      {finding.detail}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              {findings.length > 6 ? <small>and {findings.length - 6} more</small> : null}
+            </div>
+          ) : null}
+
+          {/* A page that opens six bullets on the same verb reads as a form. */}
+          {repeated.length ? (
+            <p className="studio-writing-repeat">
+              {repeated.slice(0, 2).map((entry) => `${entry.count} bullets under ${entry.role} open on "${entry.verb}"`).join("; ")}.
+              {" "}Vary the verb to fit the work.
+            </p>
           ) : null}
 
           {/*
