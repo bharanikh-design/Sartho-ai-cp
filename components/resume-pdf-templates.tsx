@@ -57,26 +57,37 @@ function paletteFor(pdf: ResumeTemplatePdf) {
     aside: sidebar
       ? { width: pdf.sidebarWidth ?? 174, backgroundColor: pdf.accent, color: pdf.sidebarInk ?? "#ffffff", paddingTop: 38, paddingBottom: 38, paddingLeft: 22, paddingRight: 20 }
       : {},
+    /*
+     * Every text block states its own line height.
+     *
+     * The page sets one for the body — 1.36 or so — and a value tuned for 9pt
+     * body text is not enough box for a 24pt name: the line under it was drawn
+     * across the name's lower third. Inheriting a leading multiplier across an
+     * order-of-magnitude size change is the mistake, so each block that differs
+     * in size from the body says what it needs.
+     */
     name: {
       fontSize: pdf.nameSize,
+      lineHeight: 1.16,
       fontWeight: 700 as const,
       letterSpacing: pdf.nameTracking,
       textAlign: pdf.nameAlign,
       textTransform: (pdf.nameCaps ? "uppercase" : "none") as "uppercase" | "none",
-      marginBottom: 3,
+      marginBottom: 6,
     },
-    targetRole: { fontSize: pdf.bodySize + 2.2, color: pdf.accent, textAlign: pdf.nameAlign, marginBottom: 5 },
-    contact: { fontSize: pdf.bodySize - 0.8, color: pdf.muted, textAlign: pdf.nameAlign },
+    targetRole: { fontSize: pdf.bodySize + 2.2, lineHeight: 1.3, color: pdf.accent, textAlign: pdf.nameAlign, marginBottom: 5 },
+    contact: { fontSize: pdf.bodySize - 0.8, lineHeight: 1.35, color: pdf.muted, textAlign: pdf.nameAlign },
     paragraph: { marginBottom: 8 },
     role: { marginBottom: 9 },
     roleHeader: { flexDirection: "row" as const, justifyContent: "space-between" as const, marginBottom: 2.5 },
     roleTitle: { fontWeight: 700 as const, flexGrow: 1, paddingRight: 8 },
-    roleDates: { color: pdf.muted, fontSize: pdf.bodySize - 0.6 },
+    roleDates: { color: pdf.muted, fontSize: pdf.bodySize - 0.6, lineHeight: 1.35 },
     bulletRow: { flexDirection: "row" as const, marginBottom: 2.2 },
     bulletMark: { width: 9, color: pdf.accent },
     bulletText: { flexGrow: 1, flexShrink: 1 },
     asideHeading: {
       fontSize: pdf.headingSize - 0.6,
+      lineHeight: 1.25,
       fontWeight: 700 as const,
       letterSpacing: 0.9,
       textTransform: "uppercase" as const,
@@ -84,7 +95,7 @@ function paletteFor(pdf: ResumeTemplatePdf) {
       marginBottom: 5,
       color: pdf.sidebarInk ?? "#ffffff",
     },
-    asideText: { fontSize: pdf.bodySize - 0.7, color: pdf.sidebarMuted ?? "#dbe7e4", marginBottom: 3 },
+    asideText: { fontSize: pdf.bodySize - 0.7, lineHeight: 1.35, color: pdf.sidebarMuted ?? "#dbe7e4", marginBottom: 3 },
   };
 }
 
@@ -99,6 +110,7 @@ function Heading({ text, p }: { text: string; p: Palette }) {
   const { pdf } = p;
   const base = {
     fontSize: pdf.headingSize,
+    lineHeight: 1.25,
     fontWeight: 700 as const,
     letterSpacing: 0.7,
     textTransform: (pdf.headingCaps ? "uppercase" : "none") as "uppercase" | "none",
