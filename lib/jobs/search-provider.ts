@@ -612,6 +612,9 @@ export async function searchWithProvider(
 
 
 
+/** How long a diagnostic probe waits for an answer, or for a reason. */
+const PROBE_TIMEOUT_MS = 25_000;
+
 export type JobProviderProbe = {
   provider: JobSearchProviderName;
   name: string;
@@ -645,15 +648,28 @@ export async function probeJobProvider(provider: JobSearchProviderName): Promise
 
   const startedAt = Date.now();
   try {
+    /*
+     * Deliberately more patient than a real search.
+     *
+     * The search's own timeout is sized so one stalled provider cannot spend
+     * the run; this probe has no such duty and every second it waits buys a
+     * fact. Cut short at the search's eight seconds, a provider that was about
+     * to answer "429 — monthly quota exceeded" reported only "Timed out", which
+     * is the symptom and names none of the causes. If it still has nothing to
+     * say after twenty-five seconds, that silence is itself the finding.
+     */
     const results = await searchWithProvider(provider, {
       keywords: "project manager",
       country: "sg",
       limit: 10,
+      timeoutMs: PROBE_TIMEOUT_MS,
     });
     return { provider, name, configured, reads, reachable: true, results: results.length, elapsedMs: Date.now() - startedAt, error: null };
   } catch (caught) {
     const error = caught instanceof Error
-      ? (caught.name === "TimeoutError" || caught.name === "AbortError" ? "Timed out." : caught.message)
+      ? (caught.name === "TimeoutError" || caught.name === "AbortError"
+          ? `No response at all within ${PROBE_TIMEOUT_MS / 1000}s — the request is not being refused, it is being left open. That points at the network or the subscription rather than the query.`
+          : caught.message)
       : "Unknown error.";
     return { provider, name, configured, reads, reachable: false, results: 0, elapsedMs: Date.now() - startedAt, error };
   }
