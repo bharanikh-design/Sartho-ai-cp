@@ -1,3 +1,5 @@
+import { RESUME_WRITING_RULES } from "@/lib/resume/writing";
+
 /*
  * Refusing a figure the person never gave.
  *
@@ -19,13 +21,11 @@ export function inventedNumbersIn(rewritten: string, ...permitted: string[]): st
 
 /** The instruction both rewrite routes give, so they ask for the same thing. */
 export const BULLET_REWRITE_RULES = [
-  "You are an elite executive career coach and expert resume writer. Your job is to rewrite a single résumé bullet to perfectly integrate a fact the candidate supplied, transforming it into a high-impact STAR-method statement.",
+  "You rewrite a single résumé bullet so that it carries a fact the person has just supplied.",
   "You may use ONLY the supplied bullet and the supplied fact. Never introduce a number, percentage, currency amount, duration, team size, employer, tool, certification or outcome that is not in one of them.",
-  "Start the bullet with a powerful action verb (e.g., Spearheaded, Orchestrated, Delivered). Do NOT use weak verbs like 'Helped', 'Worked on', or 'Responsible for'.",
-  "Use active voice exclusively. Ensure the tone is professional, direct, and metric-driven.",
+  RESUME_WRITING_RULES,
   "If the supplied fact contains no usable detail, return the original bullet unchanged and set usedFact to false.",
   "Do not exaggerate the fact. If the person says 'about 30 records', do not write '30+' or 'thousands'.",
-  "Keep it one sentence, keep their voice, lead with the action, and do not add a closing flourish about impact that the fact does not support.",
   "Return the bullet text only, with no leading bullet character.",
 ].join(" ");
 
@@ -43,12 +43,14 @@ export const BULLET_REWRITE_RULES = [
  * instead. A blank is honest in a way a plausible number never is.
  */
 export const BULLET_PROPOSE_RULES = [
-  "You are shown one résumé bullet that states no measurable result. Rewrite it as the stronger line it could be.",
+  "You are shown one résumé bullet. Rewrite it as the stronger line it could be.",
   "You do NOT know this person's figures and must never guess one. Every quantity you cannot read in the bullet itself must appear as a square-bracketed blank naming what is wanted — [how many phases], [over how many weeks], [how many stakeholders].",
   "Never write a number, percentage, currency amount, duration, team size, tool, employer or certification that is not already in the bullet. A blank is always correct where a guess is not.",
-  "Keep their voice and the facts they stated. Do not add scope, seniority or impact the bullet does not claim.",
+  RESUME_WRITING_RULES,
+  "Keep the facts they stated. Do not add scope, seniority or impact the bullet does not claim.",
+  "A line can be made stronger without a figure at all. If the bullet already names real scope, or if its weakness is a limp opener, the passive voice or a claim no reader could check, fix that and add no blanks — a blank asking for a number the line does not need is busywork.",
   "Use at most three blanks: the ones that would most change how the line reads. A line dense with brackets is not a draft, it is homework.",
-  "Also return two to four short questions naming exactly what would make this line strongest, each specific to this bullet and not generic résumé advice.",
+  "Also return two to four short questions naming exactly what would make this line strongest, each specific to this bullet and not generic résumé advice. If the line's problem is not a missing figure, the questions must not ask for one.",
   "Return the rewritten line only, with no leading bullet character.",
 ].join(" ");
 

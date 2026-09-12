@@ -6,6 +6,7 @@ import { aiQuotaResponse, checkAiQuota } from "@/lib/ai/quota";
 import { getAuthenticatedUser } from "@/lib/auth";
 import { evidenceIdsIn, renderResumeText, type ResumeBullet, type ResumeContent, type ResumeRole } from "@/lib/resume/content";
 import { DEFAULT_TEMPLATE } from "@/lib/resume/templates";
+import { RESUME_WRITING_RULES } from "@/lib/resume/writing";
 import { saveResumeDraft } from "@/lib/resume/save";
 
 // Same reasoning as the deep-analysis route: the declared budget has to cover
@@ -192,6 +193,13 @@ export async function POST(
       safetyIdentifier: createSafetyIdentifier(user.id),
       schemaName: "sartho_tailored_resume",
       schema: jsonSchema,
+      /*
+       * The house writing standard sits in the middle of these, not as a
+       * flourish but because this is the document somebody sends. It used to
+       * be told only not to invent — and was then scored by an ATS panel
+       * marking it down for weak openers and passive voice it had never been
+       * asked to avoid. The instruction and the score now read one source.
+       */
       system: [
         "You draft a review-only résumé version using only the approved evidence supplied.",
         "Never create or infer an employer, date, skill, metric, certification, responsibility or outcome.",
@@ -201,6 +209,8 @@ export async function POST(
         "Place each bullet under the employment role it happened in, citing that role's id in experience[].roleId.",
         "Use only the role ids supplied. Never invent a role, an employer, a job title or a date — the employment history is given to you and is not yours to add to.",
         "Put a bullet in sections[] only when it genuinely belongs to no supplied role, such as a project or a certification.",
+        RESUME_WRITING_RULES,
+        "Aligning to the advert means choosing which true things to lead with and naming them in the advert's own vocabulary where the evidence already means the same thing. It never means claiming something the evidence does not carry.",
         "The change log must explain every material emphasis, rewording, omission or movement.",
       ].join(" "),
       prompt: JSON.stringify({

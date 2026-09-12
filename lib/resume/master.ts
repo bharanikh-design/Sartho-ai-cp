@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { RESUME_WRITING_RULES } from "@/lib/resume/writing";
 
 /*
  * What Sartho asks for when the résumé is not about any particular advert.
@@ -12,6 +13,12 @@ import { z } from "zod";
  * of their own CV, drawn from what the evidence actually shows rather than from
  * an ambition. "ServiceNow delivery lead, ITSM and ITOM" is a reading of a
  * career; "Visionary transformation leader" is a claim nobody can check.
+ *
+ * How to write a line — action verbs, active voice, the self-descriptions no
+ * reader can check, repetition, length, tense — is not restated here. It is
+ * the house standard in lib/resume/writing.ts, shared with the tailored draft
+ * and the single-bullet rewrite so all three ask for the same thing and the
+ * ATS panel scores what was actually asked for.
  */
 
 export const MASTER_RESUME_RULES = [
@@ -20,13 +27,7 @@ export const MASTER_RESUME_RULES = [
   "Every bullet must cite at least one supplied evidence ID that directly supports its wording.",
   "Place each bullet under the employment role it happened in, citing that role's id in experience[].roleId. Use only the role ids supplied — the employment history is given to you and is not yours to add to.",
   "Order each role's bullets strongest first: the ones showing the largest scope, the clearest outcome, or the most senior responsibility.",
-  "Write each bullet the way a person speaks to a hiring manager: what they did, at what scope, and what came of it. Open on a real action — led, cut, built, negotiated, migrated — never on 'responsible for', 'helped with', 'assisted with' or 'worked on'.",
-  "Use the active voice throughout. 'Cut incident volume' rather than 'incident volume was cut'.",
-  "Never describe the person with a claim no reader could verify: results-driven, detail-oriented, team player, passionate, hard-working, proven track record, excellent communicator, go-getter, think outside the box, synergy. State what they did instead.",
-  "Do not open more than two bullets in the same role with the same verb, and do not repeat a distinctive phrase across roles.",
-  "A figure is welcome where the evidence states one, and never invented where it does not. A line naming real scope — four business units, three countries, an eleven-person team — is strong without a percentage.",
-  "Keep each bullet to one or two lines. A bullet longer than that is a paragraph and will not be read.",
-  "Present tense for a role still held, past tense for every other.",
+  RESUME_WRITING_RULES,
   "The professional summary is three to four sentences, in the person's own register, naming what they do, the scale they do it at, and the domains the evidence covers. No adjectives about their character.",
   "The headline is the job title a person like this would put at the top of their CV, read off the evidence rather than aspired to.",
 ].join(" ");

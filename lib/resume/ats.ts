@@ -1,4 +1,5 @@
 import type { RuleAnalysis } from "@/lib/types";
+import { PASSIVE_VOICE, WEAK_OPENER } from "@/lib/resume/writing";
 
 /*
  * How a résumé draft reads to an applicant tracking system, and what to do
@@ -137,8 +138,13 @@ function withoutYears(value: string) {
   return value.replace(CALENDAR_YEAR, " ");
 }
 
-const WEAK_VERBS = /^(?:worked|helped|assisted|responsible for|duties included|handled|did|made)\b/i;
-const PASSIVE_VOICE = /\b(?:was|were|is|are|am|be|been|being)\b\s+\w+ed\b/i;
+/*
+ * Both patterns come from the shared writing standard rather than from a copy
+ * kept here. They used to be defined in this file alone, which meant the panel
+ * marked a draft down for weak openers and passive voice that no drafting
+ * route had ever been told to avoid — a score for a rule that was never
+ * stated. Now the instruction and the check read the same source.
+ */
 
 /*
  * A fresh regex per call. A /g regex carries lastIndex between .test() calls,
@@ -245,7 +251,7 @@ export function scoreAts(draft: string, analysis: RuleAnalysis | null): AtsScore
    * bullets with "Responsible for" scored exactly the same as one opening them
    * with "Cut", "Led" and "Shipped".
    */
-  const weakVerbBullets = bullets.filter((bullet) => WEAK_VERBS.test(bullet));
+  const weakVerbBullets = bullets.filter((bullet) => WEAK_OPENER.test(bullet));
   const passiveBullets = bullets.filter((bullet) => PASSIVE_VOICE.test(bullet));
   const strongVerbShare = bullets.length
     ? Math.round(((bullets.length - weakVerbBullets.length) / bullets.length) * 100)
