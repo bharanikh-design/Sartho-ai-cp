@@ -79,6 +79,40 @@ describe("OAuth callback", () => {
 
     const response = await callback("?code=one-time-code&next=%2F%2Fevil.example");
 
-    expect(response.headers.get("location")).toBe("https://sartho.tech/");
+    /*
+     * Asserted on the parts rather than the whole string. The destination now
+     * carries a welcome marker, and a test pinned to an exact URL would fail
+     * for that and read as though the open-redirect guard had broken — which
+     * is the one thing here that must never be mistaken for cosmetic.
+     */
+    const location = new URL(response.headers.get("location") ?? "");
+    expect(location.origin).toBe("https://sartho.tech");
+    expect(location.pathname).toBe("/");
+  });
+
+  /*
+   * The welcome plays once, on the way in from a real sign-in. It is carried
+   * in the address because it has to be true exactly once, and the cinematic
+   * strips it as it starts so a reload lands on the product instead.
+   */
+  it("marks a successful sign-in so the destination can welcome somebody", async () => {
+    exchangeCodeForSession.mockResolvedValue({ error: null });
+
+    const response = await callback("?code=one-time-code");
+    const location = new URL(response.headers.get("location") ?? "");
+
+    expect(location.pathname).toBe("/");
+    expect(location.searchParams.get("welcome")).toBe("1");
+  });
+
+  it("does not welcome somebody into a page that is not the home page", async () => {
+    exchangeCodeForSession.mockResolvedValue({ error: null });
+
+    const response = await callback("?code=one-time-code&next=%2Fresume-studio");
+    const location = new URL(response.headers.get("location") ?? "");
+
+    /* Somebody returning to a deep link asked for that page, not an introduction. */
+    expect(location.pathname).toBe("/resume-studio");
+    expect(location.searchParams.get("welcome")).toBeNull();
   });
 });

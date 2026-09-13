@@ -19,6 +19,7 @@ import "./experience-polish.css";
 import "./ai-career-workspaces.css";
 import "./product-system.css";
 import "./landing.css";
+import "./welcome.css";
 import { AppShell } from "@/components/app-shell";
 import { siteMetadata } from "@/lib/site-metadata";
 
