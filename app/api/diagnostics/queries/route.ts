@@ -4,6 +4,7 @@ import {
   configuredJobSearchProviders,
   searchWithProvider,
   providerCallBudgetMs,
+  suppressedJobSearchProviders,
   type JobSearchProviderName,
 } from "@/lib/jobs/search-provider";
 import { providerLabel } from "@/lib/jobs/provider-cascade";
@@ -69,6 +70,20 @@ export async function GET(request: Request) {
   const providers: JobSearchProviderName[] = configuredJobSearchProviders();
 
   /*
+   * Named first, and on every answer, because this is the failure that hides.
+   *
+   * A provider switched off by JOBS_DISABLED_PROVIDERS keeps its key and
+   * answers anything asked of it directly — so it probes healthy, warms
+   * happily, and never appears in a search. The only sign was its absence from
+   * a list of two, which is not a thing anybody reads. Saying it out loud costs
+   * one line and would have saved this exact afternoon.
+   */
+  const suppressed = suppressedJobSearchProviders();
+  const suppressedNote = suppressed.length
+    ? `${suppressed.map(providerLabel).join(", ")} ${suppressed.length === 1 ? "has a key but is" : "have keys but are"} switched off by JOBS_DISABLED_PROVIDERS, so no search will ask ${suppressed.length === 1 ? "it" : "them"}. Clear that variable to put ${suppressed.length === 1 ? "it" : "them"} back in the cascade.`
+    : null;
+
+  /*
    * Warm these titles at SerpApi and return, rather than searching them.
    *
    * SerpApi answers a title it has served before in about a second and one it
@@ -114,6 +129,12 @@ export async function GET(request: Request) {
       note: warming
         ? "Give these a minute to finish at SerpApi, then run this again without &warm=1 — a cached query comes back in about a second."
         : "Nothing needed warming. These titles are already cached and a search should read them quickly.",
+      /*
+       * Warming bypasses the cascade and calls SerpApi directly, so it succeeds
+       * whether or not a search would ever use it. Without this line that reads
+       * as a working provider.
+       */
+      suppressed: suppressedNote,
       country,
       warmed,
       checkedAt: new Date().toISOString(),
@@ -165,6 +186,7 @@ export async function GET(request: Request) {
     {
       summary: `${queries.length} quer${queries.length === 1 ? "y" : "ies"} against ${providers.length} provider${providers.length === 1 ? "" : "s"}: `
         + `${rows.length - empty.length - failed.length} answered, ${empty.length} came back empty, ${failed.length} failed.`,
+      suppressed: suppressedNote,
       country,
       /* Null means each provider was given exactly what a real search gives it. */
       timeoutMs,
