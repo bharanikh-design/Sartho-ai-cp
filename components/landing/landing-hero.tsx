@@ -29,7 +29,16 @@ export function LandingHero() {
       <div className="lh-scene" aria-hidden="true" style={{ backgroundImage: `url("${ENTRY_ART}")` }} />
       <div className="lh-scrim" aria-hidden="true" />
 
-      <div className="lh-body">
+      {/*
+        * Head and foot, with the corridor owning the space between them.
+        *
+        * Everything sat in one centred stack to begin with, which put the
+        * lockup and the paragraph directly on the lit doorway — the brightest
+        * thing on the screen — where "Your Career CoPilot" all but vanished.
+        * Separating the head from the foot is how the entry screen avoided
+        * that, and it is the whole trick.
+        */}
+      <div className="lh-head">
         <h1 className="lh-line">
           Your own headhunter. <em>Finally.</em>
         </h1>
@@ -47,21 +56,22 @@ export function LandingHero() {
           experience, and makes sure you walk in ready — without ever writing a
           claim you cannot back.
         </p>
+      </div>
 
+      <div className="lh-foot">
         <div className="lh-actions">
           <Link href="/login" className="lh-enter">Continue to Sign In</Link>
           <Link href="/extension" className="lh-quiet">Get the browser extension</Link>
         </div>
-      </div>
 
-      {/*
-        * A reason to keep going, on a page that scrolls where the entry screen
-        * ends. Without it the corridor reads as the whole page and there is no
-        * sign that anything follows.
-        */}
-      <a className="lh-more" href="#what-it-does">
-        See what it does <span aria-hidden="true">↓</span>
-      </a>
+        {/*
+          * The entry screen ended at its button; this page does not, and
+          * without a cue the corridor reads as the whole of it.
+          */}
+        <a className="lh-more" href="#what-it-does">
+          See what it does <span aria-hidden="true">↓</span>
+        </a>
+      </div>
     </section>
   );
 }
