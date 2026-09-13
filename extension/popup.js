@@ -170,8 +170,8 @@ const MIN_DESCRIPTION = 120;
       send.textContent = "✓ Sent";
       note.className = "warn ok";
       note.textContent = response?.opened
-        ? "Sartho is opening in a new tab — the role lands in your pipeline there."
-        : "Waiting for Sartho — the role appears in your pipeline as soon as that tab is open and signed in.";
+        ? "Sartho is opening in a new tab — the role lands there and is analysed against your Career Profile."
+        : "Waiting for Sartho — the role appears in your pipeline, and is analysed, as soon as that tab is open and signed in.";
       setTimeout(() => window.close(), 2200);
     });
   });

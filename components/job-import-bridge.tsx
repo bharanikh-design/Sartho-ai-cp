@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { analysisSetback, shouldAutoAnalyse, summariseAnalysis } from "@/lib/jobs/auto-analysis";
 import { parseImportedJob, type ImportedJob } from "@/lib/jobs/imported-job";
-import type { JobRecord } from "@/lib/types";
+import type { DeepAnalysisSummary, JobRecord } from "@/lib/types";
 
 /*
  * Where a role sent from LinkedIn actually lands.
@@ -21,11 +22,29 @@ import type { JobRecord } from "@/lib/types";
  * extension's own window, which shows exactly what it read before sending —
  * and the save is reversible, editable, and deduplicated, so a wrong capture
  * costs a click rather than a duplicate row.
+ *
+ * And it does not stop at saved. A save scores the role on keywords; the
+ * grounded analysis — every requirement in the advert, answered against
+ * approved evidence — used to wait behind a button on a page the person had no
+ * reason to open. So the one step that made the capture worth anything was the
+ * one step they had to know to take. The send now runs it, and the answer is on
+ * screen before they have left the job board tab.
  */
+
+/*
+ * The analysis runs after the save has already succeeded, so it never speaks
+ * for the import. A role that is saved but unanalysed is a smaller problem than
+ * a banner that reports a failure over a role sitting safely in the pipeline.
+ */
+type Analysis =
+  | { phase: "running" }
+  | { phase: "done"; summary: DeepAnalysisSummary }
+  | { phase: "held"; reason: string }
+  | { phase: "skipped" };
 
 type Outcome =
   | { state: "importing"; title: string }
-  | { state: "saved"; job: JobRecord; existing: boolean; captured: ImportedJob }
+  | { state: "saved"; job: JobRecord; existing: boolean; captured: ImportedJob; analysis: Analysis }
   | { state: "failed"; reason: string };
 
 const MATCH_LABEL: Record<string, string> = {
@@ -48,6 +67,37 @@ export function JobImportBridge() {
   const acknowledge = useCallback((id: string) => {
     window.postMessage({ source: "sartho-app", type: "SARTHO_IMPORTED", id }, window.location.origin);
   }, []);
+
+  /*
+   * Folded into whatever the banner is already showing, so an analysis that
+   * finishes after the person has dismissed the banner cannot bring it back.
+   */
+  const settleAnalysis = useCallback((analysis: Analysis) => {
+    setOutcome((current) => (current?.state === "saved" ? { ...current, analysis } : current));
+  }, []);
+
+  const analyse = useCallback(async (jobId: string) => {
+    try {
+      const response = await fetch(`/api/jobs/${jobId}/deep-analysis`, { method: "POST" });
+      const result = await response.json().catch(() => null) as
+        { summary?: DeepAnalysisSummary; error?: string } | null;
+
+      if (!response.ok || !result?.summary) {
+        settleAnalysis({ phase: "held", reason: analysisSetback(response.status, result?.error) });
+        return;
+      }
+
+      settleAnalysis({ phase: "done", summary: result.summary });
+      /*
+       * The analysis has also rewritten overall_match from evidenced coverage,
+       * so the server-rendered ledger under this banner is now out of date in
+       * the one way that matters.
+       */
+      router.refresh();
+    } catch {
+      settleAnalysis({ phase: "held", reason: analysisSetback(0) });
+    }
+  }, [router, settleAnalysis]);
 
   useEffect(() => {
     const onMessage = async (event: MessageEvent) => {
@@ -72,6 +122,12 @@ export function JobImportBridge() {
 
       setOutcome({ state: "importing", title: parsed.job.title });
 
+      /*
+       * Run outside the save's try, so a setback in the analysis can never be
+       * mistaken for a failed import and send the role back to the queue.
+       */
+      let analysed: string | null = null;
+
       try {
         const response = await fetch("/api/jobs", {
           method: "POST",
@@ -87,10 +143,21 @@ export function JobImportBridge() {
         const result = await response.json() as { job?: JobRecord; existing?: boolean; error?: string };
         if (!response.ok || !result.job) throw new Error(result.error ?? "Sartho could not save this role.");
 
+        const job = result.job;
         acknowledge(data.id);
-        setOutcome({ state: "saved", job: result.job, existing: Boolean(result.existing), captured: parsed.job });
+
+        const wanted = shouldAutoAnalyse(job);
+        setOutcome({
+          state: "saved",
+          job,
+          existing: Boolean(result.existing),
+          captured: parsed.job,
+          analysis: wanted ? { phase: "running" } : { phase: "skipped" },
+        });
         /* The ledger below is server-rendered, so it needs the refresh to show this. */
         router.refresh();
+
+        analysed = wanted ? job.id : null;
       } catch (caught) {
         /*
          * Deliberately not acknowledged. The role stays queued in the
@@ -103,6 +170,8 @@ export function JobImportBridge() {
           reason: caught instanceof Error ? caught.message : "Sartho could not save this role.",
         });
       }
+
+      if (analysed) await analyse(analysed);
     };
 
     window.addEventListener("message", onMessage);
@@ -114,7 +183,7 @@ export function JobImportBridge() {
      */
     window.postMessage({ source: "sartho-app", type: "SARTHO_READY" }, window.location.origin);
     return () => window.removeEventListener("message", onMessage);
-  }, [acknowledge, router]);
+  }, [acknowledge, analyse, router]);
 
   if (!outcome) return null;
 
@@ -142,9 +211,14 @@ export function JobImportBridge() {
     );
   }
 
-  const { job, existing, captured } = outcome;
+  const { job, existing, captured, analysis } = outcome;
   return (
-    <section className="glass-card import-banner is-saved" role="status" aria-live="polite">
+    <section
+      className={`glass-card import-banner is-saved${analysis.phase === "running" ? " is-analysing" : ""}`}
+      role="status"
+      aria-live="polite"
+    >
+      {analysis.phase === "running" ? <span className="import-banner__spinner" aria-hidden="true" /> : null}
       <div>
         <strong>
           {existing ? "Updated in your pipeline" : "Added to your pipeline"}: {job.title}
@@ -155,6 +229,29 @@ export function JobImportBridge() {
           {job.recommendation ? ` · ${MATCH_LABEL[job.recommendation] ?? job.recommendation}` : ""}
           {existing ? " · you had already saved this advert, so it was refreshed rather than duplicated" : ""}
         </p>
+        {/*
+          * The second line is the one worth sending a role over for: not the
+          * keyword score above it, but how much of the advert this person can
+          * actually answer with evidence they have approved.
+          */}
+        {analysis.phase === "running" ? (
+          <p className="section-subtitle import-banner__analysis">
+            Reading every requirement in the advert against your Career Profile…
+          </p>
+        ) : null}
+        {analysis.phase === "done" ? (
+          <p className="section-subtitle import-banner__analysis is-done">
+            <strong>Analysed:</strong> {summariseAnalysis(analysis.summary)}
+          </p>
+        ) : null}
+        {analysis.phase === "held" ? (
+          <p className="section-subtitle import-banner__analysis is-held">{analysis.reason}</p>
+        ) : null}
+        {analysis.phase === "skipped" ? (
+          <p className="section-subtitle import-banner__analysis">
+            Already analysed against your Career Profile — open it for the requirement-by-requirement read.
+          </p>
+        ) : null}
         {/*
           * Read off the job board at the moment of capture, and shown once
           * here. It is not stored: Sartho keeps the advert, not a snapshot of
