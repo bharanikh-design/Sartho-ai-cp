@@ -20,7 +20,6 @@ import {
   jobsFromSerpApiBody,
   readSerpApiStatus,
   serpApiConfig,
-  SerpApiStillRunningError,
   submitSerpApiSearch,
 } from "@/lib/jobs/serpapi";
 import { cacheSignature, planFromCache, type CachePlan, type CacheRow } from "@/lib/jobs/search-cache";
@@ -43,10 +42,27 @@ export type SearchCacheStore = {
 export type CachedSearchOutcome = {
   results: JobSearchResult[];
   /** Where the answer came from, for the criteria line and for diagnostics. */
-  source: "cache" | "collected" | "live";
+  source: "cache" | "collected" | "live" | "pending";
   /** Whether this query spent one of the month's searches. */
   spent: boolean;
 };
+
+/*
+ * Why a search still running is an empty answer rather than a failure.
+ *
+ * The uncached provider polls, so running out of time there really is a
+ * disappointment worth counting against it. Here nothing is polled: the query
+ * is handed over in about twenty-six milliseconds and the ticket is filed.
+ * Nothing went wrong, and the title is now warming for the next run.
+ *
+ * Counting that as a failure was costing almost everything this cache is for.
+ * Two strikes retire a provider, and on a cold cache every query submits — so
+ * the very first search would have filed two tickets and abandoned the deep
+ * provider for the remaining thirteen queries, warming two titles per search
+ * instead of fifteen. An empty answer falls through to the next provider
+ * without a strike, which is exactly the intended behaviour: Adzuna fills the
+ * page today, and tomorrow those fifteen titles collect for free.
+ */
 
 /*
  * A submission fired and not waited on.
@@ -153,10 +169,13 @@ export async function searchSerpApiCached(
        * to try again next time, and paying for a second copy of a search that
        * is already running is the waste this replaced.
        */
-      throw new SerpApiStillRunningError(0);
+      return { results: [], source: "pending", spent: false };
     } catch (caught) {
-      if (caught instanceof SerpApiStillRunningError) throw caught;
-      /* A ticket that cannot be read is a dead ticket. Stop trying it. */
+      /*
+       * A ticket the archive cannot read is a dead ticket — expired, or for a
+       * search that never ran. Cleared so it is not tried again, and re-thrown
+       * because unlike a search still working, this one really is a failure.
+       */
       await store.clearTicket(signature).catch(() => undefined);
       throw caught;
     }
@@ -177,9 +196,9 @@ export async function searchSerpApiCached(
     /*
      * Submitted and outstanding. Nothing to show for this query now, and
      * nothing lost either — the ticket is on file and the next search reads it
-     * for free.
+     * for free. See the note on "pending" above for why this is not a failure.
      */
-    throw new SerpApiStillRunningError(0);
+    return { results: [], source: "pending", spent: true };
   }
 
   const listings = listingsFrom(body);

@@ -109,12 +109,15 @@ describe("searchSerpApiCached", () => {
       submitted_at: ago(60_000),
     });
 
-    await expect(searchSerpApiCached(query, store, {
+    const outcome = await searchSerpApiCached(query, store, {
       submit: async () => { throw new Error("must not submit while one is running"); },
       collect: async () => ({ search_metadata: { status: "Processing" } }),
       now: () => NOW,
-    })).rejects.toThrow(/still working/i);
+    });
 
+    expect(outcome.source).toBe("pending");
+    expect(outcome.results).toEqual([]);
+    expect(outcome.spent).toBe(false);
     expect(calls.clearTicket).toBe(0);
     expect(current()?.serpapi_search_id).toBe("ticket-1");
   });
@@ -146,11 +149,18 @@ describe("searchSerpApiCached", () => {
     process.env.SERPAPI_KEY = "k1";
     const { store, calls, current } = fakeStore(null);
 
-    await expect(searchSerpApiCached(query, store, {
+    const outcome = await searchSerpApiCached(query, store, {
       submit: async () => ({ id: "ticket-new", body: null }),
       now: () => NOW,
-    })).rejects.toThrow(/still working/i);
+    });
 
+    /*
+     * Empty rather than thrown. A submission is not a failure — it is a title
+     * warming — and counting it as one retired the provider after two queries
+     * on a cold cache, which is every query of a first search.
+     */
+    expect(outcome.source).toBe("pending");
+    expect(outcome.results).toEqual([]);
     expect(calls.saveTicket).toBe(1);
     expect(current()?.serpapi_search_id).toBe("ticket-new");
   });
@@ -223,11 +233,12 @@ describe("searchSerpApiCached", () => {
     });
 
     let submitted = false;
-    await expect(searchSerpApiCached(query, store, {
+    const outcome = await searchSerpApiCached(query, store, {
       submit: async () => { submitted = true; return { id: "t", body: null }; },
       now: () => NOW,
-    })).rejects.toThrow(/still working/i);
+    });
 
+    expect(outcome.source).toBe("pending");
     expect(submitted).toBe(true);
   });
 
@@ -355,5 +366,66 @@ describe("a run that has spent its ration", () => {
     expect(outcome.results).toHaveLength(1);
     expect(submitted).toBe(false);
     expect(outcome.spent).toBe(false);
+  });
+});
+
+/*
+ * A first search against an empty cache.
+ *
+ * This is the run that has to warm everything, and the one the old behaviour
+ * broke: a submission counted as a provider failure, two failures retired the
+ * provider, so fifteen cold queries filed two tickets and gave up.
+ */
+describe("a cold cache", () => {
+  it("files a ticket for every query rather than giving up after two", async () => {
+    process.env.SERPAPI_KEY = "k1";
+
+    const filed: string[] = [];
+    const store: SearchCacheStore = {
+      read: async () => null,
+      saveListings: async () => undefined,
+      saveTicket: async (signature) => { filed.push(signature); },
+      clearTicket: async () => undefined,
+    };
+
+    const titles = ["Engagement Manager", "Delivery Director", "ITSM Manager", "Practice Lead", "Programme Manager"];
+    for (const keywords of titles) {
+      const outcome = await searchSerpApiCached({ keywords, country: "sg" }, store, {
+        submit: async () => ({ id: `ticket-${keywords}`, body: null }),
+        now: () => NOW,
+      });
+      /* Empty, so the query falls through to the shallow provider for today. */
+      expect(outcome.results).toEqual([]);
+      expect(outcome.source).toBe("pending");
+    }
+
+    expect(filed).toHaveLength(titles.length);
+    expect(new Set(filed).size).toBe(titles.length);
+  });
+
+  it("collects every one of them on the next run, for free", async () => {
+    process.env.SERPAPI_KEY = "k1";
+    const store: SearchCacheStore = {
+      read: async (signature) => ({
+        signature,
+        listings: null,
+        collected_at: null,
+        serpapi_search_id: `ticket-${signature}`,
+        submitted_at: ago(60 * 60 * 1000),
+      }),
+      saveListings: async () => undefined,
+      saveTicket: async () => { throw new Error("must not pay again for a filed ticket"); },
+      clearTicket: async () => undefined,
+    };
+
+    for (const keywords of ["Engagement Manager", "Delivery Director"]) {
+      const outcome = await searchSerpApiCached({ keywords, country: "sg" }, store, {
+        collect: async () => ({ search_metadata: { status: "Success" }, jobs_results: [listing] }),
+        now: () => NOW,
+      });
+      expect(outcome.source).toBe("collected");
+      expect(outcome.spent).toBe(false);
+      expect(outcome.results).toHaveLength(1);
+    }
   });
 });

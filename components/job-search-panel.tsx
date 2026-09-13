@@ -471,6 +471,14 @@ export function JobSearchPanel({
           {criteria.deepFromCache ? (
             <> · {criteria.deepFromCache} deep {criteria.deepFromCache === 1 ? "answer" : "answers"} came from Sartho&rsquo;s advert cache, free</>
           ) : null}
+          {/*
+            * Work done for the next search rather than this one. Without this a
+            * first search reads as "Google for Jobs contributed nothing", when
+            * what it actually did was buy the answers the next search shows.
+            */}
+          {criteria.deepWarming ? (
+            <> · {criteria.deepWarming} {criteria.deepWarming === 1 ? "title is" : "titles are"} still being read by Google for Jobs — search again shortly and {criteria.deepWarming === 1 ? "it arrives" : "they arrive"} free</>
+          ) : null}
         </p>
       ) : null}
 
