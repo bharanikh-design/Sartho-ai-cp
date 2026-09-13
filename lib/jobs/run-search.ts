@@ -186,6 +186,16 @@ export type SearchCriteria = {
   employerPortals?: Array<{ employer: string; status: "searched" | "empty" | "failed" | "unknown"; found: number }>;
   queriesRun: number;
   queriesSkipped: number;
+  /**
+   * Why the query loop stopped early, when it did.
+   *
+   * There are four reasons and they were all reported as one: the page said
+   * "22 queries skipped (time limit)" for a search that had not run out of
+   * time at all — it had found twenty-five roles and covered every lane, and
+   * stopped because it was finished. A search that is working looked starved
+   * on every run, which is a bad thing for a page to say about itself.
+   */
+  queriesStoppedBecause?: "budget" | "no_providers" | "enough_results";
   targetRolesRequested?: number;
   targetRolesSearched?: number;
   employersChecked?: number;
@@ -456,6 +466,7 @@ export async function runBriefSearch(
   const byUrl = new Map<string, JobSearchResult>();
   let queriesRun = 0;
   let queriesSkipped = 0;
+  let queriesStoppedBecause: "budget" | "no_providers" | "enough_results" | undefined;
   const searchedTargetRoles = new Set<string>();
   const searchedEmployers = new Set<string>();
   let lastQueryEndedAt = 0;
@@ -551,15 +562,15 @@ export async function runBriefSearch(
     let index = 0;
     while (index < list.length) {
       const concurrency = batchConcurrency();
-      if (Date.now() - startedAt > budgetMs) { queriesSkipped += list.length - index; break; }
-      if (cascade.exhausted()) { queriesSkipped += list.length - index; break; }
+      if (Date.now() - startedAt > budgetMs) { queriesSkipped += list.length - index; queriesStoppedBecause = "budget"; break; }
+      if (cascade.exhausted()) { queriesSkipped += list.length - index; queriesStoppedBecause = "no_providers"; break; }
       /*
        * Nothing left to spend on a query that could finish. A call that cannot
        * finish is worse than one not made: it spends what is left, returns
        * nothing, and counts a failure against the provider that was about to
        * answer.
        */
-      if (remainingMs() < leadCallBudgetMs()) { queriesSkipped += list.length - index; break; }
+      if (remainingMs() < leadCallBudgetMs()) { queriesSkipped += list.length - index; queriesStoppedBecause = "budget"; break; }
 
       if (queriesRun > 0 && concurrency === 1) {
         /*
@@ -597,8 +608,14 @@ export async function runBriefSearch(
       }
       lastQueryEndedAt = Date.now();
 
+      /*
+       * Enough, rather than out of time: twenty-five roles found and every
+       * lane asked about at least once. The remaining queries are narrower
+       * variations that would mostly return the same adverts again.
+       */
       if (byUrl.size >= 25 && index >= activeLanes.length) {
         queriesSkipped += list.length - index;
+        queriesStoppedBecause = "enough_results";
         break;
       }
     }
@@ -961,6 +978,7 @@ export async function runBriefSearch(
       : undefined,
     queriesRun,
     queriesSkipped,
+    queriesStoppedBecause,
     targetRolesRequested: activeLanes.length,
     targetRolesSearched: searchedTargetRoles.size,
     employersChecked: searchedEmployers.size,
@@ -1123,6 +1141,11 @@ export function normaliseCriteria(stored: unknown): SearchCriteria {
       : undefined,
     queriesRun: count(value.queriesRun),
     queriesSkipped: count(value.queriesSkipped),
+    queriesStoppedBecause: value.queriesStoppedBecause === "budget"
+      || value.queriesStoppedBecause === "no_providers"
+      || value.queriesStoppedBecause === "enough_results"
+      ? value.queriesStoppedBecause
+      : undefined,
     targetRolesRequested: count(value.targetRolesRequested),
     targetRolesSearched: count(value.targetRolesSearched),
     employersChecked: count(value.employersChecked),

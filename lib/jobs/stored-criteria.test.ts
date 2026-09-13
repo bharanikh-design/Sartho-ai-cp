@@ -173,3 +173,39 @@ describe("withScreeningInsight", () => {
     expect(annotated.matchedSkills).toEqual(match.matchedSkills);
   });
 });
+
+/*
+ * Why the query loop stopped, which the page used to get wrong on every run.
+ *
+ * Four reasons funnelled into one counter and the page called all of them
+ * "time limit". A search that found twenty-five roles, covered every lane and
+ * stopped because it was finished reported itself as starved.
+ */
+describe("why the search stopped asking", () => {
+  it("keeps the reason through a round trip", () => {
+    const criteria = normaliseCriteria({
+      queriesRun: 5,
+      queriesSkipped: 22,
+      queriesStoppedBecause: "enough_results",
+    });
+    expect(criteria.queriesStoppedBecause).toBe("enough_results");
+  });
+
+  it("keeps the other two reasons apart", () => {
+    expect(normaliseCriteria({ queriesStoppedBecause: "budget" }).queriesStoppedBecause).toBe("budget");
+    expect(normaliseCriteria({ queriesStoppedBecause: "no_providers" }).queriesStoppedBecause).toBe("no_providers");
+  });
+
+  it("reads a row written before the reason existed as unknown, not as a stall", () => {
+    /* Every search stored before this deploy, which must not start claiming one. */
+    expect(normaliseCriteria({ queriesRun: 6, queriesSkipped: 0 }).queriesStoppedBecause).toBeUndefined();
+  });
+
+  it("refuses a value it does not recognise", () => {
+    expect(normaliseCriteria({ queriesStoppedBecause: "vibes" }).queriesStoppedBecause).toBeUndefined();
+  });
+
+  it("says nothing when the loop ran to the end", () => {
+    expect(normaliseCriteria({ queriesRun: 27, queriesSkipped: 0 }).queriesStoppedBecause).toBeUndefined();
+  });
+});
