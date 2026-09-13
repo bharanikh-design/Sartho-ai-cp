@@ -251,3 +251,117 @@ describe("the shipped scraper", () => {
     expect(page.description.length).toBeLessThanOrEqual(24_000);
   });
 });
+
+/*
+ * The furniture of the page, as opposed to the advert on it.
+ *
+ * A real capture came back reading "121 school alumni work here", "Be an early
+ * applicant" and "Posted 1 day ago" three times over, in the field Sartho
+ * labels "the exact source used for every analysis and résumé decision". Every
+ * requirement assessment and every résumé bullet is grounded in this text, so
+ * chrome here is Sartho confidently analysing a navigation bar.
+ */
+describe("page chrome", () => {
+  const linkedInPage = (body: string) => `
+    <html><body><main>
+      <h1 class="topcard__title">ServiceNow Delivery Director</h1>
+      <a href="/company/acme" class="topcard__org-name-link">Acme</a>
+      <div id="job-details">${body}</div>
+    </main></body></html>
+  `;
+
+  it("drops the lines from the capture that started this", () => {
+    const job = scrape(linkedInPage(`
+      <p>About the job</p>
+      <p>121 school alumni work here</p>
+      <p>Be an early applicant</p>
+      <p>Posted 1 day ago</p>
+      <p>Lead ServiceNow delivery for enterprise clients across APAC.</p>
+    `), "https://www.linkedin.com/jobs/view/4012345678/");
+
+    expect(job.description).not.toMatch(/alumni work here/i);
+    expect(job.description).not.toMatch(/early applicant/i);
+    expect(job.description).not.toMatch(/Posted 1 day ago/i);
+    expect(job.description).toContain("Lead ServiceNow delivery for enterprise clients across APAC.");
+  });
+
+  it("collapses the same line rendered three times over", () => {
+    const job = scrape(linkedInPage(`
+      <p>Posted 1 day ago</p>
+      <p>Own the delivery roadmap.</p>
+      <p>Own the delivery roadmap.</p>
+      <p>Own the delivery roadmap.</p>
+    `), "https://www.linkedin.com/jobs/view/1/");
+
+    expect(job.description.match(/Own the delivery roadmap/g)).toHaveLength(1);
+  });
+
+  it("drops applicant counts and apply buttons", () => {
+    const job = scrape(linkedInPage(`
+      <p>Over 200 applicants</p>
+      <p>Easy Apply</p>
+      <p>Show more</p>
+      <p>Actively recruiting</p>
+      <p>Promoted by hirer</p>
+      <p>Design the integration architecture.</p>
+    `), "https://www.linkedin.com/jobs/view/1/");
+
+    expect(job.description).toBe("Design the integration architecture.");
+  });
+
+  /*
+   * The rule that matters more than the other one. Over-filtering deletes a
+   * requirement, and a requirement Sartho cannot see is one it scores somebody
+   * as not having.
+   */
+  it("never drops a requirement, however short", () => {
+    const job = scrape(linkedInPage(`
+      <p>5+ years of ServiceNow delivery</p>
+      <p>ITIL v4 certified</p>
+      <p>Remote team leadership across three time zones</p>
+      <p>Apply Agile and SAFe at programme scale</p>
+      <p>Contract negotiation with enterprise vendors</p>
+      <p>Share knowledge across the practice</p>
+    `), "https://www.linkedin.com/jobs/view/1/");
+
+    expect(job.description).toContain("5+ years of ServiceNow delivery");
+    expect(job.description).toContain("ITIL v4 certified");
+    expect(job.description).toContain("Remote team leadership across three time zones");
+    expect(job.description).toContain("Apply Agile and SAFe at programme scale");
+    expect(job.description).toContain("Contract negotiation with enterprise vendors");
+    expect(job.description).toContain("Share knowledge across the practice");
+  });
+
+  it("keeps a sentence that merely contains a chrome phrase", () => {
+    const job = scrape(linkedInPage(`
+      <p>You will be an early applicant reviewer, triaging the first sift each week.</p>
+      <p>Reporting on how many applicants progressed past screening.</p>
+    `), "https://www.linkedin.com/jobs/view/1/");
+
+    /* Anchored patterns match a whole line, never a phrase inside one. */
+    expect(job.description).toContain("early applicant reviewer");
+    expect(job.description).toContain("how many applicants progressed");
+  });
+
+  it("keeps a repeated line that is long enough to be the advert's own doing", () => {
+    const paragraph = "We are looking for somebody who can hold a room of executives and still write the detail up afterwards, every single week.";
+    const job = scrape(linkedInPage(`<p>${paragraph}</p><p>${paragraph}</p>`), "https://www.linkedin.com/jobs/view/1/");
+    expect(job.description.match(/hold a room of executives/g)).toHaveLength(2);
+  });
+
+  it("cleans the page-text fallback too, which is where most of it comes from", () => {
+    const job = scrape(`
+      <html><body><main>
+        <h1>Engagement Manager</h1>
+        <p>Posted 2 weeks ago</p>
+        <p>Be among the first 25 applicants</p>
+        <p>Full-time</p>
+        <p>Run client engagements end to end.</p>
+      </main></body></html>
+    `, "https://careers.example.com/jobs/engagement-manager");
+
+    expect(job.description).not.toMatch(/Posted 2 weeks ago/i);
+    expect(job.description).not.toMatch(/first 25 applicants/i);
+    expect(job.description).toContain("Run client engagements end to end.");
+  });
+});
