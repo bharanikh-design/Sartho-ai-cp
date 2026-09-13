@@ -36,6 +36,77 @@
       ? value.replace(/\u00a0/g, " ").replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n").trim()
       : "";
 
+  /*
+   * The furniture of the page, as opposed to the advert on it.
+   *
+   * A capture came back reading "121 school alumni work here", "Be an early
+   * applicant" and "Posted 1 day ago" three times over — in the field Sartho
+   * labels "the exact source used for every analysis and résumé decision".
+   * Every requirement assessment, every résumé bullet and every match score is
+   * grounded in this text, so page chrome here is not untidy, it is Sartho
+   * confidently analysing a navigation bar.
+   *
+   * Two rules have to hold at once, and the second matters more:
+   *
+   *   - a line that is plainly chrome goes;
+   *   - a line that might be a requirement stays, always.
+   *
+   * So a line is only ever dropped when it BOTH matches one of these patterns
+   * AND is short. Each pattern is anchored end to end, so it matches a whole
+   * line rather than appearing inside one — "Posted 1 day ago" goes, while a
+   * sentence that happens to contain those words does not. A real requirement
+   * has no way to match: "5+ years of ServiceNow delivery" is short but looks
+   * nothing like any of these.
+   */
+  const CHROME_LINE_MAX = 90;
+
+  const PAGE_CHROME = [
+    /* Recency and applicant counts — LinkedIn, Indeed, Seek all carry these. */
+    /^(re)?posted\s+.{0,24}\s*ago\b.{0,12}$/i,
+    /^posted\s+(today|yesterday)\b.{0,12}$/i,
+    /^(be an early applicant|be among the first\s+\d[\d,]*\s+applicants?)\.?$/i,
+    /^(over\s+)?\d[\d,]*\+?\s+(people\s+)?(clicked\s+)?appl(y|ied|icants?)\b.{0,24}$/i,
+    /^\d[\d,]*\s+(school\s+|company\s+)?(alumni|connections?|employees?)\s+work(s)?\s+here\.?$/i,
+    /^actively\s+(recruiting|reviewing applicants)\.?$/i,
+    /^promoted\b.{0,24}$/i,
+    /^(easy\s+apply|apply\s+now|apply\s+on\s+.{1,30}|save|saved|share|report\s+this\s+job)\.?$/i,
+    /^(show|see|read|view)\s+(more|less|all)\b.{0,20}$/i,
+    /^(sign\s+in|join\s+now|skip\s+to\s+.{1,30}|continue\s+with\s+.{1,20})\.?$/i,
+    /^(your\s+profile\s+matches|am\s+i\s+a\s+good\s+fit|how\s+your\s+profile\s+matches)\b.{0,40}$/i,
+    /^(matches\s+your\s+(job\s+)?preferences?)\b.{0,50}$/i,
+    /^\d+\s+of\s+\d+$/,
+    /* A bare working-pattern chip, which the advert states properly elsewhere. */
+    /^(full[\s-]?time|part[\s-]?time|contract|temporary|internship|permanent|remote|hybrid|on[\s-]?site)\.?$/i,
+  ];
+
+  const isPageChrome = (line) => {
+    const value = line.trim().replace(/^[•\-–—*·]\s*/, "");
+    if (!value || value.length > CHROME_LINE_MAX) return false;
+    return PAGE_CHROME.some((pattern) => pattern.test(value));
+  };
+
+  /*
+   * Chrome removed, and a line repeated back to back collapsed to one.
+   *
+   * The repetition is its own tell: "Posted 1 day ago" appeared three times in
+   * that capture, because the same widget is rendered at several sizes and the
+   * text reader cannot see which one the person is looking at. Only identical
+   * neighbouring lines are collapsed, and only short ones — a long paragraph
+   * repeating is the advert's own doing and none of our business.
+   */
+  const stripPageChrome = (text) => {
+    if (typeof text !== "string" || !text) return "";
+    const kept = [];
+    for (const line of text.split("\n")) {
+      if (isPageChrome(line)) continue;
+      const trimmed = line.trim();
+      const previous = kept.length ? kept[kept.length - 1].trim() : null;
+      if (trimmed && trimmed === previous && trimmed.length <= CHROME_LINE_MAX) continue;
+      kept.push(line);
+    }
+    return kept.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+  };
+
   /* JSON-LD descriptions are HTML. Parsed as markup, never pasted as tags. */
   const textFromHtml = (html) => {
     if (typeof html !== "string" || !html) return "";
@@ -279,11 +350,21 @@
     /* Context is a nicety. Losing it must never cost us the advert. */
   }
 
+  /*
+   * Applied once, here, rather than inside each strategy.
+   *
+   * All three funnel through this return, and the chrome arrives by more than
+   * one route — the page-text fallback sweeps it up wholesale, and a board's
+   * own description container can have widgets nested inside it. Filtering at
+   * the exit means no strategy can be added later that quietly skips it.
+   */
+  const description = stripPageChrome(job.description || "");
+
   return {
     title: (job.title || "").slice(0, 240),
     company: (job.company || "").slice(0, 240),
     location: (job.location || "").slice(0, 240),
-    description: (job.description || "").slice(0, MAX_DESCRIPTION),
+    description: description.slice(0, MAX_DESCRIPTION),
     postedDate: (job.postedDate || "").slice(0, 120),
     applicants,
     hiringManager,
