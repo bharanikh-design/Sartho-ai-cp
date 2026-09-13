@@ -55,7 +55,20 @@ const FEATURES: Feature[] = [
   },
 ];
 
-export function PlatformHero() {
+/*
+ * The same four tiles serve two audiences.
+ *
+ * Signed in, each one is a way into the page that does it. Signed out — which
+ * is now a real case, because the homepage has to be readable without an
+ * account — those pages all bounce to /login, so the links carry a `next` and
+ * come back afterwards rather than dumping somebody on a sign-in form with
+ * their intent thrown away.
+ *
+ * One component rather than two, because the four descriptions are the answer
+ * to "what is this" and a copy of them would drift from the original within a
+ * month.
+ */
+export function PlatformHero({ signedOut = false }: { signedOut?: boolean } = {}) {
   return (
     <section className="glass-card content-card platform-hero" aria-labelledby="platform-hero-title">
       <div className="card-header">
@@ -72,7 +85,10 @@ export function PlatformHero() {
           <li className="platform-hero-tile" data-tone={feature.tone} key={feature.href}>
             <h3>{feature.title}</h3>
             <p>{feature.body}</p>
-            <Link href={feature.href} className="platform-hero-action">
+            <Link
+              href={signedOut ? `/login?next=${encodeURIComponent(feature.href)}` : feature.href}
+              className="platform-hero-action"
+            >
               {feature.action} <span aria-hidden="true">→</span>
             </Link>
           </li>

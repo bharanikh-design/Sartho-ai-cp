@@ -4,7 +4,8 @@ import { ProductPageHeader } from "@/components/product-page-header";
 import { JourneyNudgeCard } from "@/components/journey-nudge-card";
 import { ProfileScorecard } from "@/components/profile-scorecard";
 import { ResumeImport } from "@/components/resume-import";
-import { requireUser } from "@/lib/auth";
+import { SignedOutHome } from "@/components/signed-out-home";
+import { getAuthenticatedUser } from "@/lib/auth";
 import { connectionStatus } from "@/lib/integrations/store";
 import {
   buildCareerCommandCentre,
@@ -17,7 +18,20 @@ import { withJwtClockSkewRetry } from "@/lib/supabase/retry";
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  const { supabase, user } = await requireUser();
+  /*
+   * One address, two pages.
+   *
+   * This used to require a session, so a signed-out visitor was redirected to
+   * /login and sartho.tech had no public face at all — a link sent to somebody
+   * opened a sign-in form rather than an answer to "what is this". Google's
+   * brand verification found it before any person complained and failed with
+   * "your homepage is behind a login page", which is why its consent screen
+   * kept naming a Supabase project reference instead of Sartho.
+   *
+   * Signed in, this is still the command centre and nothing below has changed.
+   */
+  const { supabase, user } = await getAuthenticatedUser();
+  if (!user) return <SignedOutHome />;
   const driveConnected = (await connectionStatus(user.id)).connected;
 
   const [journeyResult, jobsResult, applicationsResult] = await Promise.all([
