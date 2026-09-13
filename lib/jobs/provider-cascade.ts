@@ -172,6 +172,25 @@ export function createProviderCascade(
       return;
     }
 
+    /*
+     * Still working, rather than broken.
+     *
+     * SerpApi is submitted and polled rather than waited on, so a query that
+     * outruns the budget leaves a search running at SerpApi instead of an
+     * aborted socket. It is retired for this run — a provider that is slow on
+     * one rare title will be slow on the next — but the reason is kept and
+     * shown, because it is the one provider message a person can actually use:
+     * the search finishes anyway, so running it again gets the cached answer.
+     */
+    if (caught instanceof Error && caught.name === "SerpApiStillRunningError") {
+      const label = providerLabel(provider);
+      timeouts.set(label, (timeouts.get(label) ?? 0) + 1);
+      timeoutWaits.set(label, Math.max(timeoutWaits.get(label) ?? 0, lastAllowedMs));
+      dead.add(provider);
+      record(provider, `${label}: ${caught.message}`);
+      return;
+    }
+
     const count = (failures.get(provider) ?? 0) + 1;
     failures.set(provider, count);
     if (count >= failuresBeforeDead) dead.add(provider);

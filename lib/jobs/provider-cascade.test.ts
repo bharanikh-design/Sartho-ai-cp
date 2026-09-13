@@ -779,3 +779,57 @@ describe("rationing the deep provider", () => {
     expect(cascade.exhausted()).toBe(false);
   });
 });
+
+/*
+ * SerpApi is submitted and polled rather than waited on, so "the budget ran
+ * out" no longer means an aborted socket — it means a search still running at
+ * SerpApi that will finish and be cached whatever this run does. That is a
+ * different fact from a failure and the cascade has to treat it as one.
+ */
+describe("a SerpApi search still running when the budget ran out", () => {
+  function stillRunning() {
+    const error = new Error("SerpApi was still working on this query after 16s. It finishes at SerpApi either way, so the next search for this role reads it from cache.");
+    error.name = "SerpApiStillRunningError";
+    return error;
+  }
+
+  it("retires the provider at once rather than spending the budget again", async () => {
+    const cascade = createProviderCascade(["serpapi", "adzuna"], {
+      search: async (provider) => {
+        if (provider === "serpapi") throw stillRunning();
+        return [{ title: "Analyst", employer: null, location: null, description: "d", url: "https://x/1", salary: null, postedAt: null, source: "Adzuna", platforms: [], applyDirect: false }];
+      },
+    });
+
+    await cascade.run({ keywords: "ServiceNow Delivery Director", country: "sg", timeoutMs: 20_000 });
+    expect(cascade.isDead("serpapi")).toBe(true);
+    expect(cascade.willAsk("serpapi")).toBe(false);
+  });
+
+  it("still falls through, so the person gets results from the next provider", async () => {
+    const cascade = createProviderCascade(["serpapi", "adzuna"], {
+      search: async (provider) => {
+        if (provider === "serpapi") throw stillRunning();
+        return [{ title: "Analyst", employer: null, location: null, description: "d", url: "https://x/1", salary: null, postedAt: null, source: "Adzuna", platforms: [], applyDirect: false }];
+      },
+    });
+
+    const results = await cascade.run({ keywords: "ServiceNow Delivery Director", country: "sg", timeoutMs: 20_000 });
+    expect(results).toHaveLength(1);
+    expect(cascade.used.has("Adzuna")).toBe(true);
+  });
+
+  it("keeps the explanation, because it is the one a person can act on", async () => {
+    const cascade = createProviderCascade(["serpapi", "adzuna"], {
+      search: async (provider) => {
+        if (provider === "serpapi") throw stillRunning();
+        return [];
+      },
+    });
+
+    await cascade.run({ keywords: "ServiceNow Delivery Director", country: "sg", timeoutMs: 20_000 });
+    expect(cascade.errors.join(" ")).toMatch(/reads it from cache/);
+    /* Counted as slowness rather than as a fault, the same as a timeout. */
+    expect(cascade.timeouts.get("Google for Jobs (SerpApi)")).toBe(1);
+  });
+});
