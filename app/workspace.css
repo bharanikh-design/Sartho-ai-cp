@@ -255,18 +255,44 @@ textarea:focus-visible,
 .job-status-block { min-width: 210px; }
 .job-summary-grid { align-items: stretch; }
 .persisted-analysis { margin-top: 18px; }
+/*
+ * The advert, as a reference rather than the page.
+ *
+ * It was 620px of scraped text — on a LinkedIn capture, mostly "Posted 1 day
+ * ago" and "Be an early applicant" repeated down the screen. This is the source
+ * material, kept so every analysis can be checked against it; it is not what
+ * somebody came to read, and it was taking a full screen to say so.
+ *
+ * Four lines by default, and resizable because the one time it matters is when
+ * somebody is checking a specific claim against the source, and then they want
+ * as much of it as they want. CSS resize gives a real drag handle in the
+ * bottom-right corner for free — no JavaScript, and it is the affordance
+ * everybody already knows from a textarea.
+ */
 .job-description-reader {
-  max-height: 620px;
+  height: 7.5rem;
+  min-height: 4rem;
+  /* Roughly the old full height, so dragging out still lands somewhere sane. */
+  max-height: 70vh;
+  resize: vertical;
   overflow: auto;
-  padding: 18px;
+  padding: 14px 16px;
   border: 1px solid rgba(255,255,255,.07);
   border-radius: 16px;
   color: var(--text-secondary);
   background: rgba(3,6,10,.35);
   font-size: var(--text-2xs);
-  line-height: 1.75;
+  line-height: 1.7;
   white-space: pre-wrap;
 }
+
+/*
+ * The corner itself. Browsers draw a faint default grip that disappears on a
+ * dark background, so it is redrawn as two visible strokes — a handle nobody
+ * can see is a feature nobody finds.
+ */
+.job-description-reader::-webkit-resizer { background: transparent; }
+.job-description-reader { background-image: linear-gradient(135deg, transparent 0 50%, rgba(255,255,255,.22) 50% 58%, transparent 58% 66%, rgba(255,255,255,.22) 66% 74%, transparent 74%); background-repeat: no-repeat; background-position: bottom right; background-size: 14px 14px; }
 .page-footer-actions { display: flex; justify-content: space-between; gap: 12px; }
 .job-detail-management,
 .delete-opportunity-confirmation { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }

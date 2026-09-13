@@ -113,7 +113,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
         <div className="card-header">
           <div>
             <h2 className="section-heading">Original job description</h2>
-            <p className="section-subtitle">The exact source used for every analysis and résumé decision.</p>
+            <p className="section-subtitle">The exact source used for every analysis and résumé decision. Drag the corner to read more.</p>
           </div>
           {job.source_url ? <a href={job.source_url} target="_blank" rel="noreferrer" className="secondary-button">Open source ↗</a> : null}
         </div>
