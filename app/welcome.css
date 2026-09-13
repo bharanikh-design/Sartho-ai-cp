@@ -1,0 +1,219 @@
+/*
+ * The welcome cinematic, played once after a successful sign-in.
+ *
+ * Cinematic here means pacing and light, not effects. Each scene arrives, is
+ * given five seconds to be read, and leaves; the type is large and the timing
+ * is slow enough that nothing feels hurried. There is no loop, no parallax
+ * trickery and no sound — a person is one click from the product they just
+ * signed up for, and the whole thing has to be leaveable at any moment.
+ */
+
+.wc {
+  position: fixed; inset: 0; z-index: 80;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  background: #04050a;
+  animation: wcIn .5s ease both;
+  overflow: hidden;
+}
+.wc:focus { outline: none; }
+.wc.is-leaving { animation: wcOut .6s ease forwards; }
+
+/* A slow wash of light, so the black is a room rather than an absence. */
+.wc::before {
+  content: "";
+  position: absolute; inset: -30% -10% auto;
+  height: 90%;
+  background:
+    radial-gradient(60% 55% at 30% 40%, rgba(124,92,255,.28), transparent 70%),
+    radial-gradient(55% 50% at 72% 30%, rgba(77,141,255,.22), transparent 70%);
+  filter: blur(40px);
+  pointer-events: none;
+  animation: wcWash 18s ease-in-out infinite alternate;
+}
+
+/* ---- progress ---------------------------------------------------------- */
+
+.wc-progress {
+  position: relative; z-index: 2;
+  display: flex; gap: 6px;
+  padding: 22px clamp(20px, 5vw, 56px) 0;
+}
+.wc-progress__step {
+  flex: 1;
+  height: 2px;
+  border-radius: 2px;
+  background: rgba(255,255,255,.12);
+  overflow: hidden;
+}
+.wc-progress__step i { display: block; height: 100%; width: 0; background: rgba(226,232,255,.9); }
+.wc-progress__step[data-state="done"] i { width: 100%; }
+.wc-progress__step[data-state="live"] i { animation: wcFill linear both; }
+
+.wc-skip {
+  position: absolute; top: 34px; right: clamp(20px, 5vw, 56px);
+  z-index: 3;
+  padding: 8px 16px;
+  border: 1px solid rgba(255,255,255,.16);
+  border-radius: 999px;
+  background: transparent;
+  color: rgba(226,232,255,.62);
+  font-size: 12.5px;
+  cursor: pointer;
+  transition: color .18s ease, border-color .18s ease;
+}
+.wc-skip:hover { color: #f4f6ff; border-color: rgba(255,255,255,.34); }
+
+/* ---- the scene --------------------------------------------------------- */
+
+.wc-stage {
+  position: relative; z-index: 2;
+  display: grid; place-items: center;
+  padding: clamp(24px, 5vh, 56px) clamp(20px, 5vw, 56px);
+  overflow: hidden;
+}
+
+.wc-scene {
+  display: grid;
+  justify-items: center;
+  gap: 16px;
+  width: min(760px, 100%);
+  text-align: center;
+  animation: wcScene .8s cubic-bezier(.2,.7,.2,1) both;
+}
+
+.wc-kicker {
+  margin: 0;
+  color: rgba(166,140,255,.86);
+  font-size: 11.5px;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+}
+.wc-line-title {
+  margin: 0;
+  font-size: clamp(26px, 4.6vw, 52px);
+  line-height: 1.05;
+  letter-spacing: -.035em;
+  font-weight: 600;
+  color: #f4f6ff;
+  text-wrap: balance;
+}
+.wc-body {
+  margin: 0;
+  max-width: 56ch;
+  color: rgba(226,232,255,.6);
+  font-size: clamp(13.5px, 1.5vw, 16px);
+  line-height: 1.7;
+}
+
+/* ---- the visuals ------------------------------------------------------- */
+
+/*
+ * Each one is the shape of a real Sartho surface, drawn in the product's own
+ * tokens rather than screenshotted — so it cannot go stale, it is crisp at any
+ * density, and it follows the type around as the window changes.
+ */
+.wc-visual {
+  width: min(560px, 100%);
+  margin-top: 10px;
+  padding: 20px;
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 18px;
+  background: linear-gradient(160deg, rgba(24,29,40,.82), rgba(12,15,22,.72));
+  box-shadow: 0 30px 80px rgba(0,0,0,.45);
+  text-align: left;
+  display: grid;
+  gap: 10px;
+  animation: wcVisual .9s cubic-bezier(.2,.7,.2,1) .16s both;
+}
+
+.wc-claim, .wc-requirement {
+  display: grid;
+  grid-template-columns: 9px minmax(0,1fr) auto;
+  align-items: center;
+  gap: 12px;
+  color: rgba(226,232,255,.76);
+  font-size: 12.5px;
+}
+.wc-claim__mark, .wc-requirement__dot { width: 9px; height: 9px; border-radius: 50%; background: rgba(226,232,255,.28); }
+.wc-claim em, .wc-requirement em { font-style: normal; font-size: 11px; color: rgba(226,232,255,.42); }
+.wc-claim[data-state="approved"] .wc-claim__mark { background: #72e6bd; }
+.wc-claim[data-state="approved"] em { color: #72e6bd; }
+.wc-claim[data-state="review"] .wc-claim__mark { background: #ffd37a; }
+.wc-claim[data-state="review"] em { color: #ffd37a; }
+.wc-requirement[data-state="met"] .wc-requirement__dot { background: #72e6bd; }
+.wc-requirement[data-state="met"] em { color: #72e6bd; }
+.wc-requirement[data-state="partial"] .wc-requirement__dot { background: #ffd37a; }
+.wc-requirement[data-state="partial"] em { color: #ffd37a; }
+.wc-requirement[data-state="gap"] .wc-requirement__dot { background: #ff8ea3; }
+.wc-requirement[data-state="gap"] em { color: #ff8ea3; }
+
+.wc-role { display: grid; gap: 8px; }
+.wc-role__top { color: rgba(226,232,255,.42); font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; }
+.wc-role strong { color: #f4f6ff; font-size: 15px; font-weight: 600; line-height: 1.35; }
+.wc-role__score { color: rgba(226,232,255,.6); font-size: 12px; }
+.wc-role__score b { color: #72e6bd; }
+.wc-role__bar { height: 5px; border-radius: 3px; background: rgba(255,255,255,.09); overflow: hidden; margin-top: 4px; }
+.wc-role__bar span { display: block; height: 100%; background: linear-gradient(90deg, #4d8dff, #72e6bd); animation: wcBar 1.2s cubic-bezier(.2,.7,.2,1) .3s both; }
+
+.wc-line {
+  margin: 0;
+  padding-left: 12px;
+  border-left: 2px solid rgba(114,230,189,.42);
+  color: rgba(226,232,255,.76);
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+.wc-line--muted { border-left-color: rgba(255,255,255,.16); color: rgba(226,232,255,.44); }
+.wc-line span { display: block; margin-top: 4px; font-size: 10.5px; font-style: italic; color: rgba(226,232,255,.38); }
+
+/* ---- foot -------------------------------------------------------------- */
+
+.wc-foot { position: relative; z-index: 2; display: grid; justify-items: center; padding: 0 24px clamp(28px, 5vh, 56px); }
+
+.wc-enter, .wc-next {
+  display: inline-flex; align-items: center; gap: 8px;
+  min-height: 48px; padding: 0 28px;
+  border: 0; border-radius: 999px;
+  font-size: 15px; font-weight: 600;
+  cursor: pointer;
+  transition: transform .18s ease, box-shadow .18s ease;
+}
+.wc-enter {
+  background: linear-gradient(135deg, #7c5cff, #9d7bff);
+  color: #fff;
+  box-shadow: 0 14px 40px rgba(124,92,255,.44);
+}
+.wc-enter:hover { transform: translateY(-1px); box-shadow: 0 18px 50px rgba(124,92,255,.56); }
+.wc-next { background: rgba(255,255,255,.07); color: rgba(226,232,255,.86); }
+.wc-next:hover { background: rgba(255,255,255,.12); }
+
+.wc :is(button):focus-visible { outline: 2px solid #9fb6ff; outline-offset: 3px; }
+
+/* ---- motion ------------------------------------------------------------ */
+
+@keyframes wcIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes wcOut { to { opacity: 0; visibility: hidden; } }
+@keyframes wcFill { from { width: 0; } to { width: 100%; } }
+@keyframes wcWash { from { transform: translate3d(0,0,0); } to { transform: translate3d(4%, 3%, 0); } }
+@keyframes wcScene { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
+@keyframes wcVisual { from { opacity: 0; transform: translateY(24px) scale(.97); } to { opacity: 1; transform: none; } }
+@keyframes wcBar { from { width: 0 !important; } }
+
+@media (max-width: 640px) {
+  .wc-skip { top: 26px; }
+  .wc-visual { padding: 16px; }
+  .wc-foot > * { width: 100%; justify-content: center; }
+}
+
+/*
+ * Stillness. The scenes stop advancing on their own, nothing slides or scales,
+ * and the progress bar simply marks position. Every word and every control
+ * stays; only the movement goes, and Next becomes the way through.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .wc, .wc::before, .wc-scene, .wc-visual, .wc-role__bar span { animation: none; }
+  .wc.is-leaving { opacity: 0; visibility: hidden; }
+  .wc-progress__step[data-state="live"] i { animation: none; width: 100%; }
+  .wc-enter, .wc-next { transition: none; }
+}

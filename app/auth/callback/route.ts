@@ -53,7 +53,18 @@ export async function GET(request: Request) {
   const { error } = await supabase.auth.exchangeCodeForSession(code);
 
   if (!error) {
-    return NextResponse.redirect(new URL(next, url.origin));
+    /*
+     * The one moment a sign-in has just succeeded, marked so the destination
+     * can welcome somebody rather than guess at it.
+     *
+     * Carried in the address rather than stored, because it has to be true
+     * exactly once and nothing else needs to remember it afterwards — the
+     * welcome strips it from the URL as it starts playing, so a reload lands
+     * on the product instead of replaying the introduction.
+     */
+    const destination = new URL(next, url.origin);
+    if (destination.pathname === "/") destination.searchParams.set("welcome", "1");
+    return NextResponse.redirect(destination);
   }
 
   const rawMessage = safeMessage(error.message, "Supabase could not create the signed-in session.");

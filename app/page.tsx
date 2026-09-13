@@ -5,6 +5,7 @@ import { JourneyNudgeCard } from "@/components/journey-nudge-card";
 import { ProfileScorecard } from "@/components/profile-scorecard";
 import { ResumeImport } from "@/components/resume-import";
 import { SignedOutHome } from "@/components/signed-out-home";
+import { WelcomeCinematic } from "@/components/welcome/welcome-cinematic";
 import { getAuthenticatedUser } from "@/lib/auth";
 import { connectionStatus } from "@/lib/integrations/store";
 import {
@@ -17,7 +18,11 @@ import { withJwtClockSkewRetry } from "@/lib/supabase/retry";
 
 export const dynamic = "force-dynamic";
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   /*
    * One address, two pages.
    *
@@ -32,6 +37,12 @@ export default async function DashboardPage() {
    */
   const { supabase, user } = await getAuthenticatedUser();
   if (!user) return <SignedOutHome />;
+
+  /*
+   * Played once, on the way in from a successful sign-in, and never from a
+   * bookmark or a reload — the callback sets this and the cinematic clears it.
+   */
+  const welcome = (await searchParams).welcome === "1";
   const driveConnected = (await connectionStatus(user.id)).connected;
 
   const [journeyResult, jobsResult, applicationsResult] = await Promise.all([
@@ -74,6 +85,8 @@ export default async function DashboardPage() {
   const hasResume = journey.steps.find((step) => step.id === "resume")?.complete ?? false;
   if (!hasResume) {
     return (
+      <>
+        {welcome ? <WelcomeCinematic /> : null}
       <div className="page-stack dashboard-page">
         <ProductPageHeader
           eyebrow="Welcome to Sartho"
@@ -111,10 +124,13 @@ export default async function DashboardPage() {
           </ol>
         </section>
       </div>
+      </>
     );
   }
 
   return (
+    <>
+      {welcome ? <WelcomeCinematic /> : null}
     <div className="page-stack dashboard-page command-centre-page">
       <ProductPageHeader
         eyebrow="Career Command Centre"
@@ -241,5 +257,6 @@ export default async function DashboardPage() {
       </section>
 
     </div>
+    </>
   );
 }
