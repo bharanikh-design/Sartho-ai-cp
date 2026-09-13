@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import {
   buildSerpApiParams,
+  chooseApplyUrl,
   extractSerpApiJobs,
   isNoResultsMessage,
   keepScheduleTypes,
@@ -506,5 +507,94 @@ describe("searchSerpApi under a nine-second budget", () => {
      */
     expect(clock.now()).toBeGreaterThan(7_000);
     expect(clock.now()).toBeLessThanOrEqual(9_000);
+  });
+});
+
+/*
+ * Where a card actually sends somebody.
+ *
+ * A real result sent a person to sensational-raindrop-6482af.netlify.app,
+ * which answered "Site not found". Google lists every site carrying an advert
+ * and many of those are scraper farms republishing onto free hosting; being
+ * first in apply_options says nothing about being real.
+ */
+describe("chooseApplyUrl", () => {
+  it("prefers the employer's own site over anything else", () => {
+    expect(chooseApplyUrl({
+      company_name: "Northgate Advisory",
+      apply_options: [
+        { title: "Netlify", link: "https://sensational-raindrop-6482af.netlify.app/?jobs=x" },
+        { title: "LinkedIn", link: "https://www.linkedin.com/jobs/view/1" },
+        { title: "Northgate Advisory", link: "https://northgateadvisory.com/careers/1" },
+      ],
+    })).toBe("https://northgateadvisory.com/careers/1");
+  });
+
+  it("prefers a real job board over a scraper mirror listed first", () => {
+    expect(chooseApplyUrl({
+      company_name: "Acme",
+      apply_options: [
+        { title: "Netlify", link: "https://sensational-raindrop-6482af.netlify.app/?jobs=x" },
+        { title: "LinkedIn", link: "https://www.linkedin.com/jobs/view/1" },
+      ],
+    })).toBe("https://www.linkedin.com/jobs/view/1");
+  });
+
+  it("counts an applicant tracking system as the employer's front door", () => {
+    expect(chooseApplyUrl({
+      company_name: "Acme",
+      apply_options: [
+        { title: "Covj.blogspot.com", link: "https://covj.blogspot.com/2026/09/job.html" },
+        { title: "Workday", link: "https://acme.wd3.myworkdayjobs.com/en-US/careers/job/1" },
+      ],
+    })).toBe("https://acme.wd3.myworkdayjobs.com/en-US/careers/job/1");
+  });
+
+  /*
+   * Google's listing page opens on a real advert. A dead mirror does not, so
+   * an unrecognised host is worth less than the page Google itself hosts.
+   */
+  it("falls back to Google's own listing before an unrecognised host", () => {
+    expect(chooseApplyUrl({
+      company_name: "Acme",
+      share_link: "https://www.google.com/search?q=acme#job",
+      apply_options: [
+        { title: "Netlify", link: "https://sensational-raindrop-6482af.netlify.app/?jobs=x" },
+      ],
+    })).toBe("https://www.google.com/search?q=acme#job");
+  });
+
+  it("still uses an unrecognised host rather than showing nothing", () => {
+    /* A card with no link is a tease; a long shot beats no shot. */
+    expect(chooseApplyUrl({
+      company_name: "Acme",
+      apply_options: [{ title: "Somewhere", link: "https://jobs.example.org/1" }],
+    })).toBe("https://jobs.example.org/1");
+  });
+
+  it("returns nothing when there is nowhere to send anybody", () => {
+    expect(chooseApplyUrl({ company_name: "Acme" })).toBeNull();
+    expect(chooseApplyUrl({ company_name: "Acme", apply_options: [] })).toBeNull();
+  });
+
+  it("ignores a malformed link rather than throwing on it", () => {
+    expect(chooseApplyUrl({
+      company_name: "Acme",
+      apply_options: [
+        { title: "Broken", link: "not a url" },
+        { title: "LinkedIn", link: "https://www.linkedin.com/jobs/view/1" },
+      ],
+    })).toBe("https://www.linkedin.com/jobs/view/1");
+  });
+
+  it("does not match a two-letter employer against every host", () => {
+    /* "AI" or "GE" inside a hostname would otherwise pick any link at all. */
+    expect(chooseApplyUrl({
+      company_name: "GE",
+      apply_options: [
+        { title: "Netlify", link: "https://raindrop.netlify.app/x" },
+        { title: "LinkedIn", link: "https://www.linkedin.com/jobs/view/1" },
+      ],
+    })).toBe("https://www.linkedin.com/jobs/view/1");
   });
 });
