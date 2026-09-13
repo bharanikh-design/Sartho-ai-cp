@@ -15,6 +15,7 @@ import {
 } from "@/lib/resume/content";
 import { MASTER_RESUME_RULES, MASTER_RESUME_SCHEMA, masterResumeOutput } from "@/lib/resume/master";
 import { REPAIR_RULES, REPAIR_SCHEMA, acceptRepairs, linesNeedingRepair, remainingFaults } from "@/lib/resume/polish";
+import { skillsFromEvidence } from "@/lib/resume/skills";
 import { DEFAULT_TEMPLATE } from "@/lib/resume/templates";
 
 /*
@@ -254,7 +255,13 @@ export async function POST() {
       summary: parsed.professionalSummary.trim(),
       roles,
       sections,
-      skills: [],
+      /*
+       * Read off the approved evidence, never asked for. A skills taxonomy
+       * would suggest what a role usually needs, which is a fine way to
+       * propose a claim and the exact thing this product must not do — a
+       * skill here is one the person demonstrated.
+       */
+      skills: skillsFromEvidence(evidenceResult.data),
       education: [],
     };
 

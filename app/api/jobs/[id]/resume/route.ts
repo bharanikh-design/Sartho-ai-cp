@@ -7,6 +7,7 @@ import { getAuthenticatedUser } from "@/lib/auth";
 import { evidenceIdsIn, renderResumeText, resumeContentOf, type ResumeBullet, type ResumeContent, type ResumeRole } from "@/lib/resume/content";
 import { DEFAULT_TEMPLATE } from "@/lib/resume/templates";
 import { tailoringGain } from "@/lib/resume/ats";
+import { skillsForRole } from "@/lib/resume/skills";
 import { RESUME_WRITING_RULES } from "@/lib/resume/writing";
 import type { RuleAnalysis } from "@/lib/types";
 import { resumeVersionName, saveResumeDraft } from "@/lib/resume/save";
@@ -377,7 +378,16 @@ export async function POST(
       summary: parsed.professionalSummary.trim(),
       roles,
       sections,
-      skills: [],
+      /*
+       * The same evidenced skills, ordered so the ones this advert asks for
+       * lead. A requirement the evidence cannot back is not promoted in here:
+       * it stays off the résumé, which is the difference between tailoring and
+       * keyword stuffing.
+       */
+      skills: skillsForRole(
+        evidenceResult.data,
+        ((jobResult.data.rule_analysis as RuleAnalysis | null)?.matchedSignals ?? []),
+      ),
       education: [],
     };
     const draft = renderResumeText(content);
