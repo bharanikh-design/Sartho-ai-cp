@@ -20,7 +20,9 @@ import { fetchAdvertText } from "@/lib/jobs/advert-text";
 import { scoreOpportunity } from "@/lib/matching/opportunity-score";
 import { candidateSeniority, isEntryLevelTitle } from "@/lib/matching/title-fit";
 import { seniorityReach } from "@/lib/matching/seniority-reach";
+import { searchSerpApiCached } from "@/lib/jobs/cached-serpapi";
 import { findEmployerPortal, searchEmployerDirectly } from "@/lib/jobs/company-careers/registry";
+import { createSearchCacheStore } from "@/lib/jobs/search-cache-store";
 import { deduplicateSearchResults, isMarketLocationConsistent } from "@/lib/jobs/location-guard";
 import { createProviderCascade } from "@/lib/jobs/provider-cascade";
 import {
@@ -36,6 +38,7 @@ import {
   defaultJobMarket,
   providerCallBudgetMs,
   providersForCountry,
+  searchWithProvider,
   type JobSearchQuery,
   type JobSearchResult,
 } from "@/lib/jobs/search-provider";
@@ -196,6 +199,15 @@ export type SearchCriteria = {
    * on every run, which is a bad thing for a page to say about itself.
    */
   queriesStoppedBecause?: "budget" | "no_providers" | "enough_results";
+  /**
+   * Deep answers that cost nothing — served from the shared cache, or collected
+   * from a search an earlier run had already paid for.
+   *
+   * Reported because it is the number that says whether the cache is earning
+   * its place, and it is invisible otherwise: a cached answer and a bought one
+   * look identical on the page.
+   */
+  deepFromCache?: number;
   targetRolesRequested?: number;
   targetRolesSearched?: number;
   employersChecked?: number;
@@ -466,6 +478,13 @@ export async function runBriefSearch(
   const byUrl = new Map<string, JobSearchResult>();
   let queriesRun = 0;
   let queriesSkipped = 0;
+  /*
+   * Deep answers that cost nothing: served from the shared cache, or collected
+   * from a search an earlier run had already paid for. Reported, because "how
+   * much of this came free" is the number that says whether the cache is
+   * working, and it is invisible otherwise.
+   */
+  let deepFromCache = 0;
   let queriesStoppedBecause: "budget" | "no_providers" | "enough_results" | undefined;
   const searchedTargetRoles = new Set<string>();
   const searchedEmployers = new Set<string>();
@@ -511,8 +530,28 @@ export async function runBriefSearch(
    * worth more to a score built on "how much of this advert can Sartho read"
    * than a page of four-line blurbs. Adzuna still answers all 25.
    */
+  /*
+   * SerpApi asked through Sartho's own memory of it.
+   *
+   * The ration below counts searches bought, not queries answered — so a title
+   * served from the cache, or collected from a ticket an earlier run already
+   * paid for, costs nothing against it. Rationing free work would mean the
+   * provider contributes less the better the cache gets, which is backwards,
+   * and the cache only compounds if every hit is allowed through.
+   */
+  const cacheStore = createSearchCacheStore(supabase);
+  let deepSearchesSpent = 0;
+
   const cascade = createProviderCascade(providers, {
-    maxCalls: { serpapi: MAX_DEEP_PROVIDER_CALLS },
+    search: async (provider, query) => {
+      if (provider !== "serpapi") return searchWithProvider(provider, query);
+      const outcome = await searchSerpApiCached(query, cacheStore, {
+        allowSpend: deepSearchesSpent < MAX_DEEP_PROVIDER_CALLS,
+      });
+      if (outcome.spent) deepSearchesSpent += 1;
+      if (outcome.results.length && !outcome.spent) deepFromCache += 1;
+      return outcome.results;
+    },
   });
 
   /*
@@ -979,6 +1018,7 @@ export async function runBriefSearch(
     queriesRun,
     queriesSkipped,
     queriesStoppedBecause,
+    deepFromCache,
     targetRolesRequested: activeLanes.length,
     targetRolesSearched: searchedTargetRoles.size,
     employersChecked: searchedEmployers.size,
@@ -1141,6 +1181,7 @@ export function normaliseCriteria(stored: unknown): SearchCriteria {
       : undefined,
     queriesRun: count(value.queriesRun),
     queriesSkipped: count(value.queriesSkipped),
+    deepFromCache: count(value.deepFromCache),
     queriesStoppedBecause: value.queriesStoppedBecause === "budget"
       || value.queriesStoppedBecause === "no_providers"
       || value.queriesStoppedBecause === "enough_results"
