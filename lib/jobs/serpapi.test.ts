@@ -1,5 +1,17 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { keepScheduleTypes, buildSerpApiParams, extractSerpApiJobs, mapSerpApiResult, readSerpApiPlatforms, serpApiConfig } from "./serpapi";
+import {
+  buildSerpApiParams,
+  extractSerpApiJobs,
+  isNoResultsMessage,
+  keepScheduleTypes,
+  mapSerpApiResult,
+  pollDelayMs,
+  readSerpApiPlatforms,
+  readSerpApiSearchId,
+  readSerpApiStatus,
+  searchSerpApi,
+  serpApiConfig,
+} from "./serpapi";
 
 const advert = {
   title: "ServiceNow Engagement Manager",
@@ -222,5 +234,226 @@ describe("keepScheduleTypes", () => {
 
   it("ignores a selection it has no words for", () => {
     expect(keepScheduleTypes([job("Full-time")], ["Something else"])).toHaveLength(1);
+  });
+});
+
+describe("isNoResultsMessage", () => {
+  it("recognises Google's own way of saying a market has nothing", () => {
+    expect(isNoResultsMessage("Google hasn't returned any results for this query.")).toBe(true);
+    expect(isNoResultsMessage("No results found for this query")).toBe(true);
+  });
+
+  it("does not mistake a real refusal for an empty market", () => {
+    expect(isNoResultsMessage("Invalid API key")).toBe(false);
+    expect(isNoResultsMessage("Your account has run out of searches")).toBe(false);
+  });
+});
+
+describe("extractSerpApiJobs on an empty market", () => {
+  it("returns nothing rather than throwing, so the provider is not retired", () => {
+    expect(extractSerpApiJobs({ error: "Google hasn't returned any results for this query." })).toEqual([]);
+  });
+
+  it("still throws on a refusal that a person has to fix", () => {
+    expect(() => extractSerpApiJobs({ error: "Invalid API key" })).toThrow(/Invalid API key/);
+  });
+});
+
+describe("buildSerpApiParams async flag", () => {
+  it("is absent unless asked for", () => {
+    expect(buildSerpApiParams({ keywords: "analyst", country: "sg" }, "k").get("async")).toBeNull();
+  });
+
+  it("is set when the search is to be submitted rather than waited on", () => {
+    expect(buildSerpApiParams({ keywords: "analyst", country: "sg" }, "k", true).get("async")).toBe("true");
+  });
+});
+
+describe("readSerpApiStatus", () => {
+  it("reads a finished search", () => {
+    expect(readSerpApiStatus({ search_metadata: { status: "Success" }, jobs_results: [] })).toBe("success");
+  });
+
+  it("reads one still running", () => {
+    expect(readSerpApiStatus({ search_metadata: { status: "Processing" } })).toBe("processing");
+  });
+
+  it("reads a failed one", () => {
+    expect(readSerpApiStatus({ search_metadata: { status: "Error" } })).toBe("error");
+  });
+
+  it("treats a refusal with no status as an error", () => {
+    expect(readSerpApiStatus({ error: "Invalid API key" })).toBe("error");
+  });
+
+  it("treats an empty market as a finished search, not a broken one", () => {
+    expect(readSerpApiStatus({ error: "Google hasn't returned any results for this query." })).toBe("success");
+  });
+
+  it("treats a body with no status at all as a synchronous answer already in hand", () => {
+    expect(readSerpApiStatus({ jobs_results: [] })).toBe("success");
+  });
+});
+
+describe("readSerpApiSearchId", () => {
+  it("finds the ticket", () => {
+    expect(readSerpApiSearchId({ search_metadata: { id: "68abc" } })).toBe("68abc");
+  });
+
+  it("returns nothing when there is none", () => {
+    expect(readSerpApiSearchId({ search_metadata: {} })).toBeNull();
+    expect(readSerpApiSearchId(null)).toBeNull();
+  });
+});
+
+describe("pollDelayMs", () => {
+  it("starts quickly, so a cached search is not made to wait", () => {
+    expect(pollDelayMs(0)).toBe(400);
+  });
+
+  it("backs off", () => {
+    expect(pollDelayMs(1)).toBe(800);
+    expect(pollDelayMs(2)).toBe(1_600);
+  });
+
+  it("stops backing off, so a long search is still checked regularly", () => {
+    expect(pollDelayMs(10)).toBe(4_000);
+  });
+});
+
+/*
+ * The submit-and-poll loop, run with no network and no clock.
+ *
+ * This is the part that had to change and the part nobody could see failing:
+ * the old version held one socket open and every real query was aborted on it.
+ * Driving it with an injected clock means the timing rules — when it gives up,
+ * what it does with a result that arrives late — are assertions rather than
+ * something to find out in production.
+ */
+describe("searchSerpApi", () => {
+  const query = { keywords: "ServiceNow Delivery Director", country: "sg", timeoutMs: 20_000 };
+
+  const listing = {
+    title: "ServiceNow Delivery Director",
+    company_name: "Acme",
+    description: "Lead ServiceNow delivery across the region.",
+    apply_options: [{ title: "LinkedIn", link: "https://linkedin.com/jobs/1" }],
+  };
+
+  /* A clock that only moves when the code under test waits on it. */
+  function fakeClock() {
+    let ms = 0;
+    return {
+      now: () => ms,
+      wait: async (delay: number) => { ms += delay; },
+      advance: (delay: number) => { ms += delay; },
+    };
+  }
+
+  it("returns a result that SerpApi answered on the spot", async () => {
+    process.env.SERPAPI_KEY = "k1";
+    const clock = fakeClock();
+    const results = await searchSerpApi(query, {
+      submit: async () => ({ id: null, body: { jobs_results: [listing] } }),
+      collect: async () => { throw new Error("should not poll a search already answered"); },
+      now: clock.now,
+      wait: clock.wait,
+    });
+    expect(results).toHaveLength(1);
+    expect(results[0].title).toBe("ServiceNow Delivery Director");
+  });
+
+  it("polls until a submitted search finishes, then returns it", async () => {
+    process.env.SERPAPI_KEY = "k1";
+    const clock = fakeClock();
+    let reads = 0;
+    const results = await searchSerpApi(query, {
+      submit: async () => ({ id: "abc", body: null }),
+      collect: async () => {
+        reads += 1;
+        return reads < 3
+          ? { search_metadata: { status: "Processing" } }
+          : { search_metadata: { status: "Success" }, jobs_results: [listing] };
+      },
+      now: clock.now,
+      wait: clock.wait,
+    });
+    expect(reads).toBe(3);
+    expect(results).toHaveLength(1);
+  });
+
+  it("gives up inside the budget rather than overrunning it", async () => {
+    process.env.SERPAPI_KEY = "k1";
+    const clock = fakeClock();
+    await expect(searchSerpApi({ ...query, timeoutMs: 20_000 }, {
+      submit: async () => ({ id: "abc", body: null }),
+      collect: async () => ({ search_metadata: { status: "Processing" } }),
+      now: clock.now,
+      wait: clock.wait,
+    })).rejects.toThrow(/still working/i);
+    /* The whole point: it stopped short of the budget, it did not blow through it. */
+    expect(clock.now()).toBeLessThanOrEqual(20_000);
+  });
+
+  it("says a slow search is still running, not that it failed", async () => {
+    process.env.SERPAPI_KEY = "k1";
+    const clock = fakeClock();
+    const caught = await searchSerpApi(query, {
+      submit: async () => ({ id: "abc", body: null }),
+      collect: async () => ({ search_metadata: { status: "Processing" } }),
+      now: clock.now,
+      wait: clock.wait,
+    }).catch((error: Error) => error);
+
+    expect((caught as Error).name).toBe("SerpApiStillRunningError");
+    /* The fact worth telling somebody: the next run gets it free and fast. */
+    expect((caught as Error).message).toMatch(/cache/i);
+  });
+
+  it("treats an empty market as an empty answer, not a provider failure", async () => {
+    process.env.SERPAPI_KEY = "k1";
+    const clock = fakeClock();
+    const results = await searchSerpApi(query, {
+      submit: async () => ({ id: "abc", body: null }),
+      collect: async () => ({ error: "Google hasn't returned any results for this query." }),
+      now: clock.now,
+      wait: clock.wait,
+    });
+    expect(results).toEqual([]);
+  });
+
+  it("throws a refusal a person has to act on", async () => {
+    process.env.SERPAPI_KEY = "k1";
+    const clock = fakeClock();
+    await expect(searchSerpApi(query, {
+      submit: async () => ({ id: "abc", body: null }),
+      collect: async () => ({ search_metadata: { status: "Error" }, error: "Invalid API key" }),
+      now: clock.now,
+      wait: clock.wait,
+    })).rejects.toThrow(/Invalid API key/);
+  });
+
+  it("refuses to run without a key rather than calling out with none", async () => {
+    delete process.env.SERPAPI_KEY;
+    delete process.env.SERPAPI_API_KEY;
+    await expect(searchSerpApi(query)).rejects.toThrow(/not configured/i);
+  });
+
+  it("applies the schedule filter to a polled result, as the synchronous path did", async () => {
+    process.env.SERPAPI_KEY = "k1";
+    const clock = fakeClock();
+    const results = await searchSerpApi({ ...query, employmentTypes: ["Full-time"] }, {
+      submit: async () => ({ id: "abc", body: null }),
+      collect: async () => ({
+        search_metadata: { status: "Success" },
+        jobs_results: [
+          { ...listing, detected_extensions: { schedule_type: "Full-time" } },
+          { ...listing, title: "Intern", detected_extensions: { schedule_type: "Internship" } },
+        ],
+      }),
+      now: clock.now,
+      wait: clock.wait,
+    });
+    expect(results.map((item) => item.title)).toEqual(["ServiceNow Delivery Director"]);
   });
 });

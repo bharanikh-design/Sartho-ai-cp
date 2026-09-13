@@ -37,7 +37,7 @@ export function serpApiConfig() {
  * employer filter that each provider spells differently is three chances to
  * send one of them something it refuses.
  */
-export function buildSerpApiParams(query: JobSearchQuery, apiKey: string): URLSearchParams {
+export function buildSerpApiParams(query: JobSearchQuery, apiKey: string, asyncMode = false): URLSearchParams {
   let text = query.keywords.trim();
   if (query.employer?.trim()) text = `${text} ${query.employer.trim()}`;
 
@@ -74,6 +74,13 @@ export function buildSerpApiParams(query: JobSearchQuery, apiKey: string): URLSe
     api_key: apiKey,
     hl: "en",
   });
+
+  /*
+   * Submitted, not waited on. See submitSerpApiSearch below for why this one
+   * parameter is the difference between a provider that works and one that
+   * does not.
+   */
+  if (asyncMode) params.set("async", "true");
 
   const place = query.location?.trim() || countryName(query.country ?? "") || "";
   if (place) params.set("location", place);
@@ -181,9 +188,23 @@ export function extractSerpApiJobs(body: unknown): SerpApiJob[] {
   const payload = body as { error?: unknown; jobs_results?: unknown; search_metadata?: { status?: string } };
 
   if (typeof payload.error === "string" && payload.error.trim()) {
+    /*
+     * "Google hasn't returned any results for this query" arrives in the same
+     * field as a spent plan and a bad key, and it is not a failure — it is an
+     * answer. Thrown, it counted against the provider, and two rare titles in
+     * a row retired Google for Jobs for the rest of the run and finished the
+     * search on four-line blurbs. A market that simply has no ServiceNow
+     * Delivery Director is a fact about the market.
+     */
+    if (isNoResultsMessage(payload.error)) return [];
     throw new Error(`SerpApi: ${payload.error.trim()}`);
   }
   return Array.isArray(payload.jobs_results) ? (payload.jobs_results as SerpApiJob[]) : [];
+}
+
+/** SerpApi's way of saying the search worked and Google had nothing. */
+export function isNoResultsMessage(error: string): boolean {
+  return /hasn'?t returned any results|no results found/i.test(error);
 }
 
 /*
@@ -269,14 +290,91 @@ export async function serpApiAccount(): Promise<SerpApiAccount> {
   };
 }
 
-export async function searchSerpApi(query: JobSearchQuery): Promise<JobSearchResult[]> {
-  const config = serpApiConfig();
-  if (!config) throw new Error("SerpApi is not configured.");
+/*
+ * Why this provider is submitted rather than waited on.
+ *
+ * A search was one GET that held the connection until Google answered. A probe
+ * asking "project manager" came back in 8.7 seconds and the provider looked
+ * healthy; every real search — "ServiceNow Delivery Director", "ITSM manager" —
+ * was aborted at exactly the ceiling it was given. Twenty seconds, then sixty,
+ * run one at a time with nothing else in flight and an account with 227 of 250
+ * searches left. A provider that answers a common phrase in nine seconds and
+ * says nothing at all to a rare one in sixty is not a slow network and it is
+ * not a spent plan.
+ *
+ * It is the difference between a query SerpApi has served before and one it has
+ * to go and fetch live. The common phrase is cached; the rare title — which is
+ * every query Sartho actually needs — is not, and on this plan a fresh search
+ * is worked at whatever pace there is. Holding a socket open for it was always
+ * going to lose that race.
+ *
+ * So the socket is not held. `async=true` makes submission return in under a
+ * second with an id, and the result is collected from the archive afterwards.
+ * Three things follow, and each one was a real loss before:
+ *
+ *   - A slow search no longer spends the run's budget. The wait is a poll that
+ *     can be given up on, not a call that has to be seen through.
+ *   - A search that does not finish in time is no longer thrown away. It was
+ *     paid for either way — aborting the fetch never cancelled the work — and
+ *     now it completes at SerpApi and warms the cache, so the next run asking
+ *     the same title gets the fast answer the probe was getting all along.
+ *   - Collecting from the archive is free, so picking a result up costs nothing
+ *     against the allowance.
+ */
+const SERPAPI_ARCHIVE_ENDPOINT = "https://serpapi.com/searches";
 
-  const response = await fetch(`${SERPAPI_ENDPOINT}?${buildSerpApiParams(query, config.key).toString()}`, {
-    signal: AbortSignal.timeout(query.timeoutMs ?? SERPAPI_TIMEOUT_MS),
-  });
+/** Long enough to submit, short enough that a stalled submission is not the run. */
+const SUBMIT_TIMEOUT_MS = 8_000;
 
+/** One archive read. These are quick — it is a lookup, not a search. */
+const COLLECT_TIMEOUT_MS = 8_000;
+
+/*
+ * How often to ask whether it is done. Backs off so a search that takes half a
+ * minute is not polled thirty times, and starts fast so a cached one — which
+ * is ready almost immediately — is not made to wait on an interval.
+ */
+export function pollDelayMs(attempt: number): number {
+  return Math.min(400 * 2 ** attempt, 4_000);
+}
+
+export type SerpApiStatus = "success" | "processing" | "error";
+
+/**
+ * Where a submitted search has got to. SerpApi reports this in
+ * search_metadata.status as "Success", "Processing" or "Error"; anything it has
+ * not finished is treated as still running, because the alternative is giving
+ * up on a search that was paid for.
+ */
+export function readSerpApiStatus(body: unknown): SerpApiStatus {
+  if (!body || typeof body !== "object") return "processing";
+  const payload = body as { search_metadata?: { status?: unknown }; error?: unknown };
+
+  /* A real refusal — bad key, spent plan — arrives as an error with no status. */
+  if (typeof payload.error === "string" && payload.error.trim() && !isNoResultsMessage(payload.error)) {
+    return "error";
+  }
+
+  const status = typeof payload.search_metadata?.status === "string"
+    ? payload.search_metadata.status.toLowerCase()
+    : "";
+  if (status === "success") return "success";
+  if (status === "error") return "error";
+  /*
+   * No status at all means this is a synchronous response that simply came
+   * back — the whole body is the result, so it is done.
+   */
+  return status ? "processing" : "success";
+}
+
+/** The id SerpApi hands back on submission, needed to collect the result. */
+export function readSerpApiSearchId(body: unknown): string | null {
+  if (!body || typeof body !== "object") return null;
+  const id = (body as { search_metadata?: { id?: unknown } }).search_metadata?.id;
+  return typeof id === "string" && id.trim() ? id.trim() : null;
+}
+
+async function readJson(response: Response, what: string): Promise<unknown> {
   if (!response.ok) {
     /* SerpApi explains its refusals in the body; the status alone names nothing. */
     let detail = "";
@@ -286,16 +384,63 @@ export async function searchSerpApi(query: JobSearchQuery): Promise<JobSearchRes
     } catch {
       /* A non-JSON error body still leaves the status worth reporting. */
     }
-    throw new Error(`SerpApi returned ${response.status}${detail ? ` — ${detail}` : ""}`);
+    throw new Error(`SerpApi ${what} returned ${response.status}${detail ? ` — ${detail}` : ""}`);
   }
-
-  let body: unknown;
   try {
-    body = await response.json();
+    return await response.json();
   } catch {
-    throw new Error(`SerpApi returned a non-JSON response (${response.status}).`);
+    throw new Error(`SerpApi ${what} returned a non-JSON response (${response.status}).`);
   }
+}
 
+/**
+ * Hand the query over and take the ticket. Returns the search id, or the body
+ * itself when SerpApi answered synchronously anyway — some plans and some
+ * cached queries ignore the async flag and simply return the results, and a
+ * result in hand should never be thrown away for not arriving as expected.
+ */
+export async function submitSerpApiSearch(
+  query: JobSearchQuery,
+  apiKey: string,
+): Promise<{ id: string; body: null } | { id: null; body: unknown }> {
+  const params = buildSerpApiParams(query, apiKey, true);
+  const response = await fetch(`${SERPAPI_ENDPOINT}?${params.toString()}`, {
+    signal: AbortSignal.timeout(SUBMIT_TIMEOUT_MS),
+  });
+  const body = await readJson(response, "search");
+
+  if (readSerpApiStatus(body) === "success") return { id: null, body };
+
+  const id = readSerpApiSearchId(body);
+  if (!id) throw new Error("SerpApi accepted the search but named no id to collect it with.");
+  return { id, body: null };
+}
+
+/** One archive read. Free: it does not count against the allowance. */
+export async function collectSerpApiSearch(id: string, apiKey: string): Promise<unknown> {
+  const response = await fetch(
+    `${SERPAPI_ARCHIVE_ENDPOINT}/${encodeURIComponent(id)}.json?api_key=${encodeURIComponent(apiKey)}`,
+    { signal: AbortSignal.timeout(COLLECT_TIMEOUT_MS) },
+  );
+  return readJson(response, "archive");
+}
+
+/**
+ * A search left running when the budget ran out.
+ *
+ * Thrown rather than returned empty so the caller can tell it apart from "this
+ * market has no such role" — they look identical on a page and mean opposite
+ * things. It is deliberately not phrased as a fault: the search is still going,
+ * it was already paid for, and the next run gets it from the cache.
+ */
+export class SerpApiStillRunningError extends Error {
+  constructor(waitedMs: number) {
+    super(`SerpApi was still working on this query after ${Math.round(waitedMs / 1000)}s. It finishes at SerpApi either way, so the next search for this role reads it from cache.`);
+    this.name = "SerpApiStillRunningError";
+  }
+}
+
+export function jobsFromSerpApiBody(body: unknown, query: JobSearchQuery): JobSearchResult[] {
   /*
    * Filtered after the fact, and not on the early-career pass: a full-time
    * filter and a request for internships cancel each other out, which is the
@@ -307,4 +452,76 @@ export async function searchSerpApi(query: JobSearchQuery): Promise<JobSearchRes
   return kept
     .map(mapSerpApiResult)
     .filter((item): item is JobSearchResult => item !== null);
+}
+
+/**
+ * Submit a query and walk away.
+ *
+ * The cache is the whole game on this plan: a title SerpApi has served before
+ * comes back in about a second, and one it has not may not come back inside a
+ * search at all. A search that gives up on a slow query still warms it — but
+ * only that one, because the provider is retired for the rest of the run, so a
+ * brief with six target roles would take six searches to get warm.
+ *
+ * This warms them all at once, at the cost of a submission each and no waiting.
+ * The searches run at SerpApi after this returns, exactly as they would have
+ * anyway; what is skipped is sitting on a socket watching them.
+ */
+export async function warmSerpApiQuery(query: JobSearchQuery): Promise<{ submitted: boolean; id: string | null; results: number }> {
+  const config = serpApiConfig();
+  if (!config) throw new Error("SerpApi is not configured.");
+
+  const submitted = await submitSerpApiSearch(query, config.key);
+  /* Already cached: it answered on submission, so there was nothing to warm. */
+  if (submitted.id === null) {
+    return { submitted: false, id: null, results: jobsFromSerpApiBody(submitted.body, query).length };
+  }
+  return { submitted: true, id: submitted.id, results: 0 };
+}
+
+export async function searchSerpApi(
+  query: JobSearchQuery,
+  /* Injected so the whole submit-and-poll loop is testable without a network. */
+  deps: {
+    submit?: typeof submitSerpApiSearch;
+    collect?: typeof collectSerpApiSearch;
+    wait?: (ms: number) => Promise<void>;
+    now?: () => number;
+  } = {},
+): Promise<JobSearchResult[]> {
+  const config = serpApiConfig();
+  if (!config) throw new Error("SerpApi is not configured.");
+
+  const submit = deps.submit ?? submitSerpApiSearch;
+  const collect = deps.collect ?? collectSerpApiSearch;
+  const now = deps.now ?? Date.now;
+  const wait = deps.wait ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
+
+  const budgetMs = query.timeoutMs ?? SERPAPI_TIMEOUT_MS;
+  const startedAt = now();
+
+  const submitted = await submit(query, config.key);
+  /* Answered on the spot — a cached query, or a plan that ignores the flag. */
+  if (submitted.id === null) return jobsFromSerpApiBody(submitted.body, query);
+
+  for (let attempt = 0; ; attempt += 1) {
+    const elapsed = now() - startedAt;
+    const left = budgetMs - elapsed;
+    /*
+     * Stop before a poll that cannot finish. One that overruns the budget
+     * spends what is left and still answers nothing, which is the trap the
+     * synchronous version fell into on every query.
+     */
+    if (left <= COLLECT_TIMEOUT_MS / 2) throw new SerpApiStillRunningError(elapsed);
+
+    await wait(Math.min(pollDelayMs(attempt), left));
+
+    const body = await collect(submitted.id, config.key);
+    const status = readSerpApiStatus(body);
+    if (status === "success") return jobsFromSerpApiBody(body, query);
+    if (status === "error") {
+      /* Reuses the reading that turns SerpApi's error field into a throw. */
+      return jobsFromSerpApiBody(body, query);
+    }
+  }
 }
