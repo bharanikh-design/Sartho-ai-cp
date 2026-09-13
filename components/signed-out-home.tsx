@@ -1,31 +1,31 @@
 import Link from "next/link";
 import { PlatformHero } from "@/components/platform-hero";
-import { LandingHero } from "@/components/landing/landing-hero";
 import { ProductCarousel } from "@/components/landing/product-carousel";
+import { SignInExperience } from "@/components/auth/sign-in-experience";
 
 /*
- * The front door, for somebody who does not have an account yet.
+ * The front door: sign in where you land.
  *
- * There was not one. Every path including "/" redirected to a sign-in form, so
- * sartho.tech had no public face at all: a link sent to a friend opened a login
- * page, and a person who wanted to know what this was before handing over an
- * email address had nowhere to find out. Google noticed before any person did —
- * brand verification fetches the home page, found a login form, and failed.
+ * This page has been rebuilt three times and each attempt put something in
+ * front of the thing people came for. The last one opened on the entry screen
+ * — the lit corridor — which was beautiful and also a screen you had to get
+ * past before you could reach Google, and /login showed you the identical
+ * screen again on the other side of it.
  *
- * Two attempts at the hero were thrown away before this one. The first was a
- * column of text down the left third of a wide screen with two thirds of
- * nothing beside it; the second filled that space with an invented layout.
- * Both were worse than the entry screen already sitting at /login, which is
- * the best-looking thing in the product.
+ * So there is no screen in front of anything now. Google and LinkedIn are on
+ * the page you arrive at, and everything explaining the product is underneath
+ * them for whoever wants it.
  *
- * So the page opens on that screen's own corridor and sentence, and everything
- * below it is the substance: what Sartho produces, what it does, and what it
- * refuses to do.
+ * That "underneath" is not decoration. Google's OAuth brand verification
+ * rejects an application whose home page is a login form and nothing else —
+ * "your homepage is behind a login page" is the exact refusal that sent this
+ * page through three rewrites. A page that signs you in and also says what it
+ * is satisfies both, which is what should have been built first.
  */
 export function SignedOutHome() {
   return (
     <div className="landing">
-      <LandingHero />
+      <SignInExperience />
 
       <div className="landing-body" id="what-it-does">
         <ProductCarousel />
@@ -49,17 +49,13 @@ export function SignedOutHome() {
         </section>
       </div>
 
-      <section className="landing-close">
-        <h2 className="landing-close__title">Start with what you can already prove.</h2>
-        <Link href="/login" className="lh-enter">
-          Sign in <span aria-hidden="true">→</span>
-        </Link>
-        <p className="policy-footer">
-          <Link href="/privacy">Privacy</Link>
-          {" · "}
-          <Link href="/terms">Terms</Link>
-        </p>
-      </section>
+      <p className="policy-footer landing-footer">
+        <Link href="/privacy">Privacy</Link>
+        {" · "}
+        <Link href="/terms">Terms</Link>
+        {" · "}
+        <Link href="/extension">Browser extension</Link>
+      </p>
     </div>
   );
 }

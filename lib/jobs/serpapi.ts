@@ -138,6 +138,72 @@ export function readSerpApiPlatforms(raw: SerpApiJob): { platforms: string[]; ap
   return { platforms, applyDirect };
 }
 
+/*
+ * Which of Google's apply routes to actually send somebody to.
+ *
+ * It used to take the first one in the list. A real card sent a person to
+ * sensational-raindrop-6482af.netlify.app, which answered "Site not found" —
+ * Google lists every site carrying an advert, and a great many of those are
+ * scraper farms republishing a posting onto free hosting. They appear in
+ * apply_options beside LinkedIn and the employer's own careers page, and being
+ * first in the list means nothing at all about being real.
+ *
+ * Ranked rather than blocked. A blocklist of junk hosts is a list that is
+ * always one host out of date; a list of hosts known to be real job boards is
+ * one that fails safe. Anything unrecognised is used only when there is
+ * nothing better, and Google's own listing page beats it — that page opens on
+ * a real advert, which a dead mirror does not.
+ */
+const KNOWN_BOARDS = [
+  "linkedin.com", "indeed.com", "seek.com", "glassdoor.", "ziprecruiter.com",
+  "monster.com", "dice.com", "builtin.com", "wellfound.com", "totaljobs.com",
+  "reed.co.uk", "efinancialcareers.", "naukri.com", "jobstreet.com", "jobsdb.com",
+  "jora.com", "careerjet.", "jobleads.com", "bebee.com", "adzuna.",
+  /* Applicant tracking systems: these are the employer's own front door. */
+  "myworkdayjobs.com", "workday.com", "greenhouse.io", "lever.co",
+  "smartrecruiters.com", "workable.com", "ashbyhq.com", "bamboohr.com",
+  "icims.com", "taleo.net", "successfactors.", "oraclecloud.com",
+  "eightfold.ai", "jobvite.com", "recruitee.com", "teamtailor.com",
+  "personio.", "breezy.hr", "rippling.com", "phenompeople.com", "avature.net",
+];
+
+function hostOf(url: string): string {
+  try {
+    return new URL(url).hostname.toLowerCase();
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * The best place to send somebody, and null when there is nowhere real.
+ *
+ * Order: the employer's own site, then a job board or applicant tracking
+ * system, then Google's listing page, then anything else that is left.
+ */
+export function chooseApplyUrl(raw: SerpApiJob): string | null {
+  const employer = (raw.company_name ?? "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "");
+  const links = (raw.apply_options ?? [])
+    .map((option) => option?.link?.trim())
+    .filter((link): link is string => Boolean(link));
+
+  const own = employer.length >= 3
+    ? links.find((link) => hostOf(link).replace(/[^a-z0-9]+/g, "").includes(employer))
+    : undefined;
+  if (own) return own;
+
+  const board = links.find((link) => {
+    const host = hostOf(link);
+    return KNOWN_BOARDS.some((known) => host.includes(known));
+  });
+  if (board) return board;
+
+  const share = raw.share_link?.trim();
+  if (share) return share;
+
+  return links[0] ?? null;
+}
+
 /** Pure mapping from one SerpApi record to Sartho's shape — kept testable. */
 export function mapSerpApiResult(raw: SerpApiJob): JobSearchResult | null {
   if (!raw || typeof raw !== "object") return null;
@@ -146,12 +212,10 @@ export function mapSerpApiResult(raw: SerpApiJob): JobSearchResult | null {
   if (!title || !description) return null;
 
   /*
-   * A direct apply link beats the Google share link, which opens a listing
-   * page rather than an application. Without either there is nowhere to send
-   * anybody, and a card with no link is a tease.
+   * Ranked rather than taken in order — see chooseApplyUrl. Without any link
+   * there is nowhere to send anybody, and a card with no link is a tease.
    */
-  const url = (raw.apply_options ?? []).map((option) => option?.link?.trim()).find(Boolean)
-    ?? raw.share_link?.trim();
+  const url = chooseApplyUrl(raw);
   if (!url) return null;
 
   const { platforms, applyDirect } = readSerpApiPlatforms(raw);
