@@ -1430,3 +1430,41 @@
 }
 .policy-footer { margin: 4px 0 0; font-size: var(--text-2xs); }
 .policy-footer a, .policy-prose a { color: var(--text-primary); text-decoration: underline; text-underline-offset: 3px; }
+
+/*
+ * The signed-out front door.
+ *
+ * Sized to be read rather than scanned: one claim, one paragraph explaining it,
+ * and two ways in. Everything below it on the page is the same four tiles a
+ * signed-in person sees, so somebody arriving cold and somebody returning are
+ * looking at the same description of the product rather than two that drift.
+ */
+.signed-out-hero { text-align: left; }
+.signed-out-eyebrow {
+  margin: 0 0 10px;
+  color: var(--text-tertiary);
+  font-size: var(--text-2xs);
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+.signed-out-title {
+  margin: 0;
+  /* Fluid, so the claim keeps its weight on a phone without wrapping oddly. */
+  font-size: clamp(1.6rem, 4.2vw, 2.6rem);
+  line-height: 1.18;
+  letter-spacing: -.02em;
+  max-width: 20ch;
+}
+.signed-out-lede {
+  margin: 16px 0 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  line-height: 1.75;
+  max-width: 62ch;
+}
+.signed-out-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 26px; }
+
+@media (max-width: 640px) {
+  .signed-out-title { max-width: none; }
+  .signed-out-actions > * { flex: 1 1 100%; text-align: center; }
+}

@@ -12,9 +12,23 @@ describe("isPublicPath", () => {
   });
 
   it("keeps everything else behind a session", () => {
-    for (const path of ["/", "/applications", "/search-plan", "/admin", "/diagnostics", "/resume-studio"]) {
+    for (const path of ["/applications", "/search-plan", "/admin", "/diagnostics", "/resume-studio"]) {
       expect(isPublicPath(path)).toBe(false);
     }
+  });
+
+  /*
+   * "/" was in the list above, and correctly so until the homepage learned to
+   * render something for a signed-out visitor. It is public now because a
+   * product needs a front door: the page itself chooses between the command
+   * centre and an explanation of what Sartho is, rather than the router
+   * choosing between the dashboard and a sign-in form.
+   *
+   * Google's OAuth brand verification fetches it and rejects an app whose
+   * homepage is a login page, which is how this was found.
+   */
+  it("lets the homepage answer for itself", () => {
+    expect(isPublicPath("/")).toBe(true);
   });
 
   it("treats a trailing slash as the same page", () => {
