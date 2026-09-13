@@ -877,3 +877,73 @@ describe("a SerpApi search still running when the budget ran out", () => {
     expect(cascade.timeouts.get("Google for Jobs (SerpApi)")).toBe(1);
   });
 });
+
+/*
+ * A provider out of allowance for the month is not a flaky provider. JSearch
+ * had been answering "you have exceeded the MONTHLY quota" to every call for
+ * days, and was still being asked twice a run to establish that again.
+ */
+describe("a provider whose monthly allowance is spent", () => {
+  const spent = () => new Error("JSearch returned 429 — You have exceeded the MONTHLY quota for Requests on your current plan, BASIC.");
+
+  const adzunaHit = [{
+    title: "Analyst", employer: null, location: null, description: "d",
+    url: "https://x/1", salary: null, postedAt: null, source: "Adzuna",
+    platforms: [], applyDirect: false,
+  }];
+
+  it("is retired on the first refusal, not the second", async () => {
+    const cascade = createProviderCascade(["jsearch", "adzuna"], {
+      search: async (provider) => {
+        if (provider === "jsearch") throw spent();
+        return adzunaHit;
+      },
+    });
+
+    await cascade.run({ keywords: "analyst", country: "sg" });
+    expect(cascade.isDead("jsearch")).toBe(true);
+  });
+
+  it("costs one call a run rather than one per query", async () => {
+    let asked = 0;
+    const cascade = createProviderCascade(["jsearch", "adzuna"], {
+      search: async (provider) => {
+        if (provider !== "jsearch") return adzunaHit;
+        asked += 1;
+        throw spent();
+      },
+    });
+
+    for (const keywords of ["analyst", "manager", "director", "architect"]) {
+      await cascade.run({ keywords, country: "sg" });
+    }
+    expect(asked).toBe(1);
+  });
+
+  it("still lets the query through to the provider behind it", async () => {
+    const cascade = createProviderCascade(["jsearch", "adzuna"], {
+      search: async (provider) => {
+        if (provider === "jsearch") throw spent();
+        return adzunaHit;
+      },
+    });
+
+    const results = await cascade.run({ keywords: "analyst", country: "sg" });
+    expect(results).toHaveLength(1);
+    expect(cascade.used.has("Adzuna")).toBe(true);
+  });
+
+  it("keeps giving an ordinary failure its two chances", async () => {
+    const cascade = createProviderCascade(["jsearch", "adzuna"], {
+      search: async (provider) => {
+        if (provider === "jsearch") throw new Error("JSearch returned 503");
+        return adzunaHit;
+      },
+    });
+
+    await cascade.run({ keywords: "analyst", country: "sg" });
+    expect(cascade.isDead("jsearch")).toBe(false);
+    await cascade.run({ keywords: "manager", country: "sg" });
+    expect(cascade.isDead("jsearch")).toBe(true);
+  });
+});

@@ -196,6 +196,46 @@ export class JobSearchNotConfiguredError extends Error {
   }
 }
 
+/*
+ * A refusal that says the month's allowance is gone, rather than that this
+ * particular moment is busy.
+ *
+ * JSearch has been answering every call with "you have exceeded the MONTHLY
+ * quota for Requests on your current plan, BASIC" for days, and it was being
+ * asked twice a run to find that out again — two calls of a seventy-five
+ * second budget spent on a provider that cannot answer until the calendar
+ * turns over. That is the same shape as a missing key, and it gets the same
+ * treatment: there is no number of retries that refills an allowance.
+ *
+ * A rate limit is deliberately not this. "Too many requests" means wait a
+ * second and ask again, which is a thing worth doing, so the wording is
+ * matched narrowly enough to keep the two apart.
+ */
+export function isSpentAllowance(message: string): boolean {
+  /*
+   * Checked first and on the whole message: a rate limit often names a quota
+   * in the same breath ("rate limit: 1 request per second on your quota"), and
+   * reading that as a spent allowance would retire a provider that was going
+   * to answer a moment later.
+   */
+  if (/\b(?:per\s+(?:second|minute|hour)|too\s+many\s+requests|rate[\s-]*limit\w*|slow\s+down|try\s+again\s+(?:in|shortly))\b/i.test(message)) {
+    return false;
+  }
+
+  /*
+   * An allowance and a word for having spent it, in either order — vendors
+   * write both ("exceeded the MONTHLY quota", "reached its monthly quota").
+   * Within one sentence, so two unrelated clauses cannot combine into a
+   * refusal neither of them made.
+   */
+  const allowance = /\b(?:quota|allowance|monthly|daily|searches|credits|plan\s+limit)\b/i;
+  const spent = /\b(?:exceed\w*|reached|used\s+up|exhaust\w*|run\s+out|out\s+of|no\s+(?:more|remaining))\b/i;
+
+  return message
+    .split(/[.!?]+/)
+    .some((sentence) => allowance.test(sentence) && spent.test(sentence));
+}
+
 function resolveCountry(query: JobSearchQuery): string {
   const c = query.country?.trim().toLowerCase();
   if (c === "australia") return "au";

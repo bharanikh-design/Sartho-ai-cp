@@ -10,6 +10,7 @@ import {
   mapJSearchResult,
   normaliseAdzunaCountry,
   providersForCountry,
+  isSpentAllowance,
   suppressedJobSearchProviders,
 } from "./search-provider";
 
@@ -543,5 +544,58 @@ describe("suppressedJobSearchProviders", () => {
     /* A typo that disables everything is treated as a mistake, not a request. */
     expect(configuredJobSearchProviders()).toEqual(["serpapi", "jsearch", "adzuna"]);
     expect(suppressedJobSearchProviders()).toEqual([]);
+  });
+});
+
+/*
+ * Telling "the month's allowance is gone" apart from "this second is busy".
+ *
+ * These arrive as the same thing — a 429 with a sentence — and they want
+ * opposite handling. One is worth waiting a second and asking again; the other
+ * cannot change until the calendar does, and asking again only spends budget.
+ */
+describe("isSpentAllowance", () => {
+  it("recognises the refusal JSearch has been returning for days", () => {
+    expect(isSpentAllowance(
+      "JSearch returned 429 — You have exceeded the MONTHLY quota for Requests on your current plan, BASIC. Upgrade your plan at https://rapidapi.com/letscrape-6bRBa3QguO5/api/jsearch",
+    )).toBe(true);
+  });
+
+  it("recognises it however the vendor words it", () => {
+    expect(isSpentAllowance("This account has reached its monthly quota.")).toBe(true);
+    expect(isSpentAllowance("Your daily quota has been exceeded")).toBe(true);
+    expect(isSpentAllowance("You have run out of searches for this plan")).toBe(true);
+    expect(isSpentAllowance("Account is out of credits")).toBe(true);
+  });
+
+  it("does not mistake a rate limit for a spent allowance", () => {
+    /* Worth waiting a second and asking again — the opposite handling. */
+    expect(isSpentAllowance("429 Too Many Requests")).toBe(false);
+    expect(isSpentAllowance("Rate limit: 1 request per second")).toBe(false);
+    expect(isSpentAllowance("Slow down — too many requests in flight")).toBe(false);
+  });
+
+  it("leaves ordinary failures alone", () => {
+    expect(isSpentAllowance("SerpApi returned 500")).toBe(false);
+    expect(isSpentAllowance("Invalid API key")).toBe(false);
+    expect(isSpentAllowance("Adzuna returned 404")).toBe(false);
+  });
+});
+
+describe("isSpentAllowance edge cases", () => {
+  it("reads a rate limit as a rate limit even when it names the quota", () => {
+    expect(isSpentAllowance("Rate limit reached: 1 request per second against your monthly quota")).toBe(false);
+  });
+
+  it("does not combine two unrelated sentences into a refusal neither made", () => {
+    expect(isSpentAllowance("Your monthly plan is active. The request timed out.")).toBe(false);
+  });
+
+  it("reads SerpApi's own wording", () => {
+    expect(isSpentAllowance("SerpApi: Your account has run out of searches")).toBe(true);
+  });
+
+  it("reads the wording Sartho's own quota check produces", () => {
+    expect(isSpentAllowance("This account has reached its monthly AI allowance.")).toBe(true);
   });
 });

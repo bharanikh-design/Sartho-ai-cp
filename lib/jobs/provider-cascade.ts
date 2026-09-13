@@ -1,4 +1,5 @@
 import {
+  isSpentAllowance,
   JobSearchNotConfiguredError,
   providerCallBudgetMs,
   searchWithProvider,
@@ -200,6 +201,19 @@ export function createProviderCascade(
       const slow = (failures.get(provider) ?? 0) + 1;
       failures.set(provider, slow);
       if (slow >= failuresBeforeDead) dead.add(provider);
+      return;
+    }
+
+    /*
+     * A spent monthly allowance, which is a fact about the calendar rather
+     * than about this call. Retired on the first refusal for the same reason a
+     * missing key is: no number of retries refills it. JSearch was answering
+     * "you have exceeded the MONTHLY quota" to every request for days, and
+     * being asked twice a run to establish that again.
+     */
+    if (caught instanceof Error && isSpentAllowance(caught.message)) {
+      dead.add(provider);
+      record(provider, `${providerLabel(provider)}: ${caught.message}`);
       return;
     }
 
