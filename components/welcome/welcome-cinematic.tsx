@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 
 /*
  * The welcome, played once on the way in.
@@ -132,7 +131,6 @@ const SCENES: Scene[] = [
 const SCENE_MS = 5200;
 
 export function WelcomeCinematic() {
-  const router = useRouter();
   const [active, setActive] = useState(0);
   const [leaving, setLeaving] = useState(false);
   const [still, setStill] = useState(false);
@@ -142,10 +140,17 @@ export function WelcomeCinematic() {
    * Cleared from the address as soon as it is playing, not when it ends.
    * Somebody who reloads halfway through has seen it, and a welcome that
    * restarts on every refresh is not a welcome.
+   *
+   * Done through history rather than the router, which is the whole reason
+   * this screen used to vanish a few seconds in. router.replace re-runs the
+   * server component that decided to show this, and without the marker in the
+   * address that component stops rendering it — so the welcome unmounted
+   * itself while somebody was still reading the first scene. replaceState
+   * changes the address and nothing else.
    */
   useEffect(() => {
-    router.replace("/", { scroll: false });
-  }, [router]);
+    window.history.replaceState(window.history.state, "", "/");
+  }, []);
 
   useEffect(() => {
     /*
@@ -165,14 +170,20 @@ export function WelcomeCinematic() {
     window.setTimeout(() => setLeaving(false), 620);
   }, [leaving]);
 
+  /*
+   * The scenes advance themselves; the screen does not close itself.
+   *
+   * It used to call finish() after the last one, so a welcome nobody touched
+   * disappeared on its own. Holding on the final scene means the only ways out
+   * are Skip, Open Sartho and Escape — which is what a screen is, as opposed to
+   * a transition somebody has to catch.
+   */
   useEffect(() => {
     if (still || leaving) return;
-    const timer = window.setTimeout(() => {
-      if (active >= SCENES.length - 1) finish();
-      else setActive((current) => current + 1);
-    }, SCENE_MS);
+    if (active >= SCENES.length - 1) return;
+    const timer = window.setTimeout(() => setActive((current) => current + 1), SCENE_MS);
     return () => window.clearTimeout(timer);
-  }, [active, still, leaving, finish]);
+  }, [active, still, leaving]);
 
   /* Dismissed once it has played, so the dashboard is not left behind a veil. */
   const [gone, setGone] = useState(false);
@@ -201,12 +212,24 @@ export function WelcomeCinematic() {
         if (event.key === "ArrowLeft" && active > 0) setActive(active - 1);
       }}
     >
+      {/*
+        * The bar measures time until the next scene, and on the last one there
+        * is none — it holds there until somebody leaves. Drawn full rather than
+        * counting down to nothing, which would read as stuck.
+        */}
       <div className="wc-progress" aria-hidden="true">
-        {SCENES.map((item, index) => (
-          <span className="wc-progress__step" key={item.id} data-state={index < active ? "done" : index === active ? "live" : "todo"}>
-            <i style={still ? undefined : { animationDuration: `${SCENE_MS}ms` }} />
-          </span>
-        ))}
+        {SCENES.map((item, index) => {
+          const counting = index === active && !last && !still;
+          return (
+            <span
+              className="wc-progress__step"
+              key={item.id}
+              data-state={index < active || (index === active && (last || still)) ? "done" : counting ? "live" : "todo"}
+            >
+              <i style={counting ? { animationDuration: `${SCENE_MS}ms` } : undefined} />
+            </span>
+          );
+        })}
       </div>
 
       <button type="button" className="wc-skip" onClick={finish}>
