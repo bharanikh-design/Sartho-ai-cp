@@ -177,17 +177,29 @@ export function createProviderCascade(
      *
      * SerpApi is submitted and polled rather than waited on, so a query that
      * outruns the budget leaves a search running at SerpApi instead of an
-     * aborted socket. It is retired for this run — a provider that is slow on
-     * one rare title will be slow on the next — but the reason is kept and
-     * shown, because it is the one provider message a person can actually use:
-     * the search finishes anyway, so running it again gets the cached answer.
+     * aborted socket. The reason is kept and shown, because it is the one
+     * provider message a person can actually use: the search finishes anyway,
+     * so running it again gets the cached answer.
+     *
+     * This retired the provider on the first one, which was right when it was
+     * rationed to three calls a run and each cost twenty seconds. It is wrong
+     * now. What outruns the budget is a query Google has no listings for, and
+     * a plan is a mix — a brief whose first target role does not exist in the
+     * market would have lost the deep provider for all fourteen queries behind
+     * it, every one of which might have answered in three seconds.
+     *
+     * So it takes the ordinary two strikes, and a query that answers clears
+     * them below. Two dead titles in a row is a market this provider cannot
+     * help with; one is a title that does not exist.
      */
     if (caught instanceof Error && caught.name === "SerpApiStillRunningError") {
       const label = providerLabel(provider);
       timeouts.set(label, (timeouts.get(label) ?? 0) + 1);
       timeoutWaits.set(label, Math.max(timeoutWaits.get(label) ?? 0, lastAllowedMs));
-      dead.add(provider);
       record(provider, `${label}: ${caught.message}`);
+      const slow = (failures.get(provider) ?? 0) + 1;
+      failures.set(provider, slow);
+      if (slow >= failuresBeforeDead) dead.add(provider);
       return;
     }
 

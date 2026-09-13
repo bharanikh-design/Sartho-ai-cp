@@ -241,23 +241,41 @@ export const DEFAULT_SEARCH_BUDGET_MS = 75_000;
  * happened when SerpApi took the lead: 6,000ms sat comfortably above JSearch's
  * 3.4 seconds and below SerpApi's 8.7.
  */
-const MAX_CALL_MS = 20_000;
+const MAX_CALL_MS = 10_000;
 
 /*
- * Queries in flight at once while SerpApi leads. Three, because one call costs
- * the better part of ten seconds and a 25-query plan cannot otherwise finish
+ * Queries in flight at once while SerpApi leads. Three, because a call costs
+ * seconds rather than milliseconds and a 25-query plan cannot otherwise finish
  * inside the budget. Never applied to a provider that answers in milliseconds.
+ *
+ * Left at three rather than raised with the ration: every measurement of this
+ * provider so far has been of one call at a time, so a higher number would be
+ * a guess about a concurrency limit nothing here has tested.
  */
 const SERPAPI_CONCURRENCY = 3;
 
 /*
  * How many queries the deep provider answers per run.
  *
- * Three, which is one batch at the concurrency above — so the ration is spent
- * in a single round and the rest of the plan runs at the cheap provider's
- * half-second pace rather than waiting on twenty-second calls.
+ * Three was the right number for a provider that cost twenty seconds a call
+ * and threw the call away when it ran out of time: one batch, spent up front
+ * on the bare target roles, and the rest of the plan left to the cheap
+ * provider. Both halves of that have since stopped being true.
+ *
+ * A query Google has listings for now answers in about three seconds, and a
+ * query it has nothing for is given up on at nine — and giving up completes at
+ * SerpApi anyway, so the next run reads that title from cache. Fifteen at a
+ * concurrency of three is five rounds: somewhere between fifteen seconds if
+ * they all answer and forty-five if none of them do, inside a
+ * seventy-five-second budget either way, with the loop's own remaining-time
+ * guard stopping it short if the arithmetic ever goes wrong.
+ *
+ * The ration is still a ration. Twenty-five queries of a full plan would leave
+ * nothing for the fallback to broaden the page with, and the deep provider is
+ * worth the most on the first queries in a plan — which are the bare target
+ * roles.
  */
-const MAX_DEEP_PROVIDER_CALLS = 3;
+const MAX_DEEP_PROVIDER_CALLS = 15;
 
 const MAX_ADVERTS_READ = 24;
 const ADVERT_CONCURRENCY = 6;

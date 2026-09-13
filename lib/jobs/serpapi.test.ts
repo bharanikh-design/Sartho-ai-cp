@@ -457,3 +457,54 @@ describe("searchSerpApi", () => {
     expect(results.map((item) => item.title)).toEqual(["ServiceNow Delivery Director"]);
   });
 });
+
+/*
+ * The nine-second budget, which is the number the live measurements produced:
+ * a query with listings answered in 3,020ms; one without was still running at
+ * eighteen. The reserve has to leave a real share of that to poll in.
+ */
+describe("searchSerpApi under a nine-second budget", () => {
+  function fakeClock() {
+    let ms = 0;
+    return { now: () => ms, wait: async (delay: number) => { ms += delay; } };
+  }
+
+  it("still answers a query that comes back in about three seconds", async () => {
+    process.env.SERPAPI_KEY = "k1";
+    const clock = fakeClock();
+    const results = await searchSerpApi({ keywords: "Engagement Manager", country: "sg", timeoutMs: 9_000 }, {
+      submit: async () => ({ id: "abc", body: null }),
+      collect: async () => ({
+        search_metadata: { status: "Success" },
+        jobs_results: [{
+          title: "Engagement Manager",
+          company_name: "Oliver Wyman",
+          description: "Lead client engagements across insurance and asset management.",
+          apply_options: [{ title: "Oliver Wyman", link: "https://oliverwyman.com/jobs/1" }],
+        }],
+      }),
+      now: clock.now,
+      wait: clock.wait,
+    });
+    expect(results).toHaveLength(1);
+    expect(clock.now()).toBeLessThan(3_000);
+  });
+
+  it("spends most of the budget polling rather than holding it in reserve", async () => {
+    process.env.SERPAPI_KEY = "k1";
+    const clock = fakeClock();
+    await searchSerpApi({ keywords: "ServiceNow Delivery Director", country: "sg", timeoutMs: 9_000 }, {
+      submit: async () => ({ id: "abc", body: null }),
+      collect: async () => ({ search_metadata: { status: "Processing" } }),
+      now: clock.now,
+      wait: clock.wait,
+    }).catch(() => undefined);
+
+    /*
+     * The reserve used to be half an eight-second archive read, which at this
+     * budget gave a query five seconds to answer in and kept four back.
+     */
+    expect(clock.now()).toBeGreaterThan(7_000);
+    expect(clock.now()).toBeLessThanOrEqual(9_000);
+  });
+});

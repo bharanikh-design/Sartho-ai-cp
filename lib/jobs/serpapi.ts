@@ -327,7 +327,15 @@ const SERPAPI_ARCHIVE_ENDPOINT = "https://serpapi.com/searches";
 const SUBMIT_TIMEOUT_MS = 8_000;
 
 /** One archive read. These are quick — it is a lookup, not a search. */
-const COLLECT_TIMEOUT_MS = 8_000;
+const COLLECT_TIMEOUT_MS = 5_000;
+
+/*
+ * Kept back so the last poll is one that can finish rather than one that dies
+ * holding the budget. Small and fixed, not a share of the archive timeout: at
+ * a nine-second budget, reserving half of an eight-second read threw away
+ * almost half the time the query had to answer in.
+ */
+const POLL_RESERVE_MS = 1_500;
 
 /*
  * How often to ask whether it is done. Backs off so a search that takes half a
@@ -512,7 +520,7 @@ export async function searchSerpApi(
      * spends what is left and still answers nothing, which is the trap the
      * synchronous version fell into on every query.
      */
-    if (left <= COLLECT_TIMEOUT_MS / 2) throw new SerpApiStillRunningError(elapsed);
+    if (left <= POLL_RESERVE_MS) throw new SerpApiStillRunningError(elapsed);
 
     await wait(Math.min(pollDelayMs(attempt), left));
 
