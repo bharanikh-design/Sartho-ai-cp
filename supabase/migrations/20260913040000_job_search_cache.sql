@@ -71,6 +71,7 @@ alter table public.job_search_cache enable row level security;
  * path instead: a client that could write this table could poison every user's
  * results at once, which is a far worse trade than the convenience.
  */
+drop policy if exists "cached adverts are readable" on public.job_search_cache;
 create policy "cached adverts are readable"
   on public.job_search_cache
   for select to authenticated
