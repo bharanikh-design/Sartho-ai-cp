@@ -458,6 +458,19 @@ export function JobSearchPanel({
             <> · {criteria.offMarket} hidden as listed in another country</>
           ) : null}
           {criteria.queriesSkipped > 0 ? <> · {criteria.queriesSkipped} queries not run ({SKIPPED_REASON[criteria.queriesStoppedBecause ?? "budget"]})</> : null}
+          {/*
+            * What the shared cache saved this run.
+            *
+            * Google for Jobs on the free plan answers a title it has served
+            * before in seconds and a cold one in longer than a search has to
+            * give, so the cache is the difference between full adverts and
+            * four-line blurbs. A cached answer and a bought one look identical
+            * in the list, which makes the one number that says whether it is
+            * working invisible unless it is said.
+            */}
+          {criteria.deepFromCache ? (
+            <> · {criteria.deepFromCache} deep {criteria.deepFromCache === 1 ? "answer" : "answers"} came from Sartho&rsquo;s advert cache, free</>
+          ) : null}
         </p>
       ) : null}
 
