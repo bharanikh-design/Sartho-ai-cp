@@ -127,7 +127,7 @@
   animation: wcVisual .9s cubic-bezier(.2,.7,.2,1) .16s both;
 }
 
-.wc-claim, .wc-requirement {
+.wc-requirement {
   display: grid;
   grid-template-columns: 9px minmax(0,1fr) auto;
   align-items: center;
@@ -135,12 +135,8 @@
   color: rgba(226,232,255,.76);
   font-size: 12.5px;
 }
-.wc-claim__mark, .wc-requirement__dot { width: 9px; height: 9px; border-radius: 50%; background: rgba(226,232,255,.28); }
-.wc-claim em, .wc-requirement em { font-style: normal; font-size: 11px; color: rgba(226,232,255,.42); }
-.wc-claim[data-state="approved"] .wc-claim__mark { background: #72e6bd; }
-.wc-claim[data-state="approved"] em { color: #72e6bd; }
-.wc-claim[data-state="review"] .wc-claim__mark { background: #ffd37a; }
-.wc-claim[data-state="review"] em { color: #ffd37a; }
+.wc-requirement__dot { width: 9px; height: 9px; border-radius: 50%; background: rgba(226,232,255,.28); }
+.wc-requirement em { font-style: normal; font-size: 11px; color: rgba(226,232,255,.42); }
 .wc-requirement[data-state="met"] .wc-requirement__dot { background: #72e6bd; }
 .wc-requirement[data-state="met"] em { color: #72e6bd; }
 .wc-requirement[data-state="partial"] .wc-requirement__dot { background: #ffd37a; }
@@ -148,13 +144,59 @@
 .wc-requirement[data-state="gap"] .wc-requirement__dot { background: #ff8ea3; }
 .wc-requirement[data-state="gap"] em { color: #ff8ea3; }
 
-.wc-role { display: grid; gap: 8px; }
-.wc-role__top { color: rgba(226,232,255,.42); font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; }
-.wc-role strong { color: #f4f6ff; font-size: 15px; font-weight: 600; line-height: 1.35; }
-.wc-role__score { color: rgba(226,232,255,.6); font-size: 12px; }
-.wc-role__score b { color: #72e6bd; }
-.wc-role__bar { height: 5px; border-radius: 3px; background: rgba(255,255,255,.09); overflow: hidden; margin-top: 4px; }
-.wc-role__bar span { display: block; height: 100%; background: linear-gradient(90deg, #4d8dff, #72e6bd); animation: wcBar 1.2s cubic-bezier(.2,.7,.2,1) .3s both; }
+/*
+ * Search: many places, one list.
+ *
+ * The point is not that Sartho queries an API. It is that a person stops
+ * keeping a tab open per job board, so the sources are shown collapsing into
+ * a single outcome rather than drawn as a diagram of the plumbing.
+ */
+.wc-sources { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.wc-source {
+  padding: 6px 12px;
+  border: 1px solid rgba(255,255,255,.14);
+  border-radius: 999px;
+  color: rgba(226,232,255,.72);
+  font-size: 11.5px;
+  animation: wcSource .6s ease both;
+}
+.wc-source:nth-child(2) { animation-delay: .07s; }
+.wc-source:nth-child(3) { animation-delay: .14s; }
+.wc-source:nth-child(4) { animation-delay: .21s; }
+.wc-source:nth-child(5) { animation-delay: .28s; }
+
+/* Three lines drawing together, which is the whole idea in one glyph. */
+.wc-funnel { display: grid; justify-items: center; gap: 3px; margin: 14px 0 10px; }
+.wc-funnel span { display: block; height: 2px; border-radius: 2px; background: linear-gradient(90deg, rgba(77,141,255,.5), rgba(114,230,189,.7)); }
+.wc-funnel span:nth-child(1) { width: 74%; }
+.wc-funnel span:nth-child(2) { width: 46%; }
+.wc-funnel span:nth-child(3) { width: 22%; }
+
+.wc-outcome { margin: 0; text-align: center; color: rgba(226,232,255,.66); font-size: 12.5px; line-height: 1.6; }
+.wc-outcome strong { color: #f4f6ff; }
+
+/* Capture: anywhere on the web, to here, already read. */
+.wc-capture__row { display: flex; align-items: center; justify-content: center; gap: 14px; }
+.wc-capture__from, .wc-capture__to {
+  padding: 8px 16px;
+  border: 1px solid rgba(255,255,255,.14);
+  border-radius: 12px;
+  font-size: 12.5px;
+  color: rgba(226,232,255,.76);
+}
+.wc-capture__to { border-color: rgba(166,140,255,.5); background: rgba(166,140,255,.12); color: #f4f6ff; }
+.wc-capture__arrow { color: rgba(226,232,255,.4); }
+
+.wc-signal { display: grid; justify-items: center; gap: 8px; margin-top: 18px; }
+.wc-signal__label { color: rgba(226,232,255,.4); font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; }
+.wc-signal__bars { display: flex; align-items: flex-end; gap: 4px; height: 26px; }
+.wc-signal__bars i { width: 7px; border-radius: 2px; background: #72e6bd; animation: wcBars .5s ease both; }
+.wc-signal__bars i:nth-child(1) { height: 30%; animation-delay: .10s; }
+.wc-signal__bars i:nth-child(2) { height: 48%; animation-delay: .18s; }
+.wc-signal__bars i:nth-child(3) { height: 66%; animation-delay: .26s; }
+.wc-signal__bars i:nth-child(4) { height: 84%; animation-delay: .34s; }
+.wc-signal__bars i:nth-child(5) { height: 100%; animation-delay: .42s; }
+.wc-signal strong { color: #f4f6ff; font-size: 12.5px; font-weight: 600; }
 
 .wc-line {
   margin: 0;
@@ -198,7 +240,8 @@
 @keyframes wcWash { from { transform: translate3d(0,0,0); } to { transform: translate3d(4%, 3%, 0); } }
 @keyframes wcScene { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
 @keyframes wcVisual { from { opacity: 0; transform: translateY(24px) scale(.97); } to { opacity: 1; transform: none; } }
-@keyframes wcBar { from { width: 0 !important; } }
+@keyframes wcSource { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes wcBars { from { transform: scaleY(0); transform-origin: bottom; } to { transform: none; } }
 
 @media (max-width: 640px) {
   .wc-skip { top: 26px; }
@@ -212,7 +255,7 @@
  * stays; only the movement goes, and Next becomes the way through.
  */
 @media (prefers-reduced-motion: reduce) {
-  .wc, .wc::before, .wc-scene, .wc-visual, .wc-role__bar span { animation: none; }
+  .wc, .wc::before, .wc-scene, .wc-visual, .wc-source, .wc-signal__bars i { animation: none; }
   .wc.is-leaving { opacity: 0; visibility: hidden; }
   .wc-progress__step[data-state="live"] i { animation: none; width: 100%; }
   .wc-enter, .wc-next { transition: none; }
