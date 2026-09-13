@@ -208,6 +208,14 @@ export type SearchCriteria = {
    * look identical on the page.
    */
   deepFromCache?: number;
+  /**
+   * Titles submitted to Google for Jobs that were not readable in time.
+   *
+   * Not a failure: the search completes at SerpApi and the next run collects it
+   * for nothing. Reported so a first search does not look like the deep
+   * provider contributed nothing, when what it did was pay for tomorrow.
+   */
+  deepWarming?: number;
   targetRolesRequested?: number;
   targetRolesSearched?: number;
   employersChecked?: number;
@@ -485,6 +493,16 @@ export async function runBriefSearch(
    * working, and it is invisible otherwise.
    */
   let deepFromCache = 0;
+  /*
+   * Titles handed to SerpApi and not yet readable.
+   *
+   * Said out loud because otherwise a first search looks like the deep provider
+   * did nothing at all: it returns no roles, and the work it did — filing a
+   * ticket that the next search collects for free — is invisible. A person
+   * seeing "nothing from Google for Jobs" twice would reasonably conclude it
+   * is broken, when the second search is exactly when it pays off.
+   */
+  let deepWarming = 0;
   let queriesStoppedBecause: "budget" | "no_providers" | "enough_results" | undefined;
   const searchedTargetRoles = new Set<string>();
   const searchedEmployers = new Set<string>();
@@ -550,6 +568,7 @@ export async function runBriefSearch(
       });
       if (outcome.spent) deepSearchesSpent += 1;
       if (outcome.results.length && !outcome.spent) deepFromCache += 1;
+      if (outcome.source === "pending") deepWarming += 1;
       return outcome.results;
     },
   });
@@ -1019,6 +1038,7 @@ export async function runBriefSearch(
     queriesSkipped,
     queriesStoppedBecause,
     deepFromCache,
+    deepWarming,
     targetRolesRequested: activeLanes.length,
     targetRolesSearched: searchedTargetRoles.size,
     employersChecked: searchedEmployers.size,
@@ -1182,6 +1202,7 @@ export function normaliseCriteria(stored: unknown): SearchCriteria {
     queriesRun: count(value.queriesRun),
     queriesSkipped: count(value.queriesSkipped),
     deepFromCache: count(value.deepFromCache),
+    deepWarming: count(value.deepWarming),
     queriesStoppedBecause: value.queriesStoppedBecause === "budget"
       || value.queriesStoppedBecause === "no_providers"
       || value.queriesStoppedBecause === "enough_results"
