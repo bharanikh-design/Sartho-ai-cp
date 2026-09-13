@@ -793,17 +793,61 @@ describe("a SerpApi search still running when the budget ran out", () => {
     return error;
   }
 
-  it("retires the provider at once rather than spending the budget again", async () => {
+  const found = (title: string, source: string) => [{
+    title, employer: null, location: null, description: "d",
+    url: `https://x/${title}`, salary: null, postedAt: null,
+    source, platforms: [], applyDirect: false,
+  }];
+
+  /*
+   * One title Google has nothing for must not cost the fourteen queries behind
+   * it. A brief is a mix, and the deep provider answers a real title in about
+   * three seconds.
+   */
+  it("keeps the provider after one title the market has nothing for", async () => {
     const cascade = createProviderCascade(["serpapi", "adzuna"], {
       search: async (provider) => {
         if (provider === "serpapi") throw stillRunning();
-        return [{ title: "Analyst", employer: null, location: null, description: "d", url: "https://x/1", salary: null, postedAt: null, source: "Adzuna", platforms: [], applyDirect: false }];
+        return found("Analyst", "Adzuna");
       },
     });
 
-    await cascade.run({ keywords: "ServiceNow Delivery Director", country: "sg", timeoutMs: 20_000 });
+    await cascade.run({ keywords: "ServiceNow Delivery Director", country: "sg", timeoutMs: 9_000 });
+    expect(cascade.isDead("serpapi")).toBe(false);
+    expect(cascade.willAsk("serpapi")).toBe(true);
+  });
+
+  it("retires it after two in a row, which is a market it cannot help with", async () => {
+    const cascade = createProviderCascade(["serpapi", "adzuna"], {
+      search: async (provider) => {
+        if (provider === "serpapi") throw stillRunning();
+        return found("Analyst", "Adzuna");
+      },
+    });
+
+    await cascade.run({ keywords: "ServiceNow Delivery Director", country: "sg", timeoutMs: 9_000 });
+    await cascade.run({ keywords: "ITSM manager", country: "sg", timeoutMs: 9_000 });
     expect(cascade.isDead("serpapi")).toBe(true);
-    expect(cascade.willAsk("serpapi")).toBe(false);
+  });
+
+  it("clears the strikes on a title that does answer", async () => {
+    let asked = 0;
+    const cascade = createProviderCascade(["serpapi", "adzuna"], {
+      search: async (provider) => {
+        if (provider !== "serpapi") return found("Analyst", "Adzuna");
+        asked += 1;
+        /* Dead, alive, dead — a mixed plan, which is the ordinary case. */
+        if (asked === 2) return found("Engagement Manager", "Google for Jobs (SerpApi)");
+        throw stillRunning();
+      },
+    });
+
+    await cascade.run({ keywords: "ServiceNow Delivery Director", country: "sg", timeoutMs: 9_000 });
+    await cascade.run({ keywords: "Engagement Manager", country: "sg", timeoutMs: 9_000 });
+    await cascade.run({ keywords: "ITSM manager", country: "sg", timeoutMs: 9_000 });
+
+    expect(cascade.isDead("serpapi")).toBe(false);
+    expect(cascade.used.has("Google for Jobs (SerpApi)")).toBe(true);
   });
 
   it("still falls through, so the person gets results from the next provider", async () => {

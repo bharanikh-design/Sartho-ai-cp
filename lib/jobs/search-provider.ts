@@ -757,7 +757,22 @@ export function providersForCountry(country: string, configured = configuredJobS
  * breadth for free.
  */
 export function providerCallBudgetMs(provider: JobSearchProviderName): number {
-  if (provider === "serpapi") return 20_000;
+  /*
+   * Measured against the live deployment once SerpApi was actually in the
+   * cascade, which had never happened before: a query Google has listings for
+   * came back in 3,020ms with ten full adverts. A query it has nothing for was
+   * still running at eighteen seconds — and so was the same query an hour
+   * after it had been submitted once already, because there is no empty answer
+   * to cache.
+   *
+   * That splits cleanly, and nine seconds sits in the gap. It gives an
+   * answering query three times what it needs, and it stops paying eighteen
+   * seconds to learn that a title does not exist in this market. Twenty was
+   * sized when a timeout meant an aborted socket and a wasted search; now the
+   * search completes at SerpApi regardless, so giving up early costs nothing
+   * but the wait.
+   */
+  if (provider === "serpapi") return 9_000;
   if (provider === "jsearch") return 6_000;
   return 3_000;
 }
