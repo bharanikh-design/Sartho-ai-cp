@@ -27,49 +27,67 @@ type Scene = {
   visual: React.ReactNode;
 };
 
+/*
+ * Written as what somebody gets, not as how it works.
+ *
+ * The first version of these four scenes said "your career becomes evidence",
+ * "roles are scored against it", "a gap is reported as a gap" — all true, all
+ * mechanism. That is the five-gigabyte-MP3-player way to describe a thing. The
+ * line worth saying is the one about the person's afternoon: they stop keeping
+ * twelve tabs open, and they stop guessing which roles are worth the evening.
+ *
+ * Search and the extension lead, because they are what changes the day. The
+ * honest matching and the résumé follow, because they are what makes the first
+ * two worth trusting.
+ */
 const SCENES: Scene[] = [
   {
-    id: "evidence",
-    kicker: "First",
-    line: "Your career becomes evidence.",
-    body: "Sartho reads your résumé once and turns it into claims you confirm, one by one. Nothing it writes later can go beyond what you approved here.",
+    id: "search",
+    kicker: "Find",
+    line: "Every job board. One search.",
+    body: "Sartho searches Google for Jobs, which carries LinkedIn, Indeed, Seek and employers\u2019 own careers pages — and reads each advert in full rather than the four-line summary an aggregator gives you.",
     visual: (
-      <div className="wc-visual wc-visual--evidence">
-        {[
-          { claim: "Led ServiceNow delivery across 14 enterprise clients", state: "approved" },
-          { claim: "Rebuilt the ITSM operating model for a regional bank", state: "approved" },
-          { claim: "Owned a commercial P&L", state: "review" },
-        ].map((item) => (
-          <div className="wc-claim" data-state={item.state} key={item.claim}>
-            <span className="wc-claim__mark" aria-hidden="true" />
-            <span>{item.claim}</span>
-            <em>{item.state === "approved" ? "Approved" : "Needs your call"}</em>
-          </div>
-        ))}
-      </div>
-    ),
-  },
-  {
-    id: "roles",
-    kicker: "Then",
-    line: "Roles are scored on what you can prove.",
-    body: "Google for Jobs, LinkedIn, Seek and employers' own careers pages — read in full, then measured against your evidence rather than against keywords.",
-    visual: (
-      <div className="wc-visual wc-visual--roles">
-        <div className="wc-role">
-          <span className="wc-role__top">Northgate Advisory · Singapore</span>
-          <strong>Engagement Manager, Insurance &amp; Asset Management</strong>
-          <span className="wc-role__score"><b>80%</b> match · 12 of 13 capability areas evidenced</span>
-          <div className="wc-role__bar" aria-hidden="true"><span style={{ width: "80%" }} /></div>
+      <div className="wc-visual wc-visual--search">
+        <div className="wc-sources">
+          {["LinkedIn", "Indeed", "Seek", "Careers pages", "Google for Jobs"].map((source) => (
+            <span className="wc-source" key={source}>{source}</span>
+          ))}
         </div>
+        <div className="wc-funnel" aria-hidden="true"><span /><span /><span /></div>
+        <p className="wc-outcome">
+          <strong>One list.</strong> Ranked by how much of each role you can evidence.
+        </p>
       </div>
     ),
   },
   {
-    id: "analysis",
-    kicker: "Every time",
-    line: "A gap is reported as a gap.",
-    body: "Each requirement in the advert is answered against your evidence. Where you cannot support one, Sartho says so rather than filling it in for you.",
+    id: "extension",
+    kicker: "Or capture",
+    line: "Found a role somewhere else? One click.",
+    body: "The browser extension sends any posting you are looking at — anywhere on the web — straight into Sartho with the whole advert intact, and it comes back analysed before you have closed the tab.",
+    visual: (
+      <div className="wc-visual wc-visual--capture">
+        <div className="wc-capture__row">
+          <span className="wc-capture__from">Any job board</span>
+          <span className="wc-capture__arrow" aria-hidden="true">→</span>
+          <span className="wc-capture__to">Sartho</span>
+        </div>
+        <div className="wc-signal">
+          <span className="wc-signal__label">Signal strength</span>
+          <span className="wc-signal__bars" aria-hidden="true">
+            <i /><i /><i /><i /><i />
+          </span>
+          <strong>Strong — 12 of 13 requirements answerable</strong>
+        </div>
+        <p className="wc-outcome">Analysed on arrival. You never have to ask for it.</p>
+      </div>
+    ),
+  },
+  {
+    id: "honest",
+    kicker: "Then know",
+    line: "Which ones are actually worth your evening.",
+    body: "Every requirement in the advert, answered against evidence you approved. Where you cannot support one, Sartho says so — so you spend your time on the roles you can win and skip the ones you cannot.",
     visual: (
       <div className="wc-visual wc-visual--analysis">
         {[
@@ -89,9 +107,9 @@ const SCENES: Scene[] = [
   },
   {
     id: "resume",
-    kicker: "And then",
-    line: "A résumé that cites its sources.",
-    body: "Write the master once. Every tailored version starts from it, keeps its own history, and shows which approved evidence each line came from.",
+    kicker: "And walk in",
+    line: "A résumé you can defend in the room.",
+    body: "One per role, built in minutes from the master, with every line traceable to something you confirmed. Nothing on it is a sentence you will have to explain away at interview.",
     visual: (
       <div className="wc-visual wc-visual--resume">
         <p className="wc-line">
