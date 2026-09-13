@@ -11,7 +11,14 @@
  * Shared by both, so a path added here is public in both places or in neither.
  */
 
-export const PUBLIC_PATHS = ["/login", "/auth/callback", "/extension"] as const;
+/*
+ * /privacy and /terms are public for two reasons. Somebody deciding whether to
+ * sign up has to be able to read them before they do — a privacy policy behind
+ * a login is a joke — and Google's OAuth brand verification fetches both, which
+ * is what stops the sign-in screen naming a Supabase project reference instead
+ * of Sartho.
+ */
+export const PUBLIC_PATHS = ["/login", "/auth/callback", "/extension", "/privacy", "/terms"] as const;
 
 export function isPublicPath(pathname: string): boolean {
   /* A trailing slash is the same page. */

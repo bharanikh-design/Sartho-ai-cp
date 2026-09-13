@@ -36,4 +36,31 @@ describe("isPublicPath", () => {
     expect(isPublicPath("/admin")).toBe(false);
     expect(isPublicPath("/diagnostics")).toBe(false);
   });
+
+  /*
+   * Named individually rather than left to the loop above, which walks whatever
+   * the list happens to contain and would pass just as happily if these were
+   * removed from it.
+   *
+   * They fail quietly if they go. A page missing from the list does not break
+   * — it redirects to /login, which looks like a working sign-in wall. Google's
+   * OAuth brand verification fetches these two URLs and follows that redirect
+   * to a page that is neither a policy nor terms, so verification fails and the
+   * consent screen goes on naming a Supabase project reference instead of
+   * Sartho, with nothing anywhere saying why.
+   */
+  it("makes the legal pages public, which Google fetches by exact URL", () => {
+    expect(PUBLIC_PATHS).toContain("/privacy");
+    expect(PUBLIC_PATHS).toContain("/terms");
+    expect(isPublicPath("/privacy")).toBe(true);
+    expect(isPublicPath("/terms")).toBe(true);
+    /* Either spelling may be fetched. */
+    expect(isPublicPath("/privacy/")).toBe(true);
+    expect(isPublicPath("/terms/")).toBe(true);
+  });
+
+  it("does not make a page public for merely starting like a legal one", () => {
+    expect(isPublicPath("/privacy-settings")).toBe(false);
+    expect(isPublicPath("/terms-of-business")).toBe(false);
+  });
 });
