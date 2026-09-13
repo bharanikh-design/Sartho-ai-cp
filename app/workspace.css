@@ -244,6 +244,23 @@ textarea:focus-visible,
   animation: importSpin .8s linear infinite;
 }
 @keyframes importSpin { to { transform: rotate(360deg); } }
+
+/*
+ * The second line of a saved role: the grounded read, which now runs by itself
+ * the moment a role arrives from the extension. It sits under the keyword score
+ * deliberately — that score is the guess, this is the answer — and it is
+ * indented behind a rule so the two are never mistaken for one sentence.
+ */
+.import-banner__analysis {
+  margin-top: 8px; padding-left: 11px;
+  border-left: 2px solid rgba(134,174,255,.35);
+  color: var(--text-secondary);
+}
+.import-banner__analysis strong { display: inline; font-size: inherit; color: var(--text-primary); }
+.import-banner__analysis.is-done { border-left-color: rgba(114,230,189,.6); }
+/* Held, not failed: the role is saved and the analysis can be run from its page. */
+.import-banner__analysis.is-held { border-left-color: rgba(255,199,134,.55); }
+.import-banner.is-analysing { border-color: rgba(134,174,255,.3); }
 .application-row { grid-template-columns: minmax(0,1fr) 170px 34px; }
 .application-main-link { min-width: 0; }
 .status-control { display: grid; gap: 6px; }
