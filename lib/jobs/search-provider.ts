@@ -676,6 +676,43 @@ export function configuredJobSearchProviders(): JobSearchProviderName[] {
 }
 
 /**
+ * Providers that hold a working key and are switched off anyway.
+ *
+ * This exists because the distinction was invisible exactly when it mattered
+ * most. SerpApi was disabled here while it was hanging on every query, which
+ * was right at the time; when it was fixed, the variable stayed. The provider
+ * then submitted a search in 26 milliseconds when asked directly and never
+ * appeared in a real search at all, and nothing on any diagnostic said why —
+ * the only trace was a provider quietly missing from a list.
+ *
+ * A key with a switch turned off is not the same as no key, and it is not the
+ * same as a provider that is failing. It is the one provider state that is
+ * entirely somebody's own doing, which makes it the one most worth naming.
+ */
+export function suppressedJobSearchProviders(): JobSearchProviderName[] {
+  const disabled = new Set(
+    (process.env.JOBS_DISABLED_PROVIDERS ?? "")
+      .split(/[,\s]+/)
+      .map((name) => name.trim().toLowerCase())
+      .filter(Boolean),
+  );
+  if (!disabled.size) return [];
+
+  const keyed: JobSearchProviderName[] = [];
+  if (serpApiConfig()) keyed.push("serpapi");
+  if (jsearchConfig()) keyed.push("jsearch");
+  if (adzunaConfig()) keyed.push("adzuna");
+
+  const off = keyed.filter((provider) => disabled.has(provider));
+  /*
+   * All of them off is treated as a mistake by configuredJobSearchProviders,
+   * which ignores the variable entirely rather than letting a typo take search
+   * down. Nothing is actually suppressed in that case, so nothing is reported.
+   */
+  return off.length === keyed.length ? [] : off;
+}
+
+/**
  * The configured providers that can actually search a given country. JSearch
  * covers any market; Adzuna only the countries it has an endpoint for, so it
  * is dropped rather than sent a request that would 404.

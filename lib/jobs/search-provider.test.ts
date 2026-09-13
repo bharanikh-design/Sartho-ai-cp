@@ -10,6 +10,7 @@ import {
   mapJSearchResult,
   normaliseAdzunaCountry,
   providersForCountry,
+  suppressedJobSearchProviders,
 } from "./search-provider";
 
 describe("normaliseAdzunaCountry", () => {
@@ -486,5 +487,61 @@ describe("turning a provider off without deleting its key", () => {
     process.env.JOBS_DISABLED_PROVIDERS = "serpapi";
     process.env.JOBS_SEARCH_PROVIDER = "serpapi";
     expect(configuredJobSearchProviders()).toEqual(["jsearch", "adzuna"]);
+  });
+});
+
+/*
+ * The state that hid: a key that works, behind a switch that is off.
+ *
+ * SerpApi was disabled while it was hanging on every query — correct then, and
+ * still set long after it was fixed. Asked directly it submitted a search in 26
+ * milliseconds and looked perfectly healthy; asked through a search it was
+ * never reached at all, and the only trace was its absence from a list.
+ */
+describe("suppressedJobSearchProviders", () => {
+  const env = { ...process.env };
+  afterEach(() => { process.env = { ...env }; });
+
+  function configure() {
+    process.env.SERPAPI_KEY = "serp";
+    process.env.JSEARCH_RAPIDAPI_KEY = "rapid";
+    process.env.ADZUNA_APP_ID = "id";
+    process.env.ADZUNA_APP_KEY = "key";
+  }
+
+  it("names a provider that has a key and is switched off", () => {
+    configure();
+    process.env.JOBS_DISABLED_PROVIDERS = "serpapi";
+    expect(suppressedJobSearchProviders()).toEqual(["serpapi"]);
+  });
+
+  it("says nothing when nothing is switched off", () => {
+    configure();
+    delete process.env.JOBS_DISABLED_PROVIDERS;
+    expect(suppressedJobSearchProviders()).toEqual([]);
+  });
+
+  it("ignores a provider that has no key to suppress", () => {
+    delete process.env.SERPAPI_KEY;
+    delete process.env.SERPAPI_API_KEY;
+    process.env.JSEARCH_RAPIDAPI_KEY = "rapid";
+    process.env.ADZUNA_APP_ID = "id";
+    process.env.ADZUNA_APP_KEY = "key";
+    process.env.JOBS_DISABLED_PROVIDERS = "serpapi";
+    expect(suppressedJobSearchProviders()).toEqual([]);
+  });
+
+  it("reads the same spellings the cascade accepts", () => {
+    configure();
+    process.env.JOBS_DISABLED_PROVIDERS = "  SerpApi , jsearch ";
+    expect(suppressedJobSearchProviders()).toEqual(["serpapi", "jsearch"]);
+  });
+
+  it("reports nothing when every provider is off, because the cascade ignores that too", () => {
+    configure();
+    process.env.JOBS_DISABLED_PROVIDERS = "serpapi,jsearch,adzuna";
+    /* A typo that disables everything is treated as a mistake, not a request. */
+    expect(configuredJobSearchProviders()).toEqual(["serpapi", "jsearch", "adzuna"]);
+    expect(suppressedJobSearchProviders()).toEqual([]);
   });
 });
