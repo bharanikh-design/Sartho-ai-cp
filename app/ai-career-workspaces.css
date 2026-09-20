@@ -1175,3 +1175,32 @@ h2.resume-doc-heading.resume-doc-field { margin-bottom: 0; border-bottom: 1px so
   .studio-ai-write.is-working .studio-wand-spark { animation: none; }
 }
 
+
+/*
+ * Uploaded résumés, as rows.
+ *
+ * The text is shown in a <pre> with wrapping on, so every space, tab and
+ * blank line the file had is on screen — the point of the panel is to show
+ * the document as it was, not as a layout engine would prefer it.
+ */
+.resume-uploads { display: grid; gap: 10px; }
+.resume-uploads .library-row.is-master { border-color: rgba(138,180,248,.45); background: rgba(138,180,248,.05); }
+.library-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.chip-button {
+  display: inline-flex; align-items: center; gap: 4px;
+  border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px;
+  background: transparent; color: var(--text-secondary);
+  font: inherit; font-size: var(--text-2xs); font-weight: 600; line-height: 1.3; text-decoration: none; cursor: pointer;
+}
+.chip-button:hover:not(:disabled) { border-color: rgba(138,180,248,.4); color: var(--text-primary); }
+.chip-button.is-selected, .chip-button[aria-pressed="true"] { border-color: rgba(138,180,248,.5); background: rgba(138,180,248,.14); color: #8ab4f8; }
+.chip-button:disabled { cursor: default; opacity: .85; }
+.resume-upload-text { flex-basis: 100%; display: grid; gap: 6px; margin-top: 4px; }
+.resume-upload-text small { color: var(--text-tertiary); font-size: var(--text-2xs); }
+.resume-upload-text pre {
+  margin: 0; max-height: 520px; overflow: auto;
+  border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px;
+  background: rgba(0,0,0,.18); color: var(--text-primary);
+  font-size: var(--text-xs); line-height: 1.55;
+  white-space: pre-wrap; overflow-wrap: anywhere; tab-size: 4;
+}

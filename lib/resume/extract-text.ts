@@ -39,6 +39,11 @@ export class ResumeExtractionError extends Error {
  * document: hyphenated words split across lines, single newlines mid-sentence,
  * and runs of blank lines between blocks. Left alone it costs tokens and gives
  * the model spurious boundaries to reason about.
+ *
+ * For the model only. What is kept as the person's résumé is `raw` below,
+ * untouched — this collapses the spacing, the blank lines and the tabs that
+ * are the document's own layout, and a copy with those removed is not the
+ * document they uploaded.
  */
 export function normaliseWhitespace(raw: string) {
   return raw
@@ -65,9 +70,22 @@ async function extractDocx(bytes: Uint8Array) {
   return value;
 }
 
+/*
+ * Two texts come back, and they are for different readers.
+ *
+ * `raw` is the file's text exactly as the reader produced it — every space,
+ * tab, blank line and line break, nothing trimmed and nothing shortened. It is
+ * the record of what was uploaded, and it is what gets stored.
+ *
+ * `text` is the same document tidied for the model, which is charged by the
+ * token and confused by a word broken across two lines. It is built in memory
+ * and never stored.
+ */
+export type ExtractedResume = { raw: string; text: string; kind: SupportedKind };
+
 export async function extractResumeText(
   file: { name: string; type: string | null; bytes: Uint8Array },
-): Promise<{ text: string; kind: SupportedKind }> {
+): Promise<ExtractedResume> {
   if (file.bytes.byteLength === 0) {
     throw new ResumeExtractionError("That file is empty.");
   }
@@ -109,5 +127,5 @@ export async function extractResumeText(
     );
   }
 
-  return { text, kind };
+  return { raw, text, kind };
 }

@@ -23,10 +23,10 @@ import { DEFAULT_TEMPLATE } from "@/lib/resume/templates";
  *
  * This route is what "Build Master Résumé" has been calling since the button
  * was added. It did not exist, so the button answered 404 — which is why the
- * résumé somebody uploaded appeared to have gone missing. It had not gone
- * missing: the uploaded file is deleted on purpose the moment its text is read,
- * and what survives is the approved evidence. This turns that evidence back
- * into a document.
+ * résumé somebody uploaded appeared to have gone missing. This builds a
+ * document from the approved evidence; it is not the upload. The upload
+ * itself is kept as given, listed under "Uploaded résumés" on Résumé Studio,
+ * and can carry the master flag there in its own right.
  *
  * It is the tailored draft's sibling and deliberately shares its rules: only
  * approved evidence, every bullet citing the evidence that supports it, the

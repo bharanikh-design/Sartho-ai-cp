@@ -12,6 +12,8 @@ import { renderResumeText, resumeContentOf, type ResumeContent } from "@/lib/res
 import { ResumeDocument, type BulletCoach } from "@/components/resume-document";
 import { RESUME_TEMPLATES, resumeTemplate, type ResumeTemplate } from "@/lib/resume/templates";
 import { ResumeImport } from "@/components/resume-import";
+import { ResumeUploads } from "@/components/resume-uploads";
+import type { ResumeImportRecord } from "@/lib/data/career";
 import { ResumePdfRenderer } from "@/components/resume-pdf-templates";
 import { LivePdfPreview } from "@/components/live-pdf-preview";
 import type { ApplicationRecord, ResumeChange, ResumeVersionRecord, RuleAnalysis } from "@/lib/types";
@@ -187,6 +189,7 @@ export function ResumeStudio({
   master,
   masterUpdatedAt,
   driveConnected,
+  uploads,
 }: {
   drafts: StudioDraft[];
   /** Roles whose analysis is finished, so a truthful draft can be built. */
@@ -214,6 +217,12 @@ export function ResumeStudio({
   masterUpdatedAt: string | null;
   /** Decided on the server, so the Drive picker does not flash a prompt. */
   driveConnected: boolean;
+  /**
+   * Every résumé this person has uploaded, newest first, so an upload is
+   * visible on the page it was made from — with the flag that says which one
+   * is the master.
+   */
+  uploads: ResumeImportRecord[];
 }) {
   const router = useRouter();
   /*
@@ -241,8 +250,12 @@ export function ResumeStudio({
    */
   const [documents, setDocuments] = useState<Record<string, ResumeContent>>({});
 
-  /* Whether the next upload also becomes the master. Off by default: replacing
-   * the document every other one is built from is not a thing to do by accident. */
+  /*
+   * Whether the next upload is flagged as the master. Off by default: moving
+   * the flag off the document every other one starts from is not a thing to
+   * do by accident. The flag is the only thing it does — the upload is kept
+   * exactly as it was given, and nothing is rewritten from it.
+   */
   const [makeMaster, setMakeMaster] = useState(false);
 
   /*
@@ -1532,9 +1545,10 @@ return (
             <h2 className="section-heading">Add a résumé</h2>
             <p className="section-subtitle">
               PDF, Word or plain text. Sartho reads it into the career facts everything else is built from,
-              then deletes the file.
+              and keeps the file and its full text exactly as you uploaded them.
             </p>
           </div>
+          {uploads.length ? <span className="meta-pill">{uploads.length} uploaded</span> : null}
         </div>
 
         {/*
@@ -1560,7 +1574,8 @@ return (
           <span>
             <strong>Make this my master résumé</strong>
             <small>
-              Rebuilds the master from what Sartho reads out of this file. Every tailored version starts from it.
+              Flags this upload as the master. It is kept word for word as you gave it — nothing is rewritten or shortened.
+              You can move the flag to another upload at any time below.
             </small>
           </span>
         </label>
@@ -1569,8 +1584,21 @@ return (
           hasEvidence
           showLead={false}
           driveConnected={driveConnected}
-          onImported={makeMaster ? generateMaster : undefined}
+          makeMaster={makeMaster}
         />
+
+        {/*
+          * The uploads themselves, where the upload happened.
+          *
+          * Until now this page showed only the documents Sartho had written,
+          * and the file somebody uploaded was deleted the moment it was read.
+          * So the answer to "where is the résumé I just gave you" was a list
+          * on another page with the document itself missing from it.
+          */}
+        <div className="studio-uploads" id="uploads">
+          <h3 className="section-heading" style={{ fontSize: "var(--text-sm)", margin: "18px 0 8px" }}>Uploaded résumés</h3>
+          <ResumeUploads imports={uploads} />
+        </div>
       </section>
 
       {/*

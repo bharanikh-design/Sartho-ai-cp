@@ -86,6 +86,10 @@ export type ResumeImportRecord = {
   byte_size: number | null;
   created_at: string;
   completed_at: string | null;
+  /** Where the original file is kept. Null on rows from before originals were kept. */
+  object_path: string | null;
+  /** Whether this upload is the person's master résumé. At most one is. */
+  is_master: boolean;
 };
 
 /*
@@ -95,14 +99,38 @@ export type ResumeImportRecord = {
  * list has no business dragging every document's full text across the wire.
  * The text is there when something actually needs to re-read a résumé.
  */
+const IMPORT_COLUMNS =
+  "id,file_name,label,status,error,roles_created,evidence_created,evidence_skipped,character_count,byte_size,created_at,completed_at";
+
+function isMissingColumn(error: { code?: string; message?: string } | null): boolean {
+  if (!error) return false;
+  if (error.code === "PGRST204" || error.code === "42703") return true;
+  const message = (error.message ?? "").toLowerCase();
+  return message.includes("column") && (message.includes("does not exist") || message.includes("could not find"));
+}
+
 export async function getResumeImports(supabase: SupabaseClient, userId: string) {
-  const { data, error } = await supabase
-    .from("resume_imports")
-    .select("id,file_name,label,status,error,roles_created,evidence_created,evidence_skipped,character_count,byte_size,created_at,completed_at")
-    .eq("user_id", userId)
-    .is("archived_at", null)
-    .order("created_at", { ascending: false });
+  const query = (columns: string) =>
+    supabase
+      .from("resume_imports")
+      .select(columns)
+      .eq("user_id", userId)
+      .is("archived_at", null)
+      .order("created_at", { ascending: false });
+
+  let { data, error } = await query(`${IMPORT_COLUMNS},object_path,is_master`);
+  /*
+   * The two newest columns arrive by a migration run by hand. PostgREST fails
+   * the whole select for one unknown column, so a deployment running ahead of
+   * its schema is asked again for the columns it has, and the list still
+   * renders — without originals or a master, which it cannot have anyway.
+   */
+  if (isMissingColumn(error)) ({ data, error } = await query(IMPORT_COLUMNS));
 
   if (error) throw error;
-  return (data ?? []) as ResumeImportRecord[];
+  return ((data ?? []) as unknown as Array<Partial<ResumeImportRecord>>).map((row) => ({
+    ...row,
+    object_path: row.object_path ?? null,
+    is_master: row.is_master === true,
+  })) as ResumeImportRecord[];
 }

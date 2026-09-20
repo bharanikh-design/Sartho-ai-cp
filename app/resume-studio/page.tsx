@@ -3,6 +3,7 @@ import { ResumeStudio, type StudioDraft, type TailorableRole } from "@/component
 import { requireUser } from "@/lib/auth";
 import { connectionStatus } from "@/lib/integrations/store";
 import { getJobs } from "@/lib/data/jobs";
+import { getResumeImports } from "@/lib/data/career";
 import { renderResumeText, resumeContentOf } from "@/lib/resume/content";
 import type { ApplicationRecord, ResumeVersionRecord } from "@/lib/types";
 
@@ -25,7 +26,7 @@ export default async function ResumeStudioPage() {
   const { supabase, user } = await requireUser();
   /* Decided here so the Drive picker does not flash a "connect Drive" prompt. */
   const driveConnected = (await connectionStatus(user.id)).connected;
-  const [jobs, applicationsResult, approvedResult, versionsResult, masterResult] = await Promise.all([
+  const [jobs, applicationsResult, approvedResult, versionsResult, masterResult, uploads] = await Promise.all([
     getJobs(supabase, user.id),
     supabase
       .from("applications")
@@ -53,6 +54,8 @@ export default async function ResumeStudioPage() {
      * of its schema would lose the page rather than the comparison.
      */
     supabase.from("profiles").select("master_resume,master_resume_text,master_resume_updated_at").eq("id", user.id).maybeSingle(),
+    /* The uploads, so the page shows what was handed over and which one is the master. */
+    getResumeImports(supabase, user.id),
   ]);
 
   if (applicationsResult.error) throw applicationsResult.error;
@@ -130,6 +133,7 @@ export default async function ResumeStudioPage() {
         master={master}
         masterUpdatedAt={masterResult.error ? null : (masterResult.data?.master_resume_updated_at ?? null)}
         driveConnected={driveConnected}
+        uploads={uploads}
       />
     </div>
   );
