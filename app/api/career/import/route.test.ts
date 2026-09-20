@@ -72,6 +72,9 @@ const RESUME = [
 
 type Recorded = {
   rpc: Record<string, unknown> | null;
+  /* Every rpc by name, so the master flag can be checked without disturbing `rpc`. */
+  rpcCalls: Array<{ name: string; args: Record<string, unknown> }>;
+  inserts: Array<Record<string, unknown>>;
   updates: Array<Record<string, unknown>>;
   downloads: string[];
   removals: string[];
@@ -81,6 +84,9 @@ function fakeSupabase(
   recorded: Recorded,
   opts: {
     importInsertFails?: boolean;
+    /* The schema behind the code: an insert naming object_path is refused. */
+    objectPathUnknown?: boolean;
+    masterFails?: boolean;
     storedText?: string;
     downloadFails?: boolean;
     quotaDecision?: Record<string, unknown>;
@@ -115,12 +121,16 @@ function fakeSupabase(
     },
     from(table: string) {
       return {
-        insert: () => ({
+        insert: (payload: Record<string, unknown>) => ({
           select: () => ({
-            single: async () =>
-              opts.importInsertFails
-                ? { data: null, error: { message: "insert refused" } }
-                : { data: { id: "import-1" }, error: null },
+            single: async () => {
+              recorded.inserts.push({ table, ...payload });
+              if (opts.importInsertFails) return { data: null, error: { message: "insert refused" } };
+              if (opts.objectPathUnknown && "object_path" in payload) {
+                return { data: null, error: { code: "PGRST204", message: "Could not find the 'object_path' column of 'resume_imports' in the schema cache" } };
+              }
+              return { data: { id: "import-1" }, error: null };
+            },
           }),
         }),
         select: () => ({
@@ -131,6 +141,12 @@ function fakeSupabase(
       };
     },
     rpc: async (name: string, args: Record<string, unknown>) => {
+      recorded.rpcCalls.push({ name, args });
+      if (name === "set_master_resume_import") {
+        return opts.masterFails
+          ? { data: null, error: { code: "PGRST202", message: "function not found" } }
+          : { data: null, error: null };
+      }
       if (name === "consume_ai_quota") {
         return {
           data: opts.quotaDecision ?? {
@@ -175,7 +191,7 @@ let recorded: Recorded;
 
 beforeEach(() => {
   vi.clearAllMocks();
-  recorded = { rpc: null, updates: [], downloads: [], removals: [] };
+  recorded = { rpc: null, rpcCalls: [], inserts: [], updates: [], downloads: [], removals: [] };
   getAuthenticatedUser.mockResolvedValue({ supabase: fakeSupabase(recorded), user: { id: "user-1" } });
   generateStructuredJson.mockResolvedValue(EXTRACTION);
 });
@@ -209,10 +225,96 @@ describe("POST /api/career/import", () => {
     expect(extracted.sample).toContain("BARCLAYS");
   });
 
-  it("deletes the temporary object immediately after extraction", async () => {
+  /*
+   * The upload is the person's document. It used to be deleted the moment
+   * its text was read, so nothing could ever show it again; now the row
+   * points at it and it stays.
+   */
+  it("keeps the original object and records where it is", async () => {
     await drain(await POST(upload()));
 
     expect(recorded.downloads).toEqual([OBJECT_PATH]);
+    expect(recorded.removals).toEqual([]);
+    expect(recorded.inserts).toContainEqual(
+      expect.objectContaining({ table: "resume_imports", object_path: OBJECT_PATH, file_name: "CV.txt" }),
+    );
+  });
+
+  /*
+   * What is stored is the file's text as read, byte for byte: the double
+   * spaces, the tabs, the run of blank lines, the trailing newline. The
+   * tidied copy exists only in the prompt.
+   */
+  it("stores the text exactly as read, and tidies it only for the model", async () => {
+    const asUploaded = [
+      "BHARANI KUMAR H",
+      "Head of EUC  ·  London\t\t2019 – Present",
+      "",
+      "",
+      "",
+      "Technology leader across service transformation, infra-",
+      "structure modernisation and end user computing at global banks.",
+      "Cut major incident volume by 40% across a 60,000 device estate.",
+      "Migrated 42,000 endpoints to Windows 11 across eleven countries.",
+      "Ran a four million pound managed service contract through to renewal.",
+      "Consolidated four regional service desks into one follow-the-sun operation.",
+      "Supported ninety thousand users across a global estate every single day.",
+      "",
+    ].join("\n");
+    getAuthenticatedUser.mockResolvedValue({
+      supabase: fakeSupabase(recorded, { storedText: asUploaded }),
+      user: { id: "user-1" },
+    });
+
+    const seen = await drain(await POST(upload()));
+
+    const row = recorded.inserts.find((entry) => entry.table === "resume_imports");
+    expect(row?.extracted_text).toBe(asUploaded);
+    expect(row?.character_count).toBe(asUploaded.length);
+
+    const extracted = seen.find((e) => e.stage === "extracted");
+    if (extracted?.stage !== "extracted") throw new Error("expected an extracted stage");
+    expect(extracted.characters).toBe(asUploaded.length);
+    expect(extracted.sample).toBe(asUploaded);
+
+    const prompt = JSON.parse(generateStructuredJson.mock.calls[0][0].prompt) as { resumeText: string };
+    expect(prompt.resumeText).toContain("infrastructure modernisation");
+    expect(prompt.resumeText).not.toContain("\n\n\n");
+  });
+
+  it("flags the upload as the master before the model reads it, when asked", async () => {
+    generateStructuredJson.mockRejectedValue(new Error("provider down"));
+
+    const seen = await drain(await POST(upload("CV.txt", { makeMaster: true })));
+
+    expect(recorded.rpcCalls).toContainEqual({ name: "set_master_resume_import", args: { p_import_id: "import-1" } });
+    expect(seen.at(-1)?.stage).toBe("error");
+    /* A failed reading does not lose the document: the object is still kept. */
+    expect(recorded.removals).toEqual([]);
+  });
+
+  it("reports the master flag on the done event, and leaves it off by default", async () => {
+    const flagged = await drain(await POST(upload("CV.txt", { makeMaster: true })));
+    expect(flagged.at(-1)).toMatchObject({ stage: "done", isMaster: true });
+
+    recorded.rpcCalls = [];
+    const plain = await drain(await POST(upload()));
+    expect(plain.at(-1)).toMatchObject({ stage: "done", isMaster: false });
+    expect(recorded.rpcCalls.map((call) => call.name)).not.toContain("set_master_resume_import");
+  });
+
+  it("still imports when the schema cannot keep the original, and removes the object then", async () => {
+    getAuthenticatedUser.mockResolvedValue({
+      supabase: fakeSupabase(recorded, { objectPathUnknown: true }),
+      user: { id: "user-1" },
+    });
+
+    const seen = await drain(await POST(upload()));
+
+    expect(seen.at(-1)?.stage).toBe("done");
+    const rows = recorded.inserts.filter((entry) => entry.table === "resume_imports");
+    expect(rows).toHaveLength(2);
+    expect(rows[1]).not.toHaveProperty("object_path");
     expect(recorded.removals).toEqual([OBJECT_PATH]);
   });
 
@@ -234,6 +336,7 @@ describe("POST /api/career/import", () => {
     expect(response.status).toBe(429);
     expect(response.headers.get("Retry-After")).toBe("45");
     expect(generateStructuredJson).not.toHaveBeenCalled();
+    /* Nothing will ever point at the object, so it goes. */
     expect(recorded.removals).toEqual([OBJECT_PATH]);
   });
 
@@ -362,6 +465,7 @@ describe("POST /api/career/import", () => {
     const response = await POST(upload());
     expect(response.status).toBe(400);
     expect(generateStructuredJson).not.toHaveBeenCalled();
+    expect(recorded.removals).toEqual([OBJECT_PATH]);
   });
 
   it("fills a blank profile from the document without overwriting anything set", async () => {

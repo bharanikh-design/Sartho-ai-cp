@@ -55,7 +55,10 @@ export function ResumeLibrary({ imports }: { imports: ResumeImportRecord[] }) {
         {usable.map((item) => (
         <li key={item.id} className={`library-row is-${item.status}`}>
           <div className="library-main">
-            <strong className="library-name">{item.label ?? item.file_name}</strong>
+            <strong className="library-name">
+              {item.label ?? item.file_name}
+              {item.is_master ? <em className="studio-draft-badge">Master</em> : null}
+            </strong>
             <span className="library-meta">
               {when(item.created_at)}
               {size(item.byte_size) ? ` · ${size(item.byte_size)}` : ""}

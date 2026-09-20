@@ -33,6 +33,8 @@ type Result = {
   rolesCreated: number;
   evidenceCreated: number;
   evidenceSkipped: number;
+  /** Whether the upload was flagged as the master résumé. */
+  isMaster: boolean;
 };
 
 export function ResumeImport({
@@ -40,6 +42,7 @@ export function ResumeImport({
   showLead = true,
   continueHref,
   driveConnected = false,
+  makeMaster = false,
   onImported,
 }: {
   hasEvidence: boolean;
@@ -63,6 +66,13 @@ export function ResumeImport({
    * person is left wondering where their résumé went.
    */
   continueHref?: string;
+  /**
+   * Whether the upload should become the master résumé.
+   *
+   * Sent with the import rather than set afterwards, so the flag is on the
+   * row before anything else happens to it — including a reading that fails.
+   */
+  makeMaster?: boolean;
   /**
    * Run after a successful import, before the page refreshes.
    *
@@ -139,6 +149,12 @@ export function ResumeImport({
    */
   async function runImport(upload: { objectPath: string; fileName: string; mimeType: string; byteSize: number }) {
     const objectPath = upload.objectPath;
+    /*
+     * The file is the person's original and is kept once the import has
+     * accepted it. It used to be deleted here on every path, success included,
+     * which is why an upload could never be seen again.
+     */
+    let kept = false;
     setBusy(true);
     setError(null);
     setResult(null);
@@ -154,6 +170,7 @@ export function ResumeImport({
           fileName: upload.fileName,
           mimeType: upload.mimeType,
           byteSize: upload.byteSize,
+          makeMaster,
         }),
       });
 
@@ -165,6 +182,11 @@ export function ResumeImport({
         const payload = (await response.json().catch(() => ({}))) as { error?: string };
         throw new Error(payload.error ?? "The import failed.");
       }
+      /*
+       * From here the server has written the import row and kept the file as
+       * the original it points at. Nothing below may delete it.
+       */
+      kept = true;
       if (!response.body) throw new Error("The import failed.");
 
       let finished: Result | null = null;
@@ -177,6 +199,7 @@ export function ResumeImport({
             rolesCreated: event.rolesCreated,
             evidenceCreated: event.evidenceCreated,
             evidenceSkipped: event.evidenceSkipped,
+            isMaster: event.isMaster === true,
           };
         }
 
@@ -204,9 +227,9 @@ export function ResumeImport({
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "The import failed.");
     } finally {
-      // The API removes the object after extraction. This second, idempotent
-      // cleanup covers a lost request or a browser/network failure before then.
-      {
+      // The API removes an object it refused. This second, idempotent cleanup
+      // covers a request that never reached it. An accepted upload is kept.
+      if (!kept) {
         try {
           await supabase.storage.from(RESUME_UPLOAD_BUCKET).remove([objectPath]);
         } catch {
@@ -297,6 +320,7 @@ export function ResumeImport({
             {result.evidenceSkipped
               ? "Existing details were kept and new information was reconciled."
               : `${result.evidenceCreated} career fact${result.evidenceCreated === 1 ? "" : "s"} approved and ready to use.`}
+            {result.isMaster ? " Kept as your master résumé." : ""}
           </span>
 
           {/*

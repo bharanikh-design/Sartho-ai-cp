@@ -85,7 +85,7 @@ type Progress =
   | { stage: "extracted"; characters: number; sample: string }
   | { stage: "reading" }
   | { stage: "saving"; roles: number; claims: number }
-  | { stage: "done"; importId: string; rolesCreated: number; evidenceCreated: number; evidenceSkipped: number }
+  | { stage: "done"; importId: string; rolesCreated: number; evidenceCreated: number; evidenceSkipped: number; isMaster: boolean }
   | { stage: "error"; error: string };
 
 /* Enough of the document to show it being read, not enough to be the document. */
@@ -96,7 +96,22 @@ const uploadRequestSchema = z.object({
   fileName: z.string().min(1).max(255),
   mimeType: z.string().max(255).nullable(),
   byteSize: z.number().int().positive().max(MAX_UPLOAD_BYTES),
+  /* Whether this upload becomes the master résumé. Off unless asked for. */
+  makeMaster: z.boolean().optional().default(false),
 });
+
+/*
+ * The columns that keep the original arrive by a migration run by hand, so
+ * there is a window where the deployed code and the schema disagree. PostgREST
+ * answers PGRST204 for a column it cannot find; the import then falls back to
+ * the row shape it had before, and says so, rather than failing the upload.
+ */
+function isMissingColumn(error: { code?: string; message?: string } | null): boolean {
+  if (!error) return false;
+  if (error.code === "PGRST204" || error.code === "42703") return true;
+  const message = (error.message ?? "").toLowerCase();
+  return message.includes("column") && (message.includes("does not exist") || message.includes("could not find"));
+}
 
 export async function POST(request: Request) {
   const { supabase, user } = await getAuthenticatedUser();
@@ -113,7 +128,22 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "That résumé upload is not available." }, { status: 403 });
   }
 
+  /*
+   * The object is kept once it is known to be a readable résumé. It is removed
+   * only when nothing will ever refer to it: an unreadable file, an exhausted
+   * allowance, or an import row that could not be written.
+   */
+  const discardObject = async () => {
+    try {
+      await supabase.storage.from(RESUME_UPLOAD_BUCKET).remove([payload.objectPath]);
+    } catch {
+      // The browser retries this. Do not replace the real reason with a
+      // storage transport error.
+    }
+  };
+
   let text: string;
+  let raw: string;
   let actualByteSize = 0;
   let actualMimeType = payload.mimeType;
   try {
@@ -127,43 +157,76 @@ export async function POST(request: Request) {
     actualByteSize = storedFile.size;
     actualMimeType = storedFile.type || payload.mimeType;
     const bytes = new Uint8Array(await storedFile.arrayBuffer());
-    ({ text } = await extractResumeText({ name: payload.fileName, type: actualMimeType, bytes }));
+    ({ text, raw } = await extractResumeText({ name: payload.fileName, type: actualMimeType, bytes }));
   } catch (caught) {
+    await discardObject();
     const message = caught instanceof ResumeExtractionError
       ? caught.message
       : "Sartho could not read that file.";
     return NextResponse.json({ error: message }, { status: 400 });
-  } finally {
-    // Original bytes are transient. The extracted text is the repository
-    // record; retention for that record is handled separately.
-    try {
-      await supabase.storage.from(RESUME_UPLOAD_BUCKET).remove([payload.objectPath]);
-    } catch {
-      // Cleanup is retried by the browser. Do not replace the real extraction
-      // result with a storage transport error.
-    }
   }
 
   const quota = await checkAiQuota(supabase, "resume_import");
-  if (!quota.allowed) return aiQuotaResponse(quota);
+  if (!quota.allowed) {
+    await discardObject();
+    return aiQuotaResponse(quota);
+  }
 
-  const { data: importRow, error: importError } = await supabase
+  /*
+   * The row is the record of the upload, and it holds the document as it was:
+   * the raw text, unnormalised and untruncated, and the path of the original
+   * file, which is no longer deleted. The tidied copy the model reads is
+   * `text`, and it goes nowhere but the prompt.
+   */
+  const importColumns = {
+    user_id: user.id,
+    file_name: payload.fileName,
+    mime_type: actualMimeType,
+    byte_size: actualByteSize,
+    status: "processing",
+    extracted_text: raw,
+    character_count: raw.length,
+  };
+
+  let importRow: { id: string } | null = null;
+  let importError: { code?: string; message?: string } | null = null;
+  let originalKept = true;
+  ({ data: importRow, error: importError } = await supabase
     .from("resume_imports")
-    .insert({
-      user_id: user.id,
-      file_name: payload.fileName,
-      mime_type: actualMimeType,
-      byte_size: actualByteSize,
-      status: "processing",
-      // Kept, not consumed. A résumé that can only be read once is a log entry.
-      extracted_text: text,
-      character_count: text.length,
-    })
+    .insert({ ...importColumns, object_path: payload.objectPath })
     .select("id")
-    .single();
+    .single());
+
+  if (isMissingColumn(importError)) {
+    /*
+     * Schema behind the code. The upload is still read, but nothing can point
+     * at the original, so it is removed as it always used to be.
+     */
+    console.warn("resume_imports is missing object_path; run the 20260920090000_resume_upload_originals migration");
+    originalKept = false;
+    ({ data: importRow, error: importError } = await supabase
+      .from("resume_imports")
+      .insert(importColumns)
+      .select("id")
+      .single());
+  }
 
   if (importError || !importRow) {
+    await discardObject();
     return NextResponse.json({ error: importError?.message ?? "Could not start the import." }, { status: 400 });
+  }
+  if (!originalKept) await discardObject();
+
+  /*
+   * The master flag is set before the model reads anything: which document is
+   * the master is a fact about the upload, not about what was found in it, so
+   * a failed reading must not quietly un-master the résumé somebody chose.
+   */
+  let isMaster = false;
+  if (payload.makeMaster) {
+    const { error: masterError } = await supabase.rpc("set_master_resume_import", { p_import_id: importRow.id });
+    if (masterError) console.warn("Could not mark the upload as the master résumé", masterError);
+    else isMaster = true;
   }
 
   /*
@@ -179,9 +242,11 @@ export async function POST(request: Request) {
   const importId = importRow.id;
   const sourceName = payload.fileName;
   const resumeText = text;
+  const originalText = raw;
 
   const run = async (send: (event: Progress) => void) => {
-    send({ stage: "extracted", characters: resumeText.length, sample: resumeText.slice(0, SAMPLE_CHARACTERS) });
+    /* Counted and sampled from the document as kept, not from the model's copy. */
+    send({ stage: "extracted", characters: originalText.length, sample: originalText.slice(0, SAMPLE_CHARACTERS) });
     send({ stage: "reading" });
 
     const raw = await generateStructuredJson({
@@ -271,6 +336,7 @@ export async function POST(request: Request) {
       rolesCreated: counts.rolesCreated ?? 0,
       evidenceCreated: counts.evidenceCreated ?? 0,
       evidenceSkipped: counts.evidenceSkipped ?? 0,
+      isMaster,
     });
   };
 

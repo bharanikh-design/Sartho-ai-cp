@@ -13,7 +13,15 @@ export type ImportEvent =
   | { stage: "extracted"; characters: number; sample: string }
   | { stage: "reading" }
   | { stage: "saving"; roles: number; claims: number }
-  | { stage: "done"; importId: string; rolesCreated: number; evidenceCreated: number; evidenceSkipped: number }
+  | {
+      stage: "done";
+      importId: string;
+      rolesCreated: number;
+      evidenceCreated: number;
+      evidenceSkipped: number;
+      /* Optional so an event from a server without the flag still parses. */
+      isMaster?: boolean;
+    }
   | { stage: "error"; error: string };
 
 export async function readProgressEvents(
