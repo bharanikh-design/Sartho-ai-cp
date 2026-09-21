@@ -35,8 +35,22 @@ function size(bytes: number | null) {
 
 type Opened = { text: string; characterCount: number | null };
 
-export function ResumeUploads({ imports }: { imports: ResumeImportRecord[] }) {
+export function ResumeUploads({
+  imports,
+  studioSourceId = null,
+  onOpenInStudio,
+}: {
+  imports: ResumeImportRecord[];
+  /** The upload the master in Studio was laid out from, if any. */
+  studioSourceId?: string | null;
+  /**
+   * Opens the master upload in the editor. `alreadyBuilt` says the editor
+   * already holds a document laid out from this file, so opening is free.
+   */
+  onOpenInStudio?: (item: ResumeImportRecord, alreadyBuilt: boolean) => Promise<void> | void;
+}) {
   const router = useRouter();
+  const [openingId, setOpeningId] = useState<string | null>(null);
   /* The text of each opened row, fetched once and kept. */
   const [opened, setOpened] = useState<Record<string, Opened>>({});
   const [showing, setShowing] = useState<string | null>(null);
@@ -132,6 +146,24 @@ export function ResumeUploads({ imports }: { imports: ResumeImportRecord[] }) {
                 * clears it on every other, because there is one master.
                 */}
               <div className="library-actions">
+                {/*
+                  * The master opens in the editor. One button, whose label says
+                  * whether the editor already holds this file or has to lay it
+                  * out first — the second costs a model call, the first nothing.
+                  */}
+                {isMaster && onOpenInStudio ? (
+                  <button
+                    type="button"
+                    className="chip-button is-primary"
+                    disabled={openingId !== null}
+                    onClick={async () => {
+                      setOpeningId(item.id);
+                      try { await onOpenInStudio(item, studioSourceId === item.id); } finally { setOpeningId(null); }
+                    }}
+                  >
+                    {openingId === item.id ? "Opening…" : studioSourceId === item.id ? "Open in Studio" : "Edit in Studio"}
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   className={`chip-button${isMaster ? " is-selected" : ""}`}

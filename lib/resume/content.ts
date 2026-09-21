@@ -131,6 +131,14 @@ export type ResumeContent = {
   skills: string[];
   education: ResumeEducation[];
   /**
+   * The upload this document was laid out from, when it was one.
+   *
+   * Set only on a master built from a file somebody uploaded, so the studio
+   * can say which file it came from and open it again without rebuilding.
+   * Absent on a tailored draft and on a master written from evidence.
+   */
+  sourceImportId?: string;
+  /**
    * How it is set on the page. Part of the document because it is a decision
    * about this résumé, not a preference about the app — two drafts for two
    * different employers can reasonably want different typography.
@@ -515,6 +523,8 @@ export function parseResumeContent(stored: unknown): ResumeContent | null {
     education,
     template: normaliseTemplate(value.template),
   };
+  const sourceImportId = text(value.sourceImportId).trim();
+  if (sourceImportId) content.sourceImportId = sourceImportId;
   return hasContent(content) ? content : null;
 }
 
