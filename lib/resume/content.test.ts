@@ -365,3 +365,13 @@ describe("the structured document", () => {
     expect(hasContent(emptyContent())).toBe(false);
   });
 });
+
+describe("sourceImportId", () => {
+  it("survives a round trip through the parser, and is absent when it was never set", () => {
+    const withSource = parseResumeContent({ name: "A", summary: "Something", sourceImportId: "0f7f3f1e-2b4a-4c8d-9e1f-3a5b7c9d1e2f" });
+    expect(withSource?.sourceImportId).toBe("0f7f3f1e-2b4a-4c8d-9e1f-3a5b7c9d1e2f");
+    const without = parseResumeContent({ name: "A", summary: "Something" });
+    expect(without).not.toBeNull();
+    expect(without).not.toHaveProperty("sourceImportId");
+  });
+});

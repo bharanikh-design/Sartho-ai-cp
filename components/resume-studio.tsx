@@ -71,18 +71,22 @@ const stateTone: Record<"pass" | "warn" | "fail", string> = {
 /*
  * The document toolbar's icons.
  *
- * Five text buttons — Download PDF, Download Word, Print, Copy draft,
- * Regenerate — wrapped onto two rows and spent the width of the document on
+ * Text buttons wrapped onto two rows and spent the width of the document on
  * words their shapes already carry. Each button keeps the words in its
  * accessible name and its tooltip, so nothing is lost to a screen reader or to
  * somebody meeting the row for the first time.
+ *
+ * Print and Regenerate are gone from the row. Print made a PDF through the
+ * browser dialog beside a button that makes a PDF; Regenerate did what the
+ * "write it for me" bar above the document does, and for the master it
+ * called a job route with no job. Two controls for one action is one too many.
  */
 const toolIcon = {
   width: 17, height: 17, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor",
   strokeWidth: 1.8, strokeLinecap: "round" as const, strokeLinejoin: "round" as const, "aria-hidden": true,
 };
 
-function ToolIcon({ name }: { name: "save" | "pdf" | "word" | "print" | "copy" | "regenerate" | "discard" }) {
+function ToolIcon({ name }: { name: "save" | "pdf" | "word" | "copy" | "discard" }) {
   switch (name) {
     case "save":
       return <svg {...toolIcon}><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z" /><path d="M17 21v-8H7v8" /><path d="M7 3v5h8" /></svg>;
@@ -90,12 +94,8 @@ function ToolIcon({ name }: { name: "save" | "pdf" | "word" | "print" | "copy" |
       return <svg {...toolIcon}><path d="M12 3v11" /><path d="m8 10.5 4 3.5 4-3.5" /><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" /></svg>;
     case "word":
       return <svg {...toolIcon}><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Z" /><path d="M14 3v5h5" /><path d="M9 13h6M9 17h4" /></svg>;
-    case "print":
-      return <svg {...toolIcon}><path d="M7 9V3h10v6" /><path d="M7 19H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2" /><path d="M7 15h10v6H7z" /></svg>;
     case "copy":
       return <svg {...toolIcon}><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15V5a2 2 0 0 1 2-2h10" /></svg>;
-    case "regenerate":
-      return <svg {...toolIcon}><path d="M21 12a9 9 0 1 1-3.2-6.9" /><path d="M21 4v5h-5" /></svg>;
     case "discard":
       return <svg {...toolIcon}><path d="M3 12a9 9 0 1 0 3.2-6.9" /><path d="M3 4v5h5" /></svg>;
   }
@@ -285,17 +285,6 @@ export function ResumeStudio({
   const [busyBullet, setBusyBullet] = useState<string | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
-  /* The draft being printed, so only that one is put on the page. */
-  /*
-   * Which draft, if any, is currently rendered into the print-only markup.
-   *
-   * The @media print rules hide `body *` and reveal only `.resume-print`, and
-   * that element is only in the DOM while this is set. Nothing ever set it, so
-   * the rules did fire on Ctrl+P and found nothing to reveal — the page printed
-   * blank. It is cleared again as soon as the dialog closes so the hidden copy
-   * is not left in the accessibility tree.
-   */
-  const [printingId, setPrintingId] = useState<string | null>(null);
   /*
    * The expanded editor. The inline panel is a squeezed two-column strip; a
    * résumé is a document and wants the width. Same workspace either way — the
@@ -442,30 +431,6 @@ export function ResumeStudio({
     }
   }
 
-  /*
-   * PDF through the browser's own print dialog, on purpose.
-   *
-   * Every shortcut here rasterises the page — html2canvas and friends produce a
-   * picture of a résumé, and a picture scores zero with every applicant tracking
-   * system that opens it. Printing keeps the text as text, gets the person's own
-   * paper size and margins, and costs no dependency. The print stylesheet puts
-   * a clean read-only copy of the document on the page and hides everything
-   * else, so what prints is the résumé and not the editor around it.
-   */
-  /*
-   * A frame between committing the markup and opening the dialog. window.print
-   * snapshots the document synchronously, so calling it in the same tick as the
-   * state change prints the page as it was before React rendered the résumé.
-   */
-  useEffect(() => {
-    if (!printingId) return;
-    const frame = requestAnimationFrame(() => {
-      window.print();
-      setPrintingId(null);
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [printingId]);
-
   async function downloadPdf(draft: StudioDraft, content: ResumeContent) {
     try {
       const { pdf } = await import("@react-pdf/renderer");
@@ -495,6 +460,41 @@ export function ResumeStudio({
       router.refresh();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Unable to draft master résumé.");
+    } finally {
+      setGeneratingId(null);
+    }
+  }
+
+  /*
+   * The master upload, opened in the editor.
+   *
+   * Free when the editor already holds a document laid out from this file.
+   * Otherwise the file is laid out first — copied, never rewritten — and saved
+   * as the master, which replaces whatever the master was; that is said before
+   * it happens, because edits to the old one do not survive it.
+   */
+  async function openUploadInStudio(item: ResumeImportRecord, alreadyBuilt: boolean) {
+    const show = () => {
+      setOpenId(MASTER_ID);
+      setExpandedId(MASTER_ID);
+    };
+    if (alreadyBuilt) { show(); return; }
+    if (master && !window.confirm(`Open ${item.file_name} in Studio as your master résumé? The master currently in Studio, and any edits to it, will be replaced.`)) return;
+    if (generatingId) return;
+    setGeneratingId("master");
+    setError(null);
+    try {
+      const response = await fetch("/api/resume/master/from-upload", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ importId: item.id }),
+      });
+      const result = await response.json().catch(() => ({})) as { error?: string };
+      if (!response.ok) throw new Error(result.error ?? "Sartho could not open that résumé in Studio.");
+      router.refresh();
+      show();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Sartho could not open that résumé in Studio.");
     } finally {
       setGeneratingId(null);
     }
@@ -765,6 +765,25 @@ export function ResumeStudio({
               *
               * Same routes, put where the work happens.
               */}
+            {/*
+              * The score, in the full-window editor too.
+              *
+              * The rail that carries it belongs to the inline layout, and the
+              * full window had the preview where the rail would go — so the
+              * one editor with the most room was the one that never said how
+              * the document reads. The same live number, above the page.
+              */}
+            <div className={`studio-score is-${scoreTone}`} style={{ marginBottom: 12 }}>
+              <strong>{ats.score}</strong>
+              <div>
+                <b>{verdict.headline}</b>
+                <small>
+                  {delta === 0
+                    ? <>ATS readability · unchanged since the saved version</>
+                    : <>ATS readability · {delta > 0 ? "+" : ""}{delta} since the saved version</>}
+                </small>
+              </div>
+            </div>
             <div className="studio-ai-bar">
               <button
                 type="button"
@@ -825,16 +844,6 @@ export function ResumeStudio({
                   onClick={() => void copy(text, draft.application.id)}
                 >
                   <ToolIcon name="copy" />
-                </button>
-                <span className="resume-doc-tools-split" aria-hidden="true" />
-                <button
-                  type="button"
-                  title="Regenerate — this version is kept"
-                  aria-label="Regenerate. This version is kept."
-                  onClick={() => void generate(draft.jobId)}
-                  disabled={generatingId === draft.jobId}
-                >
-                  <ToolIcon name="regenerate" />
                 </button>
               </span>
               {dirty ? (
@@ -993,11 +1002,7 @@ return (
             * headings and list items rather than the textareas on screen, which
             * print with borders, scrollbars and clipped text.
             */}
-          {printingId === draft.application.id ? (
-            <div className="resume-print" aria-hidden="true">
-              <ResumeDocument content={content} onChange={() => {}} weakBulletIds={new Set()} readOnly />
-            </div>
-          ) : null}
+
 
           <div className="studio-draft-actions">
             {dirty ? (
@@ -1013,9 +1018,7 @@ return (
             {/*
               * Two formats, because employers ask for two. Word is what an
               * applicant tracking system parses most reliably; PDF is what a
-              * person opens without it reflowing on them. Printing is neither:
-              * it goes through the print stylesheet, the only path that lays
-              * the résumé out in points on a real page.
+              * person opens without it reflowing on them.
               */}
             <span className="resume-doc-tools">
               {/*
@@ -1050,30 +1053,11 @@ return (
               </button>
               <button
                 type="button"
-                title="Print"
-                aria-label="Print"
-                disabled={printingId !== null}
-                onClick={() => setPrintingId(draft.application.id)}
-              >
-                <ToolIcon name="print" />
-              </button>
-              <button
-                type="button"
                 title={copiedId === draft.application.id ? "Copied" : "Copy draft"}
                 aria-label={copiedId === draft.application.id ? "Copied" : "Copy draft"}
                 onClick={() => void copy(text, draft.application.id)}
               >
                 <ToolIcon name="copy" />
-              </button>
-              <span className="resume-doc-tools-split" aria-hidden="true" />
-              <button
-                type="button"
-                title="Regenerate — this version is kept"
-                aria-label={generatingId === draft.jobId ? "Regenerating" : "Regenerate. This version is kept."}
-                onClick={() => void generate(draft.jobId)}
-                disabled={generatingId === draft.jobId}
-              >
-                <ToolIcon name="regenerate" />
               </button>
               {dirty ? (
                 <button
@@ -1086,11 +1070,7 @@ return (
                 </button>
               ) : null}
             </span>
-            <small className="studio-regenerate-note">
-              {dirty
-                ? "Your edits are not saved until you save them. Regenerating would replace them."
-                : "Regenerating keeps this version — it is added as a new one."}
-            </small>
+            {dirty ? <small className="studio-regenerate-note">Your edits are not saved until you save them.</small> : null}
           </div>
         </div>
 
@@ -1286,6 +1266,9 @@ return (
    * it identically rather than growing a second code path — and a second code
    * path is exactly how the two drifted apart in the first place.
    */
+  /* The file the master was laid out from, when it was one. */
+  const masterSource = master?.sourceImportId ? uploads.find((item) => item.id === master.sourceImportId) ?? null : null;
+
   const masterDraft: StudioDraft | null = master
     ? {
         application: {
@@ -1353,7 +1336,7 @@ return (
   const blockedReason = canBuild
     ? null
     : !evidenceReady
-      ? <>There are no approved career facts to write from yet. Upload your résumé in <Link href="/career-truth">Career Truth</Link> first.</>
+      ? <>Nothing to write from yet. Upload your résumé below, flag it as your master and open it in Studio.</>
       : !hasAnyJobs
         ? <>Save a role in <Link href="/applications">Opportunities</Link> first — a résumé is tailored to one real advert, not written in the abstract.</>
         : analysedCount === 0
@@ -1373,9 +1356,6 @@ return (
             </p>
           </div>
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-            <button type="button" className="secondary-button" onClick={generateMaster} disabled={generatingId === "master"} style={{ padding: "4px 8px", fontSize: "11px" }}>
-              {generatingId === "master" ? "Building..." : "+ Master Résumé"}
-            </button>
             {/*
               * Offered only once there is enough to look at.
               *
@@ -1452,7 +1432,9 @@ return (
                           */}
                         <small>
                           {draft.jobId === MASTER_ID ? (
-                            <>Everything you can evidence · every tailored version starts here</>
+                            masterSource
+                              ? <>Laid out from {masterSource.file_name} · every tailored version starts here</>
+                              : <>Everything you can evidence · every tailored version starts here</>
                           ) : (
                             <>
                               {draft.employer ?? "Employer not recorded"}
@@ -1465,6 +1447,8 @@ return (
                       <span className="studio-ats-badge" style={{ color: stateTone[currentAts.score >= 70 ? "pass" : currentAts.score >= 40 ? "warn" : "fail"] }}>
                         {currentAts.score}<small>ATS</small>
                       </span>
+                      {/* The same control the row already is, drawn rather than duplicated as a second button. */}
+                      {showGrid ? null : <span className="studio-draft-caret" aria-hidden="true">{open ? "▲" : "▼"}</span>}
                     </button>
 
                     {/*
@@ -1482,14 +1466,6 @@ return (
                       <span aria-hidden="true">⤢</span>
                     </button>
 
-                    {showGrid ? null : <button
-                      type="button"
-                      className="studio-draft-chevron"
-                      aria-label={open ? "Collapse this draft" : "Expand this draft"}
-                      onClick={() => setOpenId(open ? null : draft.application.id)}
-                    >
-                      <span aria-hidden="true">{open ? "▲" : "▼"}</span>
-                    </button>}
                   </div>
 
                   {open && !showGrid ? renderWorkspace(draft) : null}
@@ -1525,9 +1501,13 @@ return (
                   {generatingId === "master" ? "Building master résumé…" : "Build master résumé"}
                 </button>
               ) : null}
-              <Link href="/applications" className="secondary-button">
-                Find a role in Opportunities
-              </Link>
+              {evidenceReady ? (
+                <Link href="/applications" className="secondary-button">
+                  Find a role in Opportunities
+                </Link>
+              ) : (
+                <a href="#uploads" className="secondary-button">Upload your résumé</a>
+              )}
             </div>
             {error && generatingId === null ? <p className="inline-error" role="alert">{error}</p> : null}
           </div>
@@ -1597,7 +1577,7 @@ return (
           */}
         <div className="studio-uploads" id="uploads">
           <h3 className="section-heading" style={{ fontSize: "var(--text-sm)", margin: "18px 0 8px" }}>Uploaded résumés</h3>
-          <ResumeUploads imports={uploads} />
+          <ResumeUploads imports={uploads} studioSourceId={master?.sourceImportId ?? null} onOpenInStudio={openUploadInStudio} />
         </div>
       </section>
 
@@ -1698,34 +1678,20 @@ return (
             <header className="studio-overlay-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
                 <strong>{expanded.application.resume_version ?? expanded.jobTitle}</strong>
-                <small>{expanded.employer ?? "Employer not recorded"}</small>
+                <small>
+                  {expanded.jobId === MASTER_ID
+                    ? masterSource ? `Laid out from ${masterSource.file_name}` : "Built from everything you can evidence"
+                    : expanded.employer ?? "Employer not recorded"}
+                </small>
               </div>
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <button type="button" className="primary-button" onClick={() => {
-                  const stored = expanded.application.resume_content;
-                  const text = expanded.application.resume_draft ?? "";
-                  const c = documents[expanded.application.id] ?? resumeContentOf(stored, text);
-                  if (c) void downloadPdf(expanded, c);
-                }}>
-                  Download PDF
-                </button>
-                <button
-                  type="button"
-                  className="secondary-button"
-                  disabled={downloadingId === expanded.application.id}
-                  onClick={() => {
-                    const stored = expanded.application.resume_content;
-                    const text = expanded.application.resume_draft ?? "";
-                    const c = documents[expanded.application.id] ?? resumeContentOf(stored, text);
-                    if (c) void downloadDocx(expanded, c);
-                  }}
-                >
-                  {downloadingId === expanded.application.id ? "Building…" : "Download Word"}
-                </button>
-                <button type="button" className="secondary-button" onClick={() => setExpandedId(null)}>
-                  Close <span aria-hidden="true">✕</span>
-                </button>
-              </div>
+              {/*
+                * Close, and only close. The downloads live in the toolbar under
+                * the document, the same place they are in the inline editor;
+                * a second pair up here was the same two buttons twice.
+                */}
+              <button type="button" className="secondary-button" onClick={() => setExpandedId(null)}>
+                Close <span aria-hidden="true">✕</span>
+              </button>
             </header>
             <div className="studio-overlay-body" style={{ padding: '0 20px 20px', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>{renderWorkspace(expanded, true)}</div>
           </div>

@@ -1204,3 +1204,8 @@ h2.resume-doc-heading.resume-doc-field { margin-bottom: 0; border-bottom: 1px so
   font-size: var(--text-xs); line-height: 1.55;
   white-space: pre-wrap; overflow-wrap: anywhere; tab-size: 4;
 }
+
+/* The caret that used to be a second button beside the row. */
+.studio-draft-caret { margin-left: 10px; color: var(--text-tertiary); font-size: var(--text-2xs); }
+.chip-button.is-primary { border-color: rgba(138,180,248,.5); background: rgba(138,180,248,.16); color: #cfe0ff; }
+.chip-button.is-primary:hover:not(:disabled) { background: rgba(138,180,248,.24); }

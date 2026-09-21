@@ -74,4 +74,6 @@ export const resumeContentSchema = z.object({
    * anywhere, because `.catch()` is doing exactly what it was asked to.
    */
   template: z.enum(RESUME_TEMPLATE_IDS).catch(DEFAULT_TEMPLATE).default(DEFAULT_TEMPLATE),
+  /* The upload a master was laid out from. Carried, never required. */
+  sourceImportId: z.string().uuid().optional(),
 });
