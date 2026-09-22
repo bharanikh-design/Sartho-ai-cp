@@ -445,12 +445,34 @@ export function ResumeDocument({
           </section>
         ))}
 
-        {content.skills.length ? (
+        {content.skills.length || content.skillGroups.length ? (
           <>
             <h2 className="resume-doc-heading">Skills</h2>
-            <ul className="resume-doc-skills">
-              {content.skills.map((skill) => <li key={skill}>{skill}</li>)}
-            </ul>
+            {content.skillGroups.map((group) => (
+              <div className="resume-doc-skill-group" key={group.id}>
+                {group.name ? <strong>{group.name}</strong> : null}
+                <ul className="resume-doc-skills">
+                  {group.skills.map((skill) => <li key={skill}>{skill}</li>)}
+                </ul>
+              </div>
+            ))}
+            {content.skills.length ? (
+              <ul className="resume-doc-skills">
+                {content.skills.map((skill) => <li key={skill}>{skill}</li>)}
+              </ul>
+            ) : null}
+          </>
+        ) : null}
+
+        {content.certifications.length ? (
+          <>
+            <h2 className="resume-doc-heading">Certifications</h2>
+            {content.certifications.map((entry) => (
+              <div className="resume-doc-education" key={entry.id}>
+                <span>{[entry.name, entry.issuer].filter(Boolean).join(", ")}</span>
+                <span className="resume-doc-education-year">{entry.year}</span>
+              </div>
+            ))}
           </>
         ) : null}
 
@@ -625,10 +647,29 @@ export function ResumeDocument({
 
       <h2 className="resume-doc-heading">Skills</h2>
       {/*
-        * One comma-separated line rather than a tag editor. Everybody already
-        * knows how to type a list, and a chip UI here would be a week of work
-        * to make the same string harder to paste into.
+        * Groups first, each a name and a comma-separated line, then the flat
+        * list. One comma-separated line rather than a tag editor: everybody
+        * already knows how to type a list, and a chip UI here would be a week
+        * of work to make the same string harder to paste into.
         */}
+      {content.skillGroups.map((group, index) => (
+        <div className="resume-doc-education-fields" key={group.id}>
+          <label>
+            <span>Category</span>
+            <input type="text" value={group.name} placeholder="Languages" onChange={(event) => onChange({ ...content, skillGroups: content.skillGroups.map((item, at) => (at === index ? { ...item, name: event.target.value } : item)) })} />
+          </label>
+          <label className="is-wide">
+            <span>Skills, separated by commas</span>
+            <input type="text" value={group.skills.join(", ")} placeholder="Go, Python, TypeScript" spellCheck={false} onChange={(event) => onChange({ ...content, skillGroups: content.skillGroups.map((item, at) => (at === index ? { ...item, skills: event.target.value.split(",").map((skill) => skill.trim()).filter(Boolean) } : item)) })} />
+          </label>
+          <button
+            type="button"
+            className="resume-doc-role-remove"
+            aria-label={`Remove ${group.name || `skill group ${index + 1}`}`}
+            onClick={() => onChange({ ...content, skillGroups: content.skillGroups.filter((_, at) => at !== index) })}
+          >Remove</button>
+        </div>
+      ))}
       <AutoTextarea
         className="resume-doc-skills-field resume-doc-field"
         ariaLabel="Skills, separated by commas"
@@ -637,6 +678,43 @@ export function ResumeDocument({
         value={content.skills.join(", ")}
         onChange={(value) => onChange({ ...content, skills: value.split(",").map((skill) => skill.trim()).filter(Boolean) })}
       />
+      <button
+        type="button"
+        className="resume-doc-add"
+        onClick={() => onChange({ ...content, skillGroups: [...content.skillGroups, { id: nextId("sg"), name: "", skills: [] }] })}
+      >+ Add a skill category</button>
+
+      <h2 className="resume-doc-heading">Certifications</h2>
+      {content.certifications.map((entry, index) => (
+        <div className="resume-doc-education-fields" key={entry.id}>
+          <label className="is-wide">
+            <span>Certification</span>
+            <input type="text" value={entry.name} placeholder="ISO 26262 Functional Safety Engineer" onChange={(event) => onChange({ ...content, certifications: content.certifications.map((item, at) => (at === index ? { ...item, name: event.target.value } : item)) })} />
+          </label>
+          <label className="is-wide">
+            <span>Issuer</span>
+            <input type="text" value={entry.issuer} placeholder="TÜV SÜD" onChange={(event) => onChange({ ...content, certifications: content.certifications.map((item, at) => (at === index ? { ...item, issuer: event.target.value } : item)) })} />
+          </label>
+          <label>
+            <span>Year</span>
+            <input type="text" value={entry.year} placeholder="2023" onChange={(event) => onChange({ ...content, certifications: content.certifications.map((item, at) => (at === index ? { ...item, year: event.target.value } : item)) })} />
+          </label>
+          <button
+            type="button"
+            className="resume-doc-role-remove"
+            aria-label={`Remove ${entry.name || `certification ${index + 1}`}`}
+            onClick={() => onChange({ ...content, certifications: content.certifications.filter((_, at) => at !== index) })}
+          >Remove</button>
+        </div>
+      ))}
+      <button
+        type="button"
+        className="resume-doc-add"
+        onClick={() => onChange({
+          ...content,
+          certifications: [...content.certifications, { id: nextId("c"), name: "", issuer: "", year: "" }],
+        })}
+      >+ Add certification</button>
 
       <h2 className="resume-doc-heading">Education</h2>
       {content.education.map((entry, index) => (

@@ -177,19 +177,80 @@ function Section({ section, p }: { section: ResumeSection; p: Palette }) {
   );
 }
 
+/*
+ * The skills block, grouped when the person grouped them.
+ *
+ * A group is one line: the category in the accent colour, the skills after
+ * it. Still text on one column, so a parser reads it as a skills section;
+ * what changes is that a recruiter can find "Languages" without reading the
+ * whole list.
+ */
+function Skills({ content, p }: { content: ResumeContent; p: Palette }) {
+  const groups = content.skillGroups.filter((group) => group.skills.some((skill) => skill.trim()));
+  const skills = content.skills.filter(Boolean);
+  if (!groups.length && !skills.length) return null;
+  return (
+    <View>
+      <Heading text="Skills" p={p} />
+      {groups.map((group) => (
+        <View style={{ flexDirection: "row", marginBottom: 2.4 }} key={group.id} wrap={false}>
+          {group.name.trim() ? <Text style={{ fontWeight: 700, color: p.pdf.accent, width: 96, paddingRight: 6 }}>{group.name.trim()}</Text> : null}
+          <Text style={{ flexGrow: 1, flexShrink: 1 }}>{group.skills.map((skill) => skill.trim()).filter(Boolean).join(" · ")}</Text>
+        </View>
+      ))}
+      {skills.length ? <Text>{skills.join(" · ")}</Text> : null}
+    </View>
+  );
+}
+
+function Certifications({ content, p }: { content: ResumeContent; p: Palette }) {
+  const entries = content.certifications.filter((entry) => entry.name.trim() || entry.issuer.trim());
+  if (!entries.length) return null;
+  return (
+    <View>
+      <Heading text="Certifications" p={p} />
+      {entries.map((entry) => (
+        <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 2 }} key={entry.id} wrap={false}>
+          <Text>{[entry.name.trim(), entry.issuer.trim()].filter(Boolean).join(", ")}</Text>
+          {entry.year.trim() ? <Text style={{ color: p.pdf.muted }}>{entry.year.trim()}</Text> : null}
+        </View>
+      ))}
+    </View>
+  );
+}
+
 /* Skills and education, which are what a sidebar is for when there is one. */
 function Supporting({ content, p, inAside }: { content: ResumeContent; p: Palette; inAside: boolean }) {
   const skills = content.skills.filter(Boolean);
+  const groups = content.skillGroups.filter((group) => group.skills.some((skill) => skill.trim()));
+  const certifications = content.certifications.filter((entry) => entry.name.trim() || entry.issuer.trim());
   const education = content.education.filter((entry) => entry.qualification.trim() || entry.institution.trim() || entry.year.trim());
-  if (!skills.length && !education.length) return null;
+  if (!skills.length && !groups.length && !certifications.length && !education.length) return null;
 
   if (inAside) {
     return (
       <>
-        {skills.length ? (
+        {skills.length || groups.length ? (
           <View>
             <Text style={p.asideHeading}>Skills</Text>
+            {groups.map((group) => (
+              <View key={group.id} style={{ marginBottom: 4 }}>
+                {group.name.trim() ? <Text style={{ ...p.asideText, marginBottom: 1, color: p.pdf.sidebarInk ?? "#ffffff" }}>{group.name.trim()}</Text> : null}
+                <Text style={p.asideText}>{group.skills.map((skill) => skill.trim()).filter(Boolean).join(" · ")}</Text>
+              </View>
+            ))}
             {skills.map((skill) => <Text style={p.asideText} key={skill}>{skill}</Text>)}
+          </View>
+        ) : null}
+        {certifications.length ? (
+          <View>
+            <Text style={p.asideHeading}>Certifications</Text>
+            {certifications.map((entry) => (
+              <View key={entry.id} style={{ marginBottom: 6 }}>
+                <Text style={{ ...p.asideText, marginBottom: 1, color: p.pdf.sidebarInk ?? "#ffffff" }}>{entry.name.trim()}</Text>
+                <Text style={p.asideText}>{[entry.issuer.trim(), entry.year.trim()].filter(Boolean).join(" · ")}</Text>
+              </View>
+            ))}
           </View>
         ) : null}
         {education.length ? (
@@ -207,14 +268,12 @@ function Supporting({ content, p, inAside }: { content: ResumeContent; p: Palett
     );
   }
 
+  /* Skills placed at the top are drawn by Career; here only when they belong at the bottom. */
+  const skillsHere = (p.pdf.skillsPlacement ?? "bottom") === "bottom";
   return (
     <>
-      {skills.length ? (
-        <View>
-          <Heading text="Skills" p={p} />
-          <Text>{skills.join(" · ")}</Text>
-        </View>
-      ) : null}
+      {skillsHere ? <Skills content={content} p={p} /> : null}
+      <Certifications content={content} p={p} />
       {education.length ? (
         <View>
           <Heading text="Education" p={p} />
@@ -243,6 +302,9 @@ function Career({ content, p }: { content: ResumeContent; p: Palette }) {
           <Text style={p.paragraph}>{content.summary.trim()}</Text>
         </View>
       ) : null}
+
+      {/* The Systems template puts the skills block where a technical recruiter looks first. */}
+      {!p.sidebar && p.pdf.skillsPlacement === "top" ? <Skills content={content} p={p} /> : null}
 
       {content.roles.length ? (
         <View>

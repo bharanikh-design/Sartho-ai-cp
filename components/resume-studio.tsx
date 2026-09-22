@@ -13,6 +13,7 @@ import { ResumeDocument, type BulletCoach } from "@/components/resume-document";
 import { RESUME_TEMPLATES, resumeTemplate, type ResumeTemplate } from "@/lib/resume/templates";
 import { ResumeImport } from "@/components/resume-import";
 import { ResumeUploads } from "@/components/resume-uploads";
+import { AtsGatePanel } from "@/components/ats-gate-panel";
 import type { ResumeImportRecord } from "@/lib/data/career";
 import { ResumePdfRenderer } from "@/components/resume-pdf-templates";
 import { LivePdfPreview } from "@/components/live-pdf-preview";
@@ -598,7 +599,9 @@ export function ResumeStudio({
 
     const text = renderResumeText(content);
     const dirty = Boolean(edits) && text !== storedText;
-    const ats = scoreAts(text, draft.analysis);
+    /* The document and the advert's title go in too, so placement and the title line are judged. */
+    const scoring = { content, jobTitle: draft.jobId === MASTER_ID ? null : draft.jobTitle };
+    const ats = scoreAts(text, draft.analysis, scoring);
     const verdict = atsVerdict(ats);
     const scoreTone = ats.score >= 70 ? "pass" : ats.score >= 40 ? "warn" : "fail";
 
@@ -608,7 +611,7 @@ export function ResumeStudio({
      * than a guess — and it is the thing that makes editing feel like progress
      * instead of typing into a void.
      */
-    const delta = ats.score - scoreAts(storedText, draft.analysis).score;
+    const delta = ats.score - scoreAts(storedText, draft.analysis, { ...scoring, content: saved }).score;
 
     /*
      * What tailoring to this advert was worth.
@@ -784,6 +787,7 @@ export function ResumeStudio({
                 </small>
               </div>
             </div>
+            <AtsGatePanel content={content} checkKey={`${documentKey}:${content.template}:${storedText.length}`} compact />
             <div className="studio-ai-bar">
               <button
                 type="button"
@@ -1107,6 +1111,13 @@ return (
             * from the same handful of format checks and the difference would
             * be noise dressed as a finding.
             */}
+          {/*
+            * Before the score, apart from it: whether the document gets read
+            * at all. A blended number hides the one fault that loses an
+            * interview outright, so the gate is its own verdict.
+            */}
+          <AtsGatePanel content={content} checkKey={`${documentKey}:${content.template}:${storedText.length}`} />
+
           {tailorGain !== null && draft.analysis && draft.jobId !== MASTER_ID ? (
             <p className={`studio-tailor-gain is-${tailorGain > 0 ? "up" : tailorGain < 0 ? "down" : "flat"}`}>
               {tailorGain > 0
@@ -1187,8 +1198,9 @@ return (
               <li key={check.label}>
                 <details>
                   <summary>
-                    <span style={{ color: stateTone[check.state] }} aria-hidden="true">
-                      {check.state === "pass" ? "✓" : check.state === "warn" ? "!" : "×"}
+                    {/* A check that cannot apply yet is neither passed nor failed; a cross on it reads as a fault. */}
+                    <span style={{ color: check.applicable ? stateTone[check.state] : "var(--text-tertiary)" }} aria-hidden="true">
+                      {!check.applicable ? "–" : check.state === "pass" ? "✓" : check.state === "warn" ? "!" : "×"}
                     </span>
                     {check.label}
                   </summary>

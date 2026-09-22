@@ -1,5 +1,5 @@
 import { AlignmentType, BorderStyle, Document, HeadingLevel, Packer, Paragraph, TabStopType, TextRun } from "docx";
-import { EDUCATION_HEADING, EXPERIENCE_HEADING, SKILLS_HEADING, contactLine, headlineOf, roleDates, roleWhere, type ResumeContent } from "@/lib/resume/content";
+import { CERTIFICATIONS_HEADING, EDUCATION_HEADING, EXPERIENCE_HEADING, SKILLS_HEADING, contactLine, headlineOf, roleDates, roleWhere, type ResumeContent } from "@/lib/resume/content";
 import { resumeTemplate, type ResumeDocxStyle } from "@/lib/resume/templates";
 
 /*
@@ -128,12 +128,47 @@ export function buildResumeDocx(content: ResumeContent): Document {
     }
   }
 
-  if (content.skills.length) {
+  /*
+   * Grouped skills are one paragraph per group with the group name in bold,
+   * then the flat list. Still one column and no table: a parser reads a
+   * "Languages: Go, Python" paragraph as skills exactly as it reads the list.
+   */
+  const groups = content.skillGroups.filter((group) => group.skills.some((skill) => skill.trim()));
+  if (groups.length || content.skills.length) {
     children.push(sectionHeading(SKILLS_HEADING, style));
-    children.push(new Paragraph({
-      spacing: { after: 160 },
-      children: [new TextRun({ text: content.skills.join(" · "), size: style.bodySize, font: style.font })],
-    }));
+    for (const group of groups) {
+      children.push(new Paragraph({
+        spacing: { after: 60 },
+        children: [
+          ...(group.name.trim() ? [new TextRun({ text: `${group.name.trim()}: `, bold: true, size: style.bodySize, font: style.font })] : []),
+          new TextRun({ text: group.skills.map((skill) => skill.trim()).filter(Boolean).join(" · "), size: style.bodySize, font: style.font }),
+        ],
+      }));
+    }
+    if (content.skills.length) {
+      children.push(new Paragraph({
+        spacing: { after: 160 },
+        children: [new TextRun({ text: content.skills.join(" · "), size: style.bodySize, font: style.font })],
+      }));
+    }
+  }
+
+  if (content.certifications.length) {
+    children.push(sectionHeading(CERTIFICATIONS_HEADING, style));
+    for (const entry of content.certifications) {
+      const left = [entry.name.trim(), entry.issuer.trim()].filter(Boolean).join(", ");
+      if (!left) continue;
+      children.push(new Paragraph({
+        spacing: { after: 60 },
+        tabStops: entry.year.trim() ? [{ type: TabStopType.RIGHT, position: 9020 }] : undefined,
+        children: [
+          new TextRun({ text: left, size: style.bodySize, font: style.font }),
+          ...(entry.year.trim()
+            ? [new TextRun({ text: `\t${entry.year.trim()}`, italics: true, size: style.bodySize, font: style.font })]
+            : []),
+        ],
+      }));
+    }
   }
 
   if (content.education.length) {

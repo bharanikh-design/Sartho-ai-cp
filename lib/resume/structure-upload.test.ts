@@ -67,6 +67,20 @@ describe("contentFromStructuredUpload", () => {
     expect(renderResumeText(content)).toContain("Cut major incident volume by 40%");
   });
 
+  it("carries grouped skills and certifications, and tolerates an answer without them", () => {
+    const parsed = structuredUploadOutput.parse({
+      ...MODEL_OUTPUT,
+      skillGroups: [{ name: "Standards", skills: ["ISO 26262", "ASPICE"] }, { name: "Empty", skills: [] }],
+      certifications: [{ name: "Functional Safety Engineer", issuer: "TÜV SÜD", year: "2023" }],
+    });
+    const content = contentFromStructuredUpload(parsed, { importId: IMPORT_ID });
+    expect(content.skillGroups).toEqual([{ id: "sg0", name: "Standards", skills: ["ISO 26262", "ASPICE"] }]);
+    expect(content.certifications).toEqual([{ id: "c0", name: "Functional Safety Engineer", issuer: "TÜV SÜD", year: "2023" }]);
+    const older = contentFromStructuredUpload(structuredUploadOutput.parse(MODEL_OUTPUT), { importId: IMPORT_ID });
+    expect(older.skillGroups).toEqual([]);
+    expect(older.certifications).toEqual([]);
+  });
+
   it("falls back to the sign-in email only when the résumé states none", () => {
     const parsed = structuredUploadOutput.parse({ ...MODEL_OUTPUT, contact: { ...MODEL_OUTPUT.contact, email: "" } });
     const content = contentFromStructuredUpload(parsed, { importId: IMPORT_ID, fallbackEmail: "signin@example.com" });

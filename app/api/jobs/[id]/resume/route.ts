@@ -389,6 +389,8 @@ export async function POST(
         ((jobResult.data.rule_analysis as RuleAnalysis | null)?.matchedSignals ?? []),
       ),
       education: [],
+      skillGroups: [],
+      certifications: [],
     };
     const draft = renderResumeText(content);
     const evidenceIds = evidenceIdsIn(content);

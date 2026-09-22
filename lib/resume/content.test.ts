@@ -25,6 +25,8 @@ const document: ResumeContent = {
   roles: [],
   skills: [],
   education: [],
+  skillGroups: [],
+  certifications: [],
   sections: [
     {
       id: "s0",
@@ -373,5 +375,27 @@ describe("sourceImportId", () => {
     const without = parseResumeContent({ name: "A", summary: "Something" });
     expect(without).not.toBeNull();
     expect(without).not.toHaveProperty("sourceImportId");
+  });
+});
+
+describe("grouped skills and certifications", () => {
+  it("round-trip through the parser and the text renderer", () => {
+    const stored = {
+      name: "A Person", summary: "Engineer.",
+      skillGroups: [{ id: "sg0", name: "Languages", skills: ["Go", "Python"] }, { name: "", skills: [] }],
+      certifications: [{ name: "Functional Safety Engineer", issuer: "TÜV SÜD", year: "2023" }, { name: "", issuer: "", year: "" }],
+    };
+    const parsed = parseResumeContent(stored);
+    expect(parsed?.skillGroups).toEqual([{ id: "sg0", name: "Languages", skills: ["Go", "Python"] }]);
+    expect(parsed?.certifications).toEqual([{ id: "c0", name: "Functional Safety Engineer", issuer: "TÜV SÜD", year: "2023" }]);
+    const text = renderResumeText(parsed!);
+    expect(text).toContain("SKILLS\nLanguages: Go · Python");
+    expect(text).toContain("CERTIFICATIONS\nFunctional Safety Engineer, TÜV SÜD — 2023");
+  });
+
+  it("are empty, not absent, on a document saved before they existed", () => {
+    const parsed = parseResumeContent({ name: "A Person", summary: "Engineer." });
+    expect(parsed?.skillGroups).toEqual([]);
+    expect(parsed?.certifications).toEqual([]);
   });
 });
