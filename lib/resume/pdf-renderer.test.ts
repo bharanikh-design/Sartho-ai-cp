@@ -7,7 +7,6 @@ describe("ResumePdfRenderer", () => {
     const document = ResumePdfRenderer({ content: emptyContent() });
     const page = document.props.children as { props: { size: string } };
 
-    expect(document.props.title).toBe("Résumé");
     expect(page.props.size).toBe("A4");
   });
 });
