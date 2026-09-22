@@ -9,7 +9,7 @@ export function constructMetadata(
 ): Metadata {
   return {
     ...siteMetadata,
-    title: title ? `${title} · ${SITE_NAME}` : siteMetadata.title,
+    title: title ?? siteMetadata.title,
     description: description || siteMetadata.description,
     openGraph: {
       ...siteMetadata.openGraph,
