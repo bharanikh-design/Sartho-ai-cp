@@ -486,3 +486,24 @@ describe("the document behind the text", () => {
     }
   });
 });
+
+
+describe("explainable match intelligence", () => {
+  it("separates resume quality from role-specific job match", () => {
+    const result = scoreAts(
+      draft("• Led ServiceNow transformation across 6 countries and cut incidents by 40%."),
+      analysis([], ["ServiceNow", "Transformation"]),
+    );
+    expect(result.resumeQuality).toBe(result.score);
+    expect(result.jobMatch).not.toBeNull();
+    expect(result.dimensions.map((item) => item.id)).toEqual([
+      "evidence", "impact", "writing", "placement", "role", "structure",
+    ]);
+  });
+
+  it("does not invent a job match when no role analysis exists", () => {
+    const result = scoreAts(draft("• Improved service quality by 20%."), null);
+    expect(result.jobMatch).toBeNull();
+    expect(result.dimensions.find((item) => item.id === "evidence")?.applicable).toBe(false);
+  });
+});
