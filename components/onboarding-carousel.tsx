@@ -47,9 +47,8 @@ export function OnboardingCarousel({ user }: { user: User }) {
   const [index, setIndex] = useState(0);
   const [dismissedThisSession, setDismissedThisSession] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [dontShowAgain, setDontShowAgain] = useState(completed);
-  
   const completed = user.user_metadata?.sartho_onboarding_complete === true;
+  const [dontShowAgain, setDontShowAgain] = useState(completed);
 
   useEffect(() => {
     const dismissed = window.sessionStorage.getItem(SESSION_DISMISS_KEY) === "true";
