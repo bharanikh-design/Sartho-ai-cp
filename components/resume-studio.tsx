@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";\nimport dynamic from "next/dynamic";
+import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import { atsVerdict, scoreAts, tailoringGain } from "@/lib/resume/ats";
 import { unfilledBlanks } from "@/lib/resume/bullet-rewrite";
 import { overusedOpeners, reviewWriting } from "@/lib/resume/writing";
