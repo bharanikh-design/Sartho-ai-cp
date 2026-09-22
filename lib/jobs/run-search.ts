@@ -163,7 +163,7 @@ export type SearchCriteria = {
   companies: string[];
   roles: string[];
   remoteOnly: boolean;
-  providers: string[];
+  providers: string[];\n  /** Whether this run intentionally hid unverified/agency postings. */\n  directEmployersOnly?: boolean;\n  agencyOrUnverifiedHidden?: number;
   providerErrors?: string[];
   /**
    * Providers that ran out of time, and how often. Said out loud because a
