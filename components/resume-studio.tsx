@@ -61,7 +61,10 @@ const MASTER_ID = "master-resume";
  * toggle is a control that changes nothing a person can feel. Six is roughly
  * where a page stops being scannable at a glance.
  */
-const GRID_VIEW_THRESHOLD = 6;\n\n/* Only parser-safe layouts are offered in the application workflow. */\nconst PROFESSIONAL_TEMPLATES = RESUME_TEMPLATES.filter((template) => template.atsSafe);
+const GRID_VIEW_THRESHOLD = 6;
+
+/* Only parser-safe layouts are offered in the application workflow. */
+const PROFESSIONAL_TEMPLATES = RESUME_TEMPLATES.filter((template) => template.atsSafe);
 
 const stateTone: Record<"pass" | "warn" | "fail", string> = {
   pass: "#6bcf93",
@@ -911,7 +914,8 @@ return (
             <div className="studio-version-rail" role="group" aria-label="Résumé versions">
               {draft.history.map((version) => {
                 const isShown = version.id === (chosen?.id ?? current?.id);
-                const versionContent = resumeContentOf(version.content, version.draft);\n                const versionAts = scoreAts(version.draft, draft.analysis, { content: versionContent, jobTitle: draft.jobId === MASTER_ID ? null : draft.jobTitle });
+                const versionContent = resumeContentOf(version.content, version.draft);
+                const versionAts = scoreAts(version.draft, draft.analysis, { content: versionContent, jobTitle: draft.jobId === MASTER_ID ? null : draft.jobTitle });
                 return (
                   <button
                     type="button"
@@ -1444,7 +1448,9 @@ return (
             {allDrafts.map((draft) => {
               const open = openId === draft.application.id;
               /* The collapsed row shows the current version's score, never a draft edit. */
-              const currentText = draft.application.resume_draft ?? "";\n              const currentContent = resumeContentOf(draft.application.resume_content, currentText);\n              const currentAts = scoreAts(currentText, draft.analysis, { content: currentContent, jobTitle: draft.jobId === MASTER_ID ? null : draft.jobTitle });
+              const currentText = draft.application.resume_draft ?? "";
+              const currentContent = resumeContentOf(draft.application.resume_content, currentText);
+              const currentAts = scoreAts(currentText, draft.analysis, { content: currentContent, jobTitle: draft.jobId === MASTER_ID ? null : draft.jobTitle });
               return (
                 <article className={`studio-draft${open ? " is-open" : ""}`} key={draft.application.id}>
                   <div className="studio-draft-row">
