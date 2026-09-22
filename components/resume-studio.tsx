@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { atsVerdict, scoreAts, tailoringGain } from "@/lib/resume/ats";
 import { unfilledBlanks } from "@/lib/resume/bullet-rewrite";
@@ -292,6 +292,8 @@ export function ResumeStudio({
    * body is rendered once and placed in whichever container is showing.
    */
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
+  const restoreFocusRef = useRef<HTMLElement | null>(null);
 
   /*
    * A proposal is fetched when a line is opened, not behind another button: a
@@ -459,6 +461,10 @@ export function ResumeStudio({
       const result = await response.json();
       if (!response.ok) throw new Error(result.error ?? "Unable to draft master résumé.");
       router.refresh();
+      setOpenId(MASTER_ID);
+      requestAnimationFrame(() => {
+        document.getElementById("drafts")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Unable to draft master résumé.");
     } finally {
@@ -545,16 +551,31 @@ export function ResumeStudio({
     }
   }
 
-  /* Escape closes the expanded editor, and the page behind it does not scroll. */
+  /* The editor is a real modal: trap focus, Escape to close, then restore focus. */
   useEffect(() => {
     if (!expandedId) return;
-    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") setExpandedId(null); };
+    restoreFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const panel = overlayRef.current;
+    const focusable = () => Array.from(panel?.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), [href], input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    ) ?? []);
+    requestAnimationFrame(() => (focusable()[0] ?? panel)?.focus());
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") { event.preventDefault(); setExpandedId(null); return; }
+      if (event.key !== "Tab") return;
+      const items = focusable();
+      if (!items.length) { event.preventDefault(); panel?.focus(); return; }
+      const first = items[0], last = items[items.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    };
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     window.addEventListener("keydown", onKey);
     return () => {
       window.removeEventListener("keydown", onKey);
       document.body.style.overflow = previousOverflow;
+      restoreFocusRef.current?.focus();
     };
   }, [expandedId]);
 
@@ -890,7 +911,7 @@ return (
             <div className="studio-version-rail" role="group" aria-label="Résumé versions">
               {draft.history.map((version) => {
                 const isShown = version.id === (chosen?.id ?? current?.id);
-                const versionAts = scoreAts(version.draft, draft.analysis);
+                const versionContent = resumeContentOf(version.content, version.draft);\n                const versionAts = scoreAts(version.draft, draft.analysis, { content: versionContent, jobTitle: draft.jobId === MASTER_ID ? null : draft.jobTitle });
                 return (
                   <button
                     type="button"
@@ -1423,7 +1444,7 @@ return (
             {allDrafts.map((draft) => {
               const open = openId === draft.application.id;
               /* The collapsed row shows the current version's score, never a draft edit. */
-              const currentAts = scoreAts(draft.application.resume_draft ?? "", draft.analysis);
+              const currentText = draft.application.resume_draft ?? "";\n              const currentContent = resumeContentOf(draft.application.resume_content, currentText);\n              const currentAts = scoreAts(currentText, draft.analysis, { content: currentContent, jobTitle: draft.jobId === MASTER_ID ? null : draft.jobTitle });
               return (
                 <article className={`studio-draft${open ? " is-open" : ""}`} key={draft.application.id}>
                   <div className="studio-draft-row">
@@ -1675,7 +1696,6 @@ return (
                   <button type="button" className="primary-button" onClick={() => void generate(role.id)} disabled={Boolean(generatingId)}>
                     {generatingId === role.id ? "Drafting…" : "Build résumé"}
                   </button>
-                  {error && generatingId === null && <span style={{ color: 'red', fontSize: '12px', maxWidth: '300px', textAlign: 'right' }}>{error}</span>}
                 </div>
               </article>
               );
@@ -1692,6 +1712,8 @@ return (
       {expanded ? (
         <div
           className="studio-overlay"
+          ref={overlayRef}
+          tabIndex={-1}
           role="dialog"
           aria-modal="true"
           aria-label={`Editing ${expanded.application.resume_version ?? expanded.jobTitle}`}
