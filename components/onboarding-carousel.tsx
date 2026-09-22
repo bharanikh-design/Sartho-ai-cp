@@ -1,49 +1,26 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase";
 
-type Slide = {
-  stage: string;
-  title: string;
-  description: string;
-  outcome: string;
-};
+type Slide = { eyebrow: string; title: string; description: string; outcome: string; route: string; visual: string[] };
 
 const SESSION_DISMISS_KEY = "sartho-onboarding-dismissed-this-session";
-
 const slides: Slide[] = [
-  {
-    stage: "Your evidence",
-    title: "Career truth, not claims.",
-    description: "Your résumé is read once into evidence you approve. Every line Sartho writes afterwards cites it, so nothing on your résumé is something you cannot back.",
-    outcome: "Nothing invented. Ever.",
-  },
-  {
-    stage: "The right roles",
-    title: "Roles scored against your evidence.",
-    description: "Sartho searches live listings in your markets and scores each one against your evidence — and leaves out the roles asking for years you do not yet have.",
-    outcome: "A shortlist, not a feed.",
-  },
-  {
-    stage: "Apply with proof",
-    title: "A master résumé, and one per role.",
-    description: "Write the master once. Every tailored version starts from it, keeps its own history, and says what tailoring was worth.",
-    outcome: "An honest case, made well.",
-  },
-  {
-    stage: "Anywhere you go",
-    title: "Save a role from anywhere.",
-    description: "The browser extension sends a posting from LinkedIn, Seek or an employer's own careers page straight into Sartho, with the full advert intact.",
-    outcome: "Seamless integration.",
-  }
+  { eyebrow:"01 · Build your career truth", title:"Start with one Master Résumé.", description:"Upload your strongest résumé once. Sartho turns it into career evidence you control, keeps one Master, and uses that truth everywhere else.", outcome:"One career source of truth. No invented claims.", route:"Résumé Studio", visual:["Upload résumé","Approve evidence","Master résumé"] },
+  { eyebrow:"02 · Discover the right work", title:"Search for fit, not noise.", description:"Sartho compares opportunities with your evidence, seniority and target markets so you can focus on roles worth your time.", outcome:"Résumé Quality and Job Match explain why a role fits.", route:"Job Search", visual:["Career evidence","Role requirements","Job Match"] },
+  { eyebrow:"03 · Save jobs from anywhere", title:"The browser extension brings the web into Sartho.", description:"On LinkedIn, SEEK or an employer careers page, save the role with the Sartho extension. The full advert comes back to your workspace for analysis.", outcome:"Browse → Save with Sartho → Analyse. No copy-and-paste workflow.", route:"Browser Extension", visual:["Open job advert","Save with Sartho","Role appears in Sartho"] },
+  { eyebrow:"04 · Tailor with evidence", title:"One role. One purposeful résumé.", description:"Sartho starts from your Master, surfaces evidence the role needs, exposes unsupported gaps, and creates a role-specific version without keyword stuffing.", outcome:"Supported but missing → surface it. Unsupported → never invent it.", route:"Résumé Studio", visual:["Master","Career evidence","Tailored résumé"] },
+  { eyebrow:"05 · Match the market", title:"Country and profession shape the document.", description:"Australia, USA, UK, Singapore, UAE/GCC and India have different expectations. Sartho combines market, profession and seniority to recommend the right ATS-safe presentation.", outcome:"Mechanical Engineer in the UK? Engineering can be recommended automatically.", route:"Market Fit", visual:["Country","Profession","Recommended template"] },
+  { eyebrow:"06 · Validate before you send", title:"Know what the ATS will actually read.", description:"Before export, Sartho checks structure and reads the generated Word/PDF back through its parser so lost facts and formatting problems are visible before an employer sees them.", outcome:"Quality → Job Match → Parse check → Export.", route:"Ready to apply", visual:["Résumé Quality","Parse fidelity","Export"] },
 ];
 
 export function OnboardingCarousel({ user }: { user: User }) {
   const pathname = usePathname();
   const router = useRouter();
+  const panelRef = useRef<HTMLDivElement>(null);
   const [index, setIndex] = useState(0);
   const [dismissedThisSession, setDismissedThisSession] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -62,65 +39,63 @@ export function OnboardingCarousel({ user }: { user: User }) {
     if (saving) return;
     setSaving(true);
     const supabase = createClient();
-    
-    if (completed !== dontShowAgain) {
-      await supabase.auth.updateUser({
-        data: { sartho_onboarding_complete: dontShowAgain },
-      });
-    }
-
-    if (dontShowAgain) {
-      window.sessionStorage.removeItem(SESSION_DISMISS_KEY);
-    } else {
-      window.sessionStorage.setItem(SESSION_DISMISS_KEY, "true");
-    }
-
+    if (completed !== dontShowAgain) await supabase.auth.updateUser({ data: { sartho_onboarding_complete: dontShowAgain } });
+    if (dontShowAgain) window.sessionStorage.removeItem(SESSION_DISMISS_KEY);
+    else window.sessionStorage.setItem(SESSION_DISMISS_KEY, "true");
     setDismissedThisSession(true);
     setSaving(false);
     router.refresh();
   }, [completed, dontShowAgain, router, saving]);
 
-  if (!visible) return null;
+  useEffect(() => {
+    if (!visible) return;
+    const panel = panelRef.current;
+    const focusable = () => Array.from(panel?.querySelectorAll<HTMLElement>('button:not([disabled]), input:not([disabled]), [href], [tabindex]:not([tabindex="-1"])') ?? []);
+    requestAnimationFrame(() => focusable()[0]?.focus());
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") { event.preventDefault(); void finish(); return; }
+      if (event.key === "ArrowRight") { event.preventDefault(); setIndex((i) => Math.min(slides.length - 1, i + 1)); return; }
+      if (event.key === "ArrowLeft") { event.preventDefault(); setIndex((i) => Math.max(0, i - 1)); return; }
+      if (event.key !== "Tab") return;
+      const items = focusable(); if (!items.length) return;
+      const first = items[0], last = items[items.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    };
+    window.addEventListener("keydown", onKey);
+    const overflow = document.body.style.overflow; document.body.style.overflow = "hidden";
+    return () => { window.removeEventListener("keydown", onKey); document.body.style.overflow = overflow; };
+  }, [finish, visible]);
 
-  const slide = slides[index];
-  const isLast = index === slides.length - 1;
+  if (!visible) return null;
+  const slide = slides[index], isLast = index === slides.length - 1;
 
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0, 0, 0, 0.6)", backdropFilter: "blur(12px)" }} role="dialog" aria-modal="true" aria-label="Welcome to Sartho">
-      <div style={{ background: "rgba(255, 255, 255, 0.05)", border: "1px solid rgba(255, 255, 255, 0.1)", borderRadius: "24px", padding: "48px", maxWidth: "800px", width: "90%", boxShadow: "0 24px 48px rgba(0,0,0,0.4)", display: "flex", flexDirection: "column", gap: "32px", position: "relative", animation: "slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1)" }}>
-        
-        <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-           <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-             <span style={{ fontSize: "24px" }}>✦</span>
-             <h1 style={{ margin: 0, fontSize: "1.5rem", color: "#fff" }}>What Sartho Does</h1>
-           </div>
-           <button onClick={finish} style={{ background: "none", border: "none", color: "#888", fontSize: "24px", cursor: "pointer" }}>×</button>
-        </header>
-
-        <div style={{ display: "flex", flexDirection: "column", gap: "16px", minHeight: "180px" }}>
-          <span style={{ color: "#6bcf93", fontSize: "0.9rem", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "1px" }}>{slide.stage}</span>
-          <h2 style={{ margin: 0, fontSize: "2.5rem", color: "#fff", lineHeight: 1.2 }}>{slide.title}</h2>
-          <p style={{ margin: 0, fontSize: "1.1rem", color: "#b9d1c6", lineHeight: 1.6, maxWidth: "600px" }}>{slide.description}</p>
+    <div className="tour-backdrop" role="dialog" aria-modal="true" aria-labelledby="tour-title">
+      <div className="tour-cinema" ref={panelRef}>
+        <div className="tour-topline"><span className="tour-brand">SARTHO · PRODUCT TOUR</span><button className="tour-close" onClick={() => void finish()} aria-label="Close product tour">×</button></div>
+        <div className="tour-stage">
+          <section className="tour-copy">
+            <span className="tour-eyebrow">{slide.eyebrow}</span>
+            <h1 id="tour-title">{slide.title}</h1>
+            <p>{slide.description}</p>
+            <strong className="tour-outcome">{slide.outcome}</strong>
+            <span className="tour-route">{slide.route}</span>
+          </section>
+          <section className="tour-visual" aria-label={slide.route}>
+            <span className="tour-orbit" aria-hidden="true" />
+            {slide.visual.map((item, i) => <div key={item} className={"tour-hero-card card-" + i}><small>0{i + 1}</small><strong>{item}</strong>{i < slide.visual.length - 1 ? <span>→</span> : null}</div>)}
+          </section>
         </div>
-
-        <footer style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "32px", borderTop: "1px solid rgba(255,255,255,0.1)", paddingTop: "24px" }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-            <div style={{ display: "flex", gap: "8px" }}>
-              {slides.map((_, i) => (
-                <button key={i} onClick={() => setIndex(i)} style={{ width: "40px", height: "4px", borderRadius: "2px", background: i === index ? "#6bcf93" : "rgba(255,255,255,0.2)", border: "none", cursor: "pointer", padding: 0 }} aria-label={`Go to slide ${i + 1}`} />
-              ))}
-            </div>
-            <label style={{ display: "flex", alignItems: "center", gap: "8px", color: "#888", fontSize: "0.85rem", cursor: "pointer" }}>
-              <input type="checkbox" checked={dontShowAgain} onChange={e => setDontShowAgain(e.target.checked)} />
-              Do not show this next time
-            </label>
+        <footer className="tour-footer">
+          <div className="tour-progress" aria-label={"Step " + (index + 1) + " of " + slides.length}>
+            {slides.map((item, i) => <button key={item.eyebrow} className={i === index ? "is-active" : ""} onClick={() => setIndex(i)} aria-label={"Go to step " + (i + 1)} />)}
           </div>
-
-          <div style={{ display: "flex", gap: "16px", alignItems: "center" }}>
-            <button onClick={finish} style={{ background: "none", border: "none", color: "#888", cursor: "pointer", fontWeight: "bold" }}>Skip</button>
-            <button onClick={() => isLast ? finish() : setIndex(i => i + 1)} style={{ background: "#fff", color: "#000", padding: "12px 24px", borderRadius: "12px", border: "none", fontWeight: "bold", cursor: "pointer" }}>
-              {isLast ? "Get Started" : "Next →"}
-            </button>
+          <label className="tour-dismiss"><input type="checkbox" checked={dontShowAgain} onChange={(e) => setDontShowAgain(e.target.checked)} /> Do not show this next time</label>
+          <div className="tour-actions">
+            <button className="tour-skip" onClick={() => void finish()}>Skip</button>
+            {index > 0 ? <button className="tour-secondary" onClick={() => setIndex(index - 1)}>Back</button> : null}
+            <button className="tour-primary" onClick={() => isLast ? void finish() : setIndex(index + 1)}>{isLast ? "Enter Sartho" : "Continue"}</button>
           </div>
         </footer>
       </div>
