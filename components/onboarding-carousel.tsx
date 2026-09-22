@@ -76,7 +76,7 @@ export function OnboardingCarousel({ user }: { user: User }) {
       window.sessionStorage.setItem(SESSION_DISMISS_KEY, "true");
     }
 
-    setVisible(false);
+    setDismissedThisSession(true);
     setSaving(false);
     router.refresh();
   }, [completed, dontShowAgain, router, saving]);
