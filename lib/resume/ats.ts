@@ -64,9 +64,21 @@ export type WeakBullet = {
   text: string;
 };
 
-export type AtsScore = {
-  /** 0–100, from the checks below. */
+export type AtsDimension = {
+  id: "evidence" | "impact" | "writing" | "placement" | "role" | "structure";
+  label: string;
   score: number;
+  applicable: boolean;
+  explanation: string;
+};
+
+export type AtsScore = {
+  /** 0–100 résumé readiness. Kept as score for existing callers. */
+  score: number;
+  resumeQuality: number;
+  /** Role-specific match; null until a role analysis exists. */
+  jobMatch: number | null;
+  dimensions: AtsDimension[];
   /**
    * Capabilities the evidence supports that the draft never names. These are
    * the honest fixes: the person can already back every one.
@@ -402,7 +414,31 @@ export function scoreAts(draft: string, analysis: RuleAnalysis | null, options: 
    */
   const score = scoreFromChecks(checks, strengthCoverage);
 
-  return { score, unusedStrengths, unbackedRequirements, weakBullets, bulletCount: bullets.length, metricsFound, wordCount, strengthCoverage, checks };
+  const dimension = (id: AtsDimension["id"], label: string, labels: string[]): AtsDimension => {
+    const relevant = checks.filter((check) => labels.includes(check.label));
+    const applicable = relevant.filter((check) => check.applicable);
+    if (!applicable.length) return { id, label, score: 0, applicable: false, explanation: relevant[0]?.detail ?? "Not enough information to judge." };
+    const total = applicable.reduce((sum, check) => sum + check.weight, 0);
+    const value = Math.round(applicable.reduce((sum, check) => sum + check.weight * checkValue(check, strengthCoverage), 0) / total);
+    return { id, label, score: value, applicable: true, explanation: applicable.map((check) => check.detail).join(" ") };
+  };
+
+  const dimensions: AtsDimension[] = [
+    dimension("evidence", "Evidence & capability coverage", ["Evidence you can back, used"]),
+    dimension("impact", "Achievements & measurable impact", ["Quantified achievement"]),
+    dimension("writing", "Writing quality", ["Strong opening verbs", "Active voice"]),
+    dimension("placement", "Experience relevance", ["Strengths shown in the career, not only listed"]),
+    dimension("role", "Role & title alignment", ["Title matches the role"]),
+    dimension("structure", "Résumé structure", ["Length"]),
+  ];
+  const matchWeights: Record<AtsDimension["id"], number> = { evidence: 0.4, placement: 0.25, role: 0.2, impact: 0.15, writing: 0, structure: 0 };
+  const matchParts = dimensions.filter((item) => matchWeights[item.id] > 0 && item.applicable);
+  const matchTotal = matchParts.reduce((sum, item) => sum + matchWeights[item.id], 0);
+  const jobMatch = analysis && matchTotal
+    ? Math.round(matchParts.reduce((sum, item) => sum + item.score * matchWeights[item.id], 0) / matchTotal)
+    : null;
+
+  return { score, resumeQuality: score, jobMatch, dimensions, unusedStrengths, unbackedRequirements, weakBullets, bulletCount: bullets.length, metricsFound, wordCount, strengthCoverage, checks };
 }
 
 /*
