@@ -64,6 +64,17 @@ export const resumeContentSchema = z.object({
     institution: z.string().trim().max(200).default(""),
     year: z.string().trim().max(60).default(""),
   })).max(15).default([]),
+  skillGroups: z.array(z.object({
+    id: z.string().trim().max(64).default(""),
+    name: z.string().trim().max(120).default(""),
+    skills: z.array(z.string().trim().min(1).max(80)).max(40).default([]),
+  })).max(12).default([]),
+  certifications: z.array(z.object({
+    id: z.string().trim().max(64).default(""),
+    name: z.string().trim().max(200).default(""),
+    issuer: z.string().trim().max(200).default(""),
+    year: z.string().trim().max(60).default(""),
+  })).max(20).default([]),
   /*
    * Unrecognised or absent falls back to Classic rather than being rejected.
    *

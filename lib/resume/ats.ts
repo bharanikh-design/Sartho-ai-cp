@@ -1,4 +1,6 @@
 import type { RuleAnalysis } from "@/lib/types";
+import type { ResumeContent } from "@/lib/resume/content";
+import { experienceText, mentions, titleAlignment } from "@/lib/resume/ats-gate";
 import { PASSIVE_VOICE, WEAK_OPENER } from "@/lib/resume/writing";
 
 /*
@@ -154,10 +156,6 @@ function hasMetric(line: string) {
   return new RegExp(METRIC_SOURCE.source, "i").test(withoutYears(line));
 }
 
-function normalise(value: string) {
-  return ` ${value.toLowerCase().replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim()} `;
-}
-
 /*
  * A bullet marker as people actually write them.
  *
@@ -205,13 +203,33 @@ function scoreFromChecks(checks: AtsCheck[], strengthCoverage: number): number {
   return Math.round(earned / total);
 }
 
-export function scoreAts(draft: string, analysis: RuleAnalysis | null): AtsScore {
+/*
+ * What the scorer can know beyond the text.
+ *
+ * The document, so a strength can be judged on where it appears and not only
+ * whether it does; and the advert's title, so the title line — the most
+ * heavily weighted line in most screens — can be checked against it. Both
+ * optional: every caller that has only text keeps the score it had.
+ */
+export type AtsScoreOptions = {
+  content?: ResumeContent | null;
+  jobTitle?: string | null;
+};
+
+export function scoreAts(draft: string, analysis: RuleAnalysis | null, options: AtsScoreOptions = {}): AtsScore {
   const text = draft.trim();
-  const haystack = normalise(text);
   const wordCount = text ? text.split(/\s+/).length : 0;
+  const content = options.content ?? null;
+  const jobTitle = (options.jobTitle ?? "").trim();
 
   const evidenced = [...new Set((analysis?.matchedSignals ?? []).filter(Boolean))];
-  const unusedStrengths = evidenced.filter((term) => !haystack.includes(normalise(term).trim()));
+  /*
+   * A strength counts in any of its spellings — "K8s" for Kubernetes, "Intune"
+   * for Microsoft Intune — because that is how a recruiter search matches it,
+   * and a draft marked down for writing a skill the way people write it was
+   * being scored against a stricter reader than any real one.
+   */
+  const unusedStrengths = evidenced.filter((term) => !mentions(text, term));
   const unbackedRequirements = [...new Set((analysis?.missingRequirements ?? []).filter(Boolean))];
 
   /*
@@ -260,10 +278,25 @@ export function scoreAts(draft: string, analysis: RuleAnalysis | null): AtsScore
     ? Math.round(((bullets.length - passiveBullets.length) / bullets.length) * 100)
     : 0;
 
+  /*
+   * Where a strength appears, not only whether it does.
+   *
+   * Most ranking weights the career above the skills list: a term that only
+   * ever appears in a list is a claim with no story behind it. Counted over
+   * the strengths that are used at all, so this cannot punish twice for the
+   * ones that are missing.
+   */
+  const used = evidenced.filter((term) => mentions(text, term));
+  const career = content ? experienceText(content) : "";
+  const inExperience = content ? used.filter((term) => mentions(career, term)) : [];
+  const placementShare = used.length ? Math.round((inExperience.length / used.length) * 100) : 0;
+
+  const title = content && jobTitle ? titleAlignment(content, jobTitle) : null;
+
   const checks: AtsCheck[] = [
     {
       label: "Evidence you can back, used",
-      weight: 0.5,
+      weight: 0.4,
       /*
        * The only check that can be inapplicable. Without a role analysis there
        * is no list of strengths to look for, which is a different thing from
@@ -292,7 +325,7 @@ export function scoreAts(draft: string, analysis: RuleAnalysis | null): AtsScore
     },
     {
       label: "Quantified achievement",
-      weight: 0.2,
+      weight: 0.16,
       applicable: true,
       state: !bullets.length ? "fail" : bulletCoverage >= 70 ? "pass" : bulletCoverage >= 40 ? "warn" : "fail",
       detail: !bullets.length
@@ -303,7 +336,7 @@ export function scoreAts(draft: string, analysis: RuleAnalysis | null): AtsScore
     },
     {
       label: "Length",
-      weight: 0.12,
+      weight: 0.1,
       applicable: true,
       state: wordCount >= 350 && wordCount <= 900 ? "pass" : wordCount ? "warn" : "fail",
       detail: wordCount
@@ -312,7 +345,7 @@ export function scoreAts(draft: string, analysis: RuleAnalysis | null): AtsScore
     },
     {
       label: "Strong opening verbs",
-      weight: 0.1,
+      weight: 0.08,
       applicable: bullets.length > 0,
       state: !bullets.length ? "fail" : strongVerbShare >= 90 ? "pass" : strongVerbShare >= 70 ? "warn" : "fail",
       detail: !bullets.length
@@ -323,7 +356,7 @@ export function scoreAts(draft: string, analysis: RuleAnalysis | null): AtsScore
     },
     {
       label: "Active voice",
-      weight: 0.08,
+      weight: 0.06,
       applicable: bullets.length > 0,
       state: !bullets.length ? "fail" : activeVoiceShare >= 85 ? "pass" : activeVoiceShare >= 65 ? "warn" : "fail",
       detail: !bullets.length
@@ -331,6 +364,28 @@ export function scoreAts(draft: string, analysis: RuleAnalysis | null): AtsScore
         : passiveBullets.length
           ? `${passiveBullets.length} of ${bullets.length} line${bullets.length === 1 ? "" : "s"} are written in the passive voice, which hides who did the work.`
           : `All ${bullets.length} lines say who did the work.`,
+    },
+    {
+      label: "Strengths shown in the career, not only listed",
+      weight: 0.1,
+      applicable: Boolean(content) && used.length > 0,
+      state: placementShare >= 80 ? "pass" : placementShare >= 50 ? "warn" : "fail",
+      detail: !content || !used.length
+        ? "Judged once the draft names strengths the role wants."
+        : inExperience.length === used.length
+          ? `Every strength named appears in a role or the summary, where a screen weights it most.`
+          : `${used.length - inExperience.length} of ${used.length} named strength${used.length - inExperience.length === 1 ? "" : "s"} appear only in the skills list: ${used.filter((term) => !inExperience.includes(term)).slice(0, 4).join(", ")}. A term with no bullet behind it ranks as a claim, not a record.`,
+    },
+    {
+      label: "Title matches the role",
+      weight: 0.1,
+      applicable: Boolean(title && title.wanted.length),
+      state: !title ? "fail" : title.share >= 0.6 ? "pass" : title.share >= 0.3 ? "warn" : "fail",
+      detail: !title || !title.wanted.length
+        ? "Judged against the advert's title once a role is chosen."
+        : title.share >= 0.6
+          ? `The title line reads as "${jobTitle}" — ${title.matched.length} of ${title.wanted.length} words of the advert's title are on it.`
+          : `The advert says "${jobTitle}"; the title line shares ${title.matched.length} of its ${title.wanted.length} words. The title is the most heavily weighted line in most screens and the first thing a recruiter search matches.`,
     },
   ];
 
@@ -403,6 +458,10 @@ export function atsVerdict(ats: AtsScore): AtsVerdict {
         return "Open each line with what you did, not what you were responsible for";
       case "Active voice":
         return "Rewrite the passive lines so they say who did the work";
+      case "Strengths shown in the career, not only listed":
+        return "Give each strength that sits only in the skills list a bullet under a role";
+      case "Title matches the role":
+        return "Put the advert's job title on the title line";
       default:
         return check.label;
     }

@@ -11,6 +11,8 @@ const document: ResumeContent = {
   roles: [],
   skills: [],
   education: [],
+  skillGroups: [],
+  certifications: [],
   summary: "Consulting and analytical professional with delivery experience.",
   sections: [
     {

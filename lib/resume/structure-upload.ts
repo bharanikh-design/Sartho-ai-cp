@@ -26,7 +26,8 @@ export const STRUCTURE_UPLOAD_RULES = [
   "summary is the résumé's own profile or summary paragraph, unchanged. Empty if there is none.",
   "roles are the dated employment entries, in the order they appear. title, employer, location, start and end are copied as written; dates keep their original wording such as '2019', 'Jan 2022' or 'Present'. current is true only when the résumé says the role is ongoing. bullets are that role's own bullet points or sentences, one per bullet, unchanged and in their original order.",
   "sections hold everything that is not dated employment, the summary, skills or education — projects, certifications, awards, publications, and any other heading — each under the résumé's own heading with its lines as bullets, unchanged.",
-  "skills are the entries of the résumé's own skills section, split only on the separators the résumé itself uses, each unchanged. Empty if there is no such section.",
+  "skills are the entries of the résumé's own skills section, split only on the separators the résumé itself uses, each unchanged. Empty if there is no such section. When the résumé groups its skills under labels such as 'Languages', 'Tools' or 'Platforms', put each group in skillGroups with the label as its name and leave skills for the ungrouped ones.",
+  "certifications are the résumé's own certifications, licences and professional standards, each with its issuer and year as written, and not repeated under education or skills.",
   "education entries copy the qualification, institution and year as written.",
 ].join(" ");
 
@@ -37,7 +38,7 @@ export const STRUCTURE_UPLOAD_RULES = [
 export const STRUCTURE_UPLOAD_SCHEMA = {
   type: "object",
   additionalProperties: false,
-  required: ["name", "targetRole", "contact", "summary", "roles", "sections", "skills", "education"],
+  required: ["name", "targetRole", "contact", "summary", "roles", "sections", "skills", "skillGroups", "certifications", "education"],
   properties: {
     name: { type: "string" },
     targetRole: { type: "string" },
@@ -74,6 +75,24 @@ export const STRUCTURE_UPLOAD_SCHEMA = {
       },
     },
     skills: { type: "array", items: { type: "string" } },
+    skillGroups: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["name", "skills"],
+        properties: { name: { type: "string" }, skills: { type: "array", items: { type: "string" } } },
+      },
+    },
+    certifications: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["name", "issuer", "year"],
+        properties: { name: { type: "string" }, issuer: { type: "string" }, year: { type: "string" } },
+      },
+    },
     education: {
       type: "array",
       items: {
@@ -110,6 +129,9 @@ export const structuredUploadOutput = z.object({
   })).max(30),
   sections: z.array(z.object({ heading: z.string().max(200), bullets: z.array(line).max(60) })).max(20),
   skills: z.array(z.string().max(80)).max(60),
+  /* Optional so an answer from before the fields existed still parses. */
+  skillGroups: z.array(z.object({ name: z.string().max(120), skills: z.array(z.string().max(80)).max(40) })).max(12).optional(),
+  certifications: z.array(z.object({ name: z.string().max(200), issuer: z.string().max(200), year: z.string().max(60) })).max(20).optional(),
   education: z.array(z.object({
     qualification: z.string().max(200),
     institution: z.string().max(200),
@@ -179,6 +201,12 @@ export function contentFromStructuredUpload(
     sections,
     skills: parsed.skills.map((skill) => skill.trim()).filter(Boolean),
     education,
+    skillGroups: (parsed.skillGroups ?? [])
+      .map((group, index) => ({ id: `sg${index}`, name: group.name.trim(), skills: group.skills.map((skill) => skill.trim()).filter(Boolean) }))
+      .filter((group) => group.skills.length),
+    certifications: (parsed.certifications ?? [])
+      .map((entry, index) => ({ id: `c${index}`, name: entry.name.trim(), issuer: entry.issuer.trim(), year: entry.year.trim() }))
+      .filter((entry) => entry.name || entry.issuer),
     sourceImportId: options.importId,
   };
 }
@@ -201,6 +229,8 @@ export function placedWordShare(rawText: string, content: ResumeContent): { plac
     ...content.roles.flatMap((role) => [role.title, role.employer, role.location, role.start, role.end, ...role.bullets.map((b) => b.text)]),
     ...content.sections.flatMap((section) => [section.heading, ...section.bullets.map((b) => b.text)]),
     ...content.skills,
+    ...content.skillGroups.flatMap((group) => [group.name, ...group.skills]),
+    ...content.certifications.flatMap((entry) => [entry.name, entry.issuer, entry.year]),
     ...content.education.flatMap((entry) => [entry.qualification, entry.institution, entry.year]),
   ].join(" \n "));
   const source = words(rawText);

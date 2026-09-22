@@ -41,7 +41,9 @@ export type ResumeTemplateId =
   | "editorial"
   | "compact"
   | "innovator"
-  | "atlas";
+  | "atlas"
+  | "systems"
+  | "engineering";
 
 /*
  * What the Word file does, per template.
@@ -91,6 +93,12 @@ export type ResumeTemplatePdf = {
   bodySize: number;
   lineHeight: number;
   pagePadding: number;
+  /**
+   * Where the skills block sits. "top" puts it between the summary and the
+   * career, which is where technical recruiters look for it first; "bottom"
+   * is the conventional place after the career.
+   */
+  skillsPlacement?: "top" | "bottom";
   /** Sidebar only. */
   sidebarWidth?: number;
   sidebarInk?: string;
@@ -158,6 +166,34 @@ export const RESUME_TEMPLATES: ResumeTemplate[] = [
       sidebarWidth: 172, sidebarInk: "#ffffff", sidebarMuted: "#b3c0d6",
     },
     docx: { font: "Georgia", nameAlign: "left", nameSize: 34, bodySize: 22, headingSize: 23, headingUpper: true, headingRule: true },
+  },
+  {
+    id: "systems",
+    name: "Systems",
+    description: "One column, a technical skills block by category above the career, roles headed by scope. The layout engineering recruiters at large technology companies circulate internally.",
+    bestFor: "Software, platform, data and ML roles at product and cloud companies, where the file is parsed first and skimmed second.",
+    atsSafe: true,
+    pdf: {
+      font: "Helvetica", layout: "single", accent: "#0f766e", ink: "#111827", muted: "#5b6570",
+      nameSize: 22, nameAlign: "left", nameCaps: false, nameTracking: 0,
+      heading: "plain", headingSize: 9.2, headingCaps: true, bodySize: 9.1, lineHeight: 1.34, pagePadding: 40,
+      skillsPlacement: "top",
+    },
+    docx: { font: "Calibri", nameAlign: "left", nameSize: 30, bodySize: 21, headingSize: 23, headingUpper: true, headingRule: false },
+  },
+  {
+    id: "engineering",
+    name: "Engineering",
+    description: "Ruled serif headings, certifications and standards given a section of their own, skills grouped by discipline. Reads the way an automotive or hardware programme office expects.",
+    bestFor: "Automotive, hardware, manufacturing and programme leadership, where standards, certifications and platforms carry the reading.",
+    atsSafe: true,
+    pdf: {
+      font: "Times-Roman", layout: "single", accent: "#1e3a5f", ink: "#141a22", muted: "#59626d",
+      nameSize: 23, nameAlign: "left", nameCaps: true, nameTracking: 1.6,
+      heading: "rule", headingSize: 9.6, headingCaps: true, bodySize: 9.4, lineHeight: 1.36, pagePadding: 42,
+      skillsPlacement: "bottom",
+    },
+    docx: { font: "Georgia", nameAlign: "left", nameSize: 32, bodySize: 22, headingSize: 23, headingUpper: true, headingRule: true },
   },
   {
     id: "classic",

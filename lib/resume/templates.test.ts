@@ -148,6 +148,8 @@ describe("the Word file follows the template", () => {
     roles: [],
     skills: [],
     education: [],
+  skillGroups: [],
+  certifications: [],
     summary: "A summary long enough to be worth setting.",
     sections: [{ id: "s0", heading: "Work", bullets: [{ id: "s0b0", text: "Did a thing with 3 people.", evidenceIds: [], edited: false }] }],
   };
@@ -238,5 +240,19 @@ describe("one template, rendered twice", () => {
   it("does not give two templates the same accent", () => {
     const accents = RESUME_TEMPLATES.map((template) => template.pdf.accent.toLowerCase());
     expect(new Set(accents).size).toBe(accents.length);
+  });
+});
+
+describe("the Systems and Engineering templates", () => {
+  it("exist, are parser-safe, and say where the skills block goes", () => {
+    const systems = resumeTemplate("systems");
+    const engineering = resumeTemplate("engineering");
+    expect(systems.atsSafe).toBe(true);
+    expect(engineering.atsSafe).toBe(true);
+    expect(systems.pdf.layout).toBe("single");
+    expect(engineering.pdf.layout).toBe("single");
+    expect(systems.pdf.skillsPlacement).toBe("top");
+    expect(engineering.pdf.skillsPlacement).toBe("bottom");
+    expect(RESUME_TEMPLATE_IDS).toEqual(expect.arrayContaining(["systems", "engineering"]));
   });
 });

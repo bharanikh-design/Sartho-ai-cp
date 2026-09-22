@@ -1209,3 +1209,17 @@ h2.resume-doc-heading.resume-doc-field { margin-bottom: 0; border-bottom: 1px so
 .studio-draft-caret { margin-left: 10px; color: var(--text-tertiary); font-size: var(--text-2xs); }
 .chip-button.is-primary { border-color: rgba(138,180,248,.5); background: rgba(138,180,248,.16); color: #cfe0ff; }
 .chip-button.is-primary:hover:not(:disabled) { background: rgba(138,180,248,.24); }
+
+/* A skill category in the read-only document: the label, then its chips. */
+.resume-doc-skill-group { margin-top: 8px; }
+.resume-doc-skill-group strong { display: block; color: var(--text-secondary); font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; }
+
+/* The filter gate: pass/fail before the score, and the parse round trip under it. */
+.studio-gate { display: grid; gap: 8px; margin: 0 0 14px; border: 1px solid var(--line); border-radius: 12px; padding: 11px 13px; }
+.studio-gate.is-compact { margin-bottom: 12px; }
+.studio-gate-head { display: grid; gap: 2px; }
+.studio-gate-head strong { color: var(--text-primary); font-size: var(--text-xs); }
+.studio-gate-head small { color: var(--text-tertiary); font-size: var(--text-2xs); }
+.studio-gate-parse { display: grid; gap: 5px; justify-items: start; }
+.studio-gate-parse small { color: var(--text-secondary); font-size: var(--text-2xs); line-height: 1.5; }
+.studio-gate-parse small.is-error { color: #e5917a; }

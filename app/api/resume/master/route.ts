@@ -263,6 +263,8 @@ export async function POST() {
        */
       skills: skillsFromEvidence(evidenceResult.data),
       education: [],
+      skillGroups: [],
+      certifications: [],
     };
 
     const draft = renderResumeText(content);

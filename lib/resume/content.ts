@@ -109,6 +109,31 @@ export type ResumeEducation = {
   year: string;
 };
 
+/*
+ * Skills under a heading of their own: "Languages: Go, Python, TypeScript",
+ * "Platforms: AWS, Kubernetes". A flat list is what most résumés carry and
+ * what a parser is happiest with; the grouped form is what engineering
+ * recruiters in tech and automotive expect to see, and what lets a template
+ * lay the skills out as a block rather than a sentence.
+ */
+export type ResumeSkillGroup = {
+  id: string;
+  name: string;
+  skills: string[];
+};
+
+/*
+ * A certification or professional standard: "ISO 26262 Functional Safety",
+ * "AWS Solutions Architect – Professional". A first-class section because in
+ * engineering and regulated industries it is read before the education is.
+ */
+export type ResumeCertification = {
+  id: string;
+  name: string;
+  issuer: string;
+  year: string;
+};
+
 export type ResumeContent = {
   /*
    * Name and target role, apart. They were one `headline` string, which is why
@@ -130,6 +155,13 @@ export type ResumeContent = {
   sections: ResumeSection[];
   skills: string[];
   education: ResumeEducation[];
+  /**
+   * Skills by category, when the person has grouped them. Empty on every
+   * document written before the field existed; the flat `skills` list stays
+   * the one every consumer can rely on.
+   */
+  skillGroups: ResumeSkillGroup[];
+  certifications: ResumeCertification[];
   /**
    * The upload this document was laid out from, when it was one.
    *
@@ -226,6 +258,8 @@ export function emptyContent(): ResumeContent {
     sections: [],
     skills: [],
     education: [],
+    skillGroups: [],
+    certifications: [],
     template: DEFAULT_TEMPLATE,
   };
 }
@@ -240,7 +274,9 @@ export function hasContent(content: ResumeContent | null): content is ResumeCont
     || content.roles.length
     || content.sections.length
     || content.skills.length
-    || content.education.length,
+    || content.education.length
+    || content.skillGroups.length
+    || content.certifications.length,
   );
 }
 
@@ -248,6 +284,7 @@ export function hasContent(content: ResumeContent | null): content is ResumeCont
 export const EXPERIENCE_HEADING = "EXPERIENCE";
 export const SKILLS_HEADING = "SKILLS";
 export const EDUCATION_HEADING = "EDUCATION";
+export const CERTIFICATIONS_HEADING = "CERTIFICATIONS";
 
 /*
  * The one encoder.
@@ -292,8 +329,29 @@ export function renderResumeText(content: ResumeContent): string {
     lines.push(section.heading.toUpperCase(), ...section.bullets.map((bullet) => `• ${bullet.text.trim()}`), "");
   }
 
-  if (content.skills.length) {
-    lines.push(SKILLS_HEADING, content.skills.map((skill) => skill.trim()).filter(Boolean).join(" · "), "");
+  /*
+   * Grouped skills print one line per group, the flat list one line in all,
+   * both under the same heading: a parser reads either as a skills section.
+   */
+  const groups = content.skillGroups.filter((group) => group.skills.some((skill) => skill.trim()));
+  if (groups.length || content.skills.length) {
+    lines.push(SKILLS_HEADING);
+    for (const group of groups) {
+      lines.push(`${group.name.trim() ? `${group.name.trim()}: ` : ""}${group.skills.map((skill) => skill.trim()).filter(Boolean).join(" · ")}`);
+    }
+    if (content.skills.length) lines.push(content.skills.map((skill) => skill.trim()).filter(Boolean).join(" · "));
+    lines.push("");
+  }
+
+  if (content.certifications.length) {
+    lines.push(CERTIFICATIONS_HEADING);
+    for (const entry of content.certifications) {
+      lines.push([
+        [entry.name.trim(), entry.issuer.trim()].filter(Boolean).join(", "),
+        entry.year.trim(),
+      ].filter(Boolean).join(" — "));
+    }
+    lines.push("");
   }
 
   if (content.education.length) {
@@ -492,6 +550,28 @@ export function parseResumeContent(stored: unknown): ResumeContent | null {
     },
   );
 
+  const skillGroups: ResumeSkillGroup[] = (Array.isArray(value.skillGroups) ? value.skillGroups : []).flatMap(
+    (rawGroup, index) => {
+      if (!rawGroup || typeof rawGroup !== "object") return [];
+      const group = rawGroup as Partial<ResumeSkillGroup>;
+      const skills = strings(group.skills).map((skill) => skill.trim()).filter(Boolean);
+      const name = text(group.name).trim();
+      if (!name && !skills.length) return [];
+      return [{ id: text(group.id) || `sg${index}`, name, skills }];
+    },
+  );
+
+  const certifications: ResumeCertification[] = (Array.isArray(value.certifications) ? value.certifications : []).flatMap(
+    (rawEntry, index) => {
+      if (!rawEntry || typeof rawEntry !== "object") return [];
+      const entry = rawEntry as Partial<ResumeCertification>;
+      const name = text(entry.name).trim();
+      const issuer = text(entry.issuer).trim();
+      if (!name && !issuer) return [];
+      return [{ id: text(entry.id) || `c${index}`, name, issuer, year: text(entry.year).trim() }];
+    },
+  );
+
   const rawContact = (value.contact && typeof value.contact === "object" ? value.contact : {}) as Partial<ResumeContact>;
   const contact: ResumeContact = {
     email: text(rawContact.email).trim(),
@@ -521,6 +601,8 @@ export function parseResumeContent(stored: unknown): ResumeContent | null {
     sections,
     skills: strings(value.skills).map((skill) => skill.trim()).filter(Boolean),
     education,
+    skillGroups,
+    certifications,
     template: normaliseTemplate(value.template),
   };
   const sourceImportId = text(value.sourceImportId).trim();

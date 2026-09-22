@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { atsVerdict, bulletsIn, scoreAts, tailoringGain } from "./ats";
+import { emptyContent, renderResumeText } from "./content";
 import type { RuleAnalysis } from "@/lib/types";
 
 const analysis = (missing: string[], matched: string[]): RuleAnalysis => ({
@@ -439,5 +440,49 @@ describe("what tailoring to a role was worth", () => {
   it("scores both sides against the same analysis", () => {
     const text = "Led ServiceNow ITSM delivery across four business units.";
     expect(tailoringGain(text, text, roleAnalysis).gain).toBe(0);
+  });
+});
+
+describe("the document behind the text", () => {
+  const analysis = { recommendation: "apply", confidence: "high", matchedSignals: ["Kubernetes", "Microsoft Intune", "ITSM"], cautionSignals: [], explanation: "" } as unknown as RuleAnalysis;
+  const bullets = (text: string) => [{ id: "b", text, evidenceIds: [], edited: false }];
+  const base = {
+    ...emptyContent(),
+    name: "A Person", targetRole: "Head of End User Computing",
+    contact: { email: "a@example.com", phone: "1", location: "London", linkedin: "", website: "" },
+    summary: "Leads end user computing.",
+    roles: [{ id: "r0", title: "Head of EUC", employer: "Bank", location: "", start: "2019", end: "", current: true, bullets: bullets("Ran the K8s platform and rolled out Intune to 42,000 devices, cutting incidents by 40%.") }],
+    skills: ["ITSM"],
+  };
+
+  it("counts a strength written in its short form", () => {
+    const text = renderResumeText(base);
+    const scored = scoreAts(text, analysis, { content: base });
+    expect(scored.unusedStrengths).toEqual([]);
+  });
+
+  it("marks down a strength that only ever appears in the skills list", () => {
+    const text = renderResumeText(base);
+    const scored = scoreAts(text, analysis, { content: base });
+    const placement = scored.checks.find((check) => check.label === "Strengths shown in the career, not only listed");
+    expect(placement?.applicable).toBe(true);
+    expect(placement?.detail).toContain("ITSM");
+    expect(placement?.state).not.toBe("pass");
+  });
+
+  it("judges the title line against the advert's title, ignoring seniority", () => {
+    const text = renderResumeText(base);
+    const matched = scoreAts(text, analysis, { content: base, jobTitle: "Senior Head of End User Computing" });
+    expect(matched.checks.find((check) => check.label === "Title matches the role")?.state).toBe("pass");
+    const missed = scoreAts(text, analysis, { content: base, jobTitle: "Data Scientist" });
+    expect(missed.checks.find((check) => check.label === "Title matches the role")?.state).toBe("fail");
+    expect(missed.score).toBeLessThan(matched.score);
+  });
+
+  it("leaves both new checks out of the number when only text is given", () => {
+    const scored = scoreAts(renderResumeText(base), analysis);
+    for (const label of ["Strengths shown in the career, not only listed", "Title matches the role"]) {
+      expect(scored.checks.find((check) => check.label === label)?.applicable).toBe(false);
+    }
   });
 });
