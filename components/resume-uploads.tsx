@@ -20,19 +20,7 @@ function normaliseName(value: string) {
   return value.toLocaleLowerCase().replace(/\s+/g, " ").trim();
 }
 
-/*
- * The source-document shelf, not an upload log.
- *
- * A retry or re-upload must not turn into another permanent card. We collapse
- * identical source identities in the UI while retaining every database row for
- * audit/history. The master always wins its group; otherwise the newest usable
- * copy wins. Failed attempts are one collapsed system issue, not a red panel
- * repeated beside every document.
- */
-function sourceKey(item: ResumeImportRecord) {
-  return [normaliseName(item.file_name), item.byte_size ?? "", item.character_count ?? ""].join(":");
-}
-
+/* Source-document shelf: duplicates are collapsed without deleting history. */\n
 type Opened = { text: string; characterCount: number | null };
 
 export function ResumeUploads({
