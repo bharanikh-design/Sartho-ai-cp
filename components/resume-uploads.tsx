@@ -50,7 +50,7 @@ export function ResumeUploads({
   const [override, setOverride] = useState<{ id: string; seen: string | null } | null>(null);
   const masterId = override && override.seen === serverMaster ? override.id : serverMaster;
 
-  const { visible, hiddenCount, failures } = useMemo(() => {
+  const { visible, hiddenCount, failures, duplicateGroups } = useMemo(() => {
     const failed = imports.filter((item) => item.status === "failed");
     const usable = imports.filter((item) => item.status !== "failed");
     const groups = new Map<string, ResumeImportRecord[]>();
@@ -66,7 +66,10 @@ export function ResumeUploads({
       if (b.id === masterId) return 1;
       return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
     });
-    return { visible: rows, hiddenCount: usable.length - rows.length, failures: failed };
+    const duplicateGroups = [...groups.entries()]
+      .map(([key, group]) => ({ key, keep: group.find((item) => item.id === masterId) ?? [...group].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0], hidden: group.filter((item) => item.id !== (group.find((entry) => entry.id === masterId)?.id ?? [...group].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0].id)) }))
+      .filter((group) => group.hidden.length > 0);
+    return { visible: rows, hiddenCount: usable.length - rows.length, failures: failed, duplicateGroups };
   }, [imports, masterId]);
 
   if (!imports.length) {
@@ -191,7 +194,25 @@ export function ResumeUploads({
 
       {hiddenCount > 0 ? (
         <details className="resume-import-issues">
-          <summary><span><strong>{hiddenCount} duplicate upload{hiddenCount === 1 ? "" : "s"} collapsed</strong><small>Kept in history; not repeated in your working library.</small></span><span>History</span></summary>
+          <summary>
+            <span><strong>{hiddenCount} duplicate upload{hiddenCount === 1 ? "" : "s"} hidden</strong><small>Junk drawer — kept safely in the backend, removed from your working résumé list.</small></span>
+            <span>Review junk</span>
+          </summary>
+          <div className="resume-import-issue-list">
+            {duplicateGroups.map((group) => (
+              <div key={group.key}>
+                <p><strong>{group.keep.label ?? group.keep.file_name}</strong> — keeping the {group.keep.id === masterId ? "Master" : "newest"} copy; {group.hidden.length} duplicate{group.hidden.length === 1 ? "" : "s"} hidden.</p>
+                {group.hidden.map((item) => (
+                  <p key={item.id}>
+                    {when(item.created_at)} · {size(item.byte_size) ?? "size unknown"}{" "}
+                    <button type="button" className="chip-button" disabled={deletingId !== null} onClick={() => void deleteItem(item)}>
+                      {deletingId === item.id ? "Deleting…" : "Delete duplicate"}
+                    </button>
+                  </p>
+                ))}
+              </div>
+            ))}
+          </div>
         </details>
       ) : null}
     </div>
