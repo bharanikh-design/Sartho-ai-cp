@@ -46,12 +46,21 @@ function stringList(value: unknown): string[] {
 }
 
 export async function getSearchPreferences(supabase: SupabaseClient, userId: string): Promise<SearchPreferences> {
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from("search_preferences")
     .select("country,countries,employment_types,target_locations,target_companies,experience_level,remote_preference,sources,direct_employers_only")
     .eq("user_id", userId)
     .maybeSingle();
 
+  if (error && (error.code === "PGRST204" || error.code === "42703" || (error.message ?? "").toLowerCase().includes("direct_employers_only"))) {
+    const legacy = await supabase
+      .from("search_preferences")
+      .select("country,countries,employment_types,target_locations,target_companies,experience_level,remote_preference,sources")
+      .eq("user_id", userId)
+      .maybeSingle();
+    data = legacy.data as typeof data;
+    error = legacy.error;
+  }
   if (error && error.code !== "PGRST116") throw error;
 
   return {
