@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { PlatformHero } from "@/components/platform-hero";
+import { OnboardingCarousel } from "@/components/onboarding-carousel";
 import { ProductPageHeader } from "@/components/product-page-header";
 import { JourneyNudgeCard } from "@/components/journey-nudge-card";
 import { ProfileScorecard } from "@/components/profile-scorecard";
@@ -88,13 +88,12 @@ export default async function DashboardPage({
       <>
         {welcome ? <WelcomeCinematic /> : null}
       <div className="page-stack dashboard-page">
+        <OnboardingCarousel user={user} />
         <ProductPageHeader
           eyebrow="Welcome to Sartho"
           title={`Let's start with your résumé, ${firstName}.`}
           description="Everything Sartho does is grounded in evidence you approve. Upload one strong résumé and it reads every role and achievement into your career profile — no line-by-line confirmation."
         />
-
-        <PlatformHero />
 
       <section className="glass-card content-card" id="resume">
           <div className="card-header">
@@ -132,6 +131,7 @@ export default async function DashboardPage({
     <>
       {welcome ? <WelcomeCinematic /> : null}
     <div className="page-stack dashboard-page command-centre-page">
+      <OnboardingCarousel user={user} />
       <ProductPageHeader
         eyebrow="Career Command Centre"
         title={`Welcome back, ${firstName}.`}
@@ -149,7 +149,6 @@ export default async function DashboardPage({
         * card is read in two seconds; the next step is still immediately under
         * it.
         */}
-      <PlatformHero />
 
       <JourneyNudgeCard progress={journey.progress} isActivated={journey.activated} steps={journey.steps} />
 

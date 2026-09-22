@@ -5,6 +5,7 @@ import {
   Page,
   Text,
   View,
+  StyleSheet,
 } from "@react-pdf/renderer";
 import {
   contactLine,
@@ -15,373 +16,226 @@ import {
 } from "@/lib/resume/content";
 import { resumeTemplate, type ResumeTemplatePdf } from "@/lib/resume/templates";
 
-/*
- * The PDF renderer deliberately lives in its own client-only module.
- * @react-pdf/renderer is an ESM/browser renderer; importing it from the
- * server page or from the download handler makes Next try to bundle its Node
- * entry and fail before the application can build. Keeping the document tree
- * here gives both the live preview and the browser download the same source.
- *
- * It reads the template's tokens, which it previously did not. Seven templates
- * were described in lib/resume/templates.ts — a coloured left bar, a solid
- * accent bar, letterspaced capitals over a double rule — and this file read one
- * field of them, the font, and drew all seven identically in Helvetica or
- * Times. A template chosen on screen changed the typeface of the thing a person
- * actually sends and nothing else, which is why the output looked the same
- * however long somebody spent choosing.
- */
+// ---------------------------------------------------------------------------
+// 1. CONSULTING CLASSIC (Big 4 / Finance Standard)
+// Strictly single column, serif font, highly dense, chronological.
+// ---------------------------------------------------------------------------
+const classicStyles = StyleSheet.create({
+  page: { padding: 36, fontFamily: 'Times-Roman', backgroundColor: '#FFFFFF', color: '#000000' },
+  header: { textAlign: 'center', marginBottom: 16 },
+  name: { fontSize: 24, fontWeight: 'bold', textTransform: 'uppercase', marginBottom: 4 },
+  contact: { fontSize: 10, flexDirection: 'row', justifyContent: 'center', flexWrap: 'wrap', gap: 6 },
+  section: { marginBottom: 12 },
+  sectionHeading: { 
+    fontSize: 12, 
+    fontWeight: 'bold', 
+    textTransform: 'uppercase', 
+    borderBottom: '1px solid #000', 
+    paddingBottom: 2, 
+    marginBottom: 8 
+  },
+  itemHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 2 },
+  itemTitle: { fontSize: 11, fontWeight: 'bold' },
+  itemDate: { fontSize: 11 },
+  itemSubtitle: { fontSize: 11, fontStyle: 'italic', marginBottom: 4 },
+  bullet: { flexDirection: 'row', marginBottom: 3 },
+  bulletPoint: { width: 12, fontSize: 10 },
+  bulletText: { flex: 1, fontSize: 10, lineHeight: 1.3 },
+  summary: { fontSize: 10, lineHeight: 1.3, marginBottom: 12 },
+  skills: { fontSize: 10, lineHeight: 1.4 }
+});
 
-type Palette = ReturnType<typeof paletteFor>;
+export function ConsultingClassicPdf({ content }: { content: ResumeContent }) {
+  const contactParts = [
+    content.contact.phone,
+    content.contact.email,
+    content.contact.location,
+    content.contact.linkedin
+  ].filter(Boolean);
 
-/*
- * Every style the document needs, derived from the template rather than frozen
- * in a StyleSheet. react-pdf takes plain objects, so a token that changes is a
- * page that changes — there is no second place for a template to be described.
- */
-function paletteFor(pdf: ResumeTemplatePdf) {
-  const sidebar = pdf.layout === "sidebar";
-  return {
-    pdf,
-    sidebar,
-    page: {
-      fontFamily: pdf.font,
-      color: pdf.ink,
-      fontSize: pdf.bodySize,
-      lineHeight: pdf.lineHeight,
-      /* A sidebar runs to the paper's edge, so the page itself carries no padding. */
-      ...(sidebar
-        ? { flexDirection: "row" as const }
-        : { paddingTop: pdf.pagePadding, paddingBottom: pdf.pagePadding, paddingLeft: pdf.pagePadding, paddingRight: pdf.pagePadding }),
-    },
-    main: sidebar ? { flexGrow: 1, paddingTop: 38, paddingBottom: 38, paddingLeft: 26, paddingRight: 34 } : {},
-    aside: sidebar
-      ? { width: pdf.sidebarWidth ?? 174, backgroundColor: pdf.accent, color: pdf.sidebarInk ?? "#ffffff", paddingTop: 38, paddingBottom: 38, paddingLeft: 22, paddingRight: 20 }
-      : {},
-    /*
-     * Every text block states its own line height.
-     *
-     * The page sets one for the body — 1.36 or so — and a value tuned for 9pt
-     * body text is not enough box for a 24pt name: the line under it was drawn
-     * across the name's lower third. Inheriting a leading multiplier across an
-     * order-of-magnitude size change is the mistake, so each block that differs
-     * in size from the body says what it needs.
-     */
-    name: {
-      fontSize: pdf.nameSize,
-      lineHeight: 1.16,
-      fontWeight: 700 as const,
-      letterSpacing: pdf.nameTracking,
-      textAlign: pdf.nameAlign,
-      textTransform: (pdf.nameCaps ? "uppercase" : "none") as "uppercase" | "none",
-      marginBottom: 6,
-    },
-    targetRole: { fontSize: pdf.bodySize + 2.2, lineHeight: 1.3, color: pdf.accent, textAlign: pdf.nameAlign, marginBottom: 5 },
-    contact: { fontSize: pdf.bodySize - 0.8, lineHeight: 1.35, color: pdf.muted, textAlign: pdf.nameAlign },
-    paragraph: { marginBottom: 8 },
-    role: { marginBottom: 9 },
-    roleHeader: { flexDirection: "row" as const, justifyContent: "space-between" as const, marginBottom: 2.5 },
-    roleTitle: { fontWeight: 700 as const, flexGrow: 1, paddingRight: 8 },
-    roleDates: { color: pdf.muted, fontSize: pdf.bodySize - 0.6, lineHeight: 1.35 },
-    bulletRow: { flexDirection: "row" as const, marginBottom: 2.2 },
-    bulletMark: { width: 9, color: pdf.accent },
-    bulletText: { flexGrow: 1, flexShrink: 1 },
-    asideHeading: {
-      fontSize: pdf.headingSize - 0.6,
-      lineHeight: 1.25,
-      fontWeight: 700 as const,
-      letterSpacing: 0.9,
-      textTransform: "uppercase" as const,
-      marginTop: 16,
-      marginBottom: 5,
-      color: pdf.sidebarInk ?? "#ffffff",
-    },
-    asideText: { fontSize: pdf.bodySize - 0.7, lineHeight: 1.35, color: pdf.sidebarMuted ?? "#dbe7e4", marginBottom: 3 },
-  };
-}
-
-/*
- * One heading, drawn the way the template says.
- *
- * Five treatments rather than five renderers, because a heading is the single
- * element that carries most of a template's character — the difference between
- * Classic and Impact is almost entirely what happens on this line.
- */
-function Heading({ text, p }: { text: string; p: Palette }) {
-  const { pdf } = p;
-  const base = {
-    fontSize: pdf.headingSize,
-    lineHeight: 1.25,
-    fontWeight: 700 as const,
-    letterSpacing: 0.7,
-    textTransform: (pdf.headingCaps ? "uppercase" : "none") as "uppercase" | "none",
-    marginTop: 13,
-    marginBottom: 6,
-  };
-
-  if (pdf.heading === "bar") {
-    return (
-      <View style={{ backgroundColor: pdf.accent, marginTop: 13, marginBottom: 7, paddingVertical: 3, paddingHorizontal: 7 }} wrap={false}>
-        <Text style={{ ...base, marginTop: 0, marginBottom: 0, color: "#ffffff" }}>{text}</Text>
-      </View>
-    );
-  }
-
-  /* A short thick stroke to the left, which reads as a margin mark rather than a rule. */
-  if (pdf.heading === "edge") {
-    return (
-      <View style={{ flexDirection: "row", alignItems: "center", marginTop: 13, marginBottom: 6 }} wrap={false}>
-        <View style={{ width: 14, height: 2.2, backgroundColor: pdf.accent, marginRight: 7 }} />
-        <Text style={{ ...base, marginTop: 0, marginBottom: 0, color: pdf.accent }}>{text}</Text>
-      </View>
-    );
-  }
-
-  if (pdf.heading === "doubleRule") {
-    return (
-      <View style={{ marginTop: 14, marginBottom: 7, borderTopWidth: 0.6, borderTopColor: pdf.accent, borderBottomWidth: 0.6, borderBottomColor: pdf.accent, paddingVertical: 3 }} wrap={false}>
-        <Text style={{ ...base, marginTop: 0, marginBottom: 0, textAlign: "center" }}>{text}</Text>
-      </View>
-    );
-  }
-
-  if (pdf.heading === "rule") {
-    return <Text style={{ ...base, borderBottomWidth: 0.7, borderBottomColor: pdf.muted, paddingBottom: 3 }}>{text}</Text>;
-  }
-
-  return <Text style={{ ...base, color: pdf.accent }}>{text}</Text>;
-}
-
-function Bullets({ items, p }: { items: Array<{ text: string }>; p: Palette }) {
   return (
-    <>
-      {items
-        .filter((item) => item.text.trim())
-        .map((item, index) => (
-          <View style={p.bulletRow} key={`${item.text}-${index}`} wrap={false}>
-            <Text style={p.bulletMark}>•</Text>
-            <Text style={p.bulletText}>{item.text.trim()}</Text>
-          </View>
-        ))}
-    </>
-  );
-}
-
-function Section({ section, p }: { section: ResumeSection; p: Palette }) {
-  const items = section.bullets.filter((bullet) => bullet.text.trim());
-  if (!items.length) return null;
-  return (
-    <View>
-      {section.heading.trim() ? <Heading text={section.heading.trim()} p={p} /> : null}
-      <Bullets items={items} p={p} />
-    </View>
-  );
-}
-
-/*
- * The skills block, grouped when the person grouped them.
- *
- * A group is one line: the category in the accent colour, the skills after
- * it. Still text on one column, so a parser reads it as a skills section;
- * what changes is that a recruiter can find "Languages" without reading the
- * whole list.
- */
-function Skills({ content, p }: { content: ResumeContent; p: Palette }) {
-  const groups = content.skillGroups.filter((group) => group.skills.some((skill) => skill.trim()));
-  const skills = content.skills.filter(Boolean);
-  if (!groups.length && !skills.length) return null;
-  return (
-    <View>
-      <Heading text="Skills" p={p} />
-      {groups.map((group) => (
-        <View style={{ flexDirection: "row", marginBottom: 2.4 }} key={group.id} wrap={false}>
-          {group.name.trim() ? <Text style={{ fontWeight: 700, color: p.pdf.accent, width: 96, paddingRight: 6 }}>{group.name.trim()}</Text> : null}
-          <Text style={{ flexGrow: 1, flexShrink: 1 }}>{group.skills.map((skill) => skill.trim()).filter(Boolean).join(" · ")}</Text>
-        </View>
-      ))}
-      {skills.length ? <Text>{skills.join(" · ")}</Text> : null}
-    </View>
-  );
-}
-
-function Certifications({ content, p }: { content: ResumeContent; p: Palette }) {
-  const entries = content.certifications.filter((entry) => entry.name.trim() || entry.issuer.trim());
-  if (!entries.length) return null;
-  return (
-    <View>
-      <Heading text="Certifications" p={p} />
-      {entries.map((entry) => (
-        <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 2 }} key={entry.id} wrap={false}>
-          <Text>{[entry.name.trim(), entry.issuer.trim()].filter(Boolean).join(", ")}</Text>
-          {entry.year.trim() ? <Text style={{ color: p.pdf.muted }}>{entry.year.trim()}</Text> : null}
-        </View>
-      ))}
-    </View>
-  );
-}
-
-/* Skills and education, which are what a sidebar is for when there is one. */
-function Supporting({ content, p, inAside }: { content: ResumeContent; p: Palette; inAside: boolean }) {
-  const skills = content.skills.filter(Boolean);
-  const groups = content.skillGroups.filter((group) => group.skills.some((skill) => skill.trim()));
-  const certifications = content.certifications.filter((entry) => entry.name.trim() || entry.issuer.trim());
-  const education = content.education.filter((entry) => entry.qualification.trim() || entry.institution.trim() || entry.year.trim());
-  if (!skills.length && !groups.length && !certifications.length && !education.length) return null;
-
-  if (inAside) {
-    return (
-      <>
-        {skills.length || groups.length ? (
-          <View>
-            <Text style={p.asideHeading}>Skills</Text>
-            {groups.map((group) => (
-              <View key={group.id} style={{ marginBottom: 4 }}>
-                {group.name.trim() ? <Text style={{ ...p.asideText, marginBottom: 1, color: p.pdf.sidebarInk ?? "#ffffff" }}>{group.name.trim()}</Text> : null}
-                <Text style={p.asideText}>{group.skills.map((skill) => skill.trim()).filter(Boolean).join(" · ")}</Text>
-              </View>
+    <Document title={`${content.name} - Resume`}>
+      <Page size="A4" style={classicStyles.page}>
+        
+        {/* Header */}
+        <View style={classicStyles.header}>
+          <Text style={classicStyles.name}>{content.name}</Text>
+          <View style={classicStyles.contact}>
+            {contactParts.map((part, i) => (
+              <Text key={i}>{part}{i < contactParts.length - 1 ? '  |' : ''}</Text>
             ))}
-            {skills.map((skill) => <Text style={p.asideText} key={skill}>{skill}</Text>)}
           </View>
-        ) : null}
-        {certifications.length ? (
-          <View>
-            <Text style={p.asideHeading}>Certifications</Text>
-            {certifications.map((entry) => (
-              <View key={entry.id} style={{ marginBottom: 6 }}>
-                <Text style={{ ...p.asideText, marginBottom: 1, color: p.pdf.sidebarInk ?? "#ffffff" }}>{entry.name.trim()}</Text>
-                <Text style={p.asideText}>{[entry.issuer.trim(), entry.year.trim()].filter(Boolean).join(" · ")}</Text>
+        </View>
+
+        {/* Professional Summary */}
+        {content.summary && (
+          <View style={classicStyles.section}>
+             <Text style={classicStyles.sectionHeading}>Professional Summary</Text>
+             <Text style={classicStyles.summary}>{content.summary}</Text>
+          </View>
+        )}
+
+        {/* Education */}
+        {content.education.length > 0 && (
+          <View style={classicStyles.section}>
+            <Text style={classicStyles.sectionHeading}>Education</Text>
+            {content.education.map((edu, i) => (
+              <View key={i} style={{ marginBottom: 6 }}>
+                <View style={classicStyles.itemHeader}>
+                  <Text style={classicStyles.itemTitle}>{edu.institution}</Text>
+                  <Text style={classicStyles.itemDate}>{edu.year}</Text>
+                </View>
+                <Text style={classicStyles.itemSubtitle}>{edu.qualification}</Text>
               </View>
             ))}
           </View>
-        ) : null}
-        {education.length ? (
-          <View>
-            <Text style={p.asideHeading}>Education</Text>
-            {education.map((entry) => (
-              <View key={entry.id} style={{ marginBottom: 6 }}>
-                <Text style={{ ...p.asideText, marginBottom: 1, color: p.pdf.sidebarInk ?? "#ffffff" }}>{entry.qualification.trim()}</Text>
-                <Text style={p.asideText}>{[entry.institution.trim(), entry.year.trim()].filter(Boolean).join(" · ")}</Text>
-              </View>
-            ))}
-          </View>
-        ) : null}
-      </>
-    );
-  }
+        )}
 
-  /* Skills placed at the top are drawn by Career; here only when they belong at the bottom. */
-  const skillsHere = (p.pdf.skillsPlacement ?? "bottom") === "bottom";
-  return (
-    <>
-      {skillsHere ? <Skills content={content} p={p} /> : null}
-      <Certifications content={content} p={p} />
-      {education.length ? (
-        <View>
-          <Heading text="Education" p={p} />
-          {education.map((entry) => {
-            const label = [entry.qualification.trim(), entry.institution.trim()].filter(Boolean).join(", ");
-            return (
-              <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 2 }} key={entry.id} wrap={false}>
-                <Text>{label}</Text>
-                {entry.year.trim() ? <Text style={{ color: p.pdf.muted }}>{entry.year.trim()}</Text> : null}
-              </View>
-            );
-          })}
-        </View>
-      ) : null}
-    </>
-  );
-}
-
-/* The career itself: summary, employment, then anything that belongs to no role. */
-function Career({ content, p }: { content: ResumeContent; p: Palette }) {
-  return (
-    <>
-      {content.summary.trim() ? (
-        <View>
-          <Heading text="Professional Summary" p={p} />
-          <Text style={p.paragraph}>{content.summary.trim()}</Text>
-        </View>
-      ) : null}
-
-      {/* The Systems template puts the skills block where a technical recruiter looks first. */}
-      {!p.sidebar && p.pdf.skillsPlacement === "top" ? <Skills content={content} p={p} /> : null}
-
-      {content.roles.length ? (
-        <View>
-          <Heading text="Experience" p={p} />
-          {content.roles.map((role) => {
-            const where = roleWhere(role);
-            const dates = roleDates(role);
-            return (
-              <View style={p.role} key={role.id}>
-                {role.title.trim() || where || dates ? (
-                  <View style={p.roleHeader} wrap={false}>
-                    <Text style={p.roleTitle}>{[role.title.trim(), where].filter(Boolean).join(", ")}</Text>
-                    {dates ? <Text style={p.roleDates}>{dates}</Text> : null}
+        {/* Experience */}
+        {content.roles.length > 0 && (
+          <View style={classicStyles.section}>
+            <Text style={classicStyles.sectionHeading}>Professional Experience</Text>
+            {content.roles.map((role) => (
+              <View key={role.id} style={{ marginBottom: 10 }}>
+                <View style={classicStyles.itemHeader}>
+                  <Text style={classicStyles.itemTitle}>{role.employer}{role.location ? ` - ${role.location}` : ''}</Text>
+                  <Text style={classicStyles.itemDate}>{`${role.start}${role.end ? ` - ${role.end}` : (role.current ? " - Present" : "")}`}</Text>
+                </View>
+                <Text style={classicStyles.itemSubtitle}>{role.title}</Text>
+                
+                {role.bullets.map((bullet) => (
+                  <View key={bullet.id} style={classicStyles.bullet}>
+                    <Text style={classicStyles.bulletPoint}>•</Text>
+                    <Text style={classicStyles.bulletText}>{bullet.text}</Text>
                   </View>
-                ) : null}
-                <Bullets items={role.bullets} p={p} />
+                ))}
               </View>
-            );
-          })}
-        </View>
-      ) : null}
+            ))}
+          </View>
+        )}
 
-      {content.sections.map((item) => <Section section={item} p={p} key={item.id} />)}
-    </>
+        {/* Skills */}
+        {content.skills.length > 0 && (
+          <View style={classicStyles.section}>
+            <Text style={classicStyles.sectionHeading}>Skills & Additional Information</Text>
+            <Text style={classicStyles.skills}>{content.skills.join(', ')}</Text>
+          </View>
+        )}
+      </Page>
+    </Document>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 2. TECH MINIMALIST (FAANG / Startup Standard)
+// Clean sans-serif, left-aligned header, highly scannable, single column.
+// ---------------------------------------------------------------------------
+const techStyles = StyleSheet.create({
+  page: { padding: 40, fontFamily: 'Helvetica', backgroundColor: '#FFFFFF', color: '#1a1a1a' },
+  header: { marginBottom: 20 },
+  name: { fontSize: 26, fontWeight: 'bold', letterSpacing: -0.5, marginBottom: 4 },
+  targetRole: { fontSize: 14, color: '#555', marginBottom: 8 },
+  contact: { fontSize: 9, color: '#666', flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  section: { marginBottom: 16 },
+  sectionHeading: { 
+    fontSize: 11, 
+    fontWeight: 'bold', 
+    textTransform: 'uppercase', 
+    color: '#444',
+    letterSpacing: 1,
+    marginBottom: 8 
+  },
+  itemHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 2 },
+  itemTitle: { fontSize: 12, fontWeight: 'bold' },
+  itemEmployer: { fontSize: 11, color: '#444', marginBottom: 6 },
+  itemDate: { fontSize: 10, color: '#666' },
+  bullet: { flexDirection: 'row', marginBottom: 4 },
+  bulletPoint: { width: 10, fontSize: 10, color: '#666' },
+  bulletText: { flex: 1, fontSize: 10, lineHeight: 1.4, color: '#333' },
+  skillsContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
+  skillItem: { fontSize: 10, color: '#333' }
+});
+
+export function TechMinimalistPdf({ content }: { content: ResumeContent }) {
+  const contactParts = [content.contact.phone, content.contact.email, content.contact.linkedin].filter(Boolean);
+
+  return (
+    <Document title={`${content.name} - Resume`}>
+      <Page size="A4" style={techStyles.page}>
+        <View style={techStyles.header}>
+          <Text style={techStyles.name}>{content.name}</Text>
+          {content.targetRole && <Text style={techStyles.targetRole}>{content.targetRole}</Text>}
+          <View style={techStyles.contact}>
+            {contactParts.map((part, i) => (
+              <Text key={i}>{part}{i < contactParts.length - 1 ? '  •' : ''}</Text>
+            ))}
+          </View>
+        </View>
+
+        {content.summary && (
+          <View style={techStyles.section}>
+            <Text style={techStyles.sectionHeading}>Summary</Text>
+            <Text style={{ fontSize: 10, lineHeight: 1.4, color: '#333' }}>{content.summary}</Text>
+          </View>
+        )}
+        
+        {content.roles.length > 0 && (
+          <View style={techStyles.section}>
+            <Text style={techStyles.sectionHeading}>Experience</Text>
+            {content.roles.map((role) => (
+              <View key={role.id} style={{ marginBottom: 12 }}>
+                <View style={techStyles.itemHeader}>
+                  <Text style={techStyles.itemTitle}>{role.title}</Text>
+                  <Text style={techStyles.itemDate}>{`${role.start}${role.end ? ` - ${role.end}` : (role.current ? " - Present" : "")}`}</Text>
+                </View>
+                <Text style={techStyles.itemEmployer}>{role.employer}{role.location ? ` • ${role.location}` : ''}</Text>
+                
+                {role.bullets.map((bullet) => (
+                  <View key={bullet.id} style={techStyles.bullet}>
+                    <Text style={techStyles.bulletPoint}>-</Text>
+                    <Text style={techStyles.bulletText}>{bullet.text}</Text>
+                  </View>
+                ))}
+              </View>
+            ))}
+          </View>
+        )}
+
+        {/* Education */}
+        {content.education.length > 0 && (
+          <View style={techStyles.section}>
+            <Text style={techStyles.sectionHeading}>Education</Text>
+            {content.education.map((edu, i) => (
+              <View key={i} style={{ marginBottom: 6 }}>
+                <View style={techStyles.itemHeader}>
+                  <Text style={techStyles.itemTitle}>{edu.institution}</Text>
+                  <Text style={techStyles.itemDate}>{edu.year}</Text>
+                </View>
+                <Text style={techStyles.itemEmployer}>{edu.qualification}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+        
+        {/* Skills */}
+        {content.skills.length > 0 && (
+          <View style={techStyles.section}>
+            <Text style={techStyles.sectionHeading}>Skills</Text>
+            <Text style={{ fontSize: 10, lineHeight: 1.4, color: '#333' }}>{content.skills.join(', ')}</Text>
+          </View>
+        )}
+      </Page>
+    </Document>
   );
 }
 
 export function ResumePdfRenderer({ content }: { content: ResumeContent }) {
-  const p = paletteFor(resumeTemplate(content.template).pdf);
-  const contact = contactLine(content.contact);
-  const title = [content.name.trim(), content.targetRole.trim()].filter(Boolean).join(" — ") || "Résumé";
-
-  const identity = (
-    <View style={{ marginBottom: p.sidebar ? 4 : 16 }} wrap={false}>
-      {content.name.trim() ? <Text style={p.name}>{content.name.trim()}</Text> : null}
-      {content.targetRole.trim() ? <Text style={p.targetRole}>{content.targetRole.trim()}</Text> : null}
-      {contact && !p.sidebar ? <Text style={p.contact}>{contact}</Text> : null}
-    </View>
-  );
-
-  /*
-   * Two columns, drawn as two columns. The sidebar carries contact, skills and
-   * education; the main column carries the career, which is the part a reader
-   * spends their time in and the part that should never be squeezed.
-   */
-  if (p.sidebar) {
-    return (
-      <Document title={title} author="Sartho" subject="Résumé generated from approved career evidence">
-        <Page size="A4" style={p.page} wrap>
-          <View style={p.aside}>
-            {content.contact.email || content.contact.phone || content.contact.location ? (
-              <View>
-                <Text style={p.asideHeading}>Contact</Text>
-                {[content.contact.email, content.contact.phone, content.contact.location, content.contact.linkedin, content.contact.website]
-                  .map((value) => value?.trim())
-                  .filter(Boolean)
-                  .map((value) => <Text style={p.asideText} key={value}>{value}</Text>)}
-              </View>
-            ) : null}
-            <Supporting content={content} p={p} inAside />
-          </View>
-          <View style={p.main}>
-            {identity}
-            <Career content={content} p={p} />
-          </View>
-        </Page>
-      </Document>
-    );
+  // Smart Template Mapping: map modern/impact/innovator to TechMinimalist, else ConsultingClassic
+  const isTech = ["modern", "impact", "innovator"].includes(content.template);
+  
+  if (isTech) {
+    return <TechMinimalistPdf content={content} />;
   }
-
-  return (
-    <Document title={title} author="Sartho" subject="Résumé generated from approved career evidence">
-      <Page size="A4" style={p.page} wrap>
-        {identity}
-        <Career content={content} p={p} />
-        <Supporting content={content} p={p} inAside={false} />
-      </Page>
-    </Document>
-  );
+  
+  return <ConsultingClassicPdf content={content} />;
 }

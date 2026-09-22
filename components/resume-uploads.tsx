@@ -114,6 +114,39 @@ export function ResumeUploads({
     }
   }
 
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  async function deleteItem(item: ResumeImportRecord) {
+    if (deletingId || !window.confirm(`Delete ${item.file_name}?`)) return;
+    setDeletingId(item.id);
+    setError(null);
+    try {
+      const response = await fetch(`/api/career/imports/${item.id}`, { method: "DELETE" });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error ?? "Sartho could not delete that résumé.");
+      router.refresh();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Sartho could not delete that résumé.");
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  // Detect duplicates (same file_name and byte_size as an older import)
+  const seenSignatures = new Set<string>();
+  const duplicates = new Set<string>();
+  
+  // Sort from oldest to newest to find the "original" first
+  const sortedForDedupe = [...imports].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+  for (const item of sortedForDedupe) {
+    const signature = `${item.file_name}:${item.byte_size}`;
+    if (seenSignatures.has(signature)) {
+      duplicates.add(item.id);
+    } else {
+      seenSignatures.add(signature);
+    }
+  }
+
   return (
     <div className="resume-uploads">
       {error ? <div className="inline-error" role="alert">{error}</div> : null}
@@ -122,12 +155,15 @@ export function ResumeUploads({
           const isMaster = masterId === item.id;
           const open = showing === item.id;
           const text = opened[item.id];
+          const isDuplicate = duplicates.has(item.id);
+          
           return (
             <li key={item.id} className={`library-row is-${item.status}${isMaster ? " is-master" : ""}`}>
               <div className="library-main">
                 <strong className="library-name">
                   {item.label ?? item.file_name}
                   {isMaster ? <em className="studio-draft-badge">Master</em> : null}
+                  {isDuplicate ? <em className="studio-draft-badge" style={{ background: "#e5917a", color: "#fff", marginLeft: "8px" }}>Duplicate</em> : null}
                 </strong>
                 <span className="library-meta">
                   {when(item.created_at)}
@@ -164,6 +200,7 @@ export function ResumeUploads({
                     {openingId === item.id ? "Opening…" : studioSourceId === item.id ? "Open in Studio" : "Edit in Studio"}
                   </button>
                 ) : null}
+                
                 <button
                   type="button"
                   className={`chip-button${isMaster ? " is-selected" : ""}`}
@@ -191,6 +228,18 @@ export function ResumeUploads({
                     Original not kept
                   </span>
                 )}
+                
+                {/* Delete button, especially useful for duplicates */}
+                <button
+                  type="button"
+                  className="chip-button"
+                  style={{ color: "#e5917a" }}
+                  disabled={deletingId === item.id || isMaster}
+                  onClick={() => void deleteItem(item)}
+                  title={isMaster ? "Cannot delete master résumé" : "Delete this résumé"}
+                >
+                  {deletingId === item.id ? "Deleting…" : "Delete"}
+                </button>
               </div>
 
               {item.status === "failed" ? (

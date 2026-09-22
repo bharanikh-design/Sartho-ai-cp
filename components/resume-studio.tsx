@@ -1357,6 +1357,17 @@ return (
 
   return (
     <>
+      {generatingId && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 99999, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0, 0, 0, 0.7)", backdropFilter: "blur(8px)", animation: "fadeIn 0.3s ease-out" }}>
+          <div style={{ background: "rgba(255, 255, 255, 0.05)", border: "1px solid rgba(255, 255, 255, 0.1)", borderRadius: "16px", padding: "40px", display: "flex", flexDirection: "column", alignItems: "center", gap: "20px", maxWidth: "400px", textAlign: "center", boxShadow: "0 20px 40px rgba(0,0,0,0.5)" }}>
+            <MagicWand />
+            <h3 style={{ margin: 0, color: "#fff", fontSize: "1.2rem" }}>Crafting your résumé</h3>
+            <p style={{ margin: 0, color: "#b9d1c6", fontSize: "0.95rem", lineHeight: 1.5 }}>
+              Sartho is analyzing the role and your career history to craft a tailored résumé. This takes a few seconds...
+            </p>
+          </div>
+        </div>
+      )}
       {error ? <div className="inline-error" role="alert">{error}</div> : null}
 
       <section className="glass-card content-card" id="drafts">
