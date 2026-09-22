@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";\nimport dynamic from "next/dynamic";
 import { atsVerdict, scoreAts, tailoringGain } from "@/lib/resume/ats";
 import { unfilledBlanks } from "@/lib/resume/bullet-rewrite";
 import { overusedOpeners, reviewWriting } from "@/lib/resume/writing";
@@ -16,7 +16,7 @@ import { ResumeUploads } from "@/components/resume-uploads";
 import { AtsGatePanel } from "@/components/ats-gate-panel";
 import type { ResumeImportRecord } from "@/lib/data/career";
 import { ResumePdfRenderer } from "@/components/resume-pdf-templates";
-import { LivePdfPreview } from "@/components/live-pdf-preview";
+const LivePdfPreview = dynamic(() => import("@/components/live-pdf-preview").then((mod) => mod.LivePdfPreview), { ssr: false });
 import type { ApplicationRecord, ResumeChange, ResumeVersionRecord, RuleAnalysis } from "@/lib/types";
 
 /*
