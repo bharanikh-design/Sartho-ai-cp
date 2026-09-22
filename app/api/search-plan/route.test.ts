@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { searchPlanSchema } from "./route";
+import { searchPlanSchema } from "./schema";
 
 const source = {
   id: "official",

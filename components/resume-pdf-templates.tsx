@@ -8,13 +8,9 @@ import {
   StyleSheet,
 } from "@react-pdf/renderer";
 import {
-  contactLine,
-  roleDates,
-  roleWhere,
   type ResumeContent,
-  type ResumeSection,
 } from "@/lib/resume/content";
-import { resumeTemplate, type ResumeTemplatePdf } from "@/lib/resume/templates";
+
 
 // ---------------------------------------------------------------------------
 // 1. CONSULTING CLASSIC (Big 4 / Finance Standard)

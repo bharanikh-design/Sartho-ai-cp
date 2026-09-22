@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { jobInputSchema } from "./route";
+import { jobInputSchema } from "./schema";
 
 const valid = {
   title: "Transformation Director",

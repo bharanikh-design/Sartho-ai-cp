@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { directionSchema } from "./route";
+import { directionSchema } from "./schema";
 
 const base = {
   headline: "Transformation leader",

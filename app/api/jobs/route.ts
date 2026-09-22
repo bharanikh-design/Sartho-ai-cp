@@ -1,17 +1,11 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { jobInputSchema } from "./schema";
 import { getAuthenticatedUser } from "@/lib/auth";
 import { getCareerWorkspace } from "@/lib/data/career";
 import { canonicalJobUrl } from "@/lib/jobs/source-url";
 import { scoreOpportunity } from "@/lib/matching/opportunity-score";
 
-export const jobInputSchema = z.object({
-  title: z.string().trim().min(2).max(240),
-  employer: z.string().trim().max(240).optional().default(""),
-  location: z.string().trim().max(240).optional().default(""),
-  sourceUrl: z.union([z.literal(""), z.string().url().startsWith("https://").max(2000)]).optional().default(""),
-  description: z.string().trim().min(120).max(80_000),
-});
 
 export async function POST(request: Request) {
   const { supabase, user } = await getAuthenticatedUser();
