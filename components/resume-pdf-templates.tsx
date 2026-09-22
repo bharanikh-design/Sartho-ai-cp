@@ -50,7 +50,7 @@ export function ConsultingClassicPdf({ content }: { content: ResumeContent }) {
   ].filter(Boolean);
 
   return (
-    <Document title={`${content.name} - Resume`}>
+    <Document title={content.name ? `${content.name} - Resume` : "Résumé"}>
       <Page size="A4" style={classicStyles.page}>
         
         {/* Header */}
@@ -156,7 +156,7 @@ export function TechMinimalistPdf({ content }: { content: ResumeContent }) {
   const contactParts = [content.contact.phone, content.contact.email, content.contact.linkedin].filter(Boolean);
 
   return (
-    <Document title={`${content.name} - Resume`}>
+    <Document title={content.name ? `${content.name} - Resume` : "Résumé"}>
       <Page size="A4" style={techStyles.page}>
         <View style={techStyles.header}>
           <Text style={techStyles.name}>{content.name}</Text>

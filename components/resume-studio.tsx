@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import { atsVerdict, scoreAts, tailoringGain } from "@/lib/resume/ats";
 import { unfilledBlanks } from "@/lib/resume/bullet-rewrite";
 import { overusedOpeners, reviewWriting } from "@/lib/resume/writing";
@@ -16,7 +17,7 @@ import { ResumeUploads } from "@/components/resume-uploads";
 import { AtsGatePanel } from "@/components/ats-gate-panel";
 import type { ResumeImportRecord } from "@/lib/data/career";
 import { ResumePdfRenderer } from "@/components/resume-pdf-templates";
-import { LivePdfPreview } from "@/components/live-pdf-preview";
+const LivePdfPreview = dynamic(() => import("@/components/live-pdf-preview").then((mod) => mod.LivePdfPreview), { ssr: false });
 import type { ApplicationRecord, ResumeChange, ResumeVersionRecord, RuleAnalysis } from "@/lib/types";
 
 /*
@@ -62,6 +63,9 @@ const MASTER_ID = "master-resume";
  * where a page stops being scannable at a glance.
  */
 const GRID_VIEW_THRESHOLD = 6;
+
+/* Only parser-safe layouts are offered in the application workflow. */
+const PROFESSIONAL_TEMPLATES = RESUME_TEMPLATES.filter((template) => template.atsSafe);
 
 const stateTone: Record<"pass" | "warn" | "fail", string> = {
   pass: "#6bcf93",
@@ -292,6 +296,8 @@ export function ResumeStudio({
    * body is rendered once and placed in whichever container is showing.
    */
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
+  const restoreFocusRef = useRef<HTMLElement | null>(null);
 
   /*
    * A proposal is fetched when a line is opened, not behind another button: a
@@ -459,6 +465,10 @@ export function ResumeStudio({
       const result = await response.json();
       if (!response.ok) throw new Error(result.error ?? "Unable to draft master résumé.");
       router.refresh();
+      setOpenId(MASTER_ID);
+      requestAnimationFrame(() => {
+        document.getElementById("drafts")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Unable to draft master résumé.");
     } finally {
@@ -545,16 +555,31 @@ export function ResumeStudio({
     }
   }
 
-  /* Escape closes the expanded editor, and the page behind it does not scroll. */
+  /* The editor is a real modal: trap focus, Escape to close, then restore focus. */
   useEffect(() => {
     if (!expandedId) return;
-    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") setExpandedId(null); };
+    restoreFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const panel = overlayRef.current;
+    const focusable = () => Array.from(panel?.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), [href], input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    ) ?? []);
+    requestAnimationFrame(() => (focusable()[0] ?? panel)?.focus());
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") { event.preventDefault(); setExpandedId(null); return; }
+      if (event.key !== "Tab") return;
+      const items = focusable();
+      if (!items.length) { event.preventDefault(); panel?.focus(); return; }
+      const first = items[0], last = items[items.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    };
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     window.addEventListener("keydown", onKey);
     return () => {
       window.removeEventListener("keydown", onKey);
       document.body.style.overflow = previousOverflow;
+      restoreFocusRef.current?.focus();
     };
   }, [expandedId]);
 
@@ -865,7 +890,7 @@ export function ResumeStudio({
           <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#1e2420', borderRadius: '12px' }}>
             {!isOlderVersion ? (
               <div className="studio-templates" role="radiogroup" aria-label="Résumé template" style={{ padding: '16px', background: 'rgba(0,0,0,0.2)', borderBottom: '1px solid var(--line)', margin: 0 }}>
-                {RESUME_TEMPLATES.map((template) => (
+                {PROFESSIONAL_TEMPLATES.map((template) => (
                   <TemplateChip
                     key={template.id}
                     template={template}
@@ -890,7 +915,8 @@ return (
             <div className="studio-version-rail" role="group" aria-label="Résumé versions">
               {draft.history.map((version) => {
                 const isShown = version.id === (chosen?.id ?? current?.id);
-                const versionAts = scoreAts(version.draft, draft.analysis);
+                const versionContent = resumeContentOf(version.content, version.draft);
+                const versionAts = scoreAts(version.draft, draft.analysis, { content: versionContent, jobTitle: draft.jobId === MASTER_ID ? null : draft.jobTitle });
                 return (
                   <button
                     type="button"
@@ -926,7 +952,7 @@ return (
             */}
           {!isOlderVersion && !isExpanded ? (
             <div className="studio-templates" role="radiogroup" aria-label="Résumé template">
-              {RESUME_TEMPLATES.map((template) => (
+              {PROFESSIONAL_TEMPLATES.map((template) => (
                 <TemplateChip
                   key={template.id}
                   template={template}
@@ -942,7 +968,7 @@ return (
                 */}
               <small>
                 <strong>{resumeTemplate(content.template).description}</strong>{" "}
-                {resumeTemplate(content.template).bestFor} All six are one column and parse the same.
+                {resumeTemplate(content.template).bestFor} Every template offered here is single-column and parser-safe.
               </small>
             </div>
           ) : null}
@@ -1423,7 +1449,9 @@ return (
             {allDrafts.map((draft) => {
               const open = openId === draft.application.id;
               /* The collapsed row shows the current version's score, never a draft edit. */
-              const currentAts = scoreAts(draft.application.resume_draft ?? "", draft.analysis);
+              const currentText = draft.application.resume_draft ?? "";
+              const currentContent = resumeContentOf(draft.application.resume_content, currentText);
+              const currentAts = scoreAts(currentText, draft.analysis, { content: currentContent, jobTitle: draft.jobId === MASTER_ID ? null : draft.jobTitle });
               return (
                 <article className={`studio-draft${open ? " is-open" : ""}`} key={draft.application.id}>
                   <div className="studio-draft-row">
@@ -1675,7 +1703,6 @@ return (
                   <button type="button" className="primary-button" onClick={() => void generate(role.id)} disabled={Boolean(generatingId)}>
                     {generatingId === role.id ? "Drafting…" : "Build résumé"}
                   </button>
-                  {error && generatingId === null && <span style={{ color: 'red', fontSize: '12px', maxWidth: '300px', textAlign: 'right' }}>{error}</span>}
                 </div>
               </article>
               );
@@ -1692,6 +1719,8 @@ return (
       {expanded ? (
         <div
           className="studio-overlay"
+          ref={overlayRef}
+          tabIndex={-1}
           role="dialog"
           aria-modal="true"
           aria-label={`Editing ${expanded.application.resume_version ?? expanded.jobTitle}`}

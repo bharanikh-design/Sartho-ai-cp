@@ -45,19 +45,18 @@ export function OnboardingCarousel({ user }: { user: User }) {
   const pathname = usePathname();
   const router = useRouter();
   const [index, setIndex] = useState(0);
-  const [visible, setVisible] = useState(false);
+  const [dismissedThisSession, setDismissedThisSession] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [dontShowAgain, setDontShowAgain] = useState(false);
-  
   const completed = user.user_metadata?.sartho_onboarding_complete === true;
+  const [dontShowAgain, setDontShowAgain] = useState(completed);
 
   useEffect(() => {
-    const shouldReplay = new URLSearchParams(window.location.search).get("tour") === "1";
-    const dismissedThisSession = window.sessionStorage.getItem(SESSION_DISMISS_KEY) === "true";
+    const dismissed = window.sessionStorage.getItem(SESSION_DISMISS_KEY) === "true";
+    queueMicrotask(() => setDismissedThisSession(dismissed));
+  }, [pathname]);
 
-    setDontShowAgain(completed);
-    setVisible(pathname === "/" && (shouldReplay || (!completed && !dismissedThisSession)));
-  }, [completed, pathname]);
+  const shouldReplay = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("tour") === "1";
+  const visible = pathname === "/" && (shouldReplay || (!completed && !dismissedThisSession));
 
   const finish = useCallback(async () => {
     if (saving) return;
@@ -76,7 +75,7 @@ export function OnboardingCarousel({ user }: { user: User }) {
       window.sessionStorage.setItem(SESSION_DISMISS_KEY, "true");
     }
 
-    setVisible(false);
+    setDismissedThisSession(true);
     setSaving(false);
     router.refresh();
   }, [completed, dontShowAgain, router, saving]);

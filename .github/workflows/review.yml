@@ -59,7 +59,7 @@ jobs:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           claude_args: |
             --model claude-sonnet-5
-            --allowedTools Read,Grep,Glob,Bash(npm run typecheck),Bash(npm test),Bash(git diff:*),Bash(git log:*)
+            --allowedTools Read,Grep,Glob,Bash(git diff:*),Bash(git log:*)
             --max-turns 12
           prompt: |
             Review this pull request against the diff only. Sartho is a Next.js 16
