@@ -20,6 +20,10 @@ function normaliseName(value: string) {
   return value.toLocaleLowerCase().replace(/\s+/g, " ").trim();
 }
 
+function sourceKey(item: ResumeImportRecord) {
+  return [normaliseName(item.file_name), item.byte_size ?? "", item.character_count ?? ""].join(":");
+}
+
 /* Source-document shelf: duplicates are collapsed without deleting history. */
 
 type Opened = { text: string; characterCount: number | null };
