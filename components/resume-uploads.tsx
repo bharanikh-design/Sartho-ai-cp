@@ -20,7 +20,8 @@ function normaliseName(value: string) {
   return value.toLocaleLowerCase().replace(/\s+/g, " ").trim();
 }
 
-/* Source-document shelf: duplicates are collapsed without deleting history. */\n
+/* Source-document shelf: duplicates are collapsed without deleting history. */
+
 type Opened = { text: string; characterCount: number | null };
 
 export function ResumeUploads({
