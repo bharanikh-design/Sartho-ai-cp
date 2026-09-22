@@ -28,6 +28,8 @@ export type SearchPreferences = {
   experienceLevel: ExperienceBandId | null;
   remotePreferences: string[];
   sources: SearchSourcePreference[];
+  /** Prefer vacancies verified on the employer's own careers channel. */
+  directEmployersOnly: boolean;
 };
 
 function isSearchSource(value: unknown): value is SearchSourcePreference {
@@ -46,7 +48,7 @@ function stringList(value: unknown): string[] {
 export async function getSearchPreferences(supabase: SupabaseClient, userId: string): Promise<SearchPreferences> {
   const { data, error } = await supabase
     .from("search_preferences")
-    .select("country,countries,employment_types,target_locations,target_companies,experience_level,remote_preference,sources")
+    .select("country,countries,employment_types,target_locations,target_companies,experience_level,remote_preference,sources,direct_employers_only")
     .eq("user_id", userId)
     .maybeSingle();
 
@@ -63,5 +65,6 @@ export async function getSearchPreferences(supabase: SupabaseClient, userId: str
       ? data.remote_preference.split(",")
       : [],
     sources: Array.isArray(data?.sources) ? data.sources.filter(isSearchSource) : [],
+    directEmployersOnly: data?.direct_employers_only === true,
   };
 }
