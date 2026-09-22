@@ -61,7 +61,7 @@ const MASTER_ID = "master-resume";
  * toggle is a control that changes nothing a person can feel. Six is roughly
  * where a page stops being scannable at a glance.
  */
-const GRID_VIEW_THRESHOLD = 6;
+const GRID_VIEW_THRESHOLD = 6;\n\n/* Only parser-safe layouts are offered in the application workflow. */\nconst PROFESSIONAL_TEMPLATES = RESUME_TEMPLATES.filter((template) => template.atsSafe);
 
 const stateTone: Record<"pass" | "warn" | "fail", string> = {
   pass: "#6bcf93",
@@ -886,7 +886,7 @@ export function ResumeStudio({
           <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#1e2420', borderRadius: '12px' }}>
             {!isOlderVersion ? (
               <div className="studio-templates" role="radiogroup" aria-label="Résumé template" style={{ padding: '16px', background: 'rgba(0,0,0,0.2)', borderBottom: '1px solid var(--line)', margin: 0 }}>
-                {RESUME_TEMPLATES.map((template) => (
+                {PROFESSIONAL_TEMPLATES.map((template) => (
                   <TemplateChip
                     key={template.id}
                     template={template}
@@ -947,7 +947,7 @@ return (
             */}
           {!isOlderVersion && !isExpanded ? (
             <div className="studio-templates" role="radiogroup" aria-label="Résumé template">
-              {RESUME_TEMPLATES.map((template) => (
+              {PROFESSIONAL_TEMPLATES.map((template) => (
                 <TemplateChip
                   key={template.id}
                   template={template}
@@ -963,7 +963,7 @@ return (
                 */}
               <small>
                 <strong>{resumeTemplate(content.template).description}</strong>{" "}
-                {resumeTemplate(content.template).bestFor} All six are one column and parse the same.
+                {resumeTemplate(content.template).bestFor} Every template offered here is single-column and parser-safe.
               </small>
             </div>
           ) : null}
