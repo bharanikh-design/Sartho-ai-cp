@@ -34,7 +34,7 @@ export async function PUT(request: Request) {
     target_companies: dedupe(parsed.data.targetCompanies),
     experience_level: parsed.data.experienceLevel,
     remote_preference: parsed.data.remotePreferences.join(","),
-    sources: parsed.data.sources,
+    sources: parsed.data.sources,\n    direct_employers_only: parsed.data.directEmployersOnly,
     updated_at: new Date().toISOString(),
   });
   if (error) {
