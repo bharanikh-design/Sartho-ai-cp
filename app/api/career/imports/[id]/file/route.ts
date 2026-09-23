@@ -64,7 +64,8 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
       "Content-Type": (data.mime_type as string | null) || file.type || "application/octet-stream",
       "Content-Length": String(file.size),
       "Content-Disposition": contentDisposition(data.file_name as string),
-      "Cache-Control": "private, no-store",\n      "X-Sartho-Resume-Mode": "original-immutable",
+      "Cache-Control": "private, no-store",
+      "X-Sartho-Resume-Mode": "original-immutable",
     },
   });
 }
