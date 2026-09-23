@@ -1,5 +1,4 @@
 import type { ResumeImportRecord } from "@/lib/data/career";
-import { describeAiFailure } from "@/lib/ai/failure";
 
 /*
  * Every résumé this account has handed over, kept.
@@ -31,24 +30,12 @@ export function ResumeLibrary({ imports }: { imports: ResumeImportRecord[] }) {
 
   const usable = imports.filter((item) => item.status !== "failed");
   const failures = imports.filter((item) => item.status === "failed");
-  const uniqueFailures = failures.filter((item, index) =>
-    failures.findIndex((candidate) => candidate.file_name.toLocaleLowerCase() === item.file_name.toLocaleLowerCase()) === index
-  );
-
   return (
     <div className="resume-library-grouped">
-      {failures.length ? (
-        <details className="resume-import-issues">
-          <summary><span><strong>{failures.length} import attempt{failures.length === 1 ? "" : "s"} need attention</strong><small>Collapsed so failed attempts do not overwhelm your usable résumés.</small></span><span>Review issue{uniqueFailures.length === 1 ? "" : "s"}</span></summary>
-          <div className="resume-import-issue-list">
-            {uniqueFailures.map((item) => (
-              <article key={item.id}>
-                <div><strong>{item.label ?? item.file_name}</strong><small>{when(item.created_at)}{size(item.byte_size) ? ` · ${size(item.byte_size)}` : ""}</small></div>
-                <p>{item.error ? describeAiFailure(item.error) : "Sartho could not read this résumé. Try uploading it again."}</p>
-              </article>
-            ))}
-          </div>
-        </details>
+      {failures.length && !usable.length ? (
+        <div className="empty-inline-state">
+          Your résumé is saved, but Sartho could not analyse it yet. Try uploading it again when AI analysis is available.
+        </div>
       ) : null}
 
       {usable.length ? <ul className="library">
