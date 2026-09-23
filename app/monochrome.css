@@ -1,0 +1,274 @@
+/*
+ * Monochrome theme layer
+ * ----------------------
+ * Imported LAST in app/layout.tsx so it overrides every earlier stylesheet
+ * without needing to rewrite them.
+ *
+ * Two jobs:
+ *   1. Redefine the shared design tokens as pure black / white / neutral grey.
+ *   2. Flatten every gradient (linear, radial, conic) to a solid surface.
+ *
+ * Theme switching keeps using the existing data-theme attribute on <html>,
+ * so no component logic changes.
+ */
+
+/* ---- 1. Tokens: dark theme (default) ------------------------------------ */
+
+:root,
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --canvas: #000000;
+  --canvas-soft: #0a0a0a;
+
+  --text: #ffffff;
+  --text-secondary: rgba(255, 255, 255, 0.70);
+  --text-tertiary: rgba(255, 255, 255, 0.45);
+
+  --glass: #0e0e0e;
+  --glass-soft: #121212;
+  --glass-strong: #080808;
+
+  --line: rgba(255, 255, 255, 0.12);
+  --line-bright: rgba(255, 255, 255, 0.24);
+
+  /* Accent tokens are kept so nothing references an undefined variable,
+     but they now resolve to neutral values. */
+  --accent: #ffffff;
+  --blue: #ffffff;
+  --blue-strong: #ffffff;
+  --violet: #ffffff;
+  --mint: #ffffff;
+  --amber: #ffffff;
+  --rose: #ffffff;
+
+  --shadow: 0 24px 70px rgba(0, 0, 0, 0.6);
+  --shadow-soft: 0 12px 36px rgba(0, 0, 0, 0.45);
+}
+
+/* ---- 2. Tokens: light theme --------------------------------------------- */
+
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --canvas: #ffffff;
+  --canvas-soft: #f5f5f5;
+
+  --text: #000000;
+  --text-secondary: rgba(0, 0, 0, 0.70);
+  --text-tertiary: rgba(0, 0, 0, 0.48);
+
+  --glass: #ffffff;
+  --glass-soft: #fafafa;
+  --glass-strong: #f2f2f2;
+
+  --line: rgba(0, 0, 0, 0.12);
+  --line-bright: rgba(0, 0, 0, 0.24);
+
+  --accent: #000000;
+  --blue: #000000;
+  --blue-strong: #000000;
+  --violet: #000000;
+  --mint: #000000;
+  --amber: #000000;
+  --rose: #000000;
+
+  --shadow: 0 20px 60px rgba(0, 0, 0, 0.12);
+  --shadow-soft: 0 10px 30px rgba(0, 0, 0, 0.08);
+}
+
+/* ---- 3. Page surfaces ---------------------------------------------------- */
+
+html,
+body {
+  background: var(--canvas);
+  color: var(--text);
+}
+
+/* The ambient grid overlay on <body> was a gradient pair; keep it off. */
+body::before {
+  display: none;
+}
+
+/* Blurred colour orbs behind the auth and welcome screens. */
+.auth-ambient,
+.welcome-ambient,
+.auth-ambient-one,
+.auth-ambient-two,
+.welcome-ambient-one,
+.welcome-ambient-two {
+  display: none;
+}
+
+/* ---- 4. Flatten every gradient ------------------------------------------ */
+/*
+ * A single broad rule is deliberate. The codebase carries gradients across ~20
+ * stylesheets; enumerating them would leave stragglers. Anything that needs a
+ * real gradient later can opt back in with .allow-gradient.
+ */
+
+*:not(.allow-gradient) {
+  background-image: none;
+}
+
+/* Elements whose entire visual was a gradient need a flat fallback. */
+.glass-card,
+.glass-card-soft,
+.content-card,
+.panel,
+.hero-panel,
+.feature-device,
+.profile-menu,
+.profile-protection-dialog,
+.direction-ai-advisor,
+.direction-path.is-ai,
+.avatar-button.is-open {
+  background-color: var(--glass);
+  border-color: var(--line);
+  color: var(--text);
+}
+
+.feature-device::before,
+.auth-route-preview::after,
+.direction-suggestion-skeleton {
+  display: none;
+}
+
+/* Animated colour washes are no longer meaningful without colour. */
+.route-node,
+.journey-demo-row i,
+.match-bars b,
+.import-scan-beam {
+  animation: none;
+  background-color: var(--line-bright);
+  box-shadow: none;
+}
+
+/* ---- 5. Controls --------------------------------------------------------- */
+
+.primary-button,
+.auth-submit,
+.resume-import-trigger,
+.direction-rank-button {
+  color: var(--canvas);
+  background-color: var(--text);
+  border: 1px solid var(--text);
+  box-shadow: none;
+}
+
+.primary-button:hover:not(:disabled),
+.auth-submit:hover:not(:disabled),
+.resume-import-trigger:hover {
+  filter: none;
+  opacity: 0.88;
+  transform: none;
+}
+
+.secondary-button,
+.oauth-button,
+.danger-button {
+  color: var(--text);
+  background-color: transparent;
+  border: 1px solid var(--line-bright);
+  box-shadow: none;
+}
+
+.secondary-button:hover:not(:disabled),
+.oauth-button:hover:not(:disabled),
+.danger-button:hover:not(:disabled) {
+  background-color: var(--glass-soft);
+  transform: none;
+}
+
+input,
+textarea,
+select {
+  color: var(--text);
+  background-color: var(--canvas-soft);
+  border: 1px solid var(--line);
+}
+
+input:focus,
+textarea:focus,
+select:focus,
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
+  box-shadow: none;
+}
+
+::selection {
+  color: var(--canvas);
+  background: var(--text);
+}
+
+/* ---- 6. Status, kept legible without hue -------------------------------- */
+/*
+ * Success / warning / error previously relied on mint, amber and rose. With a
+ * two-value palette the distinction has to come from weight and border, not
+ * colour, so these stay readable in both themes.
+ */
+
+.auth-message,
+.auth-message.error,
+.auth-message.success,
+.requirement-gap,
+.interview-caution,
+.resume-guardrail-note,
+.direction-ai-message,
+.direction-ai-message.is-error,
+.profile-protection-note {
+  color: var(--text);
+  background-color: var(--glass-soft);
+  border: 1px solid var(--line-bright);
+}
+
+.auth-message.error,
+.direction-ai-message.is-error,
+.requirement-gap {
+  border-left: 3px solid var(--text);
+  font-weight: 600;
+}
+
+.requirement-card.assessment-met,
+.requirement-card.assessment-partially_met,
+.requirement-card.assessment-not_met,
+.requirement-card.assessment-unknown {
+  background-color: var(--glass-soft);
+  border-color: var(--line);
+}
+
+.requirement-card.assessment-met { border-left: 3px solid var(--text); }
+.requirement-card.assessment-partially_met { border-left: 3px dashed var(--line-bright); }
+.requirement-card.assessment-not_met { border-left: 3px dotted var(--line-bright); }
+
+/* ---- 7. Light-theme readability fixes ----------------------------------- */
+/*
+ * Several sheets hard-code white text or near-black panels. In light mode that
+ * is invisible, so those specific surfaces are re-pointed at the tokens.
+ */
+
+:root[data-theme="light"] .resume-draft-reader,
+:root[data-theme="light"] .resume-sheet,
+:root[data-theme="light"] .resume-change-log li,
+:root[data-theme="light"] .account-confirmation-field input,
+:root[data-theme="light"] .auth-form input {
+  color: var(--text);
+  background-color: var(--canvas);
+  border-color: var(--line);
+}
+
+:root[data-theme="light"] .direction-ai-advisor,
+:root[data-theme="light"] .direction-ai-intro > p,
+:root[data-theme="light"] .direction-ai-label,
+:root[data-theme="light"] .direction-ai-steer-label,
+:root[data-theme="light"] .auth-kicker,
+:root[data-theme="light"] .welcome-greeting,
+:root[data-theme="light"] .profile-protection-kicker {
+  color: var(--text);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; }
+}
