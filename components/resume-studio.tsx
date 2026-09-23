@@ -1396,6 +1396,17 @@ return (
       )}
       {error ? <div className="inline-error" role="alert">{error}</div> : null}
 
+      <nav className="studio-quick-actions" aria-label="Résumé Studio actions">
+        <a className="studio-quick-action" href="#add">
+          <span className="studio-quick-action-icon" aria-hidden="true">＋</span>
+          <span><strong>Add résumé</strong><small>Upload a source document</small></span>
+        </a>
+        <a className="studio-quick-action" href="#create" aria-disabled={!canBuild}>
+          <span className="studio-quick-action-icon" aria-hidden="true">✦</span>
+          <span><strong>Build résumé</strong><small>{canBuild ? "Tailor to an analysed role" : "Analyse a role to unlock"}</small></span>
+        </a>
+      </nav>
+
       <section className="glass-card content-card" id="drafts">
         <div className="card-header">
           <div>
