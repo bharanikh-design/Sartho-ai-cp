@@ -22,6 +22,7 @@ export const searchPlanSchema = z.object({
   experienceLevel: z.string().trim().max(10).nullable().optional()
     .transform((value) => normaliseExperienceBand(value)),
   remotePreferences: z.array(z.enum(["On-site", "Hybrid", "Remote", "Flexible"])).default([]),
+  directEmployersOnly: z.boolean().optional().default(false),
   sources: z.array(z.object({ id: z.string().min(1).max(100), name: z.string().trim().min(1).max(180), url: z.string().url().startsWith("https://"), type: z.string().max(100), coverage: z.string().max(100), trust: z.string().max(100), active: z.boolean() })).min(1).max(40)
     .refine((sources) => sources.some((source) => source.active), "Choose at least one active source."),
 });

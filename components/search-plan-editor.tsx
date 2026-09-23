@@ -40,6 +40,7 @@ export function SearchPlanEditor({
   initialLocations,
   initialCompanies,
   initialRemotePreferences,
+  initialDirectEmployersOnly = false,
   targetLanes,
   movedCompanies = 0,
 }: {
@@ -56,6 +57,7 @@ export function SearchPlanEditor({
   initialLocations: string[];
   initialCompanies: string[];
   initialRemotePreferences: string[];
+  initialDirectEmployersOnly?: boolean;
   targetLanes: TargetLaneRecord[];
   /** Employers found in the saved cities list and moved across on load. */
   movedCompanies?: number;
@@ -85,6 +87,7 @@ export function SearchPlanEditor({
   const [locations, setLocations] = useState(initialLocations);
   const [companies, setCompanies] = useState(initialCompanies);
   const [remotePreferences, setRemotePreferences] = useState(initialRemotePreferences);
+  const [directEmployersOnly, setDirectEmployersOnly] = useState(initialDirectEmployersOnly);
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
 
   /*
@@ -116,13 +119,14 @@ export function SearchPlanEditor({
     if (!sameList(codes, initialCountries)) return true;
     if (movedCompanies > 0) return true;
     if (!sameList(remotePreferences, initialRemotePreferences)) return true;
+    if (directEmployersOnly !== initialDirectEmployersOnly) return true;
     /* A band suggested from the résumé but never saved is a change too. */
     if (experience !== initialExperience) return true;
     if (!sameList(employmentTypes, initialEmploymentTypes)) return true;
     if (!sameList(locations, initialLocations)) return true;
     if (!sameList(companies, initialCompanies)) return true;
     return false;
-  }, [codes, movedCompanies, remotePreferences, experience, employmentTypes, locations, companies, initialCountries, initialRemotePreferences, initialExperience, initialEmploymentTypes, initialLocations, initialCompanies]);
+  }, [codes, movedCompanies, remotePreferences, directEmployersOnly, experience, employmentTypes, locations, companies, initialCountries, initialRemotePreferences, initialDirectEmployersOnly, initialExperience, initialEmploymentTypes, initialLocations, initialCompanies]);
 
   async function save() {
     if (!hasChanges) return;
@@ -220,6 +224,7 @@ export function SearchPlanEditor({
     companies.length ? `${companies.length} employer${companies.length === 1 ? "" : "s"}` : "",
     employmentTypes.join(" · "),
     remotePreferences.join(" · "),
+    directEmployersOnly ? "Direct employers only" : "",
   ].filter(Boolean);
 
   return (
@@ -369,6 +374,17 @@ export function SearchPlanEditor({
               placeholder="PwC, Deloitte, Atlassian…"
               emptyHint="No preference"
             />
+          </div>
+
+          <div className="search-criteria-row" id="job-source">
+            <label>
+              <strong>Who should the job come from?</strong>
+              <small>Choose direct employers to hide agency and unverified reposts. Sartho keeps a vacancy only when an employer careers channel can be verified.</small>
+            </label>
+            <div className="work-model-options" role="group" aria-label="Job source" style={{ marginTop: 0 }}>
+              <button type="button" aria-pressed={!directEmployersOnly} className={!directEmployersOnly ? "is-selected" : ""} onClick={() => setDirectEmployersOnly(false)}>Employers + agencies</button>
+              <button type="button" aria-pressed={directEmployersOnly} className={directEmployersOnly ? "is-selected" : ""} onClick={() => setDirectEmployersOnly(true)}>Direct employers only</button>
+            </div>
           </div>
 
           <div className="search-criteria-row" id="employment-type">
