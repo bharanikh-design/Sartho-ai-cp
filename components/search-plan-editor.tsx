@@ -88,6 +88,22 @@ export function SearchPlanEditor({
   const [companies, setCompanies] = useState(initialCompanies);
   const [remotePreferences, setRemotePreferences] = useState(initialRemotePreferences);
   const [directEmployersOnly, setDirectEmployersOnly] = useState(initialDirectEmployersOnly);
+  const [careersEmployer, setCareersEmployer] = useState("");
+  const [careersUrl, setCareersUrl] = useState("");
+  const [sourceTest, setSourceTest] = useState<{ status: string; provider?: string | null; jobsFound?: number; message?: string } | null>(null);
+  const [testingSource, setTestingSource] = useState(false);
+
+  async function testCareersSource() {
+    if (!careersEmployer.trim() || !careersUrl.trim()) return;
+    setTestingSource(true); setSourceTest(null);
+    try {
+      const response = await fetch("/api/career-sources/test", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ employer: careersEmployer, url: careersUrl }) });
+      const result = await response.json();
+      setSourceTest(result);
+      if (response.ok && result.status === "healthy" && !companies.some((item) => item.toLowerCase() === careersEmployer.trim().toLowerCase())) setCompanies([...companies, careersEmployer.trim()]);
+    } catch { setSourceTest({ status: "degraded", message: "Sartho could not test this source." }); }
+    finally { setTestingSource(false); }
+  }
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
 
   /*
@@ -374,6 +390,19 @@ export function SearchPlanEditor({
               placeholder="PwC, Deloitte, Atlassian…"
               emptyHint="No preference"
             />
+          </div>
+
+          <div className="search-criteria-row" id="careers-source">
+            <label>
+              <strong>Know an employer&apos;s careers page?</strong>
+              <small>Optional. Paste the employer and its careers URL. Sartho will test the source before trusting it; verified employers are added to your targets.</small>
+            </label>
+            <div className="career-source-connect">
+              <input value={careersEmployer} onChange={(e) => setCareersEmployer(e.target.value)} placeholder="Employer — e.g. AtkinsRéalis" aria-label="Employer for careers source" />
+              <input value={careersUrl} onChange={(e) => setCareersUrl(e.target.value)} placeholder="https://… careers page" aria-label="Employer careers page URL" inputMode="url" />
+              <button type="button" className="secondary-button" disabled={testingSource || !careersEmployer.trim() || !careersUrl.trim()} onClick={() => void testCareersSource()}>{testingSource ? "Testing…" : "Test connection"}</button>
+            </div>
+            {sourceTest ? <div className={`career-source-result is-${sourceTest.status}`} role="status"><strong>{sourceTest.status === "healthy" ? "✓ Connected" : sourceTest.status === "unknown" ? "Not supported yet" : "Connection needs attention"}</strong><span>{sourceTest.provider ? `${sourceTest.provider} · ` : ""}{sourceTest.jobsFound != null ? `${sourceTest.jobsFound} jobs sampled · ` : ""}{sourceTest.message}</span></div> : null}
           </div>
 
           <div className="search-criteria-row" id="job-source">
