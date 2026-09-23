@@ -1,4 +1,4 @@
-port type { ResumeImportRecord } from "@/lib/data/career";
+import type { ResumeImportRecord } from "@/lib/data/career";
 import { describeAiFailure } from "@/lib/ai/failure";
 
 /*
