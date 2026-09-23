@@ -77,7 +77,23 @@ export function parseImportedJob(payload: unknown): ImportedJobResult {
 
   const input = payload as Record<string, unknown>;
   const description = body(input.description);
-  const title = text(input.title, MAX_FIELD);
+  const employer = text(input.company ?? input.employer, MAX_FIELD);
+  const rawTitle = text(input.title, MAX_FIELD);
+  /*
+   * Browser/page titles often arrive as “Role | Employer | LinkedIn”. Employer
+   * and source are already separate fields, so keeping that furniture corrupts
+   * title-fit downstream. Strip only trailing segments we can prove are
+   * duplicates/source labels; never guess at words inside the actual title.
+   */
+  const title = rawTitle
+    .split(/\s+\|\s+/)
+    .filter((part, index) => {
+      if (index === 0) return true;
+      const normal = part.trim().toLocaleLowerCase();
+      return normal !== employer.toLocaleLowerCase() && !["linkedin", "seek", "indeed"].includes(normal);
+    })
+    .join(" | ")
+    .trim();
 
   /*
    * Two failures worth telling apart, because the fix is different. No title
@@ -95,7 +111,7 @@ export function parseImportedJob(payload: unknown): ImportedJobResult {
     ok: true,
     job: {
       title,
-      employer: text(input.company ?? input.employer, MAX_FIELD),
+      employer,
       location: text(input.location, MAX_FIELD),
       sourceUrl: sourceUrl(input.url ?? input.sourceUrl),
       description,
