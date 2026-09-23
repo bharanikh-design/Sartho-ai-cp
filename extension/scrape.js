@@ -321,6 +321,8 @@
    */
   let applicants = "";
   let hiringManager = "";
+  let jobPoster = "";
+  let applyUrl = "";
   try {
     if (location.hostname.includes("linkedin.com")) {
       /*
