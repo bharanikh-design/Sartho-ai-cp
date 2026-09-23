@@ -321,6 +321,8 @@
    */
   let applicants = "";
   let hiringManager = "";
+  let jobPoster = "";
+  let applyUrl = "";
   try {
     if (location.hostname.includes("linkedin.com")) {
       /*
@@ -345,6 +347,10 @@
 
       const hirer = document.querySelector(".hirer-card__hirer-information a, .jobs-poster__name, .job-details-jobs-unified-top-card__hirer-name");
       if (hirer) hiringManager = clean(hirer.innerText).split("\n")[0].slice(0, 120);
+      const poster = document.querySelector(".jobs-poster__name, .hirer-card__hirer-information a");
+      if (poster) jobPoster = clean(poster.innerText || poster.textContent).split("\n")[0].slice(0, 120);
+      const apply = document.querySelector('a.jobs-apply-button[href], a[href*="/apply/"], a[href*="apply"][data-control-name]');
+      if (apply?.href && /^https:\/\//i.test(apply.href)) applyUrl = apply.href.slice(0, 2000);
     }
   } catch {
     /* Context is a nicety. Losing it must never cost us the advert. */
@@ -368,6 +374,9 @@
     postedDate: (job.postedDate || "").slice(0, 120),
     applicants,
     hiringManager,
+    jobPoster,
+    applyUrl,
+    capturedAt: new Date().toISOString(),
     readBy: job.readBy || "the page text",
     confidence,
     url: location.href,
