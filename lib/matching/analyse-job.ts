@@ -223,9 +223,9 @@ export function analyseJobDescription(
    * worth a look; both together is worth applying for; neither is a skip.
    */
   let recommendation: JobRecommendation;
-  if ((mandatory.length >= 2 && mandatoryCoverage < 50) || (!matchedSkills.length && titleFit < 40)) {
+  if (!matchedSkills.length && titleFit < 40) {
     recommendation = "skip";
-  } else if ((titleFit >= 60 && requirementCoverage >= 35) || (leadingMatched.length >= 2 && requirementCoverage >= 50)) {
+  } else if (mandatory.length >= 2 && mandatoryCoverage < 50) {\n    recommendation = "review";\n  } else if ((titleFit >= 60 && requirementCoverage >= 35) || (leadingMatched.length >= 2 && requirementCoverage >= 50)) {
     recommendation = "apply";
   } else {
     recommendation = "review";
