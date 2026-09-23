@@ -218,10 +218,10 @@ export function JobImportBridge() {
       role="status"
       aria-live="polite"
     >
-      {analysis.phase === "running" ? <span className="import-banner__spinner" aria-hidden="true" /> : null}
+      <span className="import-banner__saved-mark" aria-hidden="true">✓</span>
       <div>
         <strong>
-          {existing ? "Updated in your pipeline" : "Added to your pipeline"}: {job.title}
+          {existing ? "Updated in Opportunities" : "Saved to Opportunities"}: {job.title}
         </strong>
         <p className="section-subtitle">
           {job.employer ? `${job.employer} · ` : ""}
@@ -236,7 +236,7 @@ export function JobImportBridge() {
           */}
         {analysis.phase === "running" ? (
           <p className="section-subtitle import-banner__analysis">
-            Reading every requirement in the advert against your Career Profile…
+            Saved safely. Sartho is analysing the requirements in the background — you can continue now.
           </p>
         ) : null}
         {analysis.phase === "done" ? (
