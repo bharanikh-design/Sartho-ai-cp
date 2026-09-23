@@ -1258,3 +1258,8 @@ h2.resume-doc-heading.resume-doc-field { margin-bottom: 0; border-bottom: 1px so
 .studio-source-modal-head>div{display:grid;gap:3px}.studio-source-modal-head strong{font-size:var(--text-md)}.studio-source-modal-head small{color:var(--text-secondary)}
 .studio-source-modal-head button{display:grid;place-items:center;width:34px;height:34px;border:1px solid var(--line);border-radius:10px;background:transparent;color:var(--text);cursor:pointer}
 .studio-source-modal .studio-source-manager-body{padding:18px 20px 20px;border:0}
+
+.studio-source-modal-panel.is-upload-only{width:min(720px,94vw)}
+.studio-source-upload-body{display:grid;gap:14px;padding:20px}
+.studio-source-upload-body .resume-import{margin:0}
+.studio-master-flag.is-compact{margin:0;padding:13px 14px}
