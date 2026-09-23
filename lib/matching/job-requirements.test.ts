@@ -6,10 +6,10 @@ describe("weighted job requirements", () => {
     const result = extractJobRequirements(`
       You must have business analysis experience.
       Experience leading project delivery programmes.
-      Kubernetes is desirable.
+      Cloud experience is desirable.
     `);
     expect(result.find((item) => item.capability === "Business analysis")?.importance).toBe("mandatory");
-    expect(result.find((item) => item.capability === "Kubernetes")?.importance).toBe("preferred");
-    expect(result.find((item) => item.capability === "ServiceNow")?.evidenceText).toContain("must");
+    expect(result.find((item) => item.capability === "Cloud & infrastructure")?.importance).toBe("preferred");
+    expect(result.find((item) => item.capability === "Business analysis")?.evidenceText).toContain("must");
   });
 });
