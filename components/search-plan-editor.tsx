@@ -40,6 +40,7 @@ export function SearchPlanEditor({
   initialLocations,
   initialCompanies,
   initialRemotePreferences,
+  initialDirectEmployersOnly = false,
   targetLanes,
   movedCompanies = 0,
 }: {
@@ -56,6 +57,7 @@ export function SearchPlanEditor({
   initialLocations: string[];
   initialCompanies: string[];
   initialRemotePreferences: string[];
+  initialDirectEmployersOnly?: boolean;
   targetLanes: TargetLaneRecord[];
   /** Employers found in the saved cities list and moved across on load. */
   movedCompanies?: number;
