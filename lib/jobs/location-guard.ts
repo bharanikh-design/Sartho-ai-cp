@@ -116,41 +116,63 @@ export function deduplicateSearchResults<T extends {
   overallMatch?: number;
   applyDirect?: boolean;
   description?: string;
+  source?: string;
+  platforms?: string[];
 }>(results: T[]): T[] {
   const map = new Map<string, T>();
 
+  const normal = (value: string | null | undefined) =>
+    (value ?? "").toLowerCase().replace(/[^a-z0-9]/g, " ").replace(/\s+/g, " ").trim();
+  const locality = (value: string | null | undefined) => normal((value ?? "").split(",")[0] ?? "");
+  const provenance = (item: T) => [...new Set([...(item.platforms ?? []), ...(item.source ? [item.source] : [])])];
+
   for (const item of results) {
     const cleanEmp = sanitizeEmployer(item.employer);
-    const normTitle = item.title.toLowerCase().replace(/[^a-z0-9]/g, " ").replace(/\s+/g, " ").trim();
-    const normLoc = (item.location || "")
-      .toLowerCase()
-      .split(",")[0]
-      ?.replace(/[^a-z0-9]/g, " ")
-      .trim() || "";
+    const normTitle = normal(item.title);
+    const normEmp = normal(cleanEmp);
+    const normLoc = locality(item.location);
+    /*
+     * Employer is part of identity whenever we have one. The old title+city key
+     * collapsed two different companies hiring the same role in Singapore into
+     * one vacancy. Only employer-less scraper records fall back to title+place.
+     */
+    const exactKey = normEmp ? `${normTitle}::${normEmp}::${normLoc}` : "";
+    const unknownKey = `${normTitle}::unknown::${normLoc}`;
+    /*
+     * A junk/unknown employer may be the aggregator copy of a known-employer
+     * record. Let it join the sole matching title+location record, but never
+     * merge two different known employers merely because the title is equal.
+     */
+    const knownAtPlace = [...map.entries()].filter(([key]) => key.startsWith(`${normTitle}::`) && key.endsWith(`::${normLoc}`) && !key.includes("::unknown::"));
+    const compositeKey = exactKey || (knownAtPlace.length === 1 ? knownAtPlace[0][0] : unknownKey);
 
-    // A composite key based on title + location locality
-    const compositeKey = normLoc ? `${normTitle}::${normLoc}` : `${normTitle}::${cleanEmp ?? ""}`;
-
-    const existing = map.get(compositeKey);
-    if (!existing) {
-      map.set(compositeKey, cleanEmp !== item.employer ? { ...item, employer: cleanEmp } : item);
-      continue;
+    const candidate = cleanEmp !== item.employer ? { ...item, employer: cleanEmp } : item;
+    let existing = map.get(compositeKey);
+    if (!existing && normEmp && map.has(unknownKey)) {
+      existing = map.get(unknownKey);
+      map.delete(unknownKey);
     }
+    if (!existing) { map.set(compositeKey, candidate); continue; }
 
-    // Determine which duplicate is higher fidelity:
-    const existingHasEmp = Boolean(sanitizeEmployer(existing.employer));
-    const newHasEmp = Boolean(cleanEmp);
+    const existingDirect = existing.applyDirect === true;
+    const candidateDirect = candidate.applyDirect === true;
+    const existingDepth = existing.description?.length ?? 0;
+    const candidateDepth = candidate.description?.length ?? 0;
 
-    if (!existingHasEmp && newHasEmp) {
-      // Replace existing junk employer with new real employer
-      map.set(compositeKey, { ...item, employer: cleanEmp });
-    } else if (item.applyDirect && !existing.applyDirect) {
-      // Replace aggregator listing with direct apply link
-      map.set(compositeKey, cleanEmp !== item.employer ? { ...item, employer: cleanEmp } : item);
-    } else if ((item.overallMatch ?? 0) > (existing.overallMatch ?? 0)) {
-      // Retain higher match score
-      map.set(compositeKey, cleanEmp !== item.employer ? { ...item, employer: cleanEmp } : item);
-    }
+    /*
+     * Source trust outranks score. A match score is about the candidate, not
+     * whether a LinkedIn mirror is a better canonical record than the employer
+     * careers page. Direct employer wins; then fuller advert; score is only the
+     * final tie-breaker.
+     */
+    let winner = existing;
+    let loser = candidate;
+    if (candidateDirect && !existingDirect) { winner = candidate; loser = existing; }
+    else if (candidateDirect === existingDirect && candidateDepth > existingDepth) { winner = candidate; loser = existing; }
+    else if (candidateDirect === existingDirect && candidateDepth === existingDepth && (candidate.overallMatch ?? 0) > (existing.overallMatch ?? 0)) { winner = candidate; loser = existing; }
+
+    const mergedPlatforms = [...new Set([...provenance(winner), ...provenance(loser)])];
+    map.set(compositeKey, { ...winner, platforms: mergedPlatforms } as T);
   }
 
   return Array.from(map.values());
