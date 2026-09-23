@@ -136,13 +136,18 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
             <SummaryMetric label="Preferred" value={`${summary?.preferredMet ?? 0}/${summary?.preferredTotal ?? 0}`} />
             <SummaryMetric label="Honest gaps" value={String(summary?.honestGaps.length ?? 0)} />
           </div>
+          <div className="requirement-legend" aria-label="Requirement priority">
+            <span><strong>Mandatory</strong> — the advert says you must have it</span>
+            <span><strong>Important</strong> — central to doing the work, even when not labelled must-have</span>
+            <span><strong>Preferred</strong> — useful advantage, not a hard gate</span>
+          </div>
 
-          {(["mandatory", "preferred", "contextual"] as RequirementType[]).map((type) => {
+          {(["mandatory", "contextual", "preferred"] as RequirementType[]).map((type) => {
             const group = requirements.filter((requirement) => requirement.requirement_type === type);
             if (!group.length) return null;
             return (
               <div className="requirement-group" key={type}>
-                <h3>{type}</h3>
+                <h3>{type === "contextual" ? "important" : type}</h3>
                 <div className="requirement-list">
                   {group.map((requirement) => <RequirementCard key={requirement.id} requirement={requirement} evidenceMap={evidenceMap} />)}
                 </div>
