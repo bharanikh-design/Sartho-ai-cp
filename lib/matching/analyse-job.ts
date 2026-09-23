@@ -1,6 +1,7 @@
 import type { SkillProfile, SkillStrength } from "@/lib/matching/skill-profile";
 import { capabilitiesIn } from "@/lib/matching/skill-vocabulary";
-import type { TitleFit } from "@/lib/matching/title-fit";\nimport { extractJobRequirements, type JobRequirement } from "@/lib/matching/job-requirements";
+import type { TitleFit } from "@/lib/matching/title-fit";
+import { extractJobRequirements, type JobRequirement } from "@/lib/matching/job-requirements";
 
 /*
  * How many distinct capabilities an advert has to name before its coverage
