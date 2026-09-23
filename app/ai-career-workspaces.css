@@ -1263,3 +1263,20 @@ h2.resume-doc-heading.resume-doc-field { margin-bottom: 0; border-bottom: 1px so
 .studio-source-upload-body{display:grid;gap:14px;padding:20px}
 .studio-source-upload-body .resume-import{margin:0}
 .studio-master-flag.is-compact{margin:0;padding:13px 14px}
+
+/* Resume Studio visual balance: paired actions and upload choices share geometry. */
+.studio-quick-actions{align-items:stretch}
+.studio-quick-action{box-sizing:border-box;width:100%;height:76px;min-height:76px;padding:14px 18px;text-align:left;font:inherit}
+.studio-quick-action-icon{flex:0 0 36px;width:36px;height:36px}
+.studio-quick-action strong{font-size:16px;line-height:1.25}
+.studio-quick-action small{font-size:14px;line-height:1.35}
+.studio-source-modal-panel.is-upload-only{width:min(860px,94vw)}
+.studio-source-modal-panel.is-upload-only .studio-source-modal-head{padding:22px 24px}
+.studio-source-modal-panel.is-upload-only .studio-source-modal-head strong{font-size:22px;line-height:1.2}
+.studio-source-modal-panel.is-upload-only .studio-source-modal-head small{font-size:15px;line-height:1.45}
+.studio-source-modal-panel.is-upload-only .studio-source-upload-body{gap:18px;padding:24px}
+.studio-source-modal-panel.is-upload-only .resume-import-dropzone{min-height:220px;display:flex;flex-direction:column;justify-content:center}
+.studio-source-modal-panel.is-upload-only .resume-import-dropzone .primary-button,.studio-source-modal-panel.is-upload-only .drive-picker-button{min-height:58px;font-size:16px}
+.studio-source-modal-panel.is-upload-only .studio-master-flag.is-compact{min-height:76px;padding:16px 18px;align-items:center}
+.studio-source-modal-panel.is-upload-only .studio-master-flag strong{font-size:16px}
+.studio-source-modal-panel.is-upload-only .studio-master-flag small{font-size:14px}
