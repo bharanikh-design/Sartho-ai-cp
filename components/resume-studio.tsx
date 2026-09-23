@@ -1598,7 +1598,7 @@ return (
       <section className="glass-card content-card" id="add">
         <div className="card-header">
           <div>
-            <h2 className="section-heading">Add a résumé</h2>
+            <h2 className="section-heading">Manage source résumés</h2>
             <p className="section-subtitle">
               PDF, Word or plain text. Sartho reads it into the career facts everything else is built from,
               and keeps the file and its full text exactly as you uploaded them.
@@ -1652,7 +1652,7 @@ return (
           * on another page with the document itself missing from it.
           */}
         <div className="studio-uploads" id="uploads">
-          <h3 className="section-heading" style={{ fontSize: "var(--text-sm)", margin: "18px 0 8px" }}>Uploaded résumés</h3>
+          <h3 className="section-heading" style={{ fontSize: "var(--text-sm)", margin: "18px 0 8px" }}>Your source résumés</h3>
           <ResumeUploads imports={uploads} studioSourceId={master?.sourceImportId ?? null} onOpenInStudio={openUploadInStudio} />
         </div>
       </section>
@@ -1679,7 +1679,7 @@ return (
         <section className="glass-card content-card" id="create">
           <div className="card-header">
             <div>
-              <h2 className="section-heading">Build a new résumé</h2>
+              <h2 className="section-heading">Build a tailored résumé</h2>
               <p className="section-subtitle">Pick a role whose requirements Sartho has already read. The draft uses only approved evidence.</p>
             </div>
           </div>
