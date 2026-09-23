@@ -1597,73 +1597,19 @@ return (
         * the CV you already have and makes it better. Neither invents.
         */}
       {sourceManagerOpen ? (
-        <div className="studio-source-modal" role="dialog" aria-modal="true" aria-label="Add or manage source résumés" onClick={(event) => { if (event.target === event.currentTarget) setSourceManagerOpen(false); }}>
-          <section className="studio-source-modal-panel">
+        <div className="studio-source-modal" role="dialog" aria-modal="true" aria-label="Add source résumé" onClick={(event) => { if (event.target === event.currentTarget) setSourceManagerOpen(false); }}>
+          <section className="studio-source-modal-panel is-upload-only">
             <header className="studio-source-modal-head">
-              <div><strong>Add or manage source résumés</strong><small>Upload, choose your master, or retrieve an original file without leaving Résumé Studio.</small></div>
-              <button type="button" aria-label="Close source résumé manager" onClick={() => setSourceManagerOpen(false)}>✕</button>
+              <div><strong>Add source résumé</strong><small>Upload a PDF or Word file. Your original stays unchanged.</small></div>
+              <button type="button" aria-label="Close" onClick={() => setSourceManagerOpen(false)}>✕</button>
             </header>
-            <div className="studio-source-manager-body">
-        <div className="card-header">
-          <div>
-            <h2 className="section-heading">Manage source résumés</h2>
-            <p className="section-subtitle">
-              PDF, Word or plain text. Sartho reads it into the career facts everything else is built from,
-              and keeps the file and its full text exactly as you uploaded them.
-            </p>
-          </div>
-          {uploads.length ? <span className="meta-pill">{uploads.length} uploaded</span> : null}
-        </div>
-
-        {/*
-          * An upload, not a paste box.
-          *
-          * This was "Improve a résumé you already have": a textarea, a "read
-          * from a file" button, and a separate scoring and rewriting loop that
-          * did not touch anything else in the product. So a résumé improved
-          * there existed nowhere afterwards — not in the list, not as a master,
-          * not as evidence. It was a second résumé tool living inside the first
-          * one, with its own idea of what a résumé is.
-          *
-          * The same import that runs on Career Truth runs here, because there
-          * should be exactly one way a document gets into Sartho. What is added
-          * is the checkbox: whether this one also becomes the master.
-          */}
-        <label className="studio-master-flag">
-          <input
-            type="checkbox"
-            checked={makeMaster}
-            onChange={(event) => setMakeMaster(event.target.checked)}
-          />
-          <span>
-            <strong>Make this my master résumé</strong>
-            <small>
-              Flags this upload as the master. It is kept word for word as you gave it — nothing is rewritten or shortened.
-              You can move the flag to another upload at any time below.
-            </small>
-          </span>
-        </label>
-
-        <ResumeImport
-          hasEvidence
-          showLead={false}
-          driveConnected={driveConnected}
-          makeMaster={makeMaster}
-        />
-
-        {/*
-          * The uploads themselves, where the upload happened.
-          *
-          * Until now this page showed only the documents Sartho had written,
-          * and the file somebody uploaded was deleted the moment it was read.
-          * So the answer to "where is the résumé I just gave you" was a list
-          * on another page with the document itself missing from it.
-          */}
-        <div className="studio-uploads" id="uploads">
-          <h3 className="section-heading" style={{ fontSize: "var(--text-sm)", margin: "18px 0 8px" }}>Your source résumés</h3>
-          <ResumeUploads imports={uploads} studioSourceId={master?.sourceImportId ?? null} onOpenInStudio={openUploadInStudio} />
-        </div>
-        </div>
+            <div className="studio-source-upload-body">
+              <ResumeImport hasEvidence showLead={false} driveConnected={driveConnected} makeMaster={makeMaster} />
+              <label className="studio-master-flag is-compact">
+                <input type="checkbox" checked={makeMaster} onChange={(event) => setMakeMaster(event.target.checked)} />
+                <span><strong>Make this my master résumé</strong><small>Use this as the source for future tailored résumés.</small></span>
+              </label>
+            </div>
           </section>
         </div>
       ) : null}
