@@ -150,90 +150,56 @@ export default async function DashboardPage({
         * it.
         */}
 
-      <JourneyNudgeCard progress={journey.progress} isActivated={journey.activated} steps={journey.steps} />
-
-      <ProfileScorecard steps={journey.steps} progress={journey.progress} activated={journey.activated} />
-
-      <section className="dashboard-workflow command-centre-journey" aria-labelledby="career-journey-title">
-        <div className="dashboard-section-heading">
-          <div>
-            <p className="product-system-eyebrow">Your career journey</p>
-            <h2 id="career-journey-title">Every step connects to the next</h2>
+      <section className="career-pulse" aria-labelledby="career-pulse-title">
+        <article className="career-pulse-hero">
+          <p className="product-system-eyebrow">{commandCentre.nextAction.eyebrow}</p>
+          <h2 id="career-pulse-title">{commandCentre.nextAction.title}</h2>
+          <p>{commandCentre.nextAction.description}</p>
+          {commandCentre.aiBrief ? (
+            <div className="career-pulse-proof">
+              <span><strong>{commandCentre.aiBrief.match ?? "—"}</strong> Job Match</span>
+              <span><strong>{commandCentre.aiBrief.recommendation ?? "Review"}</strong> recommendation</span>
+              <span><strong>{commandCentre.aiBrief.analysisComplete ? "Mapped" : "Next"}</strong> evidence</span>
+            </div>
+          ) : null}
+          <div className="career-pulse-action">
+            <details><summary>Why this now?</summary><p>{commandCentre.nextAction.reason}</p></details>
+            <Link href={commandCentre.nextAction.href} className="command-centre-primary-action">{commandCentre.nextAction.label} <span aria-hidden="true">→</span></Link>
           </div>
-          <span>Live status from your private workspace</span>
-        </div>
+        </article>
 
-        <div className="command-centre-stage-track">
-          <div className="command-centre-stage-line" aria-hidden="true" />
+        <div className="career-pulse-stack" aria-label="Career health">
+          <Link href="/career-profile" className="career-pulse-mini is-profile">
+            <small>Profile intelligence</small><strong>{approvedEvidence}</strong><span>approved evidence items</span>
+            {pendingEvidence ? <em>{pendingEvidence} awaiting your review</em> : <em>Evidence is up to date</em>}
+          </Link>
+          <Link href="/applications" className="career-pulse-mini">
+            <small>Opportunities</small><strong>{(jobsResult.data ?? []).filter((job) => job.recommendation === "apply").length}</strong><span>strong matches</span><em>{(jobsResult.data ?? []).length} roles tracked</em>
+          </Link>
+          <Link href="/resume-studio" className="career-pulse-mini">
+            <small>Résumé readiness</small><strong>{journey.steps.find((step) => step.id === "resume")?.complete ? "Ready" : "Next"}</strong><span>career source of truth</span><em>Open Résumé Studio</em>
+          </Link>
+        </div>
+      </section>
+
+      <section className="career-rail" aria-labelledby="career-rail-title">
+        <div className="career-rail-heading"><div><p className="product-system-eyebrow">Your career journey</p><h2 id="career-rail-title">From evidence to outcome</h2></div><span>{journey.progress}% complete</span></div>
+        <div className="career-rail-track">
           {commandCentre.stages.map((stage, index) => (
-            <Link
-              className={`command-centre-stage is-${stage.state}`}
-              href={stage.href}
-              key={stage.id}
-              aria-current={stage.state === "current" ? "step" : undefined}
-            >
-              <span className="command-centre-stage-marker" aria-hidden="true">
-                {stage.state === "complete" ? "✓" : index + 1}
-              </span>
-              <span className="command-centre-stage-copy">
-                <small>{stage.label}</small>
-                <strong>{stage.value}</strong>
-                <span>{stage.detail}</span>
-              </span>
-              <b aria-hidden="true">→</b>
+            <Link href={stage.href} className={`career-rail-step is-${stage.state}`} key={stage.id} aria-current={stage.state === "current" ? "step" : undefined}>
+              <i aria-hidden="true">{stage.state === "complete" ? "✓" : index + 1}</i><span><small>{stage.label}</small><strong>{stage.value}</strong></span>
             </Link>
           ))}
         </div>
       </section>
 
-      <section className="command-centre-focus" aria-label="Sartho priority guidance">
-        <article className="command-centre-next-action">
-          <div className="command-centre-action-copy">
-            <p className="command-centre-kicker">{commandCentre.nextAction.eyebrow}</p>
-            <h2>{commandCentre.nextAction.title}</h2>
-            <p>{commandCentre.nextAction.description}</p>
-          </div>
-          <div className="command-centre-action-footer">
-            <details>
-              <summary>Why this now?</summary>
-              <p>{commandCentre.nextAction.reason}</p>
-            </details>
-            <Link href={commandCentre.nextAction.href} className="command-centre-primary-action">
-              {commandCentre.nextAction.label} <span aria-hidden="true">→</span>
-            </Link>
-          </div>
-        </article>
-
-        <aside className="command-centre-ai-brief" aria-labelledby="ai-brief-title">
-          <div className="command-centre-ai-heading">
-            <span className="command-centre-ai-symbol" aria-hidden="true">✦</span>
-            <div>
-              <p className="product-system-eyebrow">AI career briefing</p>
-              <small>Grounded in your approved data</small>
-            </div>
-          </div>
-          {commandCentre.aiBrief ? (
-            <>
-              <div className="command-centre-ai-role">
-                <span>{commandCentre.aiBrief.employer}</span>
-                <h3 id="ai-brief-title">{commandCentre.aiBrief.title}</h3>
-              </div>
-              <p>{commandCentre.aiBrief.summary}</p>
-              <div className="command-centre-ai-signals" aria-label="Opportunity signals">
-                <span><strong>{commandCentre.aiBrief.match ?? "—"}</strong> profile support</span>
-                <span><strong>{commandCentre.aiBrief.recommendation ?? "Pending"}</strong> recommendation</span>
-                <span><strong>{commandCentre.aiBrief.analysisComplete ? "Complete" : "Next"}</strong> evidence mapping</span>
-              </div>
-              <Link href={commandCentre.aiBrief.href}>Review the evidence <span aria-hidden="true">→</span></Link>
-            </>
-          ) : (
-            <div className="command-centre-ai-empty">
-              <h3 id="ai-brief-title">Ready when your next role is.</h3>
-              <p>Add a real job description and Sartho will explain the fit, gaps and best next action using your confirmed Career Profile.</p>
-              <Link href="/applications#add-role">Analyse a role <span aria-hidden="true">→</span></Link>
-            </div>
-          )}
-        </aside>
+      <section className="career-changes" aria-labelledby="career-changes-title">
+        <div className="career-changes-heading"><div><p className="product-system-eyebrow">Career intelligence</p><h2 id="career-changes-title">What Sartho sees now</h2></div><span>Grounded in your live workspace</span></div>
+        <div className="career-change-grid">
+          <article className="career-change-card"><span className="career-change-spark" aria-hidden="true">✦</span><small>Evidence</small><strong>{approvedEvidence} approved</strong><p>{pendingEvidence ? `${pendingEvidence} item${pendingEvidence === 1 ? "" : "s"} need your decision.` : "Your evidence base is currently reviewed."}</p></article>
+          <article className="career-change-card"><span className="career-change-spark" aria-hidden="true">↗</span><small>Opportunity signal</small><strong>{(jobsResult.data ?? []).filter((job) => job.recommendation === "apply").length} strong matches</strong><p>Roles marked Apply have evidence-backed fit, not keyword similarity alone.</p></article>
+          <article className="career-change-card"><span className="career-change-spark" aria-hidden="true">◎</span><small>Current focus</small><strong>{journey.current.title}</strong><p>{journey.current.reason}</p></article>
+        </div>
       </section>
 
       <section className="command-centre-review" aria-labelledby="review-queue-title">
