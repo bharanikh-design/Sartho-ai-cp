@@ -89,6 +89,7 @@ export default async function DashboardPage({
         {welcome ? <WelcomeCinematic /> : null}
       <div className="page-stack dashboard-page">
         <OnboardingCarousel user={user} />
+        <Link href="/welcome" className="tour-replay-link" title="Take the Sartho product tour" aria-label="Take the Sartho product tour"><span aria-hidden="true">▶</span> Tour</Link>
         <ProductPageHeader
           eyebrow="Welcome to Sartho"
           title={`Let's start with your résumé, ${firstName}.`}
@@ -132,6 +133,7 @@ export default async function DashboardPage({
       {welcome ? <WelcomeCinematic /> : null}
     <div className="page-stack dashboard-page command-centre-page">
       <OnboardingCarousel user={user} />
+      <Link href="/welcome" className="tour-replay-link" title="Take the Sartho product tour" aria-label="Take the Sartho product tour"><span aria-hidden="true">▶</span> Tour</Link>
       <ProductPageHeader
         eyebrow="Career Command Centre"
         title={`Welcome back, ${firstName}.`}
