@@ -320,7 +320,7 @@
    * competition, not a requirement of the role, and Sartho labels them so.
    */
   let applicants = "";
-  let hiringManager = "";
+  let hiringManager = "";\n  let jobPoster = "";\n  let applyUrl = "";
   try {
     if (location.hostname.includes("linkedin.com")) {
       /*
