@@ -29,7 +29,7 @@ export type SearchPreferences = {
   remotePreferences: string[];
   sources: SearchSourcePreference[];
   /** Prefer vacancies verified on the employer's own careers channel. */
-  directEmployersOnly: boolean;
+  directEmployersOnly?: boolean;
 };
 
 function isSearchSource(value: unknown): value is SearchSourcePreference {
