@@ -5,7 +5,8 @@
 import type { JobSearchResult } from "@/lib/jobs/search-provider";
 import type { DirectCareerQuery, EmployerPortalConfig } from "./types";
 import { searchWorkdayPortal } from "./workday";
-import { searchGreenhousePortal } from "./greenhouse";\nimport { searchLeverPortal } from "./lever";
+import { searchGreenhousePortal } from "./greenhouse";
+import { searchLeverPortal } from "./lever";
 
 export const EMPLOYER_PORTALS: EmployerPortalConfig[] = [
   {
