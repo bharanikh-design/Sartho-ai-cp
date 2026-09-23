@@ -65,6 +65,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
       "Content-Length": String(file.size),
       "Content-Disposition": contentDisposition(data.file_name as string),
       "Cache-Control": "private, no-store",
+      "X-Sartho-Resume-Mode": "original-immutable",
     },
   });
 }
