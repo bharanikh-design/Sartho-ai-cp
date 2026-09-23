@@ -309,32 +309,18 @@ export function ResumeImport({
       {error ? <div className="inline-error" role="alert">{error}</div> : null}
 
       {result ? (
-        <div className="resume-import-result" role="status">
-          <strong>
-            {result.evidenceCreated
-              ? "Your career evidence is ready"
-              : "Nothing new in that one"}
-          </strong>
-          <span>
-            {result.rolesCreated ? `${result.rolesCreated} role${result.rolesCreated === 1 ? "" : "s"} added. ` : ""}
-            {result.evidenceSkipped
-              ? "Existing details were kept and new information was reconciled."
-              : `${result.evidenceCreated} career fact${result.evidenceCreated === 1 ? "" : "s"} approved and ready to use.`}
-            {result.isMaster ? " Kept as your master résumé." : ""}
-          </span>
-
-          {/*
-            * The label is built from what actually happened rather than passed
-            * in, so it cannot promise claims to review when none were found.
-            */}
-          {continueHref ? (
-            <Link href={continueHref} className="resume-import-continue">
-              {result.evidenceCreated
-                ? "Choose your career direction"
-                : "Continue"}
-              <span aria-hidden="true">→</span>
-            </Link>
-          ) : null}
+        <div className="resume-import-success" role="status">
+          <div className="resume-success-mark" aria-hidden="true"><span>✓</span></div>
+          <div className="resume-success-copy">
+            <small>Step 1 complete</small>
+            <strong>Got it. Your résumé is safely in Sartho.</strong>
+            <span><b>{fileName}</b>{result.isMaster ? " · Master résumé" : ""}</span>
+            <p>{result.rolesCreated ? `${result.rolesCreated} role${result.rolesCreated === 1 ? "" : "s"} and ${result.evidenceCreated} career fact${result.evidenceCreated === 1 ? "" : "s"} are ready.` : "Your original document is stored safely. Sartho will keep building from it."}</p>
+          </div>
+          <div className="resume-success-actions">
+            <Link href="/resume-studio#drafts" className="secondary-button">Open My Résumés</Link>
+            <Link href={continueHref ?? "/career-direction"} className="primary-button">Next: choose career direction <span aria-hidden="true">→</span></Link>
+          </div>
         </div>
       ) : null}
     </div>
