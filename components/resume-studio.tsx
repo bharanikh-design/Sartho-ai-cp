@@ -1440,6 +1440,20 @@ return (
               </button>
             </div>
             ) : null}
+            {openId && !showGrid ? (
+              <button
+                type="button"
+                className="studio-collapse-list"
+                onClick={() => setOpenId(null)}
+                title="Collapse the open résumé back to the list"
+                aria-label="Collapse open résumé to list view"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="m18 15-6-6-6 6" />
+                </svg>
+                <span>Collapse to list</span>
+              </button>
+            ) : null}
             <span className="meta-pill">{allDrafts.length} résumé{allDrafts.length === 1 ? "" : "s"}</span>
           </div>
         </div>
