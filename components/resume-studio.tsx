@@ -262,6 +262,7 @@ export function ResumeStudio({
    * exactly as it was given, and nothing is rewritten from it.
    */
   const [makeMaster, setMakeMaster] = useState(false);
+  const [sourceManagerOpen, setSourceManagerOpen] = useState(false);
 
   /*
    * List or grid.
@@ -1397,10 +1398,10 @@ return (
       {error ? <div className="inline-error" role="alert">{error}</div> : null}
 
       <nav className="studio-quick-actions" aria-label="Résumé Studio actions">
-        <a className="studio-quick-action" href="#add">
+        <button type="button" className="studio-quick-action" onClick={() => setSourceManagerOpen(true)}>
           <span className="studio-quick-action-icon" aria-hidden="true">＋</span>
-          <span><strong>Add résumé</strong><small>Upload a source document</small></span>
-        </a>
+          <span><strong>Add résumé</strong><small>Upload or manage source documents</small></span>
+        </button>
         <a className="studio-quick-action" href="#create" aria-disabled={!canBuild}>
           <span className="studio-quick-action-icon" aria-hidden="true">✦</span>
           <span><strong>Build résumé</strong><small>{canBuild ? "Tailor to an analysed role" : "Analyse a role to unlock"}</small></span>
@@ -1595,7 +1596,14 @@ return (
         * "Build a new one" tailors to a role you are applying for; this takes
         * the CV you already have and makes it better. Neither invents.
         */}
-      <details className="glass-card content-card studio-source-manager" id="add">\n        <summary className="studio-source-manager-summary"><span><strong>Add or manage source résumés</strong><small>Upload, choose your master, or retrieve the original file</small></span><span aria-hidden="true">＋</span></summary>\n        <div className="studio-source-manager-body">
+      {sourceManagerOpen ? (
+        <div className="studio-source-modal" role="dialog" aria-modal="true" aria-label="Add or manage source résumés" onClick={(event) => { if (event.target === event.currentTarget) setSourceManagerOpen(false); }}>
+          <section className="studio-source-modal-panel">
+            <header className="studio-source-modal-head">
+              <div><strong>Add or manage source résumés</strong><small>Upload, choose your master, or retrieve an original file without leaving Résumé Studio.</small></div>
+              <button type="button" aria-label="Close source résumé manager" onClick={() => setSourceManagerOpen(false)}>✕</button>
+            </header>
+            <div className="studio-source-manager-body">
         <div className="card-header">
           <div>
             <h2 className="section-heading">Manage source résumés</h2>
@@ -1656,26 +1664,10 @@ return (
           <ResumeUploads imports={uploads} studioSourceId={master?.sourceImportId ?? null} onOpenInStudio={openUploadInStudio} />
         </div>
         </div>
-      </details>
+          </section>
+        </div>
+      ) : null}
 
-      {/*
-        * Only when there is something to build from.
-        *
-        * This was a permanent card, and most of the time its entire content was
-        * a sentence saying the work is somewhere else: "Every analysed role
-        * already has a résumé. Analyse another one in Opportunities." A card
-        * that exists to tell you it has nothing for you is worse than no card —
-        * it takes the space, the scroll and the attention of a real one.
-        *
-        * It is not a duplicate of the workbench above, which is why it is
-        * hidden rather than deleted. The workbench improves a CV you already
-        * wrote; this drafts a new one tailored to a specific advert from
-        * approved evidence. Both are real, and neither can do the other's job.
-        *
-        * When there is nothing to build, the reason now appears once — in the
-        * empty state of "Your résumés", where somebody is actually looking for
-        * a résumé and not finding one.
-        */}
       {canBuild ? (
         <section className="glass-card content-card" id="create">
           <div className="card-header">

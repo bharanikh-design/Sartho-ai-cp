@@ -1251,3 +1251,10 @@ h2.resume-doc-heading.resume-doc-field { margin-bottom: 0; border-bottom: 1px so
 .studio-source-manager-summary>span:last-child{display:grid;place-items:center;width:30px;height:30px;border:1px solid var(--line);border-radius:9px;font-size:18px;transition:transform .18s ease}
 .studio-source-manager[open] .studio-source-manager-summary>span:last-child{transform:rotate(45deg)}
 .studio-source-manager-body{padding:0 18px 18px;border-top:1px solid var(--line)}
+
+.studio-source-modal{position:fixed;inset:0;z-index:10000;display:grid;place-items:center;padding:24px;background:rgba(0,0,0,.72);backdrop-filter:blur(8px)}
+.studio-source-modal-panel{width:min(900px,94vw);max-height:88vh;overflow:auto;border:1px solid var(--line-bright);border-radius:18px;background:var(--canvas);box-shadow:0 28px 80px rgba(0,0,0,.55)}
+.studio-source-modal-head{position:sticky;top:0;z-index:2;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:18px 20px;border-bottom:1px solid var(--line);background:var(--canvas)}
+.studio-source-modal-head>div{display:grid;gap:3px}.studio-source-modal-head strong{font-size:var(--text-md)}.studio-source-modal-head small{color:var(--text-secondary)}
+.studio-source-modal-head button{display:grid;place-items:center;width:34px;height:34px;border:1px solid var(--line);border-radius:10px;background:transparent;color:var(--text);cursor:pointer}
+.studio-source-modal .studio-source-manager-body{padding:18px 20px 20px;border:0}
