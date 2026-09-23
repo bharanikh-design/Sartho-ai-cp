@@ -435,3 +435,5 @@ textarea:focus-visible,
   .admin-funnel-row { grid-template-columns: minmax(0,1fr) 84px; }
   .admin-funnel-bar { grid-column: 1 / -1; }
 }
+
+.import-banner__saved-mark{flex:0 0 auto;display:grid;place-items:center;width:24px;height:24px;border:1px solid rgba(111,222,168,.45);border-radius:999px;background:rgba(111,222,168,.10);color:#78dda9;font-size:13px;font-weight:800}
