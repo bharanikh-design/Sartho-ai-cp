@@ -225,7 +225,9 @@ export function analyseJobDescription(
   let recommendation: JobRecommendation;
   if (!matchedSkills.length && titleFit < 40) {
     recommendation = "skip";
-  } else if (mandatory.length >= 2 && mandatoryCoverage < 50) {\n    recommendation = "review";\n  } else if ((titleFit >= 60 && requirementCoverage >= 35) || (leadingMatched.length >= 2 && requirementCoverage >= 50)) {
+  } else if (mandatory.length >= 2 && mandatoryCoverage < 50) {
+    recommendation = "review";
+  } else if ((titleFit >= 60 && requirementCoverage >= 35) || (leadingMatched.length >= 2 && requirementCoverage >= 50)) {
     recommendation = "apply";
   } else {
     recommendation = "review";
