@@ -394,7 +394,7 @@ export function SearchPlanEditor({
 
           <div className="search-criteria-row" id="careers-source">
             <label>
-              <strong>Know an employer's careers page?</strong>
+              <strong>Know an employer&apos;s careers page?</strong>
               <small>Optional. Paste the employer and its careers URL. Sartho will test the source before trusting it; verified employers are added to your targets.</small>
             </label>
             <div className="career-source-connect">
