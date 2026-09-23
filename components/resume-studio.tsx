@@ -1595,7 +1595,7 @@ return (
         * "Build a new one" tailors to a role you are applying for; this takes
         * the CV you already have and makes it better. Neither invents.
         */}
-      <section className="glass-card content-card" id="add">
+      <details className="glass-card content-card studio-source-manager" id="add">\n        <summary className="studio-source-manager-summary"><span><strong>Add or manage source résumés</strong><small>Upload, choose your master, or retrieve the original file</small></span><span aria-hidden="true">＋</span></summary>\n        <div className="studio-source-manager-body">
         <div className="card-header">
           <div>
             <h2 className="section-heading">Manage source résumés</h2>
@@ -1655,7 +1655,8 @@ return (
           <h3 className="section-heading" style={{ fontSize: "var(--text-sm)", margin: "18px 0 8px" }}>Your source résumés</h3>
           <ResumeUploads imports={uploads} studioSourceId={master?.sourceImportId ?? null} onOpenInStudio={openUploadInStudio} />
         </div>
-      </section>
+        </div>
+      </details>
 
       {/*
         * Only when there is something to build from.
