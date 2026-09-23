@@ -84,7 +84,8 @@ export function SearchPlanEditor({
   const [employmentTypes, setEmploymentTypes] = useState(initialEmploymentTypes);
   const [locations, setLocations] = useState(initialLocations);
   const [companies, setCompanies] = useState(initialCompanies);
-  const [remotePreferences, setRemotePreferences] = useState(initialRemotePreferences);\n  const [directEmployersOnly, setDirectEmployersOnly] = useState(initialDirectEmployersOnly);
+  const [remotePreferences, setRemotePreferences] = useState(initialRemotePreferences);
+  const [directEmployersOnly, setDirectEmployersOnly] = useState(initialDirectEmployersOnly);
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
 
   /*
@@ -115,7 +116,8 @@ export function SearchPlanEditor({
   const hasChanges = useMemo(() => {
     if (!sameList(codes, initialCountries)) return true;
     if (movedCompanies > 0) return true;
-    if (!sameList(remotePreferences, initialRemotePreferences)) return true;\n    if (directEmployersOnly !== initialDirectEmployersOnly) return true;
+    if (!sameList(remotePreferences, initialRemotePreferences)) return true;
+    if (directEmployersOnly !== initialDirectEmployersOnly) return true;
     /* A band suggested from the résumé but never saved is a change too. */
     if (experience !== initialExperience) return true;
     if (!sameList(employmentTypes, initialEmploymentTypes)) return true;
@@ -219,7 +221,8 @@ export function SearchPlanEditor({
     experience ? experienceBand(experience)?.label ?? "" : "",
     companies.length ? `${companies.length} employer${companies.length === 1 ? "" : "s"}` : "",
     employmentTypes.join(" · "),
-    remotePreferences.join(" · "),\n    directEmployersOnly ? "Direct employers only" : "",
+    remotePreferences.join(" · "),
+    directEmployersOnly ? "Direct employers only" : "",
   ].filter(Boolean);
 
   return (
