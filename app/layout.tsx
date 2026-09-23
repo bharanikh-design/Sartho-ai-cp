@@ -20,6 +20,12 @@ import "./ai-career-workspaces.css";
 import "./product-system.css";
 import "./landing.css";
 import "./welcome.css";
+/*
+ * Last import wins. The monochrome layer redefines the palette tokens as pure
+ * black/white and flattens every gradient, for both data-theme="dark" and
+ * data-theme="light".
+ */
+import "./monochrome.css";
 import { AppShell } from "@/components/app-shell";
 import { siteMetadata } from "@/lib/site-metadata";
 
