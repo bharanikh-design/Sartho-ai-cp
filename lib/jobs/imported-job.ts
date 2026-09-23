@@ -22,6 +22,9 @@ export type ImportedJob = {
   /** Context about the competition, shown at import and not stored. */
   applicants: string;
   hiringManager: string;
+  jobPoster: string;
+  applyUrl: string;
+  capturedAt: string;
   /** How the extension read the page, so a wrong capture is explainable. */
   readBy: string;
 };
@@ -117,6 +120,9 @@ export function parseImportedJob(payload: unknown): ImportedJobResult {
       description,
       applicants: text(input.applicants, 120),
       hiringManager: text(input.hiringManager, 120),
+      jobPoster: text(input.jobPoster, 120),
+      applyUrl: sourceUrl(input.applyUrl),
+      capturedAt: text(input.capturedAt, 80),
       readBy: text(input.readBy, 60),
     },
   };
