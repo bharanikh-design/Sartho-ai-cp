@@ -261,6 +261,8 @@ export function JobImportBridge() {
           <p className="section-subtitle import-banner__intel">
             {captured.applicants ? <span>{captured.applicants}</span> : null}
             {captured.hiringManager ? <span>Hiring contact: {captured.hiringManager}</span> : null}
+            {captured.jobPoster && captured.jobPoster !== captured.hiringManager ? <span>Posted by: {captured.jobPoster}</span> : null}
+            {captured.applyUrl ? <a href={captured.applyUrl} target="_blank" rel="noreferrer">Apply on source ↗</a> : null}
             <span className="import-banner__intel-note">read from the job board just now, not saved</span>
           </p>
         ) : null}
