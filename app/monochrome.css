@@ -100,49 +100,12 @@ body::before {
   display: none;
 }
 
-/* ---- 4. Flatten every gradient ------------------------------------------ */
+/* ---- 4. Theme contract -------------------------------------------------- */
 /*
- * A single broad rule is deliberate. The codebase carries gradients across ~20
- * stylesheets; enumerating them would leave stragglers. Anything that needs a
- * real gradient later can opt back in with .allow-gradient.
+ * Theme is palette, not layout. Do not use universal selectors here and do not
+ * erase component backgrounds/animation globally. A theme switch must leave
+ * sidebar width, card geometry, spacing and visual hierarchy untouched.
  */
-
-*:not(.allow-gradient) {
-  background-image: none;
-}
-
-/* Elements whose entire visual was a gradient need a flat fallback. */
-.glass-card,
-.glass-card-soft,
-.content-card,
-.panel,
-.hero-panel,
-.feature-device,
-.profile-menu,
-.profile-protection-dialog,
-.direction-ai-advisor,
-.direction-path.is-ai,
-.avatar-button.is-open {
-  background-color: var(--glass);
-  border-color: var(--line);
-  color: var(--text);
-}
-
-.feature-device::before,
-.auth-route-preview::after,
-.direction-suggestion-skeleton {
-  display: none;
-}
-
-/* Animated colour washes are no longer meaningful without colour. */
-.route-node,
-.journey-demo-row i,
-.match-bars b,
-.import-scan-beam {
-  animation: none;
-  background-color: var(--line-bright);
-  box-shadow: none;
-}
 
 /* ---- 5. Controls --------------------------------------------------------- */
 
