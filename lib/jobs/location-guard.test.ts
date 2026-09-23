@@ -124,6 +124,25 @@ describe("deduplicateSearchResults", () => {
     expect(deduplicated[0].employer).toBe("Department of Industry");
   });
 
+  it("does not collapse different employers hiring the same title in the same city", () => {
+    const results = [
+      { title: "Project Manager", employer: "Siemens", location: "Singapore", overallMatch: 75, applyDirect: true },
+      { title: "Project Manager", employer: "GE", location: "Singapore", overallMatch: 74, applyDirect: true },
+    ];
+    expect(deduplicateSearchResults(results)).toHaveLength(2);
+  });
+
+  it("preserves source provenance while direct employer wins", () => {
+    const results = [
+      { title: "Mechanical Engineer", employer: "Acme", location: "Singapore", overallMatch: 88, applyDirect: false, source: "Google for Jobs", platforms: ["LinkedIn"], description: "short" },
+      { title: "Mechanical Engineer", employer: "Acme", location: "Singapore", overallMatch: 70, applyDirect: true, source: "Company Careers", platforms: ["Acme"], description: "the complete employer advert" },
+    ];
+    const [job] = deduplicateSearchResults(results);
+    expect(job.applyDirect).toBe(true);
+    expect(job.source).toBe("Company Careers");
+    expect(job.platforms).toEqual(expect.arrayContaining(["Acme", "Company Careers", "LinkedIn", "Google for Jobs"]));
+  });
+
   it("prefers direct apply links when duplicate adverts exist", () => {
     const results = [
       {
