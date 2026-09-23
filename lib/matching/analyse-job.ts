@@ -1,6 +1,7 @@
 import type { SkillProfile, SkillStrength } from "@/lib/matching/skill-profile";
 import { capabilitiesIn } from "@/lib/matching/skill-vocabulary";
 import type { TitleFit } from "@/lib/matching/title-fit";
+import { extractJobRequirements, type JobRequirement } from "@/lib/matching/job-requirements";
 
 /*
  * How many distinct capabilities an advert has to name before its coverage
@@ -156,7 +157,8 @@ export function analyseJobDescription(
    * only ever searched for the person's own labels, so a requirement phrased
    * any other way was invisible.
    */
-  const asked = capabilitiesIn(rawText);
+  const requirements = extractJobRequirements(rawText);
+  const asked = new Set(requirements.map((requirement) => requirement.capability));
 
   const matchedSkills: SkillHit[] = profile.skills
     .filter((skill) => asked.has(skill.capability) || mentions(haystack, skill.name))
@@ -188,12 +190,17 @@ export function analyseJobDescription(
    * has to rise with evidence, so coverage is scaled until enough of the
    * advert has been read to mean something.
    */
-  const requirementsRead = asked.size;
+  const requirementMap = requirements.map((requirement) => ({ ...requirement, evidenced: evidenced.has(requirement.capability) }));
+  const requirementsRead = requirements.length;
   const legibility = Math.min(1, requirementsRead / MIN_REQUIREMENTS_FOR_CONFIDENCE);
-  const rawCoverage = requirementsRead
-    ? ((requirementsRead - missingRequirements.length) / requirementsRead) * 100
-    : 0;
+  const totalRequirementWeight = requirementMap.reduce((sum, requirement) => sum + requirement.weight, 0);
+  const evidencedWeight = requirementMap.filter((requirement) => requirement.evidenced).reduce((sum, requirement) => sum + requirement.weight, 0);
+  const rawCoverage = totalRequirementWeight ? (evidencedWeight / totalRequirementWeight) * 100 : 0;
   const requirementCoverage = Math.round(rawCoverage * legibility);
+  const mandatory = requirementMap.filter((requirement) => requirement.importance === "mandatory");
+  const mandatoryCoverage = mandatory.length
+    ? Math.round((mandatory.filter((requirement) => requirement.evidenced).length / mandatory.length) * 100)
+    : 100;
 
   const leading = profile.skills.filter((skill) => skill.strength === "core" || skill.strength === "strong");
   const leadingMatched = matchedSkills.filter((skill) => skill.strength === "core" || skill.strength === "strong");
@@ -218,6 +225,8 @@ export function analyseJobDescription(
   let recommendation: JobRecommendation;
   if (!matchedSkills.length && titleFit < 40) {
     recommendation = "skip";
+  } else if (mandatory.length >= 2 && mandatoryCoverage < 50) {
+    recommendation = "review";
   } else if ((titleFit >= 60 && requirementCoverage >= 35) || (leadingMatched.length >= 2 && requirementCoverage >= 50)) {
     recommendation = "apply";
   } else {
