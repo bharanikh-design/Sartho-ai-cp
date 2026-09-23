@@ -136,12 +136,22 @@ export function deduplicateSearchResults<T extends {
      * collapsed two different companies hiring the same role in Singapore into
      * one vacancy. Only employer-less scraper records fall back to title+place.
      */
-    const compositeKey = normEmp
-      ? `${normTitle}::${normEmp}::${normLoc}`
-      : `${normTitle}::unknown::${normLoc}`;
+    const exactKey = normEmp ? `${normTitle}::${normEmp}::${normLoc}` : "";
+    const unknownKey = `${normTitle}::unknown::${normLoc}`;
+    /*
+     * A junk/unknown employer may be the aggregator copy of a known-employer
+     * record. Let it join the sole matching title+location record, but never
+     * merge two different known employers merely because the title is equal.
+     */
+    const knownAtPlace = [...map.entries()].filter(([key]) => key.startsWith(`${normTitle}::`) && key.endsWith(`::${normLoc}`) && !key.includes("::unknown::"));
+    const compositeKey = exactKey || (knownAtPlace.length === 1 ? knownAtPlace[0][0] : unknownKey);
 
     const candidate = cleanEmp !== item.employer ? { ...item, employer: cleanEmp } : item;
-    const existing = map.get(compositeKey);
+    let existing = map.get(compositeKey);
+    if (!existing && normEmp && map.has(unknownKey)) {
+      existing = map.get(unknownKey);
+      map.delete(unknownKey);
+    }
     if (!existing) { map.set(compositeKey, candidate); continue; }
 
     const existingDirect = existing.applyDirect === true;
