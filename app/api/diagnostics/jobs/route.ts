@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getAuthenticatedUser, isOperationsAdmin } from "@/lib/auth";
+import { isOperationsAdmin } from "@/lib/auth";\nimport { createClient } from "@/lib/supabase/server";
 import { configuredJobSearchProviders, probeJobProvider, type JobSearchProviderName } from "@/lib/jobs/search-provider";
 import { serpApiAccount, serpApiConfig } from "@/lib/jobs/serpapi";
 
