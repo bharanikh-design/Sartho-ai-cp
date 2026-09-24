@@ -311,21 +311,14 @@ export function JobSearchPanel({
       {status === "error" ? <div className="inline-error" role="alert">{error}</div> : null}
 
       {status === "ready" && criteria ? (
-        <p className="search-field-hint" style={{ marginTop: "12px" }}>
-          Searched <strong>{criteria.countryName}</strong>
-          {criteria.locations.length ? <> · {criteria.locations.join(", ")}</> : <> · nationwide</>}
-          {criteria.broadened ? <> (few strong matches there, so the rest of {criteria.countryName} was searched too)</> : null}
-          {criteria.remoteOnly ? <> · remote only</> : null}
-          <> · roles: {criteria.roles.join(", ")}</>
-          {criteria.companies.length ? (
-            <> · companies: {criteria.companies.join(", ")}
-              {/* Said out loud when the cap bites, rather than implying the list was the whole list. */}
-              {criteria.companiesRequested > criteria.companies.length
-                ? <> ({criteria.companies.length} of {criteria.companiesRequested} searched)</>
-                : null}
-            </>
-          ) : null}
-          {criteria.employmentTypes.length ? <> · filtered to {criteria.employmentTypes.join(", ")}</> : null}
+        <div className="search-summary-chips" aria-label="Search summary">
+          <span>{criteria.countryName}{criteria.locations.length ? ` · ${criteria.locations.join(", ")}` : ""}</span>
+          {criteria.employmentTypes.length ? <span>{criteria.employmentTypes.join(", ")}</span> : null}
+          {criteria.providers?.map((provider) => (
+            <strong className="search-source-badge" key={provider}>{provider === "Google for Jobs (SerpApi)" ? "Google Jobs" : provider === "Google for Jobs" ? "JSearch" : provider}</strong>
+          ))}
+        </div>
+      ) : null}          {criteria.employmentTypes.length ? <> · filtered to {criteria.employmentTypes.join(", ")}</> : null}
           {/*
             * A hint is a word in the query, not a filter. Internship and
             * Graduate programme have no Adzuna filter at all, and used to be
