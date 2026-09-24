@@ -259,7 +259,7 @@
 .signal-row dd { margin: 0; color: var(--text); font-size: var(--text-base); font-weight: 650; }
 .signal-row dd small { color: var(--text-secondary); font-size: var(--text-2xs); font-weight: 400; }
 .result-pager { display: flex; align-items: center; justify-content: center; gap: 16px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
-.result-pager button { border: 1px solid var(--line); border-radius: 9px; padding: 8px 14px; background: rgba(255,255,255,0.05); color: var(--text-secondary); font-size: var(--text-2xs); font-weight: 700; cursor: pointer; }
+.result-pager button { min-height: 48px; border: 1px solid var(--line); border-radius: 12px; padding: 0 20px; background: rgba(255,255,255,0.05); color: var(--text); font-size: var(--text-sm); font-weight: 700; cursor: pointer; }\n.result-pager span { min-width: 92px; text-align: center; color: var(--text-secondary); font-size: var(--text-sm); font-weight: 650; }
 .result-pager button:hover:not(:disabled) { border-color: #79a58f; color: var(--text); }
 .result-pager button:disabled { opacity: .35; cursor: default; }
 .result-pager span { color: var(--text-tertiary); font-size: var(--text-2xs); }
