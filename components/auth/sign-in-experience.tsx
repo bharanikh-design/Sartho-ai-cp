@@ -495,7 +495,6 @@ export function SignInExperience() {
   async function signInWithProvider(provider: Provider) {
     setBusy(provider);
     setError(null);
-    setNotice(null);
 
     const origin = window.location.origin;
 
