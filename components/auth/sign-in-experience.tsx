@@ -51,21 +51,22 @@ const styles = `
  */
 .si::before,
 .si::after {
-  right: clamp(70px, 12vw, 220px); bottom: 12%;
-  width: min(34vw, 460px); aspect-ratio: 1;
-  background: radial-gradient(circle, rgba(255,255,255,.07), transparent 66%);
-  filter: blur(58px);
-  opacity: .55;
-  animation: siAura 11s ease-in-out 1.5s infinite alternate-reverse;
+  right: -14%; bottom: -34%;
+  width: min(80vw, 900px); aspect-ratio: 1;
+  background:
+    radial-gradient(circle at 46% 50%, color-mix(in srgb, var(--blue) 52%, transparent), transparent 60%),
+    radial-gradient(circle at 24% 78%, color-mix(in srgb, var(--rose) 30%, transparent), transparent 64%);
+  filter: blur(72px);
+  opacity: .58;
 }
 .si::before {
-  top: 50%; right: clamp(18px, 4vw, 72px); left: auto;
-  width: min(52vw, 720px); aspect-ratio: 1;
-  transform: translateY(-50%);
-  background: radial-gradient(circle at 50% 50%, rgba(124,92,240,.16), rgba(91,127,240,.07) 34%, transparent 68%);
-  filter: blur(42px);
+  top: -30%; left: -6%;
+  width: min(88vw, 1000px); aspect-ratio: 1;
+  background:
+    radial-gradient(circle at 38% 42%, color-mix(in srgb, var(--violet) 62%, transparent), transparent 58%),
+    radial-gradient(circle at 74% 20%, color-mix(in srgb, var(--blue) 44%, transparent), transparent 62%);
+  filter: blur(60px);
   opacity: .72;
-  animation: siAura 8s ease-in-out infinite alternate;
 }
 .si::after {
   right: -14%; bottom: -34%;
@@ -225,14 +226,29 @@ const styles = `
   padding: clamp(22px, 2.1vw, 28px);
   border: 1px solid var(--line);
   border-radius: 26px;
-  background: rgba(8,8,10,.88);
+  background: #050506;
   box-shadow:
     var(--shadow),
     0 0 90px -10px color-mix(in srgb, var(--violet) 42%, transparent),
     0 0 160px 10px color-mix(in srgb, var(--blue) 20%, transparent);
   backdrop-filter: blur(20px);
-  animation: siRise 1s ease .26s both;
+  animation: siRise 1s ease .26s both;\n  overflow: hidden;
 }
+.si-panel::after {
+  content:"";
+  position:absolute;
+  inset:0;
+  border-radius:26px;
+  padding:1px;
+  background:conic-gradient(from var(--si-line-angle,0deg), transparent 0 78%, rgba(120,110,255,.95) 84%, rgba(105,190,255,.95) 87%, transparent 92%);
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;
+  mask-composite:exclude;
+  pointer-events:none;
+  animation:siBorderLine 7s linear infinite;
+}
+@property --si-line-angle { syntax:"<angle>"; initial-value:0deg; inherits:false; }
+@keyframes siBorderLine { to { --si-line-angle:360deg; } }
 .si-panel h2 { margin: 0; font-size: 20px; font-weight: 640; letter-spacing: -0.026em; text-align: center; }
 .si-sub { margin: 7px 0 0; color: var(--text-secondary); font-size: 13px; line-height: 1.5; text-align: center; }
 
@@ -326,7 +342,7 @@ const styles = `
 
 .si :is(button, a, input):focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; }
 
-@keyframes siAura { from { transform: translateY(-50%) scale(.94); opacity:.48; } to { transform: translateY(-50%) scale(1.06); opacity:.78; } }\n@keyframes siRise { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+@keyframes siRise { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
 
 @media (max-width: 940px) {
   .si-stage { grid-template-columns: 1fr; gap: 30px; align-items: start; }
