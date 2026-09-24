@@ -22,9 +22,9 @@ import sarthoIcon from "@/sartho.png";
  * Supabase names the LinkedIn provider "linkedin_oidc"; the bare "linkedin"
  * id is the retired OAuth 2.0 one and is rejected.
  */
-const PROVIDERS = ["google", "apple", "linkedin_oidc"] as const;
+const PROVIDERS = ["google", "github", "apple"] as const;
 type Provider = (typeof PROVIDERS)[number];
-type Mode = "signin" | "reset";
+
 
 const styles = `
 .si {
@@ -509,31 +509,6 @@ export function SignInExperience() {
     }
   }
 
-  async function submit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setError(null);
-    setNotice(null);
-
-    if (mode === "reset") {
-      setBusy("reset");
-      // Same rule as OAuth: the recovery link has to land back on the origin
-      // that asked for it, or the session it carries is exchanged nowhere.
-      const { error: failure } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${resolveAuthOrigin(window.location.origin)}/auth/callback?next=/update-password`,
-      });
-      setBusy(null);
-      if (failure) setError(friendlyAuthMessage(failure.message));
-      else setNotice("If that address has an account, a reset link is on its way.");
-      return;
-    }
-
-    setBusy("email");
-    const { error: failure } = await supabase.auth.signInWithPassword({ email, password });
-    setBusy(null);
-    if (failure) setError(friendlyAuthMessage(failure.message));
-    else router.replace("/");
-  }
-
   return (
     <main className="si">
       <style>{styles}</style>
@@ -566,85 +541,15 @@ export function SignInExperience() {
         </section>
 
         <section className="si-panel">
-          <h2>{mode === "reset" ? "Reset your password" : "Welcome to Sartho"}</h2>
-          <p className="si-sub">
-            {mode === "reset"
-              ? "We'll email you a link to set a new one."
-              : "Choose how you'd like to sign in."}
-          </p>
-
-          {mode === "signin" ? (
-            <>
-              <div className="si-providers">
-                <button type="button" className="si-provider" onClick={() => signInWithProvider("google")} disabled={busy !== null}>
-                  <GoogleIcon /><span>{busy === "google" ? "Opening…" : "Continue with Google"}</span>
-                </button>
-
-                <button type="button" className="si-provider" onClick={() => signInWithProvider("linkedin_oidc")} disabled={busy !== null}>
-                  <LinkedInIcon /><span>{busy === "linkedin_oidc" ? "Opening…" : "Continue with LinkedIn"}</span>
-                </button>
-              </div>
-
-              <div className="si-or">or</div>
-            </>
-          ) : null}
-
-          <form className="si-form" onSubmit={submit}>
-            <label>
-              <span>Email</span>
-              <input
-                type="email"
-                required
-                autoComplete="email"
-                placeholder="you@company.com"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-              />
-            </label>
-
-            {mode === "signin" ? (
-              <label>
-                <span>Password</span>
-                <input
-                  type="password"
-                  required
-                  autoComplete="current-password"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                />
-              </label>
-            ) : null}
-
-            <button type="submit" className="si-submit" disabled={busy !== null}>
-              {busy === "email" || busy === "reset"
-                ? "Working…"
-                : mode === "reset"
-                  ? "Send reset link"
-                  : "Sign in"}
-            </button>
-          </form>
-
-          <div className="si-row">
-            <button
-              type="button"
-              className="si-link"
-              onClick={() => {
-                setMode(mode === "reset" ? "signin" : "reset");
-                setError(null);
-                setNotice(null);
-              }}
-            >
-              {mode === "reset" ? "Back to sign in" : "Forgot password?"}
-            </button>
+          <h2>Welcome to Sartho</h2>
+          <p className="si-sub">Sign in securely with your preferred account.</p>
+          <div className="si-provider-icons" aria-label="Sign in options">
+            <button type="button" className="si-provider-icon" aria-label="Continue with Google" title="Google" onClick={() => signInWithProvider("google")} disabled={busy !== null}><GoogleIcon /></button>
+            <button type="button" className="si-provider-icon" aria-label="Continue with GitHub" title="GitHub" onClick={() => signInWithProvider("github")} disabled={busy !== null}><GitHubIcon /></button>
+            <button type="button" className="si-provider-icon" aria-label="Continue with Apple" title="Apple" onClick={() => signInWithProvider("apple")} disabled={busy !== null}><AppleIcon /></button>
           </div>
-
           {error ? <p className="si-msg is-error" role="alert">{error}</p> : null}
-          {notice ? <p className="si-msg is-ok" role="status">{notice}</p> : null}
-
-          <p className="si-note">
-            Private beta — approved accounts only. Nothing is submitted without your approval.
-          </p>
+          <p className="si-note">Private beta · approved accounts only</p>
         </section>
       </div>
     </main>
@@ -662,10 +567,9 @@ function GoogleIcon() {
   );
 }
 
-function LinkedInIcon() {
-  return (
-    <svg width="17" height="17" viewBox="0 0 24 24" aria-hidden="true">
-      <path fill="#0A66C2" d="M20.45 20.45h-3.56v-5.57c0-1.33-.02-3.04-1.85-3.04-1.85 0-2.14 1.45-2.14 2.94v5.67H9.35V9h3.41v1.56h.05a3.74 3.74 0 0 1 3.37-1.85c3.6 0 4.27 2.37 4.27 5.46zM5.34 7.43a2.06 2.06 0 1 1 0-4.13 2.06 2.06 0 0 1 0 4.13M7.12 20.45H3.55V9h3.57zM22.22 0H1.77C.79 0 0 .77 0 1.73v20.54C0 23.23.79 24 1.77 24h20.45c.98 0 1.78-.77 1.78-1.73V1.73C24 .77 23.2 0 22.22 0" />
-    </svg>
-  );
+function GitHubIcon() {
+  return <svg width="25" height="25" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 .7a11.5 11.5 0 0 0-3.64 22.41c.58.1.79-.25.79-.56v-2.23c-3.22.7-3.9-1.37-3.9-1.37-.52-1.34-1.28-1.7-1.28-1.7-1.05-.72.08-.71.08-.71 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.57-.29-5.27-1.29-5.27-5.73 0-1.27.45-2.3 1.19-3.11-.12-.29-.52-1.47.11-3.07 0 0 .97-.31 3.16 1.19a10.9 10.9 0 0 1 5.76 0c2.2-1.5 3.16-1.19 3.16-1.19.63 1.6.23 2.78.11 3.07.74.81 1.19 1.84 1.19 3.11 0 4.45-2.71 5.43-5.29 5.72.42.36.79 1.07.79 2.16v3.2c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .7Z"/></svg>;
+}
+function AppleIcon() {
+  return <svg width="27" height="27" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M17.05 12.54c-.03-3.02 2.47-4.49 2.58-4.56a5.54 5.54 0 0 0-4.36-2.36c-1.83-.19-3.61 1.1-4.54 1.1-.95 0-2.38-1.08-3.93-1.05a5.78 5.78 0 0 0-4.86 2.96c-2.11 3.65-.54 9.02 1.49 11.97 1.02 1.45 2.2 3.07 3.75 3.01 1.52-.06 2.09-.97 3.93-.97 1.82 0 2.36.97 3.95.93 1.63-.02 2.66-1.46 3.64-2.93a12.1 12.1 0 0 0 1.67-3.4 5.2 5.2 0 0 1-3.32-4.7ZM14.08 3.68A5.27 5.27 0 0 0 15.29 0a5.36 5.36 0 0 0-3.46 1.75 5.02 5.02 0 0 0-1.24 3.54 4.43 4.43 0 0 0 3.49-1.61Z"/></svg>;
 }
