@@ -812,7 +812,7 @@ export function providerCallBudgetMs(provider: JobSearchProviderName): number {
    * search completes at SerpApi regardless, so giving up early costs nothing
    * but the wait.
    */
-  if (provider === "serpapi") return 9_000;
+  if (provider === "serpapi") return 15_000;
   if (provider === "jsearch") return 6_000;
   return 3_000;
 }
