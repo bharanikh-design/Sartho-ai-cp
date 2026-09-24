@@ -50,9 +50,7 @@ const styles = `
  * theme brightens instead of needing a second set of colours.
  */
 .si::before,
-.si::after {
-  display: none;
-}
+.si::after { display: none; }
 .si::before {
   top: -36%; left: -28%;
   width: min(92vw, 1180px); aspect-ratio: 1;
@@ -207,10 +205,7 @@ const styles = `
   border: 1px solid var(--line);
   border-radius: 26px;
   background: #050506;
-  box-shadow:
-    var(--shadow),
-    0 0 90px -10px color-mix(in srgb, var(--violet) 42%, transparent),
-    0 0 160px 10px color-mix(in srgb, var(--blue) 20%, transparent);
+  box-shadow: 0 18px 55px rgba(0,0,0,.42);
   backdrop-filter: blur(20px);
   animation: siRise 1s ease .26s both;\n  overflow: hidden;
 }
