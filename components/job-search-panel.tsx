@@ -84,9 +84,10 @@ export function JobSearchPanel({
   const [savedUrls, setSavedUrls] = useState<string[]>([]);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [showWeak, setShowWeak] = useState(false);
-  /* Six to a page. A laundry list is not a shortlist. */
+  /* A career product presents a shortlist, not twenty pages of inventory. */
   const [page, setPage] = useState(0);
-  const PAGE_SIZE = 6;
+  const PAGE_SIZE = 8;
+  const SHORTLIST_LIMIT = 16;
 
   async function runSearch() {
     setStatus("loading");
@@ -273,7 +274,7 @@ export function JobSearchPanel({
   const unique = deduplicateSearchResults(results);
   const strong = unique.filter((result) => result.recommendation !== "skip");
   const weak = unique.filter((result) => result.recommendation === "skip");
-  const primary = strong.length ? strong : weak.slice(0, 3);
+  const primary = (strong.length ? strong : weak.slice(0, 3)).slice(0, SHORTLIST_LIMIT);
   const collapsed = strong.length ? weak : weak.slice(3);
 
   const pageCount = Math.max(1, Math.ceil(primary.length / PAGE_SIZE));
@@ -284,9 +285,9 @@ export function JobSearchPanel({
     <section className="glass-card content-card" id="find-roles">
       <div className="card-header">
         <div>
-          <h2 className="section-heading">Matching roles</h2>
+          <h2 className="section-heading">Best matches</h2>
           <p className="section-subtitle">
-            Live listings for your target roles, each scored against your approved evidence.
+            A focused shortlist of live roles closest to your direction and evidence.
             {lastRun ? ` Last searched ${new Date(lastRun).toLocaleString()}.` : ""}
           </p>
         </div>
