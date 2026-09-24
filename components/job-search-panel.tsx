@@ -351,47 +351,7 @@ export function JobSearchPanel({
             * different findings with different fixes, and both used to look
             * identical: a company named in the brief and absent from the page.
             */}
-          {criteria.employerPortals?.length ? (
-            <>
-              {" "}· careers pages: {criteria.employerPortals
-                .map((portal) => {
-                  if (portal.status === "searched") return `${portal.employer} (${portal.found})`;
-                  if (portal.status === "empty") return `${portal.employer} (none listed)`;
-                  if (portal.status === "failed") return `${portal.employer} (unreachable)`;
-                  return `${portal.employer} (not connected)`;
-                })
-                .join(", ")}
-            </>
-          ) : null}
-          {/*
-            * How many queries each provider answered. A provider rationed to
-            * three of twenty-five reads exactly like one that answered all of
-            * them, and depth is the whole reason the slow one is there.
-            */}
-          {criteria.providerCalls?.length && criteria.providerCalls.length > 1 ? (
-            <> · queries answered: {criteria.providerCalls.map((entry) => `${entry.name} ${entry.count}`).join(", ")}</>
-          ) : null}
-          {criteria.providerTimeouts?.length ? (
-            <>
-              {" "}· {criteria.providerTimeouts
-                .map((entry) => {
-                  const times = `${entry.count} time${entry.count === 1 ? "" : "s"}`;
-                  /*
-                   * The wait is named, because the count alone reads the same
-                   * whether the budget was too tight or the provider is down.
-                   */
-                  return entry.waitedMs
-                    ? `${entry.name} timed out ${times} after ${Math.round(entry.waitedMs / 1000)}s`
-                    : `${entry.name} timed out ${times}`;
-                })
-                .join(", ")}
-            </>
-          ) : null}
-          {criteria.providerErrors?.length ? (
-            <span style={{ color: "#e0b061" }}>
-              {" "}· provider note: {criteria.providerErrors.join("; ")}
-            </span>
-          ) : null}
+          {criteria.providers?.length ? <> · source: {criteria.providers.join(" + ")}</> : null}
           {criteria.countrySource === "default" ? <> · <Link href="#country">choose your country</Link> to search the right market</> : null}
           {criteria.tooSenior ? <> · {criteria.tooSenior} hidden as too senior for your experience</> : null}
           {/*
