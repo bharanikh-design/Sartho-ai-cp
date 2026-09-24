@@ -32,7 +32,7 @@ const inputSchema = z.object({
 });
 
 export async function POST(request: Request) {
-  const { user } = await getAuthenticatedUser();
+  const { supabase, user } = await getAuthenticatedUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const input = inputSchema.safeParse(await request.json().catch(() => null));
@@ -41,6 +41,36 @@ export async function POST(request: Request) {
   }
 
   const { content, versionName, employer } = input.data;
+
+  /*
+   * Original-mode fidelity: when Studio is still representing the uploaded
+   * master DOCX itself (no tailored role/version), return the exact stored
+   * bytes instead of reconstructing a visually similar Word document.
+   */
+  if (content.sourceImportId && !content.targetRole && !employer && (!versionName || versionName === "Master résumé")) {
+    const { data: source } = await supabase
+      .from("resume_imports")
+      .select("file_name,mime_type,object_path")
+      .eq("id", content.sourceImportId)
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (source?.object_path && source.mime_type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
+      const { data: original } = await supabase.storage.from("resume-uploads").download(source.object_path);
+      if (original) {
+        const bytes = new Uint8Array(await original.arrayBuffer());
+        return new NextResponse(bytes, {
+          headers: {
+            "Content-Type": source.mime_type,
+            "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(source.file_name)}`,
+            "Content-Length": String(bytes.length),
+            "Cache-Control": "private, no-store",
+            "X-Sartho-Resume-Mode": "original-byte-faithful",
+          },
+        });
+      }
+    }
+  }
+
   const hasBody = content.name
     || content.targetRole
     || content.summary
