@@ -285,12 +285,14 @@ export function ResumeImport({
               if (file) void upload(file);
             }}
           />
-          {busy ? `Reading ${fileName ?? "your résumé"}…` : hasEvidence ? "Upload another résumé" : "Upload your résumé"}
+          <span className="resume-import-trigger-icon" aria-hidden="true">⇧</span>
+          <span className="resume-import-trigger-copy">
+            <strong>{busy ? `Reading ${fileName ?? "your résumé"}…` : "Choose file"}</strong>
+            <small>PDF or Word (.docx) · Max 8MB</small>
+          </span>
         </label>
 
-        <p className="resume-import-note">
-          PDF, Word (.docx) or plain text, up to 8MB. You can also drop a file anywhere in this box.
-        </p>
+        <p className="resume-import-note">Drag and drop your file here, or choose a file.</p>
 
         {/*
           * The other way in, and for most people the better one: almost nobody
