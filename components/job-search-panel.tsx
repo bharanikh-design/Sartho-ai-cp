@@ -351,7 +351,7 @@ export function JobSearchPanel({
             * different findings with different fixes, and both used to look
             * identical: a company named in the brief and absent from the page.
             */}
-          {criteria.providerUsed?.length ? <> · via {criteria.providerUsed[0]}</> : null}
+          {criteria.providers?.length ? <> · source: {criteria.providers.join(" + ")}</> : null}
           {criteria.countrySource === "default" ? <> · <Link href="#country">choose your country</Link> to search the right market</> : null}
           {criteria.tooSenior ? <> · {criteria.tooSenior} hidden as too senior for your experience</> : null}
           {/*
