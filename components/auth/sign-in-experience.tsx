@@ -51,22 +51,18 @@ const styles = `
  */
 .si::before,
 .si::after {
-  right: -14%; bottom: -34%;
-  width: min(80vw, 900px); aspect-ratio: 1;
-  background:
-    radial-gradient(circle at 46% 50%, color-mix(in srgb, var(--blue) 52%, transparent), transparent 60%),
-    radial-gradient(circle at 24% 78%, color-mix(in srgb, var(--rose) 30%, transparent), transparent 64%);
-  filter: blur(72px);
-  opacity: .58;
+  display: none;
 }
 .si::before {
-  top: -30%; left: -6%;
-  width: min(88vw, 1000px); aspect-ratio: 1;
-  background:
-    radial-gradient(circle at 38% 42%, color-mix(in srgb, var(--violet) 62%, transparent), transparent 58%),
-    radial-gradient(circle at 74% 20%, color-mix(in srgb, var(--blue) 44%, transparent), transparent 62%);
-  filter: blur(60px);
+  top: -36%; left: -28%;
+  width: min(92vw, 1180px); aspect-ratio: 1;
+  border: 1px solid transparent;
+  border-right-color: rgba(110,110,255,.68);
+  border-bottom-color: rgba(80,165,255,.82);
+  background: transparent;
+  filter: drop-shadow(0 0 5px rgba(95,120,255,.38));
   opacity: .72;
+  animation: siArcDrift 12s ease-in-out infinite alternate;
 }
 .si::after {
   right: -14%; bottom: -34%;
@@ -79,7 +75,7 @@ const styles = `
 }
 /* The dark theme carries deeper colour before it turns to mud. */
 :root[data-theme="dark"] .si::before { opacity: .72; }
-:root[data-theme="dark"] .si::after { opacity: .55; }
+:root[data-theme="dark"] .si::after { opacity: 0; }
 
 /* Light mode needs contrast from tokens, not taste. */
 :root[data-theme="light"] .si-proof,
@@ -90,23 +86,7 @@ const styles = `
 }
 
 /* The light palette is already bright; avoid the rose wash. */
-:root[data-theme="light"] .si::after { background: radial-gradient(circle, rgba(255,255,255,.07), transparent 66%); }
-
-/*
- * Brand lockup — the first thing on the page, at full size, on its own.
- *
- * The mark is stated once and stated large. It used to appear twice on this
- * screen, small in the corner and again on the card, which is two half-strength
- * statements of the same thing; the card no longer carries a copy. What kept
- * the corner from working before was not the position but the column beneath
- * it drifting down against a taller card — the stage below now starts on the
- * card's line, so the space under the lockup is a margin rather than a hole.
- */
-.si-brand {
-  position: relative; z-index: 2;
-  display: flex; align-items: center; gap: 16px;
-  animation: siRise .8s ease both;
-}
+:root[data-theme="light"] .si::after { display:none; }
 .si-logo {
   width: clamp(52px, 4vw, 64px); height: clamp(52px, 4vw, 64px);
   border-radius: 18px; flex: none;
@@ -342,7 +322,7 @@ const styles = `
 
 .si :is(button, a, input):focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; }
 
-@keyframes siRise { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+@keyframes siArcDrift { from { transform:translate(-1.5%,1%) rotate(-2deg); } to { transform:translate(1.5%,-1%) rotate(2deg); } }\n@keyframes siRise { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
 
 @media (max-width: 940px) {
   .si-stage { grid-template-columns: 1fr; gap: 30px; align-items: start; }
