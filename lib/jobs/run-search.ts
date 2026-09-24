@@ -851,7 +851,7 @@ export async function runBriefSearch(
      * wrong (SAP transformation vs ServiceNow/ITSM). Require at least a minimal
      * title bridge to something the person has held or explicitly targeted.
      */
-    if ((match.breakdown?.titleFit ?? 0) < 35) { offFamily += 1; continue; }
+    if (match.titleFit < 35) { offFamily += 1; continue; }
     /*
      * Counted like the other two. This one dropped matches silently, so a
      * misindexed batch that removed the entire page looked identical to a
