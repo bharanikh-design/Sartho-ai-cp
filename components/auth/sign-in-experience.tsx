@@ -51,19 +51,21 @@ const styles = `
  */
 .si::before,
 .si::after {
-  content: "";
-  position: absolute; z-index: 0;
-  border-radius: 999px;
-  pointer-events: none;
+  right: clamp(70px, 12vw, 220px); bottom: 12%;
+  width: min(34vw, 460px); aspect-ratio: 1;
+  background: radial-gradient(circle, rgba(255,255,255,.07), transparent 66%);
+  filter: blur(58px);
+  opacity: .55;
+  animation: siAura 11s ease-in-out 1.5s infinite alternate-reverse;
 }
 .si::before {
-  top: -30%; left: -6%;
-  width: min(88vw, 1000px); aspect-ratio: 1;
-  background:
-    radial-gradient(circle at 38% 42%, color-mix(in srgb, var(--violet) 62%, transparent), transparent 58%),
-    radial-gradient(circle at 74% 20%, color-mix(in srgb, var(--blue) 44%, transparent), transparent 62%);
-  filter: blur(60px);
+  top: 50%; right: clamp(18px, 4vw, 72px); left: auto;
+  width: min(52vw, 720px); aspect-ratio: 1;
+  transform: translateY(-50%);
+  background: radial-gradient(circle at 50% 50%, rgba(124,92,240,.16), rgba(91,127,240,.07) 34%, transparent 68%);
+  filter: blur(42px);
   opacity: .72;
+  animation: siAura 8s ease-in-out infinite alternate;
 }
 .si::after {
   right: -14%; bottom: -34%;
@@ -75,8 +77,8 @@ const styles = `
   opacity: .58;
 }
 /* The dark theme carries deeper colour before it turns to mud. */
-:root[data-theme="dark"] .si::before { opacity: .5; }
-:root[data-theme="dark"] .si::after { opacity: .42; }
+:root[data-theme="dark"] .si::before { opacity: .72; }
+:root[data-theme="dark"] .si::after { opacity: .55; }
 
 /* Light mode needs contrast from tokens, not taste. */
 :root[data-theme="light"] .si-proof,
@@ -87,11 +89,7 @@ const styles = `
 }
 
 /* The light palette is already bright; avoid the rose wash. */
-:root[data-theme="light"] .si::after {
-  background:
-    radial-gradient(circle at 46% 50%, color-mix(in srgb, var(--blue) 52%, transparent), transparent 60%),
-    radial-gradient(circle at 24% 78%, color-mix(in srgb, var(--violet) 30%, transparent), transparent 64%);
-}
+:root[data-theme="light"] .si::after { background: radial-gradient(circle, rgba(255,255,255,.07), transparent 66%); }
 
 /*
  * Brand lockup — the first thing on the page, at full size, on its own.
@@ -227,7 +225,7 @@ const styles = `
   padding: clamp(22px, 2.1vw, 28px);
   border: 1px solid var(--line);
   border-radius: 26px;
-  background: var(--glass-strong);
+  background: rgba(8,8,10,.88);
   box-shadow:
     var(--shadow),
     0 0 90px -10px color-mix(in srgb, var(--violet) 42%, transparent),
@@ -328,7 +326,7 @@ const styles = `
 
 .si :is(button, a, input):focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; }
 
-@keyframes siRise { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+@keyframes siAura { from { transform: translateY(-50%) scale(.94); opacity:.48; } to { transform: translateY(-50%) scale(1.06); opacity:.78; } }\n@keyframes siRise { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
 
 @media (max-width: 940px) {
   .si-stage { grid-template-columns: 1fr; gap: 30px; align-items: start; }
