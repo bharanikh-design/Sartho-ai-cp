@@ -133,7 +133,7 @@ const SCENE_MS = 5200;
 export function WelcomeCinematic() {
   const [active, setActive] = useState(0);
   const [leaving, setLeaving] = useState(false);
-  const [still, setStill] = useState(false);
+  const [still, setStill] = useState(false);\n  const [neverAgain, setNeverAgain] = useState(false);
   const frame = useRef<HTMLDivElement>(null);
 
   /*
@@ -168,7 +168,7 @@ export function WelcomeCinematic() {
     setLeaving(true);
     /* Long enough for the fade, short enough that nobody waits on it. */
     window.setTimeout(() => setLeaving(false), 620);
-  }, [leaving]);
+  }, [leaving, neverAgain]);
 
   /*
    * The scenes advance themselves; the screen does not close itself.
@@ -246,7 +246,7 @@ export function WelcomeCinematic() {
         </div>
       </div>
 
-      <div className="wc-foot">
+      <div className="wc-foot">\n        {last ? <label className="wc-never"><input type="checkbox" checked={neverAgain} onChange={(event) => setNeverAgain(event.target.checked)} /> <span>Don’t show this again</span></label> : null}
         {last ? (
           <button type="button" className="wc-enter" onClick={finish}>
             Open Sartho <span aria-hidden="true">→</span>
