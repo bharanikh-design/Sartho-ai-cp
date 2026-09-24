@@ -410,12 +410,8 @@ function friendlyAuthMessage(message: string) {
 export function SignInExperience() {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
-  const [mode, setMode] = useState<Mode>("signin");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search);
