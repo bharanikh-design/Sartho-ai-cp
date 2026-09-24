@@ -257,6 +257,10 @@ const styles = `
 }
 .si-provider:disabled { opacity: .55; cursor: progress; }
 .si-provider svg { flex: none; }
+.si-provider-icons { display:flex; align-items:center; justify-content:center; gap:24px; margin:28px 0 12px; }
+.si-provider-icon { display:grid; place-items:center; width:58px; height:58px; border:1px solid var(--line-bright); border-radius:16px; color:var(--text); background:color-mix(in srgb,var(--text) 5%,transparent); cursor:pointer; transition:transform .18s ease,background .18s ease,border-color .18s ease; }
+.si-provider-icon:hover:not(:disabled){ transform:translateY(-2px); background:color-mix(in srgb,var(--text) 10%,transparent); border-color:color-mix(in srgb,var(--text) 30%,transparent); }
+.si-provider-icon:disabled{opacity:.5;cursor:progress}
 
 .si-or {
   display: flex; align-items: center; gap: 12px;
