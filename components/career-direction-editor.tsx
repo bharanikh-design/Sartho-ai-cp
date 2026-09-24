@@ -350,9 +350,14 @@ export function CareerDirectionEditor({
                   <h3>{suggestion.name}</h3>
                   <p>{suggestion.rationale}</p>
                   <details>
-                    <summary>Why AI suggested this</summary>
+                    <summary>Why this is credible</summary>
                     <ul>{suggestion.supportingSignals.map((signal) => <li key={signal}>{signal}</li>)}</ul>
                   </details>
+                  <div className="suggestion-reality-check">
+                    <span><strong>Evidence</strong>{suggestion.supportingSignals.length} career signal{suggestion.supportingSignals.length === 1 ? "" : "s"}</span>
+                    <span><strong>Move</strong>{suggestion.path === "direct" ? "Natural progression" : suggestion.path === "adjacent" ? "Transferable capability bridge" : "Credible stretch — verify the gaps"}</span>
+                  </div>
+                  <a className="suggestion-market-link" href={`/search-plan?role=${encodeURIComponent(suggestion.name)}`}>Check real jobs for this role →</a>
                   <button type="button" className={added ? "is-added" : ""} onClick={() => addLaneName(suggestion.name)} disabled={added}>
                     {added ? "Added to priorities ✓" : "Add to my priorities →"}
                   </button>
