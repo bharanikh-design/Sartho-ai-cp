@@ -39,7 +39,7 @@ export function OnboardingCarousel({user}:{user:User}){
    <div className="tour-stage" key={index}><section className="tour-copy"><span className="tour-eyebrow">{slide.eyebrow}</span><h1 id="tour-title">{slide.title}</h1><p>{slide.description}</p><strong className="tour-outcome">{slide.outcome}</strong><span className="tour-route">{slide.route}</span></section>
    <section className="tour-visual" aria-label={slide.route}><span className="tour-orbit" aria-hidden="true"/>{slide.visual.map((item,i)=><article key={item.title} className={"tour-hero-card card-"+i}><small>{item.kicker}</small><div><strong>{item.title}</strong><p>{item.detail}</p></div>{item.metric?<b>{item.metric}</b>:<span>→</span>}</article>)}</section></div>
    <footer className="tour-footer"><div className="tour-progress" aria-label={"Step "+(index+1)+" of "+slides.length}>{slides.map((s,i)=><button type="button" key={s.eyebrow} className={i===index?"is-active":""} onClick={()=>setIndex(i)} aria-label={"Go to step "+(i+1)}/>)}</div>
-   <label className="tour-dismiss"><input type="checkbox" checked={dontShowAgain} onChange={e=>setDontShowAgain(e.target.checked)}/> Do not show automatically</label>
+   <label className="tour-dismiss"><input type="checkbox" checked={dontShowAgain} onChange={e=>setDontShowAgain(e.target.checked)}/> Don’t show this again</label>
    <div className="tour-actions"><button type="button" className="tour-skip" onClick={()=>void finish()}>Skip</button>{index>0?<button type="button" className="tour-secondary" onClick={()=>setIndex(index-1)}>Back</button>:null}<button type="button" className="tour-primary" onClick={()=>last?void finish():setIndex(index+1)}>{last?"Enter Sartho":"Continue"}</button></div></footer>
  </div></div>
 }
