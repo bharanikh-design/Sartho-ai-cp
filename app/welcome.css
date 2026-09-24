@@ -260,3 +260,16 @@
   .wc-progress__step[data-state="live"] i { animation: none; width: 100%; }
   .wc-enter, .wc-next { transition: none; }
 }
+
+/* Welcome readability: use the available screen instead of shrinking into its centre. */
+.wc-scene{width:min(940px,88vw);gap:20px}
+.wc-line-title{max-width:18ch;font-size:clamp(38px,4.8vw,64px);line-height:1.02;font-weight:650}
+.wc-body{max-width:64ch;font-size:clamp(16px,1.35vw,19px);line-height:1.65}
+.wc-kicker{font-size:13px;font-weight:700}
+.wc-visual{width:min(680px,100%);padding:24px}
+.wc-line,.wc-requirement,.wc-signal strong,.wc-outcome{font-size:14px}
+.wc-line span,.wc-requirement em{font-size:12px}
+.wc-foot{gap:14px}
+.wc-never{display:flex;align-items:center;gap:9px;color:rgba(226,232,255,.72);font-size:14px;cursor:pointer}
+.wc-never input{width:18px;height:18px;accent-color:#8b6cff}
+@media(max-width:640px){.wc-scene{width:100%}.wc-line-title{font-size:clamp(32px,10vw,46px)}.wc-body{font-size:16px}}
