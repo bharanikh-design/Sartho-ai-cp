@@ -847,6 +847,12 @@ export async function runBriefSearch(
     if (!seniorityReach(match.title, heldTitles, seniorityYears).withinReach) { tooSenior += 1; continue; }
     if (!familyFit(match.title, heldTitles, roleNames).withinReach) { offFamily += 1; continue; }
     /*
+     * A role can share generic leadership vocabulary and still be categorically
+     * wrong (SAP transformation vs ServiceNow/ITSM). Require at least a minimal
+     * title bridge to something the person has held or explicitly targeted.
+     */
+    if ((match.breakdown?.titleFit ?? 0) < 35) { offFamily += 1; continue; }
+    /*
      * Counted like the other two. This one dropped matches silently, so a
      * misindexed batch that removed the entire page looked identical to a
      * search that found nothing — the one filter whose over-reach left no
