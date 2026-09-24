@@ -86,7 +86,8 @@ export function JobSearchPanel({
   const [showWeak, setShowWeak] = useState(false);
   /* A career product presents a shortlist, not twenty pages of inventory. */
   const [page, setPage] = useState(0);
-  const PAGE_SIZE = 8;\n  const SHORTLIST_LIMIT = 16;
+  const PAGE_SIZE = 8;
+  const SHORTLIST_LIMIT = 16;
 
   async function runSearch() {
     setStatus("loading");
