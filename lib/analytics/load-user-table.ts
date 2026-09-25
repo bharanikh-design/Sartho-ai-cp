@@ -8,7 +8,7 @@ type SoftQueryResult<T> = {
   unavailable: boolean;
 };
 
-async function softQuery<T>(
+export async function softQuery<T>(
   label: string,
   operation: () => PromiseLike<{ data: T | null; error: { code?: string; message?: string } | null }>,
   fallback: T,
