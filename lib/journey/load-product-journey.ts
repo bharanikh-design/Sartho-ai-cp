@@ -21,7 +21,7 @@ async function getSearchPreferencesSoft(
   userId: string,
 ): Promise<SearchPreferences> {
   try {
-    return await getSearchPreferencesSoft(supabase, userId);
+    return await getSearchPreferences(supabase, userId);
   } catch (error) {
     console.warn("Search Preferences unavailable; Journey will keep core progress and mark Search incomplete", error);
     return EMPTY_SEARCH_PREFERENCES;
