@@ -4,6 +4,7 @@ import type { CandidateContext } from "@/lib/context/candidate-context";
 import type { JobSemanticContext, SemanticJobFit } from "@/lib/types";
 
 export const MAX_SEMANTIC_JOBS_PER_PASS = 12;
+export const SEMANTIC_CHUNK_SIZE = 3;
 
 export const jobSemanticContextSchema = z.object({
   function: z.string().trim().min(2).max(120),
@@ -151,6 +152,86 @@ export function groundSemanticAssessments(
   }
 
   return result;
+}
+
+
+export type SemanticAssessment = { context: JobSemanticContext; fit: SemanticJobFit };
+
+function chunks<T>(items: T[], size: number): T[][] {
+  const output: T[][] = [];
+  for (let index = 0; index < items.length; index += size) {
+    output.push(items.slice(index, index + size));
+  }
+  return output;
+}
+
+/**
+ * Resilient semantic assessment.
+ *
+ * The old search sent twelve jobs through one strict structured-output call.
+ * One timeout or one schema-invalid item erased the entire batch. Small
+ * independent chunks isolate failure and preserve every successful answer.
+ */
+export async function assessSemanticJobsResilient(
+  context: CandidateContext,
+  jobs: SemanticJobInput[],
+  options: {
+    safetyIdentifier?: string;
+    chunkSize?: number;
+    chunkTimeoutMs?: number;
+  } = {},
+): Promise<{
+  assessments: Map<string, SemanticAssessment>;
+  attempted: Set<string>;
+  failed: Set<string>;
+  chunksAttempted: number;
+  chunksFailed: number;
+}> {
+  const selected = jobs.slice(0, MAX_SEMANTIC_JOBS_PER_PASS);
+  const attempted = new Set(selected.map((job) => job.key));
+  const failed = new Set<string>();
+  const assessments = new Map<string, SemanticAssessment>();
+  const chunkSize = Math.max(1, Math.min(SEMANTIC_CHUNK_SIZE, options.chunkSize ?? SEMANTIC_CHUNK_SIZE));
+  const groups = chunks(selected, chunkSize);
+  let chunksFailed = 0;
+
+  const results = await Promise.allSettled(groups.map(async (group) => {
+    const timeoutMs = options.chunkTimeoutMs ?? 10_000;
+    const result = await Promise.race([
+      assessSemanticJobs(context, group, { safetyIdentifier: options.safetyIdentifier }),
+      new Promise<Map<string, SemanticAssessment>>((_, reject) =>
+        setTimeout(() => reject(new Error("Semantic Job Context chunk timed out")), timeoutMs),
+      ),
+    ]);
+    return { group, result };
+  }));
+
+  results.forEach((result, index) => {
+    const group = groups[index];
+    if (result.status === "rejected") {
+      chunksFailed += 1;
+      for (const job of group) failed.add(job.key);
+      console.warn("Semantic Job Context chunk failed", {
+        jobs: group.length,
+        error: result.reason instanceof Error ? result.reason.message : String(result.reason),
+      });
+      return;
+    }
+
+    for (const job of group) {
+      const assessment = result.value.result.get(job.key);
+      if (assessment) assessments.set(job.key, assessment);
+      else failed.add(job.key);
+    }
+  });
+
+  return {
+    assessments,
+    attempted,
+    failed,
+    chunksAttempted: groups.length,
+    chunksFailed,
+  };
 }
 
 export async function assessSemanticJobs(
