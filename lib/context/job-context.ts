@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { generateStructuredJson } from "@/lib/ai/provider";
 import type { CandidateContext } from "@/lib/context/candidate-context";
+import type { JobSemanticContext, SemanticJobFit } from "@/lib/types";
 
 export const MAX_SEMANTIC_JOBS_PER_PASS = 8;
 
@@ -15,8 +16,6 @@ export const jobSemanticContextSchema = z.object({
   domainContext: z.array(z.string().trim().min(1).max(120)).max(6),
 });
 
-export type JobSemanticContext = z.infer<typeof jobSemanticContextSchema>;
-
 export const semanticJobFitSchema = z.object({
   relation: z.enum(["aligned", "adjacent", "conflict", "unclear"]),
   confidence: z.enum(["low", "medium", "high"]),
@@ -24,8 +23,6 @@ export const semanticJobFitSchema = z.object({
   conflictDimensions: z.array(z.enum(["function", "specialism", "seniority", "role_shape"])).max(4),
   supportingEvidenceRefs: z.array(z.string()).max(12),
 });
-
-export type SemanticJobFit = z.infer<typeof semanticJobFitSchema>;
 
 const semanticAssessmentSchema = z.object({
   jobs: z.array(z.object({
@@ -134,12 +131,14 @@ function allowedEvidenceRefs(context: CandidateContext): Set<string> {
 export async function assessSemanticJobs(
   context: CandidateContext,
   jobs: SemanticJobInput[],
+  options: { safetyIdentifier?: string } = {},
 ): Promise<Map<string, { context: JobSemanticContext; fit: SemanticJobFit }>> {
   const selected = jobs.slice(0, MAX_SEMANTIC_JOBS_PER_PASS);
   if (!selected.length) return new Map();
 
   const raw = await generateStructuredJson({
     workload: "fast",
+    safetyIdentifier: options.safetyIdentifier,
     schemaName: "sartho_semantic_job_context",
     schema: jsonSchema,
     system: [
