@@ -70,6 +70,8 @@ export function deriveOutcomeStage(previousStatus: JobStatus): OutcomeStage | nu
       return "interview";
     case "offer":
       return "offer";
+    case "hired":
+      return null;
     case "rejected":
     case "withdrawn":
       return null;
