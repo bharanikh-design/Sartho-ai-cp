@@ -4,6 +4,7 @@ import { getAuthenticatedUser } from "@/lib/auth";
 import { normaliseCountryCode } from "@/lib/jobs/countries";
 import { isEmploymentType } from "@/lib/jobs/employment-types";
 import { normaliseExperienceBand } from "@/lib/jobs/experience";
+import { propagateCandidateMutation } from "@/lib/workflow/propagate-candidate-mutation";
 
 import { searchPlanSchema } from "./schema";
 
@@ -42,5 +43,7 @@ export async function PUT(request: Request) {
     console.error("Unable to save search strategy", error);
     return NextResponse.json({ error: "Sartho could not save your search strategy." }, { status: 500 });
   }
+
+  await propagateCandidateMutation(supabase, user.id, "search_brief");
   return NextResponse.json({ ok: true });
 }
