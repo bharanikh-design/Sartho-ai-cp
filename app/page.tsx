@@ -42,7 +42,7 @@ export default async function DashboardPage({
    * Played once, on the way in from a successful sign-in, and never from a
    * bookmark or a reload — the callback sets this and the cinematic clears it.
    */
-  const welcome = (await searchParams).welcome === "1";
+  await searchParams;
   const driveConnected = (await connectionStatus(user.id)).connected;
 
   const [journeyResult, jobsResult, applicationsResult] = await Promise.all([
