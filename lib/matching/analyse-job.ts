@@ -58,6 +58,8 @@ export type JobAnalysis = {
   closestTitle: string | null;
   /** Levels this job sits above the closest comparable title. */
   seniorityGap: number;
+  /** Generic role overlap exists, but the specialist context contradicts the person's titles. */
+  specialistConflict: boolean;
   /** Capabilities this role asks for that the person cannot yet evidence. */
   missingRequirements: string[];
   /** How many distinct capabilities were legible in the advert at all. */
@@ -111,6 +113,7 @@ function nothingToSayYet(explanation: string): JobAnalysis {
     titleFit: 0,
     closestTitle: null,
     seniorityGap: 0,
+    specialistConflict: false,
     missingRequirements: [],
     matchedSignals: [],
     cautionSignals: [],
@@ -129,6 +132,7 @@ export function analyseJobDescription(
   const closestTitle = context.titleFit?.closest ?? null;
   const closestIsHeld = context.titleFit?.closestIsHeld ?? false;
   const seniorityGap = context.titleFit?.seniorityGap ?? 0;
+  const specialistConflict = context.titleFit?.specialistConflict ?? false;
 
   if (rawText.trim().length < 120) {
     return {
@@ -136,6 +140,7 @@ export function analyseJobDescription(
       titleFit,
       closestTitle,
       seniorityGap,
+      specialistConflict,
     };
   }
 
@@ -223,7 +228,9 @@ export function analyseJobDescription(
    * worth a look; both together is worth applying for; neither is a skip.
    */
   let recommendation: JobRecommendation;
-  if (!matchedSkills.length && titleFit < 40) {
+  if (specialistConflict) {
+    recommendation = "skip";
+  } else if (!matchedSkills.length && titleFit < 40) {
     recommendation = "skip";
   } else if (mandatory.length >= 2 && mandatoryCoverage < 50) {
     recommendation = "review";
@@ -269,6 +276,7 @@ export function analyseJobDescription(
     titleFit,
     closestTitle,
     seniorityGap,
+    specialistConflict,
     missingRequirements,
     requirementsRead,
     closestIsHeld,

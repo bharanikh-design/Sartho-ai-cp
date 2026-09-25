@@ -1,7 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { getCareerWorkspace } from "@/lib/data/career";
 import { generateStructuredJson } from "@/lib/ai/provider";
-import { getSearchPreferences } from "@/lib/data/search";
+import {
+  searchIntentFromCandidateContext,
+  type CandidateWorkflowContext,
+} from "@/lib/context/candidate-workflow";
+import { evaluateOpportunity, prepareCareerConductor } from "@/lib/workflow/career-conductor";
 import { countryName, normaliseCountryCode } from "@/lib/jobs/countries";
 import { splitMisfiledCompanies } from "@/lib/jobs/employers";
 import { filterableSelections } from "@/lib/jobs/employment-types";
@@ -17,7 +20,6 @@ import {
 import { familyFit, reachFrom, unclassifiedTitles } from "@/lib/matching/job-family";
 import { demandsMoreExperience, requiredExperienceIn } from "@/lib/matching/required-experience";
 import { fetchAdvertText } from "@/lib/jobs/advert-text";
-import { scoreOpportunity } from "@/lib/matching/opportunity-score";
 import { candidateSeniority, isEntryLevelTitle } from "@/lib/matching/title-fit";
 import { seniorityReach } from "@/lib/matching/seniority-reach";
 import { searchSerpApiCached } from "@/lib/jobs/cached-serpapi";
@@ -222,6 +224,10 @@ export type SearchCriteria = {
   targetRolesRequested?: number;
   targetRolesSearched?: number;
   employersChecked?: number;
+  /** Exact Candidate Context snapshot used to execute this search. */
+  candidateContextFingerprint?: string;
+  /** Learned signals present in that context. Observational in this release. */
+  learnedAffinitySignals?: number;
 };
 
 export type BriefSearchFailureCode = "not_configured" | "no_targets" | "country_unsupported" | "provider_error";
@@ -328,16 +334,48 @@ export const NOT_CONFIGURED_MESSAGE =
 export async function runBriefSearch(
   supabase: SupabaseClient,
   userId: string,
-  options: { budgetMs?: number; maxResults?: number } = {},
+  options: {
+    budgetMs?: number;
+    maxResults?: number;
+    workflow?: CandidateWorkflowContext;
+    contextFingerprint?: string;
+  } = {},
 ): Promise<BriefSearchOutcome> {
   if (!isJobSearchConfigured()) {
     return { ok: false, code: "not_configured", error: NOT_CONFIGURED_MESSAGE };
   }
 
-  const [{ profile, roles, evidence, lanes }, preferences] = await Promise.all([
-    getCareerWorkspace(supabase, userId),
-    getSearchPreferences(supabase, userId),
-  ]);
+  const conductor = options.workflow
+    ? { workflow: options.workflow, contextFingerprint: options.contextFingerprint ?? "" }
+    : await prepareCareerConductor(supabase, userId);
+  const workflow = conductor.workflow;
+  const contextFingerprint = options.contextFingerprint || conductor.contextFingerprint;
+  const { candidateContext, career } = workflow;
+  const { profile, roles, evidence, lanes } = career;
+
+  /*
+   * Search consumes the same canonical context that the rest of the career
+   * workflow sees. Raw records remain available for evidence-grounded scoring,
+   * but intent comes from Candidate Context rather than being reinterpreted in
+   * a parallel search-only path.
+   */
+  const searchIntent = searchIntentFromCandidateContext(candidateContext);
+  const contextRoleNames = searchIntent.roles;
+  const contextCountries = searchIntent.countries;
+  const contextLocations = searchIntent.locations;
+  const contextCompanies = searchIntent.companies;
+  const contextEmploymentTypes = searchIntent.employmentTypes;
+  const contextRemotePreferences = searchIntent.remotePreferences;
+  const learnedAffinity = {
+    positive: candidateContext.learnedAffinity.signals
+      .filter((signal) => signal.value.polarity === "positive" && signal.confidence >= 0.5)
+      .slice(0, 3)
+      .map((signal) => signal.value.concept),
+    negative: candidateContext.learnedAffinity.signals
+      .filter((signal) => signal.value.polarity === "negative" && signal.confidence >= 0.6)
+      .slice(0, 3)
+      .map((signal) => signal.value.concept),
+  };
 
   /*
    * Two different questions, which were being answered with one list.
@@ -358,7 +396,8 @@ export async function runBriefSearch(
     .filter((lane) => lane.active)
     .sort((a, b) => a.priority - b.priority);
   const activeLanes = targetedLanes;
-  if (!activeLanes.length) {
+  const roleNames = contextRoleNames;
+  if (!roleNames.length) {
     return {
       ok: false,
       code: "no_targets",
@@ -371,9 +410,9 @@ export async function runBriefSearch(
    * chose on Search Brief, then the one read from their résumé, then the
    * deployment default (only for briefs saved before country existed).
    */
-  const chosen = preferences.countries.length
-    ? preferences.countries
-    : [preferences.country ?? profile?.country ?? ""];
+  const chosen = contextCountries.length
+    ? contextCountries
+    : [profile?.country ?? ""];
   const markets = [...new Set(
     chosen.map((code) => normaliseCountryCode(code)).filter((code): code is string => Boolean(code)),
   )];
@@ -396,9 +435,8 @@ export async function runBriefSearch(
 
   // Employers typed into the cities list (before companies had a field) are
   // treated as companies here too, so an unsaved brief still searches sensibly.
-  const brief = splitMisfiledCompanies(preferences.targetLocations, preferences.targetCompanies);
-  /* Every target role, because this decides reach rather than spend. */
-  const roleNames = targetedLanes.map((lane) => lane.name);
+  const brief = splitMisfiledCompanies(contextLocations, contextCompanies);
+  /* Every target role comes from the canonical Candidate Context handoff. */
   // Extract the most common domains/skills from the user's evidence to contextualize the search.
   const domainCounts = new Map<string, number>();
   for (const record of (evidence || [])) {
@@ -420,7 +458,7 @@ export async function runBriefSearch(
    * neither source says anything the years filter is simply not applied and the
    * criteria say the question is unanswered.
    */
-  const chosenBand = experienceBand(preferences.experienceLevel);
+  const chosenBand = experienceBand(normaliseExperienceBand(searchIntent.experienceLevel));
   const resumeBand = experienceBand(bandForYears(profile?.total_experience_years ?? null));
   const band = chosenBand ?? resumeBand;
   const experienceSource: SearchCriteria["experienceSource"] =
@@ -453,10 +491,11 @@ export async function runBriefSearch(
       country,
       locations: brief.locations,
       companies: brief.companies,
-      remotePreferences: preferences.remotePreferences,
-      employmentTypes: preferences.employmentTypes,
+      remotePreferences: contextRemotePreferences,
+      employmentTypes: contextEmploymentTypes,
       entryLevelTerms: earlyCareerPass ? entryLevelTermsFor(country) : undefined,
       resumeSkills,
+      learnedAffinity,
     }))
   ];
 
@@ -466,11 +505,12 @@ export async function runBriefSearch(
       country: market,
       locations: [],
       companies: [],
-      remotePreferences: preferences.remotePreferences,
-      employmentTypes: preferences.employmentTypes,
+      remotePreferences: contextRemotePreferences,
+      employmentTypes: contextEmploymentTypes,
       /* Each market gets its own vocabulary; "graduate scheme" finds nothing in Sydney. */
       entryLevelTerms: earlyCareerPass ? entryLevelTermsFor(market) : undefined,
       resumeSkills,
+      learnedAffinity,
     })));
     queries.push(...additionalQueries.flat());
   }
@@ -742,7 +782,7 @@ export async function runBriefSearch(
   }
 
   const score = (result: JobSearchResult): ScoredJobMatch => {
-    const scored = scoreOpportunity(result.title, result.description, evidence, roles, lanes);
+    const scored = evaluateOpportunity({ workflow }, result.title, result.description);
     return {
       title: result.title,
       employer: result.employer,
@@ -985,10 +1025,10 @@ export async function runBriefSearch(
      * both as "employment types" is how two of four selections looked applied
      * while doing nothing at all.
      */
-    employmentTypes: preferences.employmentTypes.filter(
+    employmentTypes: contextEmploymentTypes.filter(
       (type) => providers.some((provider) => filterableSelections([type], provider).length),
     ),
-    employmentHinted: preferences.employmentTypes.filter(
+    employmentHinted: contextEmploymentTypes.filter(
       (type) => !providers.some((provider) => filterableSelections([type], provider).length),
     ),
     companiesRequested: brief.companies.length,
@@ -1004,7 +1044,7 @@ export async function runBriefSearch(
     offMarket,
     families: reachFrom(heldTitles, roleNames),
     countryName: countryLabel,
-    countrySource: preferences.country ? "brief" : profile?.country ? "resume" : "default",
+    countrySource: contextCountries.length ? "brief" : profile?.country ? "resume" : "default",
     locations: usedLocations,
     broadened,
     companies: brief.companies.slice(0, MAX_COMPANY_QUERIES),
@@ -1018,8 +1058,11 @@ export async function runBriefSearch(
      * and there was no way to tell from the UI what had been asked for.
      */
     roles: [...new Set(queries.filter((query) => !query.earlyCareerOnly).map((query) => query.keywords))],
-    remoteOnly: preferences.remotePreferences.length === 1 && preferences.remotePreferences[0] === "Remote",
+    remoteOnly: contextRemotePreferences.length === 1 && contextRemotePreferences[0] === "Remote",
     providers: Array.from(cascade.used),
+    candidateContextFingerprint: contextFingerprint || undefined,
+    learnedAffinitySignals: searchIntent.learnedAffinitySignals,
+    directEmployersOnly: searchIntent.directEmployersOnly ?? undefined,
     /*
      * Only the failures that changed what came back. A provider behind the one
      * that answered was never reached, so its trouble is a server-log fact
@@ -1184,6 +1227,8 @@ export function normaliseCriteria(stored: unknown): SearchCriteria {
     earlyCareerPass: value.earlyCareerPass === true,
     advertsRead: count(value.advertsRead),
     offFamily: count(value.offFamily),
+    unrecognisedTargets: strings(value.unrecognisedTargets).length ? strings(value.unrecognisedTargets) : undefined,
+    offMarket: count(value.offMarket),
     families: strings(value.families),
     countryName: typeof value.countryName === "string" ? value.countryName : "",
     countrySource: value.countrySource === "brief" || value.countrySource === "resume" ? value.countrySource : "default",
@@ -1193,6 +1238,8 @@ export function normaliseCriteria(stored: unknown): SearchCriteria {
     roles: strings(value.roles),
     remoteOnly: value.remoteOnly === true,
     providers: strings(value.providers),
+    directEmployersOnly: value.directEmployersOnly === true,
+    agencyOrUnverifiedHidden: count(value.agencyOrUnverifiedHidden),
     providerErrors: strings(value.providerErrors),
     providerTimeouts: Array.isArray(value.providerTimeouts)
       ? value.providerTimeouts.filter((entry) => entry && typeof entry.name === "string").map((entry) => ({
@@ -1220,5 +1267,9 @@ export function normaliseCriteria(stored: unknown): SearchCriteria {
     targetRolesRequested: count(value.targetRolesRequested),
     targetRolesSearched: count(value.targetRolesSearched),
     employersChecked: count(value.employersChecked),
+    candidateContextFingerprint: typeof value.candidateContextFingerprint === "string" && value.candidateContextFingerprint
+      ? value.candidateContextFingerprint
+      : undefined,
+    learnedAffinitySignals: count(value.learnedAffinitySignals),
   };
 }

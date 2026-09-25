@@ -24,6 +24,8 @@ export async function POST() {
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const budgetMs = process.env.SEARCH_BUDGET_MS ? Number(process.env.SEARCH_BUDGET_MS) : undefined;
+    // runBriefSearch enters through the Career Conductor, the same path used by
+    // scheduled alerts. The route does not assemble its own candidate state.
     const outcome = await runBriefSearch(supabase, user.id, { budgetMs });
     if (!outcome.ok) {
       return NextResponse.json({ error: outcome.error, code: outcome.code }, { status: STATUS[outcome.code] ?? 500 });

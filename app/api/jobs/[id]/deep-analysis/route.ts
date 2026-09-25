@@ -162,23 +162,13 @@ export async function POST(
     if (replaceError) throw replaceError;
 
     /*
-     * The evidence-grounded match. Now that every requirement has been assessed
-     * against approved evidence, mandatory coverage is a far truer signal than
-     * the keyword estimate stored at insert, so it replaces overall_match — the
-     * field the dashboard actually reads and sorts on.
+     * Deep analysis is evidence, not a second scoring authority.
+     *
+     * Search/Preview/Save/Rescore all obtain overall_match from the Career
+     * Conductor. This route adds the richer requirement-by-requirement evidence
+     * used for a human decision, but it does not silently replace the canonical
+     * score with a different formula.
      */
-    const mandatoryRatio = summary.mandatoryTotal ? summary.mandatoryMet / summary.mandatoryTotal : null;
-    const preferredRatio = summary.preferredTotal ? summary.preferredMet / summary.preferredTotal : null;
-    if (mandatoryRatio !== null || preferredRatio !== null) {
-      const mandatoryWeight = mandatoryRatio !== null ? 0.7 : 0;
-      const preferredWeight = preferredRatio !== null ? 0.3 : 0;
-      const overallMatch = Math.round(
-        (100 * ((mandatoryWeight * (mandatoryRatio ?? 0)) + (preferredWeight * (preferredRatio ?? 0))))
-        / (mandatoryWeight + preferredWeight),
-      );
-      await supabase.from("jobs").update({ overall_match: overallMatch }).eq("id", id).eq("user_id", user.id);
-    }
-
     return NextResponse.json({ requirements, summary });
   } catch (caught) {
     await supabase.from("jobs").update({ deep_analysis_status: "failed" }).eq("id", id).eq("user_id", user.id);

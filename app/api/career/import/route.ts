@@ -17,6 +17,7 @@ import {
   MAX_UPLOAD_BYTES,
   RESUME_UPLOAD_BUCKET,
 } from "@/lib/resume/upload";
+import { rescoreSavedJobs } from "@/lib/matching/rescore";
 
 /*
  * Résumé import — the way career evidence enters Sartho.
@@ -328,6 +329,13 @@ export async function POST(request: Request) {
         await supabase.from("profiles").update(patch).eq("id", userId);
       }
     }
+
+    /*
+     * Career Truth changed. Propagate it before declaring the import complete:
+     * existing open opportunities must be re-evaluated through the same
+     * conductor that Search/Preview/Save use.
+     */
+    await rescoreSavedJobs(supabase, userId, { invalidateDeepAnalysis: true });
 
     const counts = (applied ?? {}) as Record<string, number>;
     send({

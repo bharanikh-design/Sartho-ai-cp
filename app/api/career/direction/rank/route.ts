@@ -9,6 +9,7 @@ import { createSafetyIdentifier, generateStructuredJson } from "@/lib/ai/provide
 import { aiQuotaResponse, checkAiQuota } from "@/lib/ai/quota";
 import { getAuthenticatedUser } from "@/lib/auth";
 import { logError } from "@/lib/logger";
+import { prepareCareerConductor } from "@/lib/workflow/career-conductor";
 
 
 /*
@@ -32,17 +33,19 @@ export async function POST(request: Request) {
   const input = inputSchema.safeParse(await request.json().catch(() => ({})));
   if (!input.success) return NextResponse.json({ error: "Add at least one target role before ranking." }, { status: 400 });
 
-  const [profileResult, rolesResult, evidenceResult] = await Promise.all([
-    supabase.from("profiles").select("headline,summary,location,work_authorisation,strengths").eq("id", user.id).maybeSingle(),
-    supabase.from("career_roles").select("id,employer,title,location,start_date,end_date,is_current,summary").eq("user_id", user.id).order("start_date", { ascending: false }),
-    supabase.from("evidence_items").select("id,claim,context,metrics,domains,career_role_id,confidence").eq("user_id", user.id).eq("approval_status", "approved").order("updated_at", { ascending: false }).limit(80),
-  ]);
-  const dataError = profileResult.error ?? rolesResult.error ?? evidenceResult.error;
-  if (dataError) {
-    logError(supabase, "direction_rank_prepare", dataError);
+  let conductor;
+  try {
+    conductor = await prepareCareerConductor(supabase, user.id);
+  } catch (caught) {
+    logError(supabase, "direction_rank_prepare", caught);
     return NextResponse.json({ error: "Sartho could not prepare your Career Profile for ranking." }, { status: 500 });
   }
-  if (!evidenceResult.data?.length) {
+
+  const { profile, roles, evidence } = conductor.workflow.career;
+  const approvedEvidence = evidence
+    .filter((item) => item.approval_status === "approved")
+    .slice(0, 80);
+  if (!approvedEvidence.length) {
     return NextResponse.json({ error: "Confirm your Career Profile before ranking roles against it." }, { status: 400 });
   }
 
@@ -66,10 +69,10 @@ export async function POST(request: Request) {
         "Judge every supplied role. Do not add roles that were not supplied.",
       ].join(" "),
       prompt: JSON.stringify({
-        savedProfile: profileResult.data,
+        savedProfile: profile,
         explorationPrompt: input.data.explorationPrompt,
-        careerHistory: rolesResult.data ?? [],
-        approvedEvidence: evidenceResult.data,
+        careerHistory: roles,
+        approvedEvidence: approvedEvidence,
         rolesToRank: input.data.lanes,
       }),
     });
@@ -77,7 +80,7 @@ export async function POST(request: Request) {
     const parsed = roleRankingsOutputSchema.parse(raw);
     const rankings = groundRoleRankings(
       parsed,
-      evidenceResult.data.map((item) => ({ id: item.id, claim: item.claim })),
+      approvedEvidence.map((item) => ({ id: item.id, claim: item.claim })),
       input.data.lanes,
     );
 

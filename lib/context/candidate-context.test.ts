@@ -180,4 +180,33 @@ describe("buildCandidateContext", () => {
 
     expect(sourceFingerprint(first)).not.toBe(sourceFingerprint(second));
   });
+
+  it("keeps learned affinity explicitly below career truth and user intent", () => {
+    const context = buildCandidateContext({
+      profile,
+      roles,
+      evidence,
+      lanes,
+      search,
+      learnedAffinity: [{
+        concept: "ServiceNow Delivery Director",
+        polarity: "positive",
+        reason: "Imported deliberately.",
+        confidence: 0.6,
+        source: "interaction",
+        eventIds: ["interaction-1"],
+      }],
+      generatedAt: "2026-09-25T10:40:00Z",
+    });
+
+    expect(context.learnedAffinity.signals).toHaveLength(1);
+    expect(context.learnedAffinity.signals[0]).toMatchObject({
+      authority: "learned_affinity",
+      source: "interaction",
+      confidence: 0.6,
+      evidenceRefs: ["interaction-1"],
+    });
+    expect(context.explicitIntent.targetRoles[0].authority).toBe("explicit_intent");
+    expect(context.careerTruth.heldRoles[0].authority).toBe("career_truth");
+  });
 });

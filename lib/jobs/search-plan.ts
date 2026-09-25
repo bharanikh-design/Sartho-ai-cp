@@ -114,6 +114,10 @@ export function planSearchQueries(input: {
    */
   entryLevelTerms?: string[];
   resumeSkills?: string[];
+  learnedAffinity?: {
+    positive: string[];
+    negative: string[];
+  };
   smartKeywords?: string[];
 }): JobSearchQuery[] {
   const remoteOnly = input.remotePreferences.length === 1 && input.remotePreferences[0] === "Remote";
@@ -268,9 +272,19 @@ export async function planSmartSearchQueries(input: Parameters<typeof planSearch
           "2. One title per string, 2 to 5 words. Not a sentence, not a keyword list.",
           "3. Give alternative titles for the SAME level and line of work — a senior delivery role expands to 'Delivery Director' or 'Programme Director', never to a junior or a sales title.",
           "4. Do not repeat a title the candidate already gave you.",
+          "5. Learned affinity is weak behavioural context, never permission to change career direction. Use positive affinity only to choose an alternative title compatible with the explicit target roles and evidenced skills. Negative affinity may stop you suggesting an alternative, but must never remove an explicit target role.",
           "Output JSON: an object with one array property \"keywords\" holding up to 3 strings.",
         ].join("\n"),
-        prompt: `Roles: ${input.roles.join(", ")}\nSkills: ${input.resumeSkills.join(", ")}`,
+        prompt: [
+          `Roles: ${input.roles.join(", ")}`,
+          `Skills: ${input.resumeSkills.join(", ")}`,
+          input.learnedAffinity?.positive.length
+            ? `Weak positive affinity from deliberate/repeated behaviour: ${input.learnedAffinity.positive.join(", ")}`
+            : "",
+          input.learnedAffinity?.negative.length
+            ? `Weak negative affinity from explicit withdrawals/repeated outcomes: ${input.learnedAffinity.negative.join(", ")}`
+            : "",
+        ].filter(Boolean).join("\n"),
         schemaName: "smart_search_queries",
         schema: {
           type: "object",

@@ -68,6 +68,27 @@ export function JobImportBridge() {
     window.postMessage({ source: "sartho-app", type: "SARTHO_IMPORTED", id }, window.location.origin);
   }, []);
 
+  const rememberImport = useCallback(async (jobId: string, captured: ImportedJob) => {
+    try {
+      await fetch("/api/candidate/interactions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          eventType: "job_imported",
+          source: "extension",
+          jobId,
+          metadata: {
+            readBy: captured.readBy,
+            capturedAt: captured.capturedAt,
+          },
+        }),
+        keepalive: true,
+      });
+    } catch {
+      // Import success must not depend on learning telemetry.
+    }
+  }, []);
+
   /*
    * Folded into whatever the banner is already showing, so an analysis that
    * finishes after the person has dismissed the banner cannot bring it back.
@@ -145,6 +166,7 @@ export function JobImportBridge() {
 
         const job = result.job;
         acknowledge(data.id);
+        void rememberImport(job.id, parsed.job);
 
         const wanted = shouldAutoAnalyse(job);
         setOutcome({
@@ -183,7 +205,7 @@ export function JobImportBridge() {
      */
     window.postMessage({ source: "sartho-app", type: "SARTHO_READY" }, window.location.origin);
     return () => window.removeEventListener("message", onMessage);
-  }, [acknowledge, analyse, router]);
+  }, [acknowledge, analyse, rememberImport, router]);
 
   if (!outcome) return null;
 

@@ -1,6 +1,7 @@
 import type { CareerRoleRecord, EvidenceRecord, ProfileRecord, TargetLaneRecord } from "@/lib/types";
 import type { SearchPreferences } from "@/lib/data/search";
 import { buildSkillProfile } from "@/lib/matching/skill-profile";
+import type { LearnedAffinitySignal } from "@/lib/context/interaction-memory";
 
 export const CANDIDATE_CONTEXT_SCHEMA_VERSION = 1;
 
@@ -85,6 +86,7 @@ export function buildCandidateContext(input: {
   evidence: EvidenceRecord[];
   lanes: TargetLaneRecord[];
   search: SearchPreferences;
+  learnedAffinity?: LearnedAffinitySignal[];
   generatedAt?: string;
 }): CandidateContext {
   const { profile, roles, evidence, lanes, search } = input;
@@ -157,6 +159,18 @@ export function buildCandidateContext(input: {
         ? null
         : intentSignal(search.directEmployersOnly, "search_brief"),
     },
-    learnedAffinity: { signals: [] },
+    learnedAffinity: {
+      signals: (input.learnedAffinity ?? []).map((signal) => ({
+        value: {
+          concept: signal.concept,
+          polarity: signal.polarity,
+          reason: signal.reason,
+        },
+        authority: "learned_affinity" as const,
+        source: signal.source,
+        confidence: signal.confidence,
+        evidenceRefs: signal.eventIds,
+      })),
+    },
   };
 }
