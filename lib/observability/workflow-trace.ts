@@ -11,10 +11,12 @@ export function normaliseWorkflowTraceId(value: unknown): string | undefined {
   return typeof value === "string" && TRACE_PATTERN.test(value) ? value : undefined;
 }
 
-export function workflowTraceFromRuleAnalysis(value: unknown): string | undefined {
+export function workflowTraceFromMetadata(value: unknown): string | undefined {
   if (!value || typeof value !== "object") return undefined;
   return normaliseWorkflowTraceId((value as { workflowTraceId?: unknown }).workflowTraceId);
 }
+
+export const workflowTraceFromRuleAnalysis = workflowTraceFromMetadata;
 
 export function logWorkflowTrace(
   stage: string,
