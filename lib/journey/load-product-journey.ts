@@ -1,14 +1,38 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getCareerWorkspace, getResumeImports } from "@/lib/data/career";
-import { getSearchPreferences } from "@/lib/data/search";
+import { getSearchPreferences, type SearchPreferences } from "@/lib/data/search";
 import { buildProductJourney } from "./product-journey";
 import type { ProfileRecord } from "@/lib/types";
+
+const EMPTY_SEARCH_PREFERENCES: SearchPreferences = {
+  country: null,
+  countries: [],
+  employmentTypes: [],
+  targetLocations: [],
+  targetCompanies: [],
+  experienceLevel: null,
+  remotePreferences: [],
+  sources: [],
+  directEmployersOnly: false,
+};
+
+async function getSearchPreferencesSoft(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<SearchPreferences> {
+  try {
+    return await getSearchPreferencesSoft(supabase, userId);
+  } catch (error) {
+    console.warn("Search Preferences unavailable; Journey will keep core progress and mark Search incomplete", error);
+    return EMPTY_SEARCH_PREFERENCES;
+  }
+}
 
 export async function loadProductJourney(supabase: SupabaseClient, userId: string) {
   const [workspace, imports, searchPreferences] = await Promise.all([
     getCareerWorkspace(supabase, userId),
     getResumeImports(supabase, userId),
-    getSearchPreferences(supabase, userId),
+    getSearchPreferencesSoft(supabase, userId),
   ]);
 
   const approvedEvidence = workspace.evidence.filter((item) => item.approval_status === "approved").length;
@@ -38,7 +62,7 @@ export async function loadProductJourneyStatus(supabase: SupabaseClient, userId:
     supabase.from("career_roles").select("id", { count: "exact", head: true }).eq("user_id", userId),
     supabase.from("evidence_items").select("approval_status").eq("user_id", userId),
     supabase.from("resume_imports").select("status").eq("user_id", userId).is("archived_at", null),
-    getSearchPreferences(supabase, userId),
+    getSearchPreferencesSoft(supabase, userId),
   ]);
 
   const error = profileResult.error ?? lanesResult.error ?? rolesResult.error ?? evidenceResult.error ?? importsResult.error;
