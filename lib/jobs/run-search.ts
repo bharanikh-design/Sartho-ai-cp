@@ -27,6 +27,12 @@ import { searchSerpApiCached } from "@/lib/jobs/cached-serpapi";
 import { findEmployerPortal, searchEmployerDirectly } from "@/lib/jobs/company-careers/registry";
 import { createSearchCacheStore } from "@/lib/jobs/search-cache-store";
 import { deduplicateSearchResults, isMarketLocationConsistent } from "@/lib/jobs/location-guard";
+import {
+  decideSearchRelevance,
+  selectSemanticCandidates,
+  sortByRelevance,
+  type SearchRelevanceTier,
+} from "@/lib/jobs/search-relevance";
 import { createProviderCascade } from "@/lib/jobs/provider-cascade";
 import {
   MAX_COMPANY_QUERIES,
@@ -95,7 +101,13 @@ export type ScoredJobMatch = {
   semanticFit?: import("@/lib/types").SemanticJobFit;
   /** Candidate Context fingerprint used for semanticFit. */
   semanticContextFingerprint?: string;
-  /** Optional semantic commentary; it never changes the canonical score in this PR. */
+  /** Semantic relevance tier. This orders visibility; it is not a second numeric score. */
+  relevanceTier?: SearchRelevanceTier;
+  /** Why the role is strong, possible or outside the search. */
+  relevanceReason?: string;
+  /** True when semantics rescued a role old title/family rules would have discarded. */
+  semanticRescued?: boolean;
+  /** Optional semantic commentary. */
   screeningInsight?: string | null;
 };
 
@@ -237,6 +249,12 @@ export type SearchCriteria = {
   learnedAffinitySignals?: number;
   /** Shortlisted jobs given purpose-built semantic context in this run. */
   semanticJobsAssessed?: number;
+  /** Roles retained because semantic understanding overruled weak title/family vocabulary. */
+  semanticRescued?: number;
+  /** High-confidence semantic conflicts excluded from the visible result set. */
+  semanticExcluded?: number;
+  /** Jobs whose family vocabulary was weak but which were not hard-dropped. */
+  familyWarnings?: number;
 };
 
 export type BriefSearchFailureCode = "not_configured" | "no_targets" | "country_unsupported" | "provider_error";
@@ -504,6 +522,8 @@ export async function runBriefSearch(
       employmentTypes: contextEmploymentTypes,
       entryLevelTerms: earlyCareerPass ? entryLevelTermsFor(country) : undefined,
       resumeSkills,
+      heldTitles: roles.map((role) => role.title).filter(Boolean),
+      careerCapabilities: candidateContext.careerTruth.capabilities.slice(0, 12).map((signal) => signal.value.name),
       learnedAffinity,
     }))
   ];
@@ -519,6 +539,8 @@ export async function runBriefSearch(
       /* Each market gets its own vocabulary; "graduate scheme" finds nothing in Sydney. */
       entryLevelTerms: earlyCareerPass ? entryLevelTermsFor(market) : undefined,
       resumeSkills,
+      heldTitles: roles.map((role) => role.title).filter(Boolean),
+      careerCapabilities: candidateContext.careerTruth.capabilities.slice(0, 12).map((signal) => signal.value.name),
       learnedAffinity,
     })));
     queries.push(...additionalQueries.flat());
