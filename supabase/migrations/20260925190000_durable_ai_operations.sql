@@ -26,6 +26,10 @@ create index if not exists durable_ai_operations_running_idx
   on public.durable_ai_operations(status, started_at)
   where status = 'running';
 
+create unique index if not exists durable_ai_operations_one_running_resource_idx
+  on public.durable_ai_operations(user_id, operation, resource_id)
+  where status = 'running' and resource_id is not null;
+
 alter table public.durable_ai_operations enable row level security;
 
 drop policy if exists "own durable ai operations select" on public.durable_ai_operations;
