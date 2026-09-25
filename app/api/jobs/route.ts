@@ -2,9 +2,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { jobInputSchema } from "./schema";
 import { getAuthenticatedUser } from "@/lib/auth";
-import { getCareerWorkspace } from "@/lib/data/career";
 import { canonicalJobUrl } from "@/lib/jobs/source-url";
-import { scoreOpportunity } from "@/lib/matching/opportunity-score";
+import { evaluateOpportunity, prepareCareerConductor } from "@/lib/workflow/career-conductor";
 
 
 export async function POST(request: Request) {
@@ -21,8 +20,8 @@ export async function POST(request: Request) {
    * own to fall back on, which is the point — a role can only be judged
    * against skills the person has actually approved.
    */
-  const { roles, evidence, lanes } = await getCareerWorkspace(supabase, user.id);
-  const scored = scoreOpportunity(title, description, evidence, roles, lanes);
+  const conductor = await prepareCareerConductor(supabase, user.id);
+  const scored = evaluateOpportunity(conductor, title, description);
 
   /*
    * The same advert saved twice is one advert.
