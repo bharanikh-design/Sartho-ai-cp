@@ -12,6 +12,11 @@ import { getAuthenticatedUser } from "@/lib/auth";
 import { logError } from "@/lib/logger";
 import type { DeepAnalysisSummary, RequirementAssessment, RuleAnalysis } from "@/lib/types";
 import { prepareCareerConductor } from "@/lib/workflow/career-conductor";
+import {
+  createWorkflowTraceId,
+  logWorkflowTrace,
+  workflowTraceFromMetadata,
+} from "@/lib/observability/workflow-trace";
 
 /*
  * Quality-workload analysis waits up to 90s on the provider (see the
@@ -94,6 +99,12 @@ export async function POST(
     return NextResponse.json({ error: "Approve Career Profile evidence before running deep analysis." }, { status: 400 });
   }
 
+  const workflowTraceId =
+    workflowTraceFromMetadata(jobResult.data.rule_analysis)
+    ?? workflowTraceFromMetadata(jobResult.data.deep_analysis_summary)
+    ?? createWorkflowTraceId();
+  logWorkflowTrace("deep_analysis.started", workflowTraceId, { jobId: id });
+
   const quota = await checkAiQuota(supabase, "deep_analysis");
   if (!quota.allowed) return aiQuotaResponse(quota);
 
@@ -151,6 +162,7 @@ export async function POST(
 
     const summary: DeepAnalysisSummary = {
       candidateContextFingerprint: conductor.contextFingerprint,
+      workflowTraceId,
       mandatoryMet: mandatory.filter((item) => countedAsMet(item.assessment)).length,
       mandatoryTotal: mandatory.length,
       preferredMet: preferred.filter((item) => countedAsMet(item.assessment)).length,
@@ -175,9 +187,14 @@ export async function POST(
      * used for a human decision, but it does not silently replace the canonical
      * score with a different formula.
      */
-    return NextResponse.json({ requirements, summary });
+    logWorkflowTrace("deep_analysis.completed", workflowTraceId, {
+      jobId: id,
+      requirements: requirements.length,
+    });
+    return NextResponse.json({ requirements, summary, workflowTraceId });
   } catch (caught) {
     await supabase.from("jobs").update({ deep_analysis_status: "failed" }).eq("id", id).eq("user_id", user.id);
+    logWorkflowTrace("deep_analysis.failed", workflowTraceId, { jobId: id });
     logError(supabase, "deep_analysis_fail", caught);
     const message = caught instanceof Error && caught.message.startsWith("Sartho")
       ? caught.message
