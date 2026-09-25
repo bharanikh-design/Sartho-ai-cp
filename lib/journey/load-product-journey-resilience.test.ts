@@ -56,6 +56,26 @@ describe("Journey resilience", () => {
     expect(result.journey.current.id).toBe("search");
   });
 
+  it("uses Career Evidence when resume-import metadata is unavailable", async () => {
+    getResumeImports.mockRejectedValue(new Error("resume import metadata unavailable"));
+    getSearchPreferences.mockResolvedValue({
+      country: "sg",
+      countries: ["sg"],
+      employmentTypes: [],
+      targetLocations: ["Singapore"],
+      targetCompanies: [],
+      experienceLevel: null,
+      remotePreferences: ["Hybrid"],
+      sources: [{ id: "official", name: "Employer", url: "https://example.com", type: "Official", coverage: "Global", trust: "Primary", active: true }],
+      directEmployersOnly: false,
+    });
+
+    const result = await loadProductJourney({} as never, "user-1");
+
+    expect(result.journey.steps.find((step) => step.id === "resume")?.complete).toBe(true);
+    expect(result.journey.steps.find((step) => step.id === "search")?.complete).toBe(true);
+  });
+
   it("uses the real Search Preferences when healthy", async () => {
     getSearchPreferences.mockResolvedValue({
       country: "sg",
