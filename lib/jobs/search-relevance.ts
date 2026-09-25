@@ -67,7 +67,18 @@ export function decideSearchRelevance(
     }
   }
 
-  // No/unclear semantic answer: preserve the deterministic engine as fallback.
+  // No/unclear semantic answer: preserve the old conservative safety boundary.
+  // A role with weak title/family vocabulary needs semantic confirmation before
+  // it may be rescued into the visible feed.
+  if (!candidate.familyWithinReach || candidate.titleFit < 35) {
+    return {
+      tier: "outside",
+      reason: "Semantic confirmation was unavailable for a weak title/family match.",
+      semanticUsed: false,
+      rescued: false,
+    };
+  }
+
   if (candidate.recommendation === "apply") {
     return {
       tier: "strong",
