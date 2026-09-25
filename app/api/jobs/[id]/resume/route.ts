@@ -279,15 +279,15 @@ export async function POST(
     }, { status: 503 });
   }
 
-  const quota = await checkAiQuota(supabase, "resume_draft");
-  if (!quota.allowed) {
-    if (durableOperationId) {
-      await failDurableAiOperation(supabase, user.id, durableOperationId, new Error("AI quota unavailable."));
-    }
-    return aiQuotaResponse(quota);
-  }
-
   try {
+    const quota = await checkAiQuota(supabase, "resume_draft");
+    if (!quota.allowed) {
+      if (durableOperationId) {
+        await failDurableAiOperation(supabase, user.id, durableOperationId, new Error("AI quota unavailable."));
+      }
+      return aiQuotaResponse(quota);
+    }
+
     const raw = await generateStructuredJson({
       workload: "quality",
       safetyIdentifier: createSafetyIdentifier(user.id),
