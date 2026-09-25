@@ -29,12 +29,19 @@ export default async function AdminDashboardPage() {
 
   let rows: Awaited<ReturnType<typeof loadUserTable>>["rows"] = [];
   let truncated = false;
+  let audience: Awaited<ReturnType<typeof loadUserTable>>["audience"] = {
+    anonymousVisitors: 0,
+    anonymousNeverLoggedIn: 0,
+    anonymousConverted: 0,
+    anonymousActiveLast7Days: 0,
+  };
   let loadError: string | null = null;
 
   try {
     const loaded = await loadUserTable();
     rows = loaded.rows;
     truncated = loaded.truncated;
+    audience = loaded.audience;
   } catch (caught) {
     /*
      * The one likely failure is a missing service-role key, and it needs to say
@@ -71,10 +78,12 @@ export default async function AdminDashboardPage() {
       {loadError ? <div className="inline-error" role="alert">{loadError}</div> : null}
 
       <section className="summary-grid admin-summary-grid">
+        <SummaryCard label="Visited but never logged in" value={audience.anonymousNeverLoggedIn} of={audience.anonymousVisitors} />
+        <SummaryCard label="Anonymous visitors converted" value={audience.anonymousConverted} of={audience.anonymousVisitors} />
+        <SummaryCard label="Average active time / account" value={summary.averageActiveTime} />
+        <SummaryCard label="Average active time / visit" value={summary.averageVisitTime} />
         <SummaryCard label="Active in the last 7 days" value={summary.activeLast7Days} of={summary.total} />
-        <SummaryCard label="Active in the last 30 days" value={summary.activeLast30Days} of={summary.total} />
-        <SummaryCard label="Uploaded a résumé" value={summary.resumeUploaded} of={summary.total} />
-        <SummaryCard label="Completed all four steps" value={summary.fullyActivated} of={summary.total} />
+        <SummaryCard label="Hired" value={summary.hired} of={summary.total} />
       </section>
 
       <section className="glass-card content-card">
@@ -88,11 +97,14 @@ export default async function AdminDashboardPage() {
           </div>
         </div>
         <ul className="admin-funnel">
-          <FunnelRow label="Signed up" value={summary.total} of={summary.total} />
-          <FunnelRow label="Uploaded a résumé" value={summary.resumeUploaded} of={summary.total} />
-          <FunnelRow label="Completed Career Direction" value={summary.directionComplete} of={summary.total} />
-          <FunnelRow label="Started a job search" value={summary.searchStarted} of={summary.total} />
-          <FunnelRow label="Turned on email alerts" value={summary.notificationsOn} of={summary.total} />
+          <FunnelRow label="Accounts created" value={summary.total} of={summary.total} />
+          <FunnelRow label="Résumé uploaded" value={summary.resumeUploaded} of={summary.total} />
+          <FunnelRow label="Master résumé ready" value={summary.masterResumeReady} of={summary.total} />
+          <FunnelRow label="Career Journey completed" value={summary.journeyCompleted} of={summary.total} />
+          <FunnelRow label="Search started" value={summary.searchStarted} of={summary.total} />
+          <FunnelRow label="Applied" value={summary.applied} of={summary.total} />
+          <FunnelRow label="Interview reached" value={summary.interviewed} of={summary.total} />
+          <FunnelRow label="Hired" value={summary.hired} of={summary.total} />
         </ul>
       </section>
 
@@ -159,13 +171,13 @@ export default async function AdminDashboardPage() {
   );
 }
 
-function SummaryCard({ label, value, of }: { label: string; value: number; of: number }) {
+function SummaryCard({ label, value, of }: { label: string; value: number | string; of?: number }) {
   return (
     <div className="summary-tile">
       <span>{label}</span>
       <strong>{value}</strong>
       {/* A count without its denominator is not a finding. */}
-      <small>{of ? `of ${of}` : "no accounts yet"}</small>
+      <small>{typeof of === "number" ? (of ? `of ${of}` : "no population yet") : "measured foreground use"}</small>
     </div>
   );
 }
