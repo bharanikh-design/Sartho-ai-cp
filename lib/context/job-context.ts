@@ -128,6 +128,15 @@ function allowedEvidenceRefs(context: CandidateContext): Set<string> {
   ]);
 }
 
+export function groundSemanticAssessments(
+  context: CandidateContext,
+  jobs: SemanticJobInput[],
+  raw: unknown,
+): Map<string, { context: JobSemanticContext; fit: SemanticJobFit }> {
+  const selected = jobs.slice(0, MAX_SEMANTIC_JOBS_PER_PASS);
+  return groundSemanticAssessments(context, selected, raw);
+}
+
 export async function assessSemanticJobs(
   context: CandidateContext,
   jobs: SemanticJobInput[],
