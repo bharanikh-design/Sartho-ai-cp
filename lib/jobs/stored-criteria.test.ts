@@ -103,6 +103,22 @@ describe("normaliseCriteria", () => {
     expect(criteria.providerTimeouts).toEqual([{ name: "provider", count: 2, waitedMs: 8000 }]);
     expect(criteria.employerPortals).toEqual([{ employer: "Example Co", status: "failed", found: 0 }]);
   });
+
+  it("preserves Candidate Context provenance through stored-search round trips", () => {
+    const criteria = normaliseCriteria({
+      candidateContextFingerprint: "context-fingerprint-123",
+      learnedAffinitySignals: 4,
+      directEmployersOnly: true,
+      unrecognisedTargets: ["Specialist Role"],
+      offMarket: 2,
+    });
+
+    expect(criteria.candidateContextFingerprint).toBe("context-fingerprint-123");
+    expect(criteria.learnedAffinitySignals).toBe(4);
+    expect(criteria.directEmployersOnly).toBe(true);
+    expect(criteria.unrecognisedTargets).toEqual(["Specialist Role"]);
+    expect(criteria.offMarket).toBe(2);
+  });
 });
 
 /*
