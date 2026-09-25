@@ -20,8 +20,9 @@ export function readAnalyticsConsent(): AnalyticsConsent | null {
 }
 
 async function revokeAnonymousTelemetry() {
+  let visitorId: string | null = null;
   try {
-    const visitorId = window.localStorage.getItem(VISITOR_KEY);
+    visitorId = window.localStorage.getItem(VISITOR_KEY);
     if (visitorId) {
       await fetch("/api/activity/audience", {
         method: "DELETE",
@@ -30,9 +31,14 @@ async function revokeAnonymousTelemetry() {
         keepalive: true,
       });
     }
-    window.localStorage.removeItem(VISITOR_KEY);
   } catch {
-    // Privacy choice is still respected locally even if cleanup cannot reach the server.
+    // Server cleanup is best effort; local tracking still stops below.
+  } finally {
+    try {
+      window.localStorage.removeItem(VISITOR_KEY);
+    } catch {
+      // Browser storage can be unavailable in hardened/private contexts.
+    }
   }
 }
 
