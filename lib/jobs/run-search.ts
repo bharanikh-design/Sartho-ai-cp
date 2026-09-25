@@ -1255,6 +1255,14 @@ export function normaliseResults(stored: unknown): ScoredJobMatch[] {
       semanticContextFingerprint: typeof value.semanticContextFingerprint === "string" && value.semanticContextFingerprint
         ? value.semanticContextFingerprint
         : undefined,
+      relevanceTier:
+        value.relevanceTier === "strong" || value.relevanceTier === "possible" || value.relevanceTier === "outside"
+          ? value.relevanceTier
+          : undefined,
+      relevanceReason: typeof value.relevanceReason === "string" && value.relevanceReason
+        ? value.relevanceReason
+        : undefined,
+      semanticRescued: value.semanticRescued === true,
       screeningInsight: nullableText(value.screeningInsight),
     }];
   });
@@ -1339,5 +1347,8 @@ export function normaliseCriteria(stored: unknown): SearchCriteria {
       : undefined,
     learnedAffinitySignals: count(value.learnedAffinitySignals),
     semanticJobsAssessed: count(value.semanticJobsAssessed),
+    semanticRescued: count(value.semanticRescued),
+    semanticExcluded: count(value.semanticExcluded),
+    familyWarnings: count(value.familyWarnings),
   };
 }
