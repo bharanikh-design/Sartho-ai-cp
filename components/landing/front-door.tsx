@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef } from "react";
+import { useRef } from "react";
 import { Navbar } from "@/components/landing/navbar";
 import { ParticleRibbon } from "@/components/landing/particle-ribbon";
 import { AuthCard } from "@/components/auth/auth-card";
@@ -30,26 +30,14 @@ const FEATURES = [
 export function FrontDoor() {
   const { busy, error, signInWithProvider } = useOAuthSignIn();
   const stageRef = useRef<HTMLDivElement>(null);
-  const cardRef = useRef<HTMLDivElement>(null);
   usePointerParallax(stageRef);
-
-  const scrollToCard = useCallback(() => {
-    const card = cardRef.current;
-    if (!card) return;
-    card.scrollIntoView({ behavior: "smooth", block: "center" });
-    // Move focus to the first provider so a keyboard user lands on the action,
-    // not just the scroll. Deferred a beat so the smooth scroll can begin first.
-    window.setTimeout(() => {
-      card.querySelector<HTMLButtonElement>(".fd-providers button")?.focus();
-    }, 420);
-  }, []);
 
   return (
     <div className="fd" ref={stageRef}>
       <ParticleRibbon />
 
       <div className="fd-shell">
-        <Navbar onGetStarted={scrollToCard} />
+        <Navbar />
 
         <div className="fd-stage">
           <section className="fd-pitch">
@@ -62,7 +50,7 @@ export function FrontDoor() {
               and helps you get there with confidence.
             </p>
 
-            <ul className="fd-features" id="what-it-does">
+            <ul className="fd-features">
               {FEATURES.map(({ title, sub, icon: Icon }) => (
                 <li className="fd-feature" key={title}>
                   <span className="fd-feature-icon" aria-hidden="true">
@@ -77,13 +65,7 @@ export function FrontDoor() {
             </ul>
           </section>
 
-          <AuthCard
-            ref={cardRef}
-            id="sign-in"
-            busy={busy}
-            error={error}
-            onProvider={signInWithProvider}
-          />
+          <AuthCard id="sign-in" busy={busy} error={error} onProvider={signInWithProvider} />
         </div>
 
         <div className="fd-baseline" aria-hidden="true">
