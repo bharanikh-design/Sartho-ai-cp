@@ -14,7 +14,7 @@ export const jobSemanticContextSchema = z.object({
   responsibilities: z.array(z.string().trim().min(2).max(180)).max(6),
   mandatoryExpertise: z.array(z.string().trim().min(1).max(140)).max(8),
   domainContext: z.array(z.string().trim().min(1).max(120)).max(6),
-});
+}).strict();
 
 export const semanticJobFitSchema = z.object({
   relation: z.enum(["aligned", "adjacent", "conflict", "unclear"]),
@@ -22,15 +22,15 @@ export const semanticJobFitSchema = z.object({
   reason: z.string().trim().min(5).max(420),
   conflictDimensions: z.array(z.enum(["function", "specialism", "seniority", "role_shape"])).max(4),
   supportingEvidenceRefs: z.array(z.string()).max(12),
-});
+}).strict();
 
 const semanticAssessmentSchema = z.object({
   jobs: z.array(z.object({
     key: z.string(),
     context: jobSemanticContextSchema,
     fit: semanticJobFitSchema,
-  })).max(MAX_SEMANTIC_JOBS_PER_PASS),
-});
+  }).strict()).max(MAX_SEMANTIC_JOBS_PER_PASS),
+}).strict();
 
 const jsonSchema = {
   type: "object",
