@@ -13,6 +13,7 @@ const statusOrder: Array<{ id: JobStatus; label: string; description: string }> 
   { id: "assessment", label: "Assessment", description: "Action required" },
   { id: "interview", label: "Interview", description: "Conversation scheduled" },
   { id: "offer", label: "Offer", description: "Offer received" },
+  { id: "hired", label: "Hired", description: "Joined the employer" },
   { id: "rejected", label: "Rejected", description: "Opportunity closed" },
 ];
 
