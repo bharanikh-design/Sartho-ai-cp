@@ -5,14 +5,16 @@ import { buildCandidateContext, type CandidateContext } from "@/lib/context/cand
 import { deriveLearnedAffinity } from "@/lib/context/interaction-memory";
 import { getCandidateInteractions } from "@/lib/data/interaction-memory";
 
-export async function loadCandidateWorkflowContext(
-  supabase: SupabaseClient,
-  userId: string,
-): Promise<{
+export type CandidateWorkflowContext = {
   candidateContext: CandidateContext;
   career: Awaited<ReturnType<typeof getCareerWorkspace>>;
   search: Awaited<ReturnType<typeof getSearchPreferences>>;
-}> {
+};
+
+export async function loadCandidateWorkflowContext(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<CandidateWorkflowContext> {
   /*
    * One orchestration read. Resume/evidence, Career Direction, Search Brief and
    * Interaction Memory meet here before any downstream component consumes them.
