@@ -4,6 +4,7 @@ import { getAuthenticatedUser } from "@/lib/auth";
 import { evaluateOpportunity, prepareCareerConductor } from "@/lib/workflow/career-conductor";
 import { assessSemanticJobs } from "@/lib/context/job-context";
 import { createSafetyIdentifier } from "@/lib/ai/provider";
+import type { RuleAnalysis } from "@/lib/types";
 
 /*
  * Analyse a role without saving it.
@@ -28,7 +29,7 @@ export async function POST(request: Request) {
   const conductor = await prepareCareerConductor(supabase, user.id);
   const scored = evaluateOpportunity(conductor, parsed.data.title, parsed.data.description);
 
-  let analysis = scored.analysis;
+  let analysis: RuleAnalysis = scored.analysis;
   try {
     const assessed = await Promise.race([
       assessSemanticJobs(
