@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getAuthenticatedUser } from "@/lib/auth";
-import { rescoreSavedJobs } from "@/lib/matching/rescore";
+import { propagateCandidateMutation } from "@/lib/workflow/propagate-candidate-mutation";
 
 const evidencePatchSchema = z.object({
   approval_status: z.enum(["pending", "approved", "rejected"]).optional(),
@@ -52,7 +52,7 @@ export async function PATCH(
     || (data.approval_status === "approved"
       && (parsed.data.claim !== undefined || parsed.data.context !== undefined));
   if (careerTruthChanged) {
-    await rescoreSavedJobs(supabase, user.id, { invalidateDeepAnalysis: true });
+    await propagateCandidateMutation(supabase, user.id, "career_truth");
   }
 
   return NextResponse.json({ evidence: data });
