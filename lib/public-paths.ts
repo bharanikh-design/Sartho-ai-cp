@@ -26,7 +26,7 @@
  * centre for somebody signed in, an explanation of the product for everybody
  * else.
  */
-export const PUBLIC_PATHS = ["/", "/login", "/auth/callback", "/extension", "/privacy", "/terms"] as const;
+export const PUBLIC_PATHS = ["/", "/login", "/auth/callback", "/extension", "/privacy", "/terms", "/contact"] as const;
 
 export function isPublicPath(pathname: string): boolean {
   /* A trailing slash is the same page. */
