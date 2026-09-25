@@ -111,6 +111,9 @@ describe("normaliseCriteria", () => {
       directEmployersOnly: true,
       unrecognisedTargets: ["Specialist Role"],
       offMarket: 2,
+      semanticRescued: 3,
+      semanticExcluded: 4,
+      familyWarnings: 5,
     });
 
     expect(criteria.candidateContextFingerprint).toBe("context-fingerprint-123");
@@ -118,6 +121,9 @@ describe("normaliseCriteria", () => {
     expect(criteria.directEmployersOnly).toBe(true);
     expect(criteria.unrecognisedTargets).toEqual(["Specialist Role"]);
     expect(criteria.offMarket).toBe(2);
+    expect(criteria.semanticRescued).toBe(3);
+    expect(criteria.semanticExcluded).toBe(4);
+    expect(criteria.familyWarnings).toBe(5);
   });
 });
 
@@ -197,6 +203,19 @@ describe("normaliseResults", () => {
     expect(match.semanticContext?.specialties).toEqual(["ServiceNow", "ITSM"]);
     expect(match.semanticFit?.relation).toBe("aligned");
     expect(match.semanticContextFingerprint).toBe("context-12345678");
+  });
+
+  it("preserves Search Relevance V2 tier and rescue provenance", () => {
+    const [match] = normaliseResults([{
+      ...stored,
+      relevanceTier: "possible",
+      relevanceReason: "Service assurance is credible adjacent ITSM work.",
+      semanticRescued: true,
+    }]);
+
+    expect(match.relevanceTier).toBe("possible");
+    expect(match.relevanceReason).toContain("Service assurance");
+    expect(match.semanticRescued).toBe(true);
   });
 
   it("drops malformed semantic context rather than crashing stored Search", () => {
