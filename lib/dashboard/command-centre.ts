@@ -48,7 +48,7 @@ export type CommandCentreReviewItem = {
 
 const activeApplicationStatuses = new Set<JobStatus>(["applied", "acknowledged", "assessment", "interview"]);
 const interviewStatuses = new Set<JobStatus>(["assessment", "interview"]);
-const outcomeStatuses = new Set<JobStatus>(["offer", "rejected", "withdrawn"]);
+const outcomeStatuses = new Set<JobStatus>(["offer", "hired", "rejected", "withdrawn"]);
 
 function opportunityScore(job: CommandCentreJob) {
   const statusBoost = interviewStatuses.has(job.status) ? 500 : activeApplicationStatuses.has(job.status) ? 300 : 0;
