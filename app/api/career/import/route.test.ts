@@ -147,6 +147,9 @@ function fakeSupabase(
           ? { data: null, error: { code: "PGRST202", message: "function not found" } }
           : { data: null, error: null };
       }
+      if (name === "ensure_master_resume_import") {
+        return { data: false, error: null };
+      }
       if (name === "consume_ai_quota") {
         return {
           data: opts.quotaDecision ?? {
@@ -293,13 +296,18 @@ describe("POST /api/career/import", () => {
     expect(recorded.removals).toEqual([]);
   });
 
-  it("reports the master flag on the done event, and leaves it off by default", async () => {
+  it("reports explicit master selection and otherwise asks for the safe default", async () => {
     const flagged = await drain(await POST(upload("CV.txt", { makeMaster: true })));
     expect(flagged.at(-1)).toMatchObject({ stage: "done", isMaster: true });
+    expect(recorded.rpcCalls.map((call) => call.name)).not.toContain("ensure_master_resume_import");
 
     recorded.rpcCalls = [];
     const plain = await drain(await POST(upload()));
     expect(plain.at(-1)).toMatchObject({ stage: "done", isMaster: false });
+    expect(recorded.rpcCalls).toContainEqual({
+      name: "ensure_master_resume_import",
+      args: { p_import_id: "import-1" },
+    });
     expect(recorded.rpcCalls.map((call) => call.name)).not.toContain("set_master_resume_import");
   });
 
