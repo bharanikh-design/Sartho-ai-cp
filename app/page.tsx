@@ -7,13 +7,8 @@ import { ResumeImport } from "@/components/resume-import";
 import { SignedOutHome } from "@/components/signed-out-home";
 import { getAuthenticatedUser } from "@/lib/auth";
 import { connectionStatus } from "@/lib/integrations/store";
-import {
-  buildCareerCommandCentre,
-  type CommandCentreApplication,
-  type CommandCentreJob,
-} from "@/lib/dashboard/command-centre";
-import { loadProductJourney } from "@/lib/journey/load-product-journey";
-import { withJwtClockSkewRetry } from "@/lib/supabase/retry";
+import { buildCareerCommandCentre } from "@/lib/dashboard/command-centre";
+import { loadDashboardData } from "@/lib/dashboard/load-dashboard";
 
 export const dynamic = "force-dynamic";
 
@@ -42,25 +37,16 @@ export default async function DashboardPage({
    * bookmark or a reload — the callback sets this and the cinematic clears it.
    */
   await searchParams;
-  const driveConnected = (await connectionStatus(user.id)).connected;
+  let driveConnected = false;
+  try {
+    driveConnected = (await connectionStatus(user.id)).connected;
+  } catch (error) {
+    console.warn("Drive connection status unavailable; dashboard remains usable", error);
+  }
 
-  const [journeyResult, jobsResult, applicationsResult] = await Promise.all([
-    loadProductJourney(supabase, user.id),
-    withJwtClockSkewRetry(
-      () => supabase
-        .from("jobs")
-        .select("id,title,employer,status,recommendation,overall_match,rule_analysis,deep_analysis_status,deep_analysis_summary,updated_at")
-        .eq("user_id", user.id),
-      (result) => result.error,
-    ),
-    supabase
-      .from("applications")
-      .select("job_id,resume_draft,next_action,next_action_date")
-      .eq("user_id", user.id),
-  ]);
-
-  if (jobsResult.error) throw jobsResult.error;
-  if (applicationsResult.error) throw applicationsResult.error;
+  const dashboard = await loadDashboardData(supabase, user.id);
+  const { journeyResult, jobs, applications } = dashboard;
+  const dashboardDegraded = dashboard.unavailable.length > 0;
 
   const { journey, workspace } = journeyResult;
   const pendingSteps = journey.steps.filter((s) => !s.complete);
@@ -68,8 +54,8 @@ export default async function DashboardPage({
   const pendingEvidence = workspace.evidence.filter((item) => item.approval_status === "pending").length;
   const commandCentre = buildCareerCommandCentre({
     journey,
-    jobs: (jobsResult.data ?? []) as CommandCentreJob[],
-    applications: (applicationsResult.data ?? []) as CommandCentreApplication[],
+    jobs,
+    applications,
     approvedEvidence,
     pendingEvidence,
   });
@@ -138,6 +124,12 @@ export default async function DashboardPage({
         metric={{ value: pendingSteps.length.toString(), label: pendingSteps.length === 1 ? "action required" : "actions required", href: "/journey" }}
       />
 
+      {dashboardDegraded ? (
+        <div className="inline-notice" role="status">
+          Some opportunity or application data is temporarily unavailable. Your Career Profile and Journey are still current.
+        </div>
+      ) : null}
+
       {/*
         * Directly under the header, above the nudge.
         *
@@ -173,7 +165,7 @@ export default async function DashboardPage({
             {pendingEvidence ? <em>{pendingEvidence} awaiting your review</em> : <em>Evidence is up to date</em>}
           </Link>
           <Link href="/applications" className="career-pulse-mini">
-            <small>Opportunities</small><strong>{(jobsResult.data ?? []).filter((job) => job.recommendation === "apply").length}</strong><span>strong matches</span><em>{(jobsResult.data ?? []).length} roles tracked</em>
+            <small>Opportunities</small><strong>{jobs.filter((job) => job.recommendation === "apply").length}</strong><span>strong matches</span><em>{jobs.length} roles tracked</em>
           </Link>
           <Link href="/resume-studio" className="career-pulse-mini">
             <small>Résumé readiness</small><strong>{journey.steps.find((step) => step.id === "resume")?.complete ? "Ready" : "Next"}</strong><span>career source of truth</span><em>Open Résumé Studio</em>
@@ -196,7 +188,7 @@ export default async function DashboardPage({
         <div className="career-changes-heading"><div><p className="product-system-eyebrow">Career intelligence</p><h2 id="career-changes-title">What Sartho sees now</h2></div><span>Grounded in your live workspace</span></div>
         <div className="career-change-grid">
           <article className="career-change-card"><span className="career-change-spark" aria-hidden="true">✦</span><small>Evidence</small><strong>{approvedEvidence} approved</strong><p>{pendingEvidence ? `${pendingEvidence} item${pendingEvidence === 1 ? "" : "s"} need your decision.` : "Your evidence base is currently reviewed."}</p></article>
-          <article className="career-change-card"><span className="career-change-spark" aria-hidden="true">↗</span><small>Opportunity signal</small><strong>{(jobsResult.data ?? []).filter((job) => job.recommendation === "apply").length} strong matches</strong><p>Roles marked Apply have evidence-backed fit, not keyword similarity alone.</p></article>
+          <article className="career-change-card"><span className="career-change-spark" aria-hidden="true">↗</span><small>Opportunity signal</small><strong>{jobs.filter((job) => job.recommendation === "apply").length} strong matches</strong><p>Roles marked Apply have evidence-backed fit, not keyword similarity alone.</p></article>
           <article className="career-change-card"><span className="career-change-spark" aria-hidden="true">◎</span><small>Current focus</small><strong>{journey.current.title}</strong><p>{journey.current.reason}</p></article>
         </div>
       </section>
