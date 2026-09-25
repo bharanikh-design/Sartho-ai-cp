@@ -6,6 +6,11 @@ import { canonicalJobUrl } from "@/lib/jobs/source-url";
 import { evaluateOpportunity, prepareCareerConductor } from "@/lib/workflow/career-conductor";
 import { assessSemanticJobs } from "@/lib/context/job-context";
 import { createSafetyIdentifier } from "@/lib/ai/provider";
+import {
+  createWorkflowTraceId,
+  logWorkflowTrace,
+  normaliseWorkflowTraceId,
+} from "@/lib/observability/workflow-trace";
 
 
 export async function POST(request: Request) {
@@ -24,7 +29,11 @@ export async function POST(request: Request) {
     semanticContext,
     semanticFit,
     semanticContextFingerprint,
+    workflowTraceId: incomingWorkflowTraceId,
   } = parsed.data;
+
+  const workflowTraceId = normaliseWorkflowTraceId(incomingWorkflowTraceId) ?? createWorkflowTraceId();
+  logWorkflowTrace("opportunity.save_started", workflowTraceId);
 
   /*
    * Read against this user's own evidence. The matcher has no career of its
@@ -67,6 +76,7 @@ export async function POST(request: Request) {
   const ruleAnalysis = {
     ...scored.analysis,
     scoringContextFingerprint: conductor.contextFingerprint,
+    workflowTraceId,
     ...(semantic
       ? {
           semanticContext: semantic.context,
@@ -129,7 +139,8 @@ export async function POST(request: Request) {
       console.error("Unable to refresh an existing opportunity", updateError);
       return NextResponse.json({ error: "Sartho could not update this opportunity." }, { status: 500 });
     }
-    return NextResponse.json({ job: updated, existing: true }, { status: 200 });
+    logWorkflowTrace("opportunity.saved", workflowTraceId, { existing: true });
+    return NextResponse.json({ job: updated, existing: true, workflowTraceId }, { status: 200 });
   }
 
   const { data, error } = await supabase
@@ -158,5 +169,6 @@ export async function POST(request: Request) {
     console.error("Unable to save opportunity", error);
     return NextResponse.json({ error: "Sartho could not save this opportunity." }, { status: 500 });
   }
-  return NextResponse.json({ job: data, existing: false }, { status: 201 });
+  logWorkflowTrace("opportunity.saved", workflowTraceId, { existing: false });
+  return NextResponse.json({ job: data, existing: false, workflowTraceId }, { status: 201 });
 }
