@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getAuthenticatedUser } from "@/lib/auth";
-import { getCareerWorkspace } from "@/lib/data/career";
-import { scoreOpportunity } from "@/lib/matching/opportunity-score";
+import { evaluateOpportunity, prepareCareerConductor } from "@/lib/workflow/career-conductor";
 
 /*
  * Analyse a role without saving it.
@@ -24,8 +23,8 @@ export async function POST(request: Request) {
   const parsed = previewSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Paste the job description to analyse it." }, { status: 400 });
 
-  const { roles, evidence, lanes } = await getCareerWorkspace(supabase, user.id);
-  const scored = scoreOpportunity(parsed.data.title, parsed.data.description, evidence, roles, lanes);
+  const conductor = await prepareCareerConductor(supabase, user.id);
+  const scored = evaluateOpportunity(conductor, parsed.data.title, parsed.data.description);
 
   return NextResponse.json({ analysis: scored.analysis, overallMatch: scored.overallMatch });
 }
