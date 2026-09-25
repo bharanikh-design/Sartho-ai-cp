@@ -95,6 +95,35 @@ describe("scoreTitleFit", () => {
     expect(targeted.score).toBeGreaterThan(0);
     expect(targeted.score).toBeLessThan(held.score);
   });
+
+  it("does not let a generic Project Manager core erase SAP/FICO specialist qualifiers", () => {
+    const fit = scoreTitleFit(
+      "SAP FICO Project Manager & Solution Architect",
+      ["Project Manager"],
+      ["ServiceNow Project Manager", "ITSM Delivery Manager"],
+    );
+    expect(fit.specialistConflict).toBe(true);
+    expect(fit.score).toBeLessThanOrEqual(20);
+  });
+
+  it("keeps the same specialist context as a strong title match", () => {
+    const fit = scoreTitleFit(
+      "ServiceNow Project Manager",
+      ["ServiceNow Project Manager"],
+      ["ITSM Delivery Manager"],
+    );
+    expect(fit.specialistConflict).toBe(false);
+    expect(fit.score).toBe(100);
+  });
+
+  it.each([
+    ["AML KYC Project Manager", "ServiceNow Project Manager"],
+    ["Cybersecurity Program Manager", "Transformation Program Manager"],
+  ])("strongly suppresses contradictory specialist context: %s vs %s", (jobTitle, candidateTitle) => {
+    const fit = scoreTitleFit(jobTitle, [candidateTitle], []);
+    expect(fit.specialistConflict).toBe(true);
+    expect(fit.score).toBeLessThanOrEqual(20);
+  });
 });
 
 /*
