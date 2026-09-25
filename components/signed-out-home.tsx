@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { PlatformHero } from "@/components/platform-hero";
 import { ProductCarousel } from "@/components/landing/product-carousel";
 import { SignInExperience } from "@/components/auth/sign-in-experience";
@@ -49,13 +48,6 @@ export function SignedOutHome() {
         </section>
       </div>
 
-      <p className="policy-footer landing-footer">
-        <Link href="/privacy">Privacy</Link>
-        {" · "}
-        <Link href="/terms">Terms</Link>
-        {" · "}
-        <Link href="/extension">Browser extension</Link>
-      </p>
     </div>
   );
 }
