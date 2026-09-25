@@ -38,7 +38,6 @@ import {
   MAX_COMPANY_QUERIES,
   MAX_LOCATION_QUERIES,
   planSmartSearchQueries,
-  toSearchKeywords,
   widenToCountry,
 } from "@/lib/jobs/search-plan";
 import {
@@ -884,7 +883,7 @@ export async function runBriefSearch(
   const level = candidateSeniority(heldTitles, seniorityYears);
   const withinReach: ScoredJobMatch[] = [];
   let tooSenior = 0;
-  let offFamily = 0; // legacy counter: only semantic exclusions are counted now.
+  const offFamily = 0; // legacy field retained for stored-search compatibility.
   let familyWarnings = 0;
   let offMarket = 0;
   let tooMuchExperience = 0;
