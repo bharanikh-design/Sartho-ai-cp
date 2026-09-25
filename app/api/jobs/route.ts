@@ -66,6 +66,7 @@ export async function POST(request: Request) {
 
   const ruleAnalysis = {
     ...scored.analysis,
+    scoringContextFingerprint: conductor.contextFingerprint,
     ...(semantic
       ? {
           semanticContext: semantic.context,

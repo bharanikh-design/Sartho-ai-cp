@@ -17,7 +17,7 @@ import {
   MAX_UPLOAD_BYTES,
   RESUME_UPLOAD_BUCKET,
 } from "@/lib/resume/upload";
-import { rescoreSavedJobs } from "@/lib/matching/rescore";
+import { propagateCandidateMutation } from "@/lib/workflow/propagate-candidate-mutation";
 
 /*
  * Résumé import — the way career evidence enters Sartho.
@@ -335,7 +335,7 @@ export async function POST(request: Request) {
      * existing open opportunities must be re-evaluated through the same
      * conductor that Search/Preview/Save use.
      */
-    await rescoreSavedJobs(supabase, userId, { invalidateDeepAnalysis: true });
+    await propagateCandidateMutation(supabase, userId, "career_truth");
 
     const counts = (applied ?? {}) as Record<string, number>;
     send({

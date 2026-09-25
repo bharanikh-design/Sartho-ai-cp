@@ -29,7 +29,10 @@ export async function POST(request: Request) {
   const conductor = await prepareCareerConductor(supabase, user.id);
   const scored = evaluateOpportunity(conductor, parsed.data.title, parsed.data.description);
 
-  let analysis: RuleAnalysis = scored.analysis;
+  let analysis: RuleAnalysis = {
+    ...scored.analysis,
+    scoringContextFingerprint: conductor.contextFingerprint,
+  };
   try {
     const assessed = await Promise.race([
       assessSemanticJobs(

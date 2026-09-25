@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getAuthenticatedUser } from "@/lib/auth";
 import { logError } from "@/lib/logger";
-import { rescoreSavedJobs } from "@/lib/matching/rescore";
+import { propagateCandidateMutation } from "@/lib/workflow/propagate-candidate-mutation";
 
 import { directionSchema } from "./schema";
 
@@ -82,7 +82,7 @@ export async function PUT(request: Request) {
 
   // Priorities feed the opportunity score, so a change here re-ranks every
   // saved role against the direction the user just set.
-  await rescoreSavedJobs(supabase, user.id);
+  await propagateCandidateMutation(supabase, user.id, "career_direction");
 
   return NextResponse.json({ ok: true });
 }

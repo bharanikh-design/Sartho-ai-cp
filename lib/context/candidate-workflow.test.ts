@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { CandidateContext } from "@/lib/context/candidate-context";
 import { searchIntentFromCandidateContext } from "@/lib/context/candidate-workflow";
+import { sourceFingerprint } from "@/lib/data/candidate-context";
 
 const signal = <T>(value: T, authority: "career_truth" | "explicit_intent" | "learned_affinity" = "explicit_intent") => ({
   value,
@@ -57,6 +58,46 @@ describe("Candidate Context -> Search handoff", () => {
       directEmployersOnly: true,
       learnedAffinitySignals: 1,
     });
+  });
+
+  it("changes both provenance and the next Search handoff when Career Direction changes", () => {
+    const base = {
+      schemaVersion: 1,
+      generatedAt: "2026-09-25T00:00:00Z",
+      careerTruth: {
+        headline: null,
+        summary: null,
+        yearsExperience: null,
+        workAuthorisation: null,
+        heldRoles: [],
+        capabilities: [],
+        explicitExclusions: [],
+      },
+      explicitIntent: {
+        targetRoles: [signal({ name: "ServiceNow Delivery Director", weight: 100, priority: 1 })],
+        countries: [signal("sg")],
+        locations: [],
+        companies: [],
+        employmentTypes: [],
+        remotePreferences: [],
+        experienceLevel: null,
+        directEmployersOnly: null,
+      },
+      learnedAffinity: { signals: [] },
+    } as CandidateContext;
+
+    const changed: CandidateContext = {
+      ...base,
+      generatedAt: "2026-09-25T01:00:00Z",
+      explicitIntent: {
+        ...base.explicitIntent,
+        targetRoles: [signal({ name: "ITSM Transformation Director", weight: 100, priority: 1 })],
+      },
+    };
+
+    expect(sourceFingerprint(base)).not.toBe(sourceFingerprint(changed));
+    expect(searchIntentFromCandidateContext(base).roles).toEqual(["ServiceNow Delivery Director"]);
+    expect(searchIntentFromCandidateContext(changed).roles).toEqual(["ITSM Transformation Director"]);
   });
 
   it("reports learned affinity without silently turning it into search filters", () => {
