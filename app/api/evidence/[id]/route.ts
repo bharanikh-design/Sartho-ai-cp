@@ -52,7 +52,7 @@ export async function PATCH(
     || (data.approval_status === "approved"
       && (parsed.data.claim !== undefined || parsed.data.context !== undefined));
   if (careerTruthChanged) {
-    await rescoreSavedJobs(supabase, user.id);
+    await rescoreSavedJobs(supabase, user.id, { invalidateDeepAnalysis: true });
   }
 
   return NextResponse.json({ evidence: data });
