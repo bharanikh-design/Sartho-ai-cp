@@ -171,16 +171,22 @@ export function planSearchQueries(input: {
   for (const role of baseRoles.slice(1)) {
     queries.push({ ...role, country: input.country, location: primaryLocation, remoteOnly, employmentTypes, limit: 20 });
   }
-  // Once every saved role has a broad search, cover every saved role at every
-  // selected employer. Generated alternatives come afterwards and can widen,
-  // but never displace, the person's explicit choices.
+  /*
+   * Once every explicit target role has a broad pass, run the bounded semantic
+   * market-title expansion before aggregator employer combinations. Under a
+   * wall-clock budget, putting twenty company/title combinations first made the
+   * "smart" expansion structurally unreachable.
+   *
+   * Named companies are still honoured twice: aggregator combinations below,
+   * plus their direct careers portals in run-search, which execute independently.
+   */
+  for (const role of roles.filter((role) => role.suggested)) {
+    queries.push({ ...role, country: input.country, location: primaryLocation, remoteOnly, employmentTypes, limit: 20 });
+  }
   for (const employer of input.companies.slice(0, MAX_COMPANY_QUERIES)) {
     for (const role of baseRoles) {
       queries.push({ ...role, country: input.country, employer, remoteOnly, employmentTypes, limit: 10 });
     }
-  }
-  for (const role of roles.filter((role) => role.suggested)) {
-    queries.push({ ...role, country: input.country, location: primaryLocation, remoteOnly, employmentTypes, limit: 20 });
   }
 
   /*
