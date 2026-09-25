@@ -72,3 +72,13 @@ These workflows must leave underlying source data unchanged on failure.
 - optional integration status blocking core navigation
 - telemetry pages rendering empty as if there were no users when one metric source failed
 - silent degradation without logs or visible diagnostics where appropriate
+
+## Production deployment contract
+
+Application code must not be allowed to deploy ahead of the Supabase schema it requires.
+
+The production build runs `scripts/verify-schema-contract.mjs` before building the application. On Vercel production it checks the live Supabase schema using the existing service-role connection and fails the deployment when required tables, columns or RPCs are missing.
+
+The guard is intentionally not a second migration ledger. The database itself remains the authority: the build asks whether the concrete structures required by current code exist.
+
+Local development and ordinary CI do not query production Supabase; the guard activates only when `VERCEL_ENV=production`.
