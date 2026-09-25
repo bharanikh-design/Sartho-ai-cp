@@ -92,16 +92,11 @@ export function decideSearchRelevance(
    * provider outage cannot promote the whole raw market into the visible feed.
    */
   if (candidate.semanticAttempted && (!candidate.familyWithinReach || candidate.titleFit < 35)) {
-    const plausible = candidate.recommendation !== "skip"
-      || candidate.requirementCoverage >= 25
-      || candidate.overallMatch >= 25;
     return {
-      tier: plausible ? "possible" : "outside",
-      reason: plausible
-        ? "Semantic review was temporarily unavailable; retained as a bounded possible match from the strongest evidence-backed candidates."
-        : "Semantic review was unavailable and the deterministic evidence was too weak to retain this role.",
+      tier: "possible",
+      reason: "Semantic review was temporarily unavailable; retained as a bounded possible match because it was selected among the strongest candidates for deeper review.",
       semanticUsed: false,
-      rescued: plausible,
+      rescued: true,
     };
   }
 
