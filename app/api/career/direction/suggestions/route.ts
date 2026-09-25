@@ -149,7 +149,7 @@ export async function POST(request: Request) {
     if (!suggestions.length) throw new Error("The suggestions were not grounded in approved Career Profile evidence.");
 
     const evidenceCount = approvedEvidence.length;
-    const roleCount = rolesResult.data?.length ?? 0;
+    const roleCount = roles.length;
 
     // Stored so the next page visit is a read, not a model call. A fresh set
     // clears old dismissals: these are different roles, and a stale dismissal
