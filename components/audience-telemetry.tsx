@@ -43,6 +43,8 @@ export function AudienceTelemetry() {
   const [consent, setConsent] = useState<AnalyticsConsent | null>(null);
 
   useEffect(() => {
+    // Initial client-only browser preference sync.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setConsent(readAnalyticsConsent());
 
     const changed = (event: Event) => {
