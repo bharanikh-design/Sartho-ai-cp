@@ -40,6 +40,9 @@ type SearchResult = {
   semanticContext?: JobSemanticContext;
   semanticFit?: SemanticJobFit;
   semanticContextFingerprint?: string;
+  relevanceTier?: "strong" | "possible" | "outside";
+  relevanceReason?: string;
+  semanticRescued?: boolean;
   screeningInsight?: string | null;
 };
 
@@ -221,14 +224,16 @@ export function JobSearchPanel({
           </span>
           <strong style={{ display: "block", fontSize: "1.0625rem", margin: "2px 0" }}>{result.title}</strong>
           <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap", margin: "6px 0" }}>
-            <span style={{ fontSize: "0.75rem", fontWeight: 700, textTransform: "uppercase", color: recTone[result.recommendation], border: `1px solid ${recTone[result.recommendation]}55`, background: `${recTone[result.recommendation]}18`, padding: "3px 10px", borderRadius: "100px" }}>{result.recommendation}</span>
-            <span style={{ fontSize: "0.8125rem", color: "var(--text-secondary)" }}>{result.overallMatch}% match</span>
+            <span style={{ fontSize: "0.75rem", fontWeight: 700, textTransform: "uppercase", color: recTone[result.recommendation], border: `1px solid ${recTone[result.recommendation]}55`, background: `${recTone[result.recommendation]}18`, padding: "3px 10px", borderRadius: "100px" }}>
+              {result.relevanceTier === "strong" ? "Strong match" : result.relevanceTier === "possible" ? "Possible match" : result.recommendation}
+            </span>
+            <span style={{ fontSize: "0.8125rem", color: "var(--text-secondary)" }}>{result.overallMatch}% evidence match</span>
             {result.salary ? <span style={{ fontSize: "0.8125rem", color: "var(--text-tertiary)" }}>{result.salary}</span> : null}
             <span style={{ fontSize: "0.75rem", color: "var(--text-tertiary)" }}>{result.source}</span>
           </div>
           {result.screeningInsight ? (
             <p style={{ margin: "6px 0", color: "var(--text-secondary)", fontSize: "0.8125rem" }}>
-              Screening insight: {result.screeningInsight}
+              Why Sartho is showing this: {result.relevanceReason ?? result.screeningInsight}
             </p>
           ) : null}
           {/*
