@@ -14,8 +14,8 @@ export function buildDailyDigest(jobs: DigestJob[], since: Date) {
   const newMatches = jobs.filter((job) => new Date(job.created_at).getTime() >= sinceTime);
   const strongMatches = newMatches.filter((job) => job.recommendation === "apply");
   const applied = jobs.filter((job) => ["applied", "acknowledged", "assessment", "interview"].includes(job.status));
-  const reviewed = jobs.filter((job) => ["analysed", "approved", "applied", "acknowledged", "assessment", "interview", "offer", "rejected", "withdrawn"].includes(job.status));
-  const outcomes = jobs.filter((job) => ["offer", "rejected", "withdrawn"].includes(job.status) && new Date(job.updated_at).getTime() >= sinceTime);
+  const reviewed = jobs.filter((job) => ["analysed", "approved", "applied", "acknowledged", "assessment", "interview", "offer", "hired", "rejected", "withdrawn"].includes(job.status));
+  const outcomes = jobs.filter((job) => ["offer", "hired", "rejected", "withdrawn"].includes(job.status) && new Date(job.updated_at).getTime() >= sinceTime);
 
   return { newMatches, strongMatches, applied, reviewed, outcomes };
 }

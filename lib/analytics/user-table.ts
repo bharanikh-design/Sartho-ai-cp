@@ -1,29 +1,11 @@
 import { describeDuration } from "@/lib/analytics/activity";
 
-/*
- * One row per person, for the operator table.
- *
- * The shape of the problem is that almost none of this needs storing: how far
- * somebody got is already written down in whether their rows exist. A completed
- * résumé import means they uploaded a CV. An active target lane means they
- * finished Career Direction. A saved brief means they started searching. Adding
- * a "has_uploaded_resume" flag beside those would be a second copy of a fact
- * that can disagree with the first, and it would be wrong for everybody who
- * signed up before the flag existed.
- *
- * So the funnel is derived, and the join happens here rather than in the page.
- * It is done with sets rather than per-person queries on purpose: a table of a
- * thousand people built by asking six questions each is six thousand round
- * trips, and it would work perfectly for the twenty users it was tested with.
- */
-
 export type UserAccount = {
   id: string;
   email: string | null;
-  /** When the account was created — the first sign-in, in practice. */
   createdAt: string | null;
-  /** The last time they authenticated, which is NOT the last time they were here. */
   lastSignInAt: string | null;
+  provider: string | null;
 };
 
 export type UserActivityRow = {
@@ -43,11 +25,14 @@ export type UserTableInput = {
   accounts: UserAccount[];
   profiles: UserProfileRow[];
   activity: UserActivityRow[];
-  /** User ids that have each signal. Sets, so the join is one pass. */
   resumeUploaded: Set<string>;
-  directionComplete: Set<string>;
+  masterResumeReady: Set<string>;
+  journeyCompleted: Set<string>;
   searchStarted: Set<string>;
-  notificationsOn: Set<string>;
+  applied: Set<string>;
+  interviewed: Set<string>;
+  hired: Set<string>;
+  savedJobCounts: Map<string, number>;
 };
 
 export type UserTableRow = {
@@ -55,72 +40,83 @@ export type UserTableRow = {
   name: string;
   email: string;
   location: string;
+  provider: string;
   firstSeenAt: string | null;
   lastActiveAt: string | null;
-  /** Whether lastActiveAt is a real activity reading or only a sign-in. */
   lastActiveIsMeasured: boolean;
   activeSeconds: number;
   activeTime: string;
+  averageVisitSeconds: number;
+  averageVisitTime: string;
   visitCount: number;
+  savedJobs: number;
   resumeUploaded: boolean;
-  directionComplete: boolean;
+  masterResumeReady: boolean;
+  journeyCompleted: boolean;
   searchStarted: boolean;
-  notificationsOn: boolean;
-  /** 0–4: how many of the four steps they have completed. */
+  applied: boolean;
+  interviewed: boolean;
+  hired: boolean;
   progress: number;
 };
 
-/** The four things the funnel is made of, in the order somebody does them. */
-export const FUNNEL_STEPS = ["Résumé", "Direction", "Search", "Alerts"] as const;
+export const FUNNEL_STEPS = [
+  "Résumé",
+  "Master",
+  "Journey",
+  "Search",
+  "Applied",
+  "Interview",
+  "Hired",
+] as const;
 
 export function buildUserTable(input: UserTableInput): UserTableRow[] {
   const profileById = new Map(input.profiles.map((profile) => [profile.id, profile]));
   const activityById = new Map(input.activity.map((row) => [row.userId, row]));
 
-  const rows = input.accounts.map((account): UserTableRow => {
+  return input.accounts.map((account): UserTableRow => {
     const profile = profileById.get(account.id);
     const activity = activityById.get(account.id);
-
-    const resumeUploaded = input.resumeUploaded.has(account.id);
-    const directionComplete = input.directionComplete.has(account.id);
-    const searchStarted = input.searchStarted.has(account.id);
-    const notificationsOn = input.notificationsOn.has(account.id);
-
-    /*
-     * Measured activity when there is any, and the last sign-in otherwise —
-     * flagged, because they are different claims. Sessions persist for weeks,
-     * so a sign-in date presented as "last active" would be wrong in the
-     * flattering direction for everybody who has not signed out.
-     */
-    const measured = Boolean(activity?.lastSeenAt);
     const activeSeconds = Math.max(0, Math.floor(activity?.activeSeconds ?? 0));
+    const visitCount = Math.max(0, Math.floor(activity?.visitCount ?? 0));
+    const averageVisitSeconds = visitCount ? Math.round(activeSeconds / visitCount) : 0;
+    const measured = Boolean(activity?.lastSeenAt);
+
+    const steps = [
+      input.resumeUploaded.has(account.id),
+      input.masterResumeReady.has(account.id),
+      input.journeyCompleted.has(account.id),
+      input.searchStarted.has(account.id),
+      input.applied.has(account.id),
+      input.interviewed.has(account.id),
+      input.hired.has(account.id),
+    ];
 
     return {
       id: account.id,
-      /* Never invented. An account with no profile has not uploaded a CV yet. */
       name: profile?.fullName?.trim() || "—",
       email: account.email?.trim() || "—",
       location: profile?.location?.trim() || "—",
+      provider: account.provider?.trim() || "—",
       firstSeenAt: account.createdAt,
       lastActiveAt: measured ? activity!.lastSeenAt : account.lastSignInAt,
       lastActiveIsMeasured: measured,
       activeSeconds,
       activeTime: describeDuration(activeSeconds),
-      visitCount: Math.max(0, Math.floor(activity?.visitCount ?? 0)),
-      resumeUploaded,
-      directionComplete,
-      searchStarted,
-      notificationsOn,
-      progress: [resumeUploaded, directionComplete, searchStarted, notificationsOn].filter(Boolean).length,
+      averageVisitSeconds,
+      averageVisitTime: describeDuration(averageVisitSeconds),
+      visitCount,
+      savedJobs: input.savedJobCounts.get(account.id) ?? 0,
+      resumeUploaded: steps[0],
+      masterResumeReady: steps[1],
+      journeyCompleted: steps[2],
+      searchStarted: steps[3],
+      applied: steps[4],
+      interviewed: steps[5],
+      hired: steps[6],
+      progress: steps.filter(Boolean).length,
     };
-  });
-
-  /*
-   * Most recently active first. That is the question an operator opens this to
-   * answer — who is still here — and a row with no reading at all sorts last
-   * rather than to an arbitrary place.
-   */
-  return rows.sort((a, b) => time(b.lastActiveAt) - time(a.lastActiveAt));
+  }).sort((a, b) => time(b.lastActiveAt) - time(a.lastActiveAt));
 }
 
 function time(value: string | null): number {
@@ -129,22 +125,29 @@ function time(value: string | null): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-/** Headline counts, so the table has something above it worth reading. */
 export function summariseUserTable(rows: UserTableRow[], now = new Date()) {
   const activeSince = (days: number) => {
     const cutoff = now.getTime() - days * 24 * 60 * 60 * 1000;
     return rows.filter((row) => time(row.lastActiveAt) >= cutoff).length;
   };
 
+  const totalActiveSeconds = rows.reduce((sum, row) => sum + row.activeSeconds, 0);
+  const totalVisits = rows.reduce((sum, row) => sum + row.visitCount, 0);
+
   return {
     total: rows.length,
     activeLast7Days: activeSince(7),
     activeLast30Days: activeSince(30),
+    averageActiveSeconds: rows.length ? Math.round(totalActiveSeconds / rows.length) : 0,
+    averageActiveTime: describeDuration(rows.length ? Math.round(totalActiveSeconds / rows.length) : 0),
+    averageVisitSeconds: totalVisits ? Math.round(totalActiveSeconds / totalVisits) : 0,
+    averageVisitTime: describeDuration(totalVisits ? Math.round(totalActiveSeconds / totalVisits) : 0),
     resumeUploaded: rows.filter((row) => row.resumeUploaded).length,
-    directionComplete: rows.filter((row) => row.directionComplete).length,
+    masterResumeReady: rows.filter((row) => row.masterResumeReady).length,
+    journeyCompleted: rows.filter((row) => row.journeyCompleted).length,
     searchStarted: rows.filter((row) => row.searchStarted).length,
-    notificationsOn: rows.filter((row) => row.notificationsOn).length,
-    /* Everybody who finished all four. The number the product is actually for. */
-    fullyActivated: rows.filter((row) => row.progress === 4).length,
+    applied: rows.filter((row) => row.applied).length,
+    interviewed: rows.filter((row) => row.interviewed).length,
+    hired: rows.filter((row) => row.hired).length,
   };
 }

@@ -1,25 +1,40 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { buildUserTable, type UserTableRow } from "@/lib/analytics/user-table";
 
-/*
- * Everything the operator table needs, in a fixed number of queries.
- *
- * Seven round trips whatever the user count, rather than six per person. The
- * per-person version would have been simpler to write and would have worked
- * beautifully for the handful of accounts it was tested against, then taken
- * the page down at a few hundred.
- *
- * Reads through the service role, because two of these are not readable any
- * other way: auth.users is not exposed to a signed-in client at all, and every
- * other table is behind a row-level policy that correctly restricts a person to
- * their own rows. Called only from a page that has already checked the caller
- * is an operator.
- */
-
-/** A page of accounts. Deliberately capped: this is a table, not an export. */
 export const USER_TABLE_LIMIT = 500;
 
-export async function loadUserTable(): Promise<{ rows: UserTableRow[]; truncated: boolean }> {
+export type AudienceSummary = {
+  anonymousVisitors: number;
+  anonymousNeverLoggedIn: number;
+  anonymousConverted: number;
+  anonymousActiveLast7Days: number;
+};
+
+function stringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+}
+
+function searchBriefComplete(row: {
+  country: string | null;
+  target_locations: unknown;
+  remote_preference: string | null;
+  sources: unknown;
+}): boolean {
+  const sources = Array.isArray(row.sources)
+    ? row.sources.filter((source): source is { active?: unknown } => Boolean(source && typeof source === "object"))
+    : [];
+  const locations = stringArray(row.target_locations);
+  const remote = (row.remote_preference ?? "").split(",").map((item) => item.trim()).filter(Boolean);
+  return Boolean(row.country || locations.length)
+    && remote.length > 0
+    && sources.some((source) => source.active === true);
+}
+
+export async function loadUserTable(): Promise<{
+  rows: UserTableRow[];
+  truncated: boolean;
+  audience: AudienceSummary;
+}> {
   const admin = createAdminClient();
 
   const { data: accountPage, error: accountsError } = await admin.auth.admin.listUsers({
@@ -33,32 +48,121 @@ export async function loadUserTable(): Promise<{ rows: UserTableRow[]; truncated
     email: user.email ?? null,
     createdAt: user.created_at ?? null,
     lastSignInAt: user.last_sign_in_at ?? null,
+    provider: typeof user.app_metadata?.provider === "string"
+      ? user.app_metadata.provider
+      : Array.isArray(user.app_metadata?.providers)
+        ? user.app_metadata.providers.filter((item): item is string => typeof item === "string").join(", ")
+        : null,
   }));
 
-  const ids = accounts.map((account) => account.id);
-  if (!ids.length) return { rows: [], truncated: false };
+  const audienceFallback: AudienceSummary = {
+    anonymousVisitors: 0,
+    anonymousNeverLoggedIn: 0,
+    anonymousConverted: 0,
+    anonymousActiveLast7Days: 0,
+  };
 
-  /*
-   * Scoped to the accounts on this page rather than fetching whole tables, so
-   * the query cost tracks the page and not the lifetime size of the product.
-   */
-  const [profiles, activity, resumes, lanes, briefs, notifications] = await Promise.all([
-    admin.from("profiles").select("id,full_name,location").in("id", ids),
+  const ids = accounts.map((account) => account.id);
+  if (!ids.length) {
+    return {
+      rows: [],
+      truncated: false,
+      audience: await loadAudienceSummary(admin).catch(() => audienceFallback),
+    };
+  }
+
+  const [
+    profiles,
+    activity,
+    resumes,
+    lanes,
+    briefs,
+    searches,
+    jobs,
+    audience,
+  ] = await Promise.all([
+    admin.from("profiles").select("id,full_name,location,strengths,master_resume,master_resume_text").in("id", ids),
     admin.from("user_activity").select("user_id,last_seen_at,active_seconds,visit_count").in("user_id", ids),
-    /* A completed import, not an attempted one — a failed upload is not a CV. */
-    admin.from("resume_imports").select("user_id").eq("status", "complete").in("user_id", ids),
-    /* An active target lane is what Career Direction produces. */
-    admin.from("target_lanes").select("user_id").eq("active", true).in("user_id", ids),
-    /* A saved brief means they got as far as describing what they want. */
-    admin.from("search_preferences").select("user_id").in("user_id", ids),
-    admin
-      .from("notification_preferences")
-      .select("user_id,daily_digest_enabled,match_alerts_enabled")
-      .in("user_id", ids),
+    admin.from("resume_imports").select("user_id,status,is_master").eq("status", "complete").is("archived_at", null).in("user_id", ids),
+    admin.from("target_lanes").select("user_id,weight,active").eq("active", true).in("user_id", ids),
+    admin.from("search_preferences").select("user_id,country,target_locations,remote_preference,sources").in("user_id", ids),
+    admin.from("search_results").select("user_id,searched_at").in("user_id", ids),
+    admin.from("jobs").select("user_id,status").in("user_id", ids),
+    loadAudienceSummary(admin).catch(() => audienceFallback),
   ]);
 
-  const idsFrom = (result: { data: Array<{ user_id: string }> | null }): Set<string> =>
-    new Set((result.data ?? []).map((row) => row.user_id));
+  const resumeUploaded = new Set<string>();
+  const masterResumeReady = new Set<string>();
+  for (const row of resumes.data ?? []) {
+    const userId = row.user_id as string;
+    resumeUploaded.add(userId);
+    if (row.is_master === true) masterResumeReady.add(userId);
+  }
+
+  for (const profile of profiles.data ?? []) {
+    if (profile.master_resume || (typeof profile.master_resume_text === "string" && profile.master_resume_text.trim())) {
+      masterResumeReady.add(profile.id as string);
+    }
+  }
+
+  const laneState = new Map<string, { count: number; weight: number }>();
+  for (const lane of lanes.data ?? []) {
+    const userId = lane.user_id as string;
+    const current = laneState.get(userId) ?? { count: 0, weight: 0 };
+    current.count += 1;
+    current.weight += Number(lane.weight ?? 0);
+    laneState.set(userId, current);
+  }
+
+  const briefComplete = new Set<string>();
+  for (const brief of briefs.data ?? []) {
+    if (searchBriefComplete({
+      country: (brief.country as string | null) ?? null,
+      target_locations: brief.target_locations,
+      remote_preference: (brief.remote_preference as string | null) ?? null,
+      sources: brief.sources,
+    })) briefComplete.add(brief.user_id as string);
+  }
+
+  const strengthsReady = new Set(
+    (profiles.data ?? [])
+      .filter((profile) => stringArray(profile.strengths).length > 0)
+      .map((profile) => profile.id as string),
+  );
+
+  const directionComplete = new Set(
+    ids.filter((id) => {
+      const lane = laneState.get(id);
+      return strengthsReady.has(id) && Boolean(lane?.count) && Math.round(lane?.weight ?? 0) === 100;
+    }),
+  );
+
+  const journeyCompleted = new Set(
+    ids.filter((id) => resumeUploaded.has(id) && directionComplete.has(id) && briefComplete.has(id)),
+  );
+
+  const searchStarted = new Set(
+    (searches.data ?? [])
+      .filter((row) => Boolean(row.searched_at))
+      .map((row) => row.user_id as string),
+  );
+
+  const applied = new Set<string>();
+  const interviewed = new Set<string>();
+  const hired = new Set<string>();
+  const savedJobCounts = new Map<string, number>();
+
+  const appliedStatuses = new Set(["applied", "acknowledged", "assessment", "interview", "offer", "hired", "rejected"]);
+  const interviewStatuses = new Set(["interview", "offer", "hired"]);
+
+  for (const job of jobs.data ?? []) {
+    const userId = job.user_id as string;
+    const status = String(job.status ?? "");
+    savedJobCounts.set(userId, (savedJobCounts.get(userId) ?? 0) + 1);
+    if (appliedStatuses.has(status)) applied.add(userId);
+    if (interviewStatuses.has(status)) interviewed.add(userId);
+    if (status === "hired") hired.add(userId);
+  }
 
   const rows = buildUserTable({
     accounts,
@@ -73,16 +177,36 @@ export async function loadUserTable(): Promise<{ rows: UserTableRow[]; truncated
       activeSeconds: Number(row.active_seconds ?? 0),
       visitCount: Number(row.visit_count ?? 0),
     })),
-    resumeUploaded: idsFrom(resumes),
-    directionComplete: idsFrom(lanes),
-    searchStarted: idsFrom(briefs),
-    /* Either email counts as opting in; the question is whether Sartho may write to them. */
-    notificationsOn: new Set(
-      (notifications.data ?? [])
-        .filter((row) => row.daily_digest_enabled || row.match_alerts_enabled)
-        .map((row) => row.user_id as string),
-    ),
+    resumeUploaded,
+    masterResumeReady,
+    journeyCompleted,
+    searchStarted,
+    applied,
+    interviewed,
+    hired,
+    savedJobCounts,
   });
 
-  return { rows, truncated: accounts.length >= USER_TABLE_LIMIT };
+  return { rows, truncated: accounts.length >= USER_TABLE_LIMIT, audience };
+}
+
+async function loadAudienceSummary(admin: ReturnType<typeof createAdminClient>): Promise<AudienceSummary> {
+  const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+
+  const [all, never, converted, recent] = await Promise.all([
+    admin.from("anonymous_visitors").select("visitor_id", { count: "exact", head: true }),
+    admin.from("anonymous_visitors").select("visitor_id", { count: "exact", head: true }).is("converted_user_id", null),
+    admin.from("anonymous_visitors").select("visitor_id", { count: "exact", head: true }).not("converted_user_id", "is", null),
+    admin.from("anonymous_visitors").select("visitor_id", { count: "exact", head: true }).gte("last_seen_at", weekAgo),
+  ]);
+
+  const error = all.error ?? never.error ?? converted.error ?? recent.error;
+  if (error) throw error;
+
+  return {
+    anonymousVisitors: all.count ?? 0,
+    anonymousNeverLoggedIn: never.count ?? 0,
+    anonymousConverted: converted.count ?? 0,
+    anonymousActiveLast7Days: recent.count ?? 0,
+  };
 }

@@ -27,6 +27,7 @@ import "./welcome.css";
  */
 import "./monochrome.css";
 import { AppShell } from "@/components/app-shell";
+import { AudienceTelemetry } from "@/components/audience-telemetry";
 import { siteMetadata } from "@/lib/site-metadata";
 
 /*
@@ -48,6 +49,7 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
   return (
     <html lang="en" className={inter.variable} suppressHydrationWarning>
       <body>
+        <AudienceTelemetry />
         {/*
           Applied before the app paints so a light-mode user never sees a dark
           flash. Reads the saved choice, falling back to the OS preference.

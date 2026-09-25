@@ -30,6 +30,7 @@ export type JobStatus =
   | "assessment"
   | "interview"
   | "offer"
+  | "hired"
   | "rejected"
   | "withdrawn";
 
