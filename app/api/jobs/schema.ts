@@ -10,4 +10,5 @@ export const jobInputSchema = z.object({
   semanticContext: jobSemanticContextSchema.optional(),
   semanticFit: semanticJobFitSchema.optional(),
   semanticContextFingerprint: z.string().trim().min(8).max(128).optional(),
+  workflowTraceId: z.string().trim().min(8).max(64).optional(),
 });

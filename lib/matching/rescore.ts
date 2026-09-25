@@ -64,6 +64,7 @@ export async function rescoreSavedJobs(
          * must be re-established by Search/Preview/Save/Deep Analysis.
          */
         ...(previous?.semanticContext ? { semanticContext: previous.semanticContext } : {}),
+        ...(previous?.workflowTraceId ? { workflowTraceId: previous.workflowTraceId } : {}),
       };
 
       await supabase

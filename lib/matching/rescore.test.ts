@@ -46,6 +46,7 @@ function fakeSupabase() {
       },
       semanticContextFingerprint: "old-fingerprint",
       scoringContextFingerprint: "old-fingerprint",
+      workflowTraceId: "wft_123e4567-e89b-42d3-a456-426614174000",
     },
   };
 
@@ -146,6 +147,7 @@ describe("saved opportunity propagation", () => {
     expect(analysis.semanticContext).toBeDefined();
     expect(analysis.semanticFit).toBeUndefined();
     expect(analysis.semanticContextFingerprint).toBeUndefined();
+    expect(analysis.workflowTraceId).toBe("wft_123e4567-e89b-42d3-a456-426614174000");
   });
 
   it("uses the Career Conductor once for the whole rescore batch", async () => {

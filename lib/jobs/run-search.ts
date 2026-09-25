@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { createWorkflowTraceId, logWorkflowTrace, normaliseWorkflowTraceId } from "@/lib/observability/workflow-trace";
 import { createSafetyIdentifier } from "@/lib/ai/provider";
 import { assessSemanticJobsResilient, jobSemanticContextSchema, semanticJobFitSchema } from "@/lib/context/job-context";
 import {
@@ -110,6 +111,8 @@ export type ScoredJobMatch = {
   semanticRescued?: boolean;
   /** Optional semantic commentary. */
   screeningInsight?: string | null;
+  /** Operational correlation only. Never used for scoring or relevance. */
+  workflowTraceId?: string;
 };
 
 /* What was actually searched, so the page (or email) can say so. */
@@ -125,6 +128,8 @@ export type ScoredJobMatch = {
 export const MAX_SENIORITY_STRETCH = 1;
 
 export type SearchCriteria = {
+  /** Operational correlation only. Never used for search decisions. */
+  workflowTraceId?: string;
   /** The primary market. */
   country: string;
   /** Every market searched. */
@@ -398,6 +403,9 @@ export async function runBriefSearch(
   if (!isJobSearchConfigured()) {
     return { ok: false, code: "not_configured", error: NOT_CONFIGURED_MESSAGE };
   }
+
+  const workflowTraceId = createWorkflowTraceId();
+  logWorkflowTrace("search.started", workflowTraceId);
 
   const conductor = options.workflow
     ? { workflow: options.workflow, contextFingerprint: options.contextFingerprint ?? "" }
@@ -1088,6 +1096,7 @@ export async function runBriefSearch(
 
     return {
       ...match,
+      workflowTraceId,
       ...(assessment
         ? {
             semanticContext: assessment.context,
@@ -1113,6 +1122,7 @@ export async function runBriefSearch(
     .slice(0, options.maxResults ?? 20);
 
   const criteria: SearchCriteria = {
+    workflowTraceId,
     country,
     countries: markets,
     /*
@@ -1212,6 +1222,13 @@ export async function runBriefSearch(
   });
   if (storeError) console.error("Could not store search results", { code: storeError.code });
 
+  logWorkflowTrace("search.completed", workflowTraceId, {
+    results: results.length,
+    semanticAssessed: semanticJobsAssessed,
+    semanticFailed: semanticJobsFailed,
+    queriesRun,
+  });
+
   return { ok: true, results, criteria };
 }
 
@@ -1310,6 +1327,7 @@ export function normaliseResults(stored: unknown): ScoredJobMatch[] {
         : undefined,
       semanticRescued: value.semanticRescued === true,
       screeningInsight: nullableText(value.screeningInsight),
+      workflowTraceId: normaliseWorkflowTraceId(value.workflowTraceId),
     }];
   });
 }
@@ -1334,6 +1352,7 @@ export function normaliseCriteria(stored: unknown): SearchCriteria {
   const count = (input: unknown): number => (typeof input === "number" && Number.isFinite(input) ? input : 0);
 
   return {
+    workflowTraceId: normaliseWorkflowTraceId(value.workflowTraceId),
     country: typeof value.country === "string" ? value.country : "",
     countries: strings(value.countries),
     employmentTypes: strings(value.employmentTypes),

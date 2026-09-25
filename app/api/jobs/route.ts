@@ -6,6 +6,11 @@ import { canonicalJobUrl } from "@/lib/jobs/source-url";
 import { evaluateOpportunity, prepareCareerConductor } from "@/lib/workflow/career-conductor";
 import { assessSemanticJobs } from "@/lib/context/job-context";
 import { createSafetyIdentifier } from "@/lib/ai/provider";
+import {
+  createWorkflowTraceId,
+  logWorkflowTrace,
+  normaliseWorkflowTraceId,
+} from "@/lib/observability/workflow-trace";
 
 
 export async function POST(request: Request) {
@@ -24,7 +29,10 @@ export async function POST(request: Request) {
     semanticContext,
     semanticFit,
     semanticContextFingerprint,
+    workflowTraceId: incomingWorkflowTraceId,
   } = parsed.data;
+
+  let workflowTraceId = normaliseWorkflowTraceId(incomingWorkflowTraceId) ?? createWorkflowTraceId();
 
   /*
    * Read against this user's own evidence. The matcher has no career of its
@@ -67,6 +75,7 @@ export async function POST(request: Request) {
   const ruleAnalysis = {
     ...scored.analysis,
     scoringContextFingerprint: conductor.contextFingerprint,
+    workflowTraceId,
     ...(semantic
       ? {
           semanticContext: semantic.context,
@@ -95,11 +104,23 @@ export async function POST(request: Request) {
   if (canonical) {
     const { data: saved } = await supabase
       .from("jobs")
-      .select("id,source_url")
+      .select("id,source_url,rule_analysis")
       .eq("user_id", user.id)
       .not("source_url", "is", null);
-    existingId = saved?.find((job) => canonicalJobUrl(job.source_url) === canonical)?.id ?? null;
+    const existing = saved?.find((job) => canonicalJobUrl(job.source_url) === canonical) ?? null;
+    existingId = existing?.id ?? null;
+    const existingTrace = normaliseWorkflowTraceId(
+      existing?.rule_analysis && typeof existing.rule_analysis === "object"
+        ? (existing.rule_analysis as { workflowTraceId?: unknown }).workflowTraceId
+        : undefined,
+    );
+    if (existingTrace) {
+      workflowTraceId = existingTrace;
+      ruleAnalysis.workflowTraceId = existingTrace;
+    }
   }
+
+  logWorkflowTrace("opportunity.save_started", workflowTraceId, { existing: Boolean(existingId) });
 
   /*
    * A role already in the pipeline is refreshed, never replaced. The status the
@@ -129,7 +150,8 @@ export async function POST(request: Request) {
       console.error("Unable to refresh an existing opportunity", updateError);
       return NextResponse.json({ error: "Sartho could not update this opportunity." }, { status: 500 });
     }
-    return NextResponse.json({ job: updated, existing: true }, { status: 200 });
+    logWorkflowTrace("opportunity.saved", workflowTraceId, { existing: true });
+    return NextResponse.json({ job: updated, existing: true, workflowTraceId }, { status: 200 });
   }
 
   const { data, error } = await supabase
@@ -158,5 +180,6 @@ export async function POST(request: Request) {
     console.error("Unable to save opportunity", error);
     return NextResponse.json({ error: "Sartho could not save this opportunity." }, { status: 500 });
   }
-  return NextResponse.json({ job: data, existing: false }, { status: 201 });
+  logWorkflowTrace("opportunity.saved", workflowTraceId, { existing: false });
+  return NextResponse.json({ job: data, existing: false, workflowTraceId }, { status: 201 });
 }

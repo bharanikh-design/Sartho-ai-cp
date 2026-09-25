@@ -124,6 +124,8 @@ export type RuleAnalysis = {
   semanticContextFingerprint?: string;
   /** Candidate Context fingerprint used for this canonical quick score. */
   scoringContextFingerprint?: string;
+  /** Operational correlation only. Never used for scoring or authority. */
+  workflowTraceId?: string;
 };
 
 export type JobRecord = {
@@ -166,6 +168,8 @@ export type JobRequirementRecord = {
 export type DeepAnalysisSummary = {
   /** Candidate Context fingerprint used for this requirement mapping. */
   candidateContextFingerprint?: string;
+  /** Operational correlation only. Never used for scoring or authority. */
+  workflowTraceId?: string;
   mandatoryMet: number;
   mandatoryTotal: number;
   preferredMet: number;

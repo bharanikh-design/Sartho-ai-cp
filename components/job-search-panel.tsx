@@ -44,6 +44,7 @@ type SearchResult = {
   relevanceReason?: string;
   semanticRescued?: boolean;
   screeningInsight?: string | null;
+  workflowTraceId?: string;
 };
 
 /* What the server actually searched — echoed back so nobody has to guess. */
@@ -118,6 +119,7 @@ export function JobSearchPanel({
             provider: result.source,
             recommendation: result.recommendation,
             overallMatch: result.overallMatch,
+            ...(result.workflowTraceId ? { workflowTraceId: result.workflowTraceId } : {}),
           },
         }),
         keepalive: true,
@@ -201,6 +203,7 @@ export function JobSearchPanel({
           ...(result.semanticContext ? { semanticContext: result.semanticContext } : {}),
           ...(result.semanticFit ? { semanticFit: result.semanticFit } : {}),
           ...(result.semanticContextFingerprint ? { semanticContextFingerprint: result.semanticContextFingerprint } : {}),
+          ...(result.workflowTraceId ? { workflowTraceId: result.workflowTraceId } : {}),
         }),
       });
       const data = await response.json() as { job?: { id?: string }; error?: string };

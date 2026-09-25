@@ -104,6 +104,13 @@ describe("normaliseCriteria", () => {
     expect(criteria.employerPortals).toEqual([{ employer: "Example Co", status: "failed", found: 0 }]);
   });
 
+  it("preserves a valid workflow trace and ignores malformed legacy values", () => {
+    const valid = "wft_123e4567-e89b-42d3-a456-426614174000";
+    expect(normaliseCriteria({ workflowTraceId: valid }).workflowTraceId).toBe(valid);
+    expect(normaliseCriteria({ workflowTraceId: "not-a-trace" }).workflowTraceId).toBeUndefined();
+    expect(normaliseCriteria({}).workflowTraceId).toBeUndefined();
+  });
+
   it("preserves Candidate Context provenance through stored-search round trips", () => {
     const criteria = normaliseCriteria({
       candidateContextFingerprint: "context-fingerprint-123",
@@ -181,6 +188,13 @@ describe("normaliseResults", () => {
     expect(match.overallMatch).toBe(0);
     expect(match.matchedSkills).toEqual(["sql"]);
     expect(match.employer).toBeNull();
+  });
+
+  it("preserves a valid result workflow trace without requiring it on old rows", () => {
+    const valid = "wft_123e4567-e89b-42d3-a456-426614174000";
+    expect(normaliseResults([{ ...stored, workflowTraceId: valid }])[0].workflowTraceId).toBe(valid);
+    expect(normaliseResults([stored])[0].workflowTraceId).toBeUndefined();
+    expect(normaliseResults([{ ...stored, workflowTraceId: "bad" }])[0].workflowTraceId).toBeUndefined();
   });
 
   it("preserves semantic Job Context across stored-search round trips", () => {
