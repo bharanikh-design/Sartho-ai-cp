@@ -75,7 +75,7 @@ export type ScoredJobMatch = {
   titleFit: number;
   requirementCoverage: number;
   /** Deterministic specialist contradiction from the canonical matcher. */
-  specialistConflict: boolean;
+  specialistConflict?: boolean;
   closestTitle: string | null;
   /** Whether closestTitle is a job held, or only one being aimed at. */
   closestIsHeld: boolean;
@@ -1022,6 +1022,8 @@ export async function runBriefSearch(
     deduplicated.map((match) => ({
       ...match,
       familyWithinReach: familyReachByUrl.get(match.url) ?? true,
+      specialistConflict: match.specialistConflict === true,
+      semanticAttempted: false,
     })),
     12,
   );
@@ -1075,7 +1077,7 @@ export async function runBriefSearch(
         requirementCoverage: match.requirementCoverage,
         applyDirect: match.applyDirect,
         familyWithinReach,
-        specialistConflict: match.specialistConflict,
+        specialistConflict: match.specialistConflict === true,
         semanticAttempted: semanticAttempted.has(match.url),
       },
       assessment?.fit,
