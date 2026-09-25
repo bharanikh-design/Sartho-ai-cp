@@ -1,4 +1,5 @@
 import { normaliseText } from "@/lib/matching/skill-vocabulary";
+import { familyOfTitle } from "@/lib/matching/job-family";
 
 /*
  * How close a job title is to what this person has actually done.
@@ -190,11 +191,16 @@ export function scoreTitleFit(
    * carries specialist terms and the person's own titles carry different
    * specialist terms, generic role-shape overlap is not allowed to dominate.
    */
+  const jobFamily = familyOfTitle(jobTitle);
+  const comparableTitles = [...heldTitles, ...targetTitles].filter(
+    (title) => jobFamily && familyOfTitle(title) === jobFamily,
+  );
   const candidateSpecialists = new Set(
-    [...heldTitles, ...targetTitles].flatMap((title) => specialistTerms(titleSubject(title))),
+    comparableTitles.flatMap((title) => specialistTerms(titleSubject(title))),
   );
   const jobSpecialists = specialistTerms(jobSubject);
-  const specialistConflict = jobSpecialists.length > 0
+  const specialistConflict = Boolean(jobFamily)
+    && jobSpecialists.length > 0
     && candidateSpecialists.size > 0
     && !jobSpecialists.some((word) => candidateSpecialists.has(word));
 
