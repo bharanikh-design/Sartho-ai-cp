@@ -99,7 +99,12 @@ export function JobImportBridge() {
 
   const analyse = useCallback(async (jobId: string) => {
     try {
-      const response = await fetch(`/api/jobs/${jobId}/deep-analysis`, { method: "POST" });
+      const operationId = crypto.randomUUID();
+      const response = await fetch(`/api/jobs/${jobId}/deep-analysis`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ operationId }),
+      });
       const result = await response.json().catch(() => null) as
         { summary?: DeepAnalysisSummary; error?: string } | null;
 
