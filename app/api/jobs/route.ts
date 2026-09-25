@@ -32,8 +32,7 @@ export async function POST(request: Request) {
     workflowTraceId: incomingWorkflowTraceId,
   } = parsed.data;
 
-  const workflowTraceId = normaliseWorkflowTraceId(incomingWorkflowTraceId) ?? createWorkflowTraceId();
-  logWorkflowTrace("opportunity.save_started", workflowTraceId);
+  let workflowTraceId = normaliseWorkflowTraceId(incomingWorkflowTraceId) ?? createWorkflowTraceId();
 
   /*
    * Read against this user's own evidence. The matcher has no career of its
@@ -105,11 +104,23 @@ export async function POST(request: Request) {
   if (canonical) {
     const { data: saved } = await supabase
       .from("jobs")
-      .select("id,source_url")
+      .select("id,source_url,rule_analysis")
       .eq("user_id", user.id)
       .not("source_url", "is", null);
-    existingId = saved?.find((job) => canonicalJobUrl(job.source_url) === canonical)?.id ?? null;
+    const existing = saved?.find((job) => canonicalJobUrl(job.source_url) === canonical) ?? null;
+    existingId = existing?.id ?? null;
+    const existingTrace = normaliseWorkflowTraceId(
+      existing?.rule_analysis && typeof existing.rule_analysis === "object"
+        ? (existing.rule_analysis as { workflowTraceId?: unknown }).workflowTraceId
+        : undefined,
+    );
+    if (existingTrace) {
+      workflowTraceId = existingTrace;
+      ruleAnalysis.workflowTraceId = existingTrace;
+    }
   }
+
+  logWorkflowTrace("opportunity.save_started", workflowTraceId, { existing: Boolean(existingId) });
 
   /*
    * A role already in the pipeline is refreshed, never replaced. The status the
