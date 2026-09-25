@@ -61,6 +61,17 @@ describe("overallMatchScore", () => {
   it("never exceeds 100", () => {
     expect(overallMatchScore(analysis(100, 100, 100), { lane: lane({ weight: 100 }), overlap: 1 })).toBe(100);
   });
+
+  it("cannot re-inflate a specialist contradiction through coverage, evidence or priority lift", () => {
+    const contradictory = {
+      ...analysis(20, 100, 100),
+      specialistConflict: true,
+    } as JobAnalysis;
+    expect(overallMatchScore(
+      contradictory,
+      { lane: lane({ name: "Project Manager", weight: 100 }), overlap: 1 },
+    )).toBeLessThanOrEqual(35);
+  });
 });
 
 describe("withLane", () => {
@@ -150,5 +161,27 @@ describe("scoreOpportunity end to end", () => {
     );
     expect(scored.recommendation).toBe("skip");
     expect(scored.overallMatch).toBeLessThan(20);
+  });
+
+  it("suppresses SAP/FICO when only generic Project Manager words overlap a ServiceNow career", () => {
+    const scored = scoreOpportunity(
+      "SAP FICO Project Manager & Solution Architect",
+      `
+        Lead a global SAP S/4HANA finance transformation covering FICO design, solution architecture,
+        stakeholder management, programme delivery, requirements, testing, deployment and governance.
+        The project manager will coordinate business and technical teams and own delivery outcomes.
+      `,
+      [
+        evidenceItem("Led ServiceNow ITSM requirements and stakeholder workshops", ["ServiceNow"]),
+        evidenceItem("Managed programme delivery, testing and deployment governance", ["Consulting"]),
+      ],
+      [role("ServiceNow Project Manager")],
+      [lane({ name: "ITSM Delivery Manager", weight: 100 })],
+    );
+
+    expect(scored.analysis.specialistConflict).toBe(true);
+    expect(scored.breakdown.titleFit).toBeLessThanOrEqual(20);
+    expect(scored.recommendation).toBe("skip");
+    expect(scored.overallMatch).toBeLessThanOrEqual(35);
   });
 });
