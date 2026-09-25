@@ -361,6 +361,27 @@ function readRequirement(text: string): { requiredYears: number | null; required
   };
 }
 
+export function retrievalBreadthComplete(
+  queries: JobSearchQuery[],
+  searchedTargetRoles: Set<string>,
+  searchedSuggestedKeywords: Set<string>,
+): boolean {
+  const requiredTargets = new Set(
+    queries
+      .filter((query) => query.targetRole && !query.employer && !query.earlyCareerOnly)
+      .map((query) => query.targetRole!.toLowerCase()),
+  );
+  const requiredSuggestions = new Set(
+    queries
+      .filter((query) => query.suggested && !query.employer && !query.earlyCareerOnly)
+      .map((query) => query.keywords.toLowerCase()),
+  );
+
+  const targetsCovered = [...requiredTargets].every((role) => searchedTargetRoles.has(role));
+  const suggestionsCovered = [...requiredSuggestions].every((keywords) => searchedSuggestedKeywords.has(keywords));
+  return targetsCovered && suggestionsCovered;
+}
+
 export const NOT_CONFIGURED_MESSAGE =
   "Jobs search isn't connected yet. Add a provider key (JSEARCH_RAPIDAPI_KEY for Google for Jobs, or ADZUNA_APP_ID / ADZUNA_APP_KEY) to turn on real search.";
 
@@ -585,6 +606,7 @@ export async function runBriefSearch(
   let deepWarming = 0;
   let queriesStoppedBecause: "budget" | "no_providers" | "enough_results" | undefined;
   const searchedTargetRoles = new Set<string>();
+  const searchedSuggestedKeywords = new Set<string>();
   const searchedEmployers = new Set<string>();
   let lastQueryEndedAt = 0;
 
@@ -742,6 +764,7 @@ export async function runBriefSearch(
         }
         queriesRun++;
         if (query.targetRole) searchedTargetRoles.add(query.targetRole.toLowerCase());
+        if (query.suggested) searchedSuggestedKeywords.add(query.keywords.toLowerCase());
         if (query.employer) searchedEmployers.add(query.employer.toLowerCase());
       }
       lastQueryEndedAt = Date.now();
@@ -751,7 +774,10 @@ export async function runBriefSearch(
        * lane asked about at least once. The remaining queries are narrower
        * variations that would mostly return the same adverts again.
        */
-      if (byUrl.size >= 25 && index >= activeLanes.length) {
+      if (
+        byUrl.size >= 25
+        && retrievalBreadthComplete(queries, searchedTargetRoles, searchedSuggestedKeywords)
+      ) {
         queriesSkipped += list.length - index;
         queriesStoppedBecause = "enough_results";
         break;
