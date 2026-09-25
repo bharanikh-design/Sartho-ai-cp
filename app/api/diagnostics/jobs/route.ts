@@ -27,7 +27,8 @@ export const maxDuration = 60;
 const ALL_PROVIDERS: JobSearchProviderName[] = ["serpapi", "jsearch", "adzuna"];
 
 export async function GET() {
-  const { user } = await getAuthenticatedUser();
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!isOperationsAdmin(user)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
