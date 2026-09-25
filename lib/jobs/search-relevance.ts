@@ -10,6 +10,8 @@ export type RelevanceCandidate = {
   requirementCoverage: number;
   applyDirect: boolean;
   familyWithinReach: boolean;
+  specialistConflict: boolean;
+  semanticAttempted: boolean;
 };
 
 export type RelevanceDecision = {
@@ -67,9 +69,43 @@ export function decideSearchRelevance(
     }
   }
 
-  // No/unclear semantic answer: preserve the old conservative safety boundary.
-  // A role with weak title/family vocabulary needs semantic confirmation before
-  // it may be rescued into the visible feed.
+  /*
+   * A deterministic specialist contradiction remains a safety boundary during
+   * semantic failure. The outage fallback must never turn "SAP FICO" into a
+   * plausible ServiceNow role merely because the model call did not answer.
+   */
+  if (candidate.specialistConflict) {
+    return {
+      tier: "outside",
+      reason: "The role carries a specialist context that conflicts with the candidate's established direction.",
+      semanticUsed: false,
+      rescued: false,
+    };
+  }
+
+  /*
+   * Graceful degradation for the bounded semantic shortlist.
+   *
+   * If Sartho deliberately selected this job for semantic review but that
+   * particular chunk failed, retain it as Possible when the deterministic
+   * evidence is at least plausible. This is bounded by semanticAttempted, so a
+   * provider outage cannot promote the whole raw market into the visible feed.
+   */
+  if (candidate.semanticAttempted && (!candidate.familyWithinReach || candidate.titleFit < 35)) {
+    const plausible = candidate.recommendation !== "skip"
+      || candidate.requirementCoverage >= 25
+      || candidate.overallMatch >= 25;
+    return {
+      tier: plausible ? "possible" : "outside",
+      reason: plausible
+        ? "Semantic review was temporarily unavailable; retained as a bounded possible match from the strongest evidence-backed candidates."
+        : "Semantic review was unavailable and the deterministic evidence was too weak to retain this role.",
+      semanticUsed: false,
+      rescued: plausible,
+    };
+  }
+
+  // Jobs outside the bounded semantic shortlist keep the conservative fallback.
   if (!candidate.familyWithinReach || candidate.titleFit < 35) {
     return {
       tier: "outside",
