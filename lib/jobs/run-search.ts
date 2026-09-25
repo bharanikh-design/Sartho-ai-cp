@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSafetyIdentifier } from "@/lib/ai/provider";
-import { assessSemanticJobs, jobSemanticContextSchema, semanticJobFitSchema } from "@/lib/context/job-context";
+import { assessSemanticJobsResilient, jobSemanticContextSchema, semanticJobFitSchema } from "@/lib/context/job-context";
 import {
   searchIntentFromCandidateContext,
   type CandidateWorkflowContext,
@@ -74,6 +74,8 @@ export type ScoredJobMatch = {
   /* Why the number is what it is, so a score never arrives unexplained. */
   titleFit: number;
   requirementCoverage: number;
+  /** Deterministic specialist contradiction from the canonical matcher. */
+  specialistConflict: boolean;
   closestTitle: string | null;
   /** Whether closestTitle is a job held, or only one being aimed at. */
   closestIsHeld: boolean;
@@ -252,6 +254,11 @@ export type SearchCriteria = {
   semanticRescued?: number;
   /** High-confidence semantic conflicts excluded from the visible result set. */
   semanticExcluded?: number;
+  /** Semantic chunks attempted/failed; exposes partial degradation instead of hiding it. */
+  semanticChunksAttempted?: number;
+  semanticChunksFailed?: number;
+  /** Jobs selected for semantic review but not successfully assessed. */
+  semanticJobsFailed?: number;
   /** Jobs whose family vocabulary was weak but which were not hard-dropped. */
   familyWarnings?: number;
 };
@@ -832,6 +839,7 @@ export async function runBriefSearch(
       matchedSkills: scored.analysis.matchedSkills?.map((skill) => skill.name).slice(0, 6) ?? [],
       titleFit: scored.breakdown.titleFit,
       requirementCoverage: scored.breakdown.requirementCoverage,
+      specialistConflict: scored.analysis.specialistConflict,
       closestTitle: scored.analysis.closestTitle ?? null,
       closestIsHeld: scored.analysis.closestIsHeld ?? false,
       requirementsRead: scored.analysis.requirementsRead ?? 0,
@@ -992,33 +1000,38 @@ export async function runBriefSearch(
     12,
   );
 
-  let semanticJobsAssessed = 0;
-  let semantic = new Map<string, {
-    context: import("@/lib/types").JobSemanticContext;
-    fit: import("@/lib/types").SemanticJobFit;
-  }>();
+  const semanticInput = semanticCandidates.map((match) => ({
+    key: match.url,
+    title: match.title,
+    employer: match.employer,
+    location: match.location,
+    description: match.description,
+  }));
 
-  try {
-    semantic = await Promise.race([
-      assessSemanticJobs(
-        candidateContext,
-        semanticCandidates.map((match) => ({
-          key: match.url,
-          title: match.title,
-          employer: match.employer,
-          location: match.location,
-          description: match.description,
-        })),
-        { safetyIdentifier: createSafetyIdentifier(userId) },
-      ),
-      new Promise<Map<string, {
-        context: import("@/lib/types").JobSemanticContext;
-        fit: import("@/lib/types").SemanticJobFit;
-      }>>((_, reject) => setTimeout(() => reject(new Error("Semantic Job Context timed out")), 16_000)),
-    ]);
-    semanticJobsAssessed = semantic.size;
-  } catch (error) {
-    console.warn("Semantic Job Context failed; using conservative deterministic fallback", error);
+  const semanticOutcome = await assessSemanticJobsResilient(
+    candidateContext,
+    semanticInput,
+    {
+      safetyIdentifier: createSafetyIdentifier(userId),
+      chunkSize: 3,
+      chunkTimeoutMs: 10_000,
+    },
+  );
+
+  const semantic = semanticOutcome.assessments;
+  const semanticAttempted = semanticOutcome.attempted;
+  const semanticJobsAssessed = semantic.size;
+  const semanticJobsFailed = semanticOutcome.failed.size;
+  const semanticChunksAttempted = semanticOutcome.chunksAttempted;
+  const semanticChunksFailed = semanticOutcome.chunksFailed;
+
+  if (semanticChunksFailed) {
+    console.warn("Semantic Job Context partially degraded", {
+      chunksAttempted: semanticChunksAttempted,
+      chunksFailed: semanticChunksFailed,
+      jobsAssessed: semanticJobsAssessed,
+      jobsFailed: semanticJobsFailed,
+    });
   }
 
   let semanticRescued = 0;
@@ -1036,6 +1049,8 @@ export async function runBriefSearch(
         requirementCoverage: match.requirementCoverage,
         applyDirect: match.applyDirect,
         familyWithinReach,
+        specialistConflict: match.specialistConflict,
+        semanticAttempted: semanticAttempted.has(match.url),
       },
       assessment?.fit,
     );
@@ -1118,6 +1133,9 @@ export async function runBriefSearch(
     semanticJobsAssessed,
     semanticRescued,
     semanticExcluded,
+    semanticChunksAttempted,
+    semanticChunksFailed,
+    semanticJobsFailed,
     familyWarnings,
     directEmployersOnly: searchIntent.directEmployersOnly ?? undefined,
     /*
@@ -1237,6 +1255,7 @@ export function normaliseResults(stored: unknown): ScoredJobMatch[] {
       matchedSkills: strings(value.matchedSkills),
       titleFit: count(value.titleFit),
       requirementCoverage: count(value.requirementCoverage),
+      specialistConflict: value.specialistConflict === true,
       closestTitle: nullableText(value.closestTitle),
       closestIsHeld: value.closestIsHeld === true,
       requirementsRead: count(value.requirementsRead),
@@ -1348,6 +1367,9 @@ export function normaliseCriteria(stored: unknown): SearchCriteria {
     semanticJobsAssessed: count(value.semanticJobsAssessed),
     semanticRescued: count(value.semanticRescued),
     semanticExcluded: count(value.semanticExcluded),
+    semanticChunksAttempted: count(value.semanticChunksAttempted),
+    semanticChunksFailed: count(value.semanticChunksFailed),
+    semanticJobsFailed: count(value.semanticJobsFailed),
     familyWarnings: count(value.familyWarnings),
   };
 }
