@@ -5,7 +5,6 @@ import { JourneyNudgeCard } from "@/components/journey-nudge-card";
 import { ProfileScorecard } from "@/components/profile-scorecard";
 import { ResumeImport } from "@/components/resume-import";
 import { SignedOutHome } from "@/components/signed-out-home";
-import { WelcomeCinematic } from "@/components/welcome/welcome-cinematic";
 import { getAuthenticatedUser } from "@/lib/auth";
 import { connectionStatus } from "@/lib/integrations/store";
 import {
@@ -86,7 +85,6 @@ export default async function DashboardPage({
   if (!hasResume) {
     return (
       <>
-        {welcome ? <WelcomeCinematic /> : null}
       <div className="page-stack dashboard-page">
         <OnboardingCarousel user={user} />
         <Link href="/welcome" className="tour-replay-link" title="Take the Sartho product tour" aria-label="Take the Sartho product tour"><span aria-hidden="true">▶</span> Tour</Link>
@@ -130,7 +128,6 @@ export default async function DashboardPage({
 
   return (
     <>
-      {welcome ? <WelcomeCinematic /> : null}
     <div className="page-stack dashboard-page command-centre-page">
       <OnboardingCarousel user={user} />
       <Link href="/welcome" className="tour-replay-link" title="Take the Sartho product tour" aria-label="Take the Sartho product tour"><span aria-hidden="true">▶</span> Tour</Link>
