@@ -16,6 +16,18 @@ const EMPTY_SEARCH_PREFERENCES: SearchPreferences = {
   directEmployersOnly: false,
 };
 
+async function getResumeImportsSoft(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<Awaited<ReturnType<typeof getResumeImports>>> {
+  try {
+    return await getResumeImports(supabase, userId);
+  } catch (error) {
+    console.warn("Resume import metadata unavailable; Journey will rely on Career Evidence", error);
+    return [];
+  }
+}
+
 async function getSearchPreferencesSoft(
   supabase: SupabaseClient,
   userId: string,
@@ -31,7 +43,7 @@ async function getSearchPreferencesSoft(
 export async function loadProductJourney(supabase: SupabaseClient, userId: string) {
   const [workspace, imports, searchPreferences] = await Promise.all([
     getCareerWorkspace(supabase, userId),
-    getResumeImports(supabase, userId),
+    getResumeImportsSoft(supabase, userId),
     getSearchPreferencesSoft(supabase, userId),
   ]);
 
@@ -61,7 +73,18 @@ export async function loadProductJourneyStatus(supabase: SupabaseClient, userId:
     supabase.from("target_lanes").select("weight,active").eq("user_id", userId).eq("active", true),
     supabase.from("career_roles").select("id", { count: "exact", head: true }).eq("user_id", userId),
     supabase.from("evidence_items").select("approval_status").eq("user_id", userId),
-    supabase.from("resume_imports").select("status").eq("user_id", userId).is("archived_at", null),
+    Promise.resolve(
+      supabase.from("resume_imports").select("status").eq("user_id", userId).is("archived_at", null),
+    ).then((result) => {
+      if (result.error) {
+        console.warn("Resume import metadata unavailable; Journey status will rely on Career Evidence", result.error);
+        return { data: [], error: null };
+      }
+      return result;
+    }).catch((error) => {
+      console.warn("Resume import metadata unavailable; Journey status will rely on Career Evidence", error);
+      return { data: [], error: null };
+    }),
     getSearchPreferencesSoft(supabase, userId),
   ]);
 
