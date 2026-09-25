@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { getAuthenticatedUser, isOperationsAdmin } from "@/lib/auth";
+import { isOperationsAdmin } from "@/lib/auth";
+import { createClient } from "@/lib/supabase/server";
 import { configuredJobSearchProviders, probeJobProvider, type JobSearchProviderName } from "@/lib/jobs/search-provider";
 import { serpApiAccount, serpApiConfig } from "@/lib/jobs/serpapi";
 
@@ -26,7 +27,8 @@ export const maxDuration = 60;
 const ALL_PROVIDERS: JobSearchProviderName[] = ["serpapi", "jsearch", "adzuna"];
 
 export async function GET() {
-  const { user } = await getAuthenticatedUser();
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!isOperationsAdmin(user)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
