@@ -782,7 +782,12 @@ export async function runBriefSearch(
       try {
         const terms = earlyCareerPass
           ? entryLevelTermsFor(country).slice(0, 1)
-          : activeLanes.map((lane) => toSearchKeywords(lane.name)).filter(Boolean);
+          : [...new Set(
+              queries
+                .filter((query) => query.country === country && !query.employer && !query.earlyCareerOnly)
+                .map((query) => query.keywords)
+                .filter(Boolean),
+            )].slice(0, 8);
         const batches = await Promise.all(terms.map((searchText) => searchEmployerDirectly(employer, {
           employer, searchText, country, limit: 10,
         })));
