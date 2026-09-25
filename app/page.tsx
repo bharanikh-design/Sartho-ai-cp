@@ -7,13 +7,8 @@ import { ResumeImport } from "@/components/resume-import";
 import { SignedOutHome } from "@/components/signed-out-home";
 import { getAuthenticatedUser } from "@/lib/auth";
 import { connectionStatus } from "@/lib/integrations/store";
-import {
-  buildCareerCommandCentre,
-  type CommandCentreApplication,
-  type CommandCentreJob,
-} from "@/lib/dashboard/command-centre";
-import { loadProductJourney } from "@/lib/journey/load-product-journey";
-import { withJwtClockSkewRetry } from "@/lib/supabase/retry";
+import { buildCareerCommandCentre } from "@/lib/dashboard/command-centre";
+import { loadDashboardData } from "@/lib/dashboard/load-dashboard";
 
 export const dynamic = "force-dynamic";
 
@@ -44,33 +39,9 @@ export default async function DashboardPage({
   await searchParams;
   const driveConnected = (await connectionStatus(user.id)).connected;
 
-  const [journeyResult, jobsLoad, applicationsLoad] = await Promise.all([
-    loadProductJourney(supabase, user.id),
-    withJwtClockSkewRetry(
-      () => supabase
-        .from("jobs")
-        .select("id,title,employer,status,recommendation,overall_match,rule_analysis,deep_analysis_status,deep_analysis_summary,updated_at")
-        .eq("user_id", user.id),
-      (result) => result.error,
-    )
-      .then((result) => ({ ok: !result.error, data: result.data ?? [], error: result.error }))
-      .catch((error) => ({ ok: false, data: [], error })),
-    Promise.resolve(
-      supabase
-        .from("applications")
-        .select("job_id,resume_draft,next_action,next_action_date")
-        .eq("user_id", user.id),
-    )
-      .then((result) => ({ ok: !result.error, data: result.data ?? [], error: result.error }))
-      .catch((error) => ({ ok: false, data: [], error })),
-  ]);
-
-  if (!jobsLoad.ok) console.warn("Dashboard jobs unavailable; showing core career state only", jobsLoad.error);
-  if (!applicationsLoad.ok) console.warn("Dashboard applications unavailable; showing core career state only", applicationsLoad.error);
-
-  const jobs = jobsLoad.data as CommandCentreJob[];
-  const applications = applicationsLoad.data as CommandCentreApplication[];
-  const dashboardDegraded = !jobsLoad.ok || !applicationsLoad.ok;
+  const dashboard = await loadDashboardData(supabase, user.id);
+  const { journeyResult, jobs, applications } = dashboard;
+  const dashboardDegraded = dashboard.unavailable.length > 0;
 
   const { journey, workspace } = journeyResult;
   const pendingSteps = journey.steps.filter((s) => !s.complete);
