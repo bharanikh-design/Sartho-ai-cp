@@ -21,6 +21,7 @@ const statuses: Array<{ value: JobStatus; label: string }> = [
   { value: "assessment", label: "Assessment" },
   { value: "interview", label: "Interview" },
   { value: "offer", label: "Offer" },
+  { value: "hired", label: "Hired" },
   { value: "rejected", label: "Rejected" },
   { value: "withdrawn", label: "Withdrawn" },
 ];
