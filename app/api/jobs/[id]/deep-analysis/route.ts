@@ -13,6 +13,11 @@ import { logError } from "@/lib/logger";
 import type { DeepAnalysisSummary, RequirementAssessment, RuleAnalysis } from "@/lib/types";
 import { prepareCareerConductor } from "@/lib/workflow/career-conductor";
 import {
+  beginDurableAiOperation,
+  failDurableAiOperation,
+  succeedDurableAiOperation,
+} from "@/lib/operations/durable-ai";
+import {
   createWorkflowTraceId,
   logWorkflowTrace,
   workflowTraceFromMetadata,
@@ -72,14 +77,23 @@ const jsonSchema = {
   },
 };
 
+const operationSchema = z.object({
+  operationId: z.string().uuid().optional(),
+});
+
 export async function POST(
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
   const { supabase, user } = await getAuthenticatedUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await context.params;
   if (!z.string().uuid().safeParse(id).success) return NextResponse.json({ error: "Opportunity not found." }, { status: 404 });
+
+  const operationInput = operationSchema.safeParse(await request.json().catch(() => ({})));
+  const requestId = operationInput.success && operationInput.data.operationId
+    ? operationInput.data.operationId
+    : crypto.randomUUID();
 
   const [jobResult, evidenceResult] = await Promise.all([
     supabase.from("jobs").select("*").eq("id", id).eq("user_id", user.id).maybeSingle(),
@@ -105,8 +119,52 @@ export async function POST(
     ?? createWorkflowTraceId();
   logWorkflowTrace("deep_analysis.started", workflowTraceId, { jobId: id });
 
+  let durableOperationId: string | null = null;
+  try {
+    const durable = await beginDurableAiOperation(supabase, user.id, {
+      operation: "deep_analysis",
+      resourceId: id,
+      requestId,
+      workflowTraceId,
+    });
+    durableOperationId = durable.row.id;
+
+    if (durable.state === "already_succeeded") {
+      const { data: existingRequirements } = await supabase
+        .from("job_requirements")
+        .select("*")
+        .eq("job_id", id)
+        .order("created_at");
+      return NextResponse.json({
+        requirements: existingRequirements ?? [],
+        summary: jobResult.data.deep_analysis_summary,
+        workflowTraceId,
+        operationId: durable.row.id,
+        reused: true,
+      });
+    }
+
+    if (durable.state === "already_running") {
+      return NextResponse.json({
+        status: "processing",
+        workflowTraceId,
+        operationId: durable.row.id,
+      }, { status: 202 });
+    }
+  } catch (caught) {
+    console.error("Unable to coordinate durable deep analysis", caught);
+    return NextResponse.json({
+      error: "Sartho could not start this analysis safely. Please retry.",
+    }, { status: 503 });
+  }
+
   const quota = await checkAiQuota(supabase, "deep_analysis");
-  if (!quota.allowed) return aiQuotaResponse(quota);
+  if (!quota.allowed) {
+    if (durableOperationId) {
+      await failDurableAiOperation(supabase, user.id, durableOperationId, new Error("AI quota unavailable."));
+    }
+    return aiQuotaResponse(quota);
+  }
 
   const conductor = await prepareCareerConductor(supabase, user.id);
 
@@ -187,12 +245,23 @@ export async function POST(
      * used for a human decision, but it does not silently replace the canonical
      * score with a different formula.
      */
+    if (durableOperationId) {
+      await succeedDurableAiOperation(supabase, user.id, durableOperationId, { jobId: id });
+    }
     logWorkflowTrace("deep_analysis.completed", workflowTraceId, {
       jobId: id,
       requirements: requirements.length,
     });
-    return NextResponse.json({ requirements, summary, workflowTraceId });
+    return NextResponse.json({
+      requirements,
+      summary,
+      workflowTraceId,
+      operationId: durableOperationId,
+    });
   } catch (caught) {
+    if (durableOperationId) {
+      await failDurableAiOperation(supabase, user.id, durableOperationId, caught);
+    }
     await supabase.from("jobs").update({ deep_analysis_status: "failed" }).eq("id", id).eq("user_id", user.id);
     logWorkflowTrace("deep_analysis.failed", workflowTraceId, { jobId: id });
     logError(supabase, "deep_analysis_fail", caught);
