@@ -35,6 +35,7 @@ export default async function AdminDashboardPage() {
     anonymousConverted: 0,
     anonymousActiveLast7Days: 0,
   };
+  let unavailable: string[] = [];
   let loadError: string | null = null;
 
   try {
@@ -42,6 +43,7 @@ export default async function AdminDashboardPage() {
     rows = loaded.rows;
     truncated = loaded.truncated;
     audience = loaded.audience;
+    unavailable = loaded.unavailable;
   } catch (caught) {
     /*
      * The one likely failure is a missing service-role key, and it needs to say
@@ -76,6 +78,11 @@ export default async function AdminDashboardPage() {
       />
 
       {loadError ? <div className="inline-error" role="alert">{loadError}</div> : null}
+      {!loadError && unavailable.length ? (
+        <div className="inline-notice" role="status">
+          Partial telemetry: {unavailable.join(", ")} {unavailable.length === 1 ? "is" : "are"} temporarily unavailable. Available metrics are still shown below.
+        </div>
+      ) : null}
 
       <section className="summary-grid admin-summary-grid">
         <SummaryCard label="Visited but never logged in" value={audience.anonymousNeverLoggedIn} of={audience.anonymousVisitors} />
