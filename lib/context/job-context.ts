@@ -3,7 +3,7 @@ import { generateStructuredJson } from "@/lib/ai/provider";
 import type { CandidateContext } from "@/lib/context/candidate-context";
 import type { JobSemanticContext, SemanticJobFit } from "@/lib/types";
 
-export const MAX_SEMANTIC_JOBS_PER_PASS = 8;
+export const MAX_SEMANTIC_JOBS_PER_PASS = 12;
 
 export const jobSemanticContextSchema = z.object({
   function: z.string().trim().min(2).max(120),
@@ -185,7 +185,7 @@ export async function assessSemanticJobs(
         title: job.title,
         employer: job.employer ?? null,
         location: job.location ?? null,
-        description: job.description.slice(0, 6000),
+        description: job.description.slice(0, 4000),
       })),
     }),
   });

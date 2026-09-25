@@ -257,6 +257,22 @@ describe("model suggestions widen the search rather than replace it", () => {
     expect(widened).toBeGreaterThanOrEqual(plain);
   });
 
+  it("accepts up to five bounded market-adjacent titles", () => {
+    const suggestions = [
+      "Service Delivery Manager",
+      "Service Assurance Director",
+      "ITSM Operations Lead",
+      "IT Governance Manager",
+      "Service Management Lead",
+      "Sixth Extra Title",
+    ];
+    const queries = planSearchQueries({ ...brief, smartKeywords: suggestions });
+    const keywords = queries.filter((query) => !query.employer).map((query) => query.keywords);
+
+    for (const title of suggestions.slice(0, 5)) expect(keywords).toContain(title);
+    expect(keywords).not.toContain("Sixth Extra Title");
+  });
+
   it("does not duplicate a suggestion that repeats a title already searched", () => {
     const keywords = planSearchQueries({
       ...brief,
@@ -282,6 +298,21 @@ describe("query order under a budget", () => {
     remotePreferences: [],
     employmentTypes: ["Full-time"],
   };
+
+  it("runs semantic market expansion before aggregator company combinations", () => {
+    const queries = planSearchQueries({
+      ...brief,
+      smartKeywords: ["Service Assurance Director", "IT Governance Manager"],
+    });
+    const firstEmployer = queries.findIndex((query) => Boolean(query.employer));
+    const assurance = queries.findIndex((query) => query.keywords === "Service Assurance Director");
+    const governance = queries.findIndex((query) => query.keywords === "IT Governance Manager");
+
+    expect(assurance).toBeGreaterThan(-1);
+    expect(governance).toBeGreaterThan(-1);
+    expect(assurance).toBeLessThan(firstEmployer);
+    expect(governance).toBeLessThan(firstEmployer);
+  });
 
   it("asks for every saved role before the named employers", () => {
     const queries = planSearchQueries(brief);

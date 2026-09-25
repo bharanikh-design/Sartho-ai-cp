@@ -27,12 +27,17 @@ import { searchSerpApiCached } from "@/lib/jobs/cached-serpapi";
 import { findEmployerPortal, searchEmployerDirectly } from "@/lib/jobs/company-careers/registry";
 import { createSearchCacheStore } from "@/lib/jobs/search-cache-store";
 import { deduplicateSearchResults, isMarketLocationConsistent } from "@/lib/jobs/location-guard";
+import {
+  decideSearchRelevance,
+  selectSemanticCandidates,
+  sortByRelevance,
+  type SearchRelevanceTier,
+} from "@/lib/jobs/search-relevance";
 import { createProviderCascade } from "@/lib/jobs/provider-cascade";
 import {
   MAX_COMPANY_QUERIES,
   MAX_LOCATION_QUERIES,
   planSmartSearchQueries,
-  toSearchKeywords,
   widenToCountry,
 } from "@/lib/jobs/search-plan";
 import {
@@ -95,7 +100,13 @@ export type ScoredJobMatch = {
   semanticFit?: import("@/lib/types").SemanticJobFit;
   /** Candidate Context fingerprint used for semanticFit. */
   semanticContextFingerprint?: string;
-  /** Optional semantic commentary; it never changes the canonical score in this PR. */
+  /** Semantic relevance tier. This orders visibility; it is not a second numeric score. */
+  relevanceTier?: SearchRelevanceTier;
+  /** Why the role is strong, possible or outside the search. */
+  relevanceReason?: string;
+  /** True when semantics rescued a role old title/family rules would have discarded. */
+  semanticRescued?: boolean;
+  /** Optional semantic commentary. */
   screeningInsight?: string | null;
 };
 
@@ -237,6 +248,12 @@ export type SearchCriteria = {
   learnedAffinitySignals?: number;
   /** Shortlisted jobs given purpose-built semantic context in this run. */
   semanticJobsAssessed?: number;
+  /** Roles retained because semantic understanding overruled weak title/family vocabulary. */
+  semanticRescued?: number;
+  /** High-confidence semantic conflicts excluded from the visible result set. */
+  semanticExcluded?: number;
+  /** Jobs whose family vocabulary was weak but which were not hard-dropped. */
+  familyWarnings?: number;
 };
 
 export type BriefSearchFailureCode = "not_configured" | "no_targets" | "country_unsupported" | "provider_error";
@@ -504,6 +521,8 @@ export async function runBriefSearch(
       employmentTypes: contextEmploymentTypes,
       entryLevelTerms: earlyCareerPass ? entryLevelTermsFor(country) : undefined,
       resumeSkills,
+      heldTitles: roles.map((role) => role.title).filter(Boolean),
+      careerCapabilities: candidateContext.careerTruth.capabilities.slice(0, 12).map((signal) => signal.value.name),
       learnedAffinity,
     }))
   ];
@@ -519,6 +538,8 @@ export async function runBriefSearch(
       /* Each market gets its own vocabulary; "graduate scheme" finds nothing in Sydney. */
       entryLevelTerms: earlyCareerPass ? entryLevelTermsFor(market) : undefined,
       resumeSkills,
+      heldTitles: roles.map((role) => role.title).filter(Boolean),
+      careerCapabilities: candidateContext.careerTruth.capabilities.slice(0, 12).map((signal) => signal.value.name),
       learnedAffinity,
     })));
     queries.push(...additionalQueries.flat());
@@ -760,7 +781,12 @@ export async function runBriefSearch(
       try {
         const terms = earlyCareerPass
           ? entryLevelTermsFor(country).slice(0, 1)
-          : activeLanes.map((lane) => toSearchKeywords(lane.name)).filter(Boolean);
+          : [...new Set(
+              queries
+                .filter((query) => query.country === country && !query.employer && !query.earlyCareerOnly)
+                .map((query) => query.keywords)
+                .filter(Boolean),
+            )].slice(0, 8);
         const batches = await Promise.all(terms.map((searchText) => searchEmployerDirectly(employer, {
           employer, searchText, country, limit: 10,
         })));
@@ -857,57 +883,30 @@ export async function runBriefSearch(
   const level = candidateSeniority(heldTitles, seniorityYears);
   const withinReach: ScoredJobMatch[] = [];
   let tooSenior = 0;
-  let offFamily = 0;
+  const offFamily = 0; // legacy field retained for stored-search compatibility.
+  let familyWarnings = 0;
   let offMarket = 0;
   let tooMuchExperience = 0;
+  const familyReachByUrl = new Map<string, boolean>();
 
   /*
-   * Job family is the second hard filter, and the one a recruiter applies first.
+   * Search Relevance V2: only integrity constraints are allowed to reject
+   * before semantic understanding.
    *
-   * Seniority alone let a Business Analyst be shown "Solutions Consultant"
-   * roles: the level was right, so nothing stopped it, and 65% of the score
-   * comes from requirement coverage and evidence depth — which a pre-sales
-   * advert and a BA CV share plenty of. Scoring it low was never enough. A job
-   * in a different function is not a weak match, it is the wrong job, and it
-   * pushes the right ones off the page.
-   */
-  /*
-   * Stated years are the third filter, and the only one that reads the advert
-   * rather than its title.
-   *
-   * "Analyst", "Consultant" and "Engineer" carry no seniority word, so the
-   * title filter passes them, and plenty of them open with "6+ years required".
-   * For somebody fresh out of university those are most of the page, and after
-   * the third screen of them the conclusion is that the tool does not work.
-   *
-   * It only ever fires on a requirement the advert actually wrote down, which
-   * means its reach depends on how much of the advert the provider returned —
-   * Adzuna sends a truncated snippet, so a requirement buried on page two of
-   * the posting is not visible here and the role stays. Under-removing is the
-   * right direction to fail in, and the count says how many it caught rather
-   * than implying it caught them all.
-   */
-  /*
-   * The free filters first, so nothing is fetched for a role already out on
-   * seniority or line of work.
+   * Family and title similarity are cheap vocabulary signals. They are useful
+   * for prioritising semantic attention, but they are not authoritative enough
+   * to discard "Service Assurance", "CSI" or "IT Governance" before Sartho has
+   * understood the actual work.
    */
   const survivors: ScoredJobMatch[] = [];
   for (const match of scoredByUrl.values()) {
     if (!seniorityReach(match.title, heldTitles, seniorityYears).withinReach) { tooSenior += 1; continue; }
-    if (!familyFit(match.title, heldTitles, roleNames).withinReach) { offFamily += 1; continue; }
-    /*
-     * A role can share generic leadership vocabulary and still be categorically
-     * wrong (SAP transformation vs ServiceNow/ITSM). Require at least a minimal
-     * title bridge to something the person has held or explicitly targeted.
-     */
-    if (match.titleFit < 35) { offFamily += 1; continue; }
-    /*
-     * Counted like the other two. This one dropped matches silently, so a
-     * misindexed batch that removed the entire page looked identical to a
-     * search that found nothing — the one filter whose over-reach left no
-     * trace at all.
-     */
     if (!isMarketLocationConsistent(match, country)) { offMarket += 1; continue; }
+
+    const familyWithinReach = familyFit(match.title, heldTitles, roleNames).withinReach;
+    familyReachByUrl.set(match.url, familyWithinReach);
+    if (!familyWithinReach || match.titleFit < 35) familyWarnings += 1;
+
     survivors.push(match);
   }
   survivors.sort((a, b) => b.overallMatch - a.overallMatch);
@@ -978,26 +977,32 @@ export async function runBriefSearch(
 
   const deduplicated = deduplicateSearchResults(withinReach);
 
-  const preLlmResults: ScoredJobMatch[] = deduplicated.slice(0, options.maxResults ?? 20);
-
   /*
-   * Purpose-built semantic Job Context for the final shortlist.
-   *
-   * One bounded batch replaces N generic "screening sentence" model calls.
-   * It understands what each job actually is and how that meaning relates to
-   * Candidate Context. In this PR the result is explanatory only: it may not
-   * inflate, suppress, reorder or otherwise become a second scoring authority.
+   * Semantic attention is bounded, not random. Most slots go to the strongest
+   * canonical matches; a reserved rescue lane is filled by roles the old
+   * title/family vocabulary would have rejected despite meaningful requirement
+   * overlap. This is the point where "Associate Director, Service Assurance"
+   * gets understood instead of disappearing.
    */
+  const semanticCandidates = selectSemanticCandidates(
+    deduplicated.map((match) => ({
+      ...match,
+      familyWithinReach: familyReachByUrl.get(match.url) ?? true,
+    })),
+    12,
+  );
+
   let semanticJobsAssessed = 0;
   let semantic = new Map<string, {
     context: import("@/lib/types").JobSemanticContext;
     fit: import("@/lib/types").SemanticJobFit;
   }>();
+
   try {
     semantic = await Promise.race([
       assessSemanticJobs(
         candidateContext,
-        preLlmResults.map((match) => ({
+        semanticCandidates.map((match) => ({
           key: match.url,
           title: match.title,
           employer: match.employer,
@@ -1009,30 +1014,60 @@ export async function runBriefSearch(
       new Promise<Map<string, {
         context: import("@/lib/types").JobSemanticContext;
         fit: import("@/lib/types").SemanticJobFit;
-      }>>((_, reject) => setTimeout(() => reject(new Error("Semantic Job Context timed out")), 12_000)),
+      }>>((_, reject) => setTimeout(() => reject(new Error("Semantic Job Context timed out")), 16_000)),
     ]);
     semanticJobsAssessed = semantic.size;
   } catch (error) {
-    console.warn("Semantic Job Context failed; keeping canonical deterministic results", error);
+    console.warn("Semantic Job Context failed; using conservative deterministic fallback", error);
   }
 
-  const semanticallyEnriched = preLlmResults.map((match) => {
+  let semanticRescued = 0;
+  let semanticExcluded = 0;
+
+  const relevant = deduplicated.map((match) => {
+    const familyWithinReach = familyReachByUrl.get(match.url) ?? true;
     const assessment = semantic.get(match.url);
-    if (!assessment) return match;
+    const decision = decideSearchRelevance(
+      {
+        url: match.url,
+        overallMatch: match.overallMatch,
+        recommendation: match.recommendation,
+        titleFit: match.titleFit,
+        requirementCoverage: match.requirementCoverage,
+        applyDirect: match.applyDirect,
+        familyWithinReach,
+      },
+      assessment?.fit,
+    );
+
+    if (decision.rescued) semanticRescued += 1;
+    if (decision.tier === "outside") semanticExcluded += 1;
+
     return {
       ...match,
-      semanticContext: assessment.context,
-      semanticFit: assessment.fit,
-      semanticContextFingerprint: contextFingerprint || undefined,
-      screeningInsight: assessment.fit.reason,
+      ...(assessment
+        ? {
+            semanticContext: assessment.context,
+            semanticFit: assessment.fit,
+            semanticContextFingerprint: contextFingerprint || undefined,
+          }
+        : {}),
+      relevanceTier: decision.tier,
+      relevanceReason: decision.reason,
+      semanticRescued: decision.rescued,
+      screeningInsight: assessment?.fit.reason ?? decision.reason,
     };
   });
 
-  // The canonical score and ordering remain conductor-owned in this PR.
-  const sorted = [...semanticallyEnriched].sort((a, b) => b.overallMatch - a.overallMatch);
-  const kept = sorted.filter((match) => match.recommendation !== "skip");
-  const results: ScoredJobMatch[] = kept.length ? kept : sorted;
-
+  /*
+   * Outside-search jobs remain auditable in diagnostics but do not crowd the
+   * user-facing result set. Tier decides visibility/order; the canonical
+   * numeric score remains unchanged and orders jobs only within a tier.
+   */
+  const visible = sortByRelevance(relevant.filter((match) => match.relevanceTier !== "outside"));
+  const fallback = sortByRelevance(relevant);
+  const results: ScoredJobMatch[] = (visible.length ? visible : fallback)
+    .slice(0, options.maxResults ?? 20);
 
   const criteria: SearchCriteria = {
     country,
@@ -1081,6 +1116,9 @@ export async function runBriefSearch(
     candidateContextFingerprint: contextFingerprint || undefined,
     learnedAffinitySignals: searchIntent.learnedAffinitySignals,
     semanticJobsAssessed,
+    semanticRescued,
+    semanticExcluded,
+    familyWarnings,
     directEmployersOnly: searchIntent.directEmployersOnly ?? undefined,
     /*
      * Only the failures that changed what came back. A provider behind the one
@@ -1216,6 +1254,14 @@ export function normaliseResults(stored: unknown): ScoredJobMatch[] {
       semanticContextFingerprint: typeof value.semanticContextFingerprint === "string" && value.semanticContextFingerprint
         ? value.semanticContextFingerprint
         : undefined,
+      relevanceTier:
+        value.relevanceTier === "strong" || value.relevanceTier === "possible" || value.relevanceTier === "outside"
+          ? value.relevanceTier
+          : undefined,
+      relevanceReason: typeof value.relevanceReason === "string" && value.relevanceReason
+        ? value.relevanceReason
+        : undefined,
+      semanticRescued: value.semanticRescued === true,
       screeningInsight: nullableText(value.screeningInsight),
     }];
   });
@@ -1300,5 +1346,8 @@ export function normaliseCriteria(stored: unknown): SearchCriteria {
       : undefined,
     learnedAffinitySignals: count(value.learnedAffinitySignals),
     semanticJobsAssessed: count(value.semanticJobsAssessed),
+    semanticRescued: count(value.semanticRescued),
+    semanticExcluded: count(value.semanticExcluded),
+    familyWarnings: count(value.familyWarnings),
   };
 }

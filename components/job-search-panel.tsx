@@ -40,6 +40,9 @@ type SearchResult = {
   semanticContext?: JobSemanticContext;
   semanticFit?: SemanticJobFit;
   semanticContextFingerprint?: string;
+  relevanceTier?: "strong" | "possible" | "outside";
+  relevanceReason?: string;
+  semanticRescued?: boolean;
   screeningInsight?: string | null;
 };
 
@@ -221,14 +224,16 @@ export function JobSearchPanel({
           </span>
           <strong style={{ display: "block", fontSize: "1.0625rem", margin: "2px 0" }}>{result.title}</strong>
           <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap", margin: "6px 0" }}>
-            <span style={{ fontSize: "0.75rem", fontWeight: 700, textTransform: "uppercase", color: recTone[result.recommendation], border: `1px solid ${recTone[result.recommendation]}55`, background: `${recTone[result.recommendation]}18`, padding: "3px 10px", borderRadius: "100px" }}>{result.recommendation}</span>
-            <span style={{ fontSize: "0.8125rem", color: "var(--text-secondary)" }}>{result.overallMatch}% match</span>
+            <span style={{ fontSize: "0.75rem", fontWeight: 700, textTransform: "uppercase", color: recTone[result.recommendation], border: `1px solid ${recTone[result.recommendation]}55`, background: `${recTone[result.recommendation]}18`, padding: "3px 10px", borderRadius: "100px" }}>
+              {result.relevanceTier === "strong" ? "Strong match" : result.relevanceTier === "possible" ? "Possible match" : result.recommendation}
+            </span>
+            <span style={{ fontSize: "0.8125rem", color: "var(--text-secondary)" }}>{result.overallMatch}% evidence match</span>
             {result.salary ? <span style={{ fontSize: "0.8125rem", color: "var(--text-tertiary)" }}>{result.salary}</span> : null}
             <span style={{ fontSize: "0.75rem", color: "var(--text-tertiary)" }}>{result.source}</span>
           </div>
           {result.screeningInsight ? (
             <p style={{ margin: "6px 0", color: "var(--text-secondary)", fontSize: "0.8125rem" }}>
-              Screening insight: {result.screeningInsight}
+              Why Sartho is showing this: {result.relevanceReason ?? result.screeningInsight}
             </p>
           ) : null}
           {/*
@@ -317,13 +322,20 @@ export function JobSearchPanel({
     );
   };
 
-  // De-duplicate near-identical reposts and clean scraper artifacts, then split
-  // into strong matches (worth acting on) and weaker ones (collapsed by default).
+  // Relevance tier owns visibility. The old deterministic recommendation is
+  // only a fallback for searches stored before Search Relevance V2 existed.
   const unique = deduplicateSearchResults(results);
-  const strong = unique.filter((result) => result.recommendation !== "skip");
-  const weak = unique.filter((result) => result.recommendation === "skip");
-  const primary = (strong.length ? strong : weak.slice(0, 3)).slice(0, SHORTLIST_LIMIT);
-  const collapsed = strong.length ? weak : weak.slice(3);
+  const visible = unique.filter((result) =>
+    result.relevanceTier === "strong"
+    || result.relevanceTier === "possible"
+    || (!result.relevanceTier && result.recommendation !== "skip"),
+  );
+  const outside = unique.filter((result) =>
+    result.relevanceTier === "outside"
+    || (!result.relevanceTier && result.recommendation === "skip"),
+  );
+  const primary = (visible.length ? visible : outside.slice(0, 3)).slice(0, SHORTLIST_LIMIT);
+  const collapsed = visible.length ? outside : outside.slice(3);
 
   const pageCount = Math.max(1, Math.ceil(primary.length / PAGE_SIZE));
   const currentPage = Math.min(page, pageCount - 1);
@@ -390,8 +402,8 @@ export function JobSearchPanel({
 
       {unique.length ? (
         <>
-          {!strong.length ? (
-            <div className="empty-inline-state">No strong matches against your evidence yet — here are the closest. Adding more approved evidence, or refining your target roles, sharpens these.</div>
+          {!visible.length ? (
+            <div className="empty-inline-state">No strong or possible matches yet — here are the closest roles outside your current search.</div>
           ) : null}
           <div className="application-list" style={{ marginTop: "8px" }}>
             {pageItems.map(renderResult)}
@@ -406,7 +418,7 @@ export function JobSearchPanel({
           {collapsed.length ? (
             <>
               <button type="button" className="secondary-button" onClick={() => setShowWeak((value) => !value)} style={{ marginTop: "12px" }}>
-                {showWeak ? "Hide weaker matches" : `Show ${collapsed.length} weaker match${collapsed.length === 1 ? "" : "es"}`}
+                {showWeak ? "Hide outside-search roles" : `Show ${collapsed.length} outside-search role${collapsed.length === 1 ? "" : "s"}`}
               </button>
               {showWeak ? (
                 <div className="application-list" style={{ marginTop: "8px", opacity: 0.7 }}>

@@ -122,19 +122,19 @@ describe("Semantic Job Context grounding", () => {
   });
 
   it("never processes more than the bounded semantic shortlist", () => {
-    const manyJobs = Array.from({ length: 9 }, (_, index) => ({
+    const manyJobs = Array.from({ length: 13 }, (_, index) => ({
       ...jobs[0],
       key: `job-${index + 1}`,
     }));
     const manyRaw = {
-      jobs: manyJobs.slice(0, 8).map((job) => ({
+      jobs: manyJobs.slice(0, 12).map((job) => ({
         ...raw(job.key).jobs[0],
         key: job.key,
       })),
     };
 
     const result = groundSemanticAssessments(context, manyJobs, manyRaw);
-    expect(result.size).toBe(8);
-    expect(result.has("job-9")).toBe(false);
+    expect(result.size).toBe(12);
+    expect(result.has("job-13")).toBe(false);
   });
 });
