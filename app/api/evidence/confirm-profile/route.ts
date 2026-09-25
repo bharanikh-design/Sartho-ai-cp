@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/lib/auth";
-import { rescoreSavedJobs } from "@/lib/matching/rescore";
+import { propagateCandidateMutation } from "@/lib/workflow/propagate-candidate-mutation";
 
 export async function PUT() {
   const { supabase, user } = await getAuthenticatedUser();
@@ -19,7 +19,7 @@ export async function PUT() {
   }
 
   // Newly approved evidence can change how every saved role scores.
-  await rescoreSavedJobs(supabase, user.id, { invalidateDeepAnalysis: true });
+  await propagateCandidateMutation(supabase, user.id, "career_truth");
 
   return NextResponse.json({ confirmed: data?.length ?? 0 });
 }
