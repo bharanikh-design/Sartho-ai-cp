@@ -46,6 +46,8 @@ export function PrivacyPreferences() {
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
+    // Initial client-only browser preference sync.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setOpen(readAnalyticsConsent() === null);
     const reopen = () => setOpen(true);
     window.addEventListener(OPEN_PRIVACY_PREFERENCES_EVENT, reopen);
