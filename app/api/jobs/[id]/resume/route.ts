@@ -437,6 +437,10 @@ export async function POST(
      */
     const signal = tailoringGain(masterText, draft, (jobResult.data.rule_analysis ?? null) as RuleAnalysis | null);
 
+    logWorkflowTrace("resume_generation.completed", workflowTraceId, {
+      jobId: id,
+      applicationSaved: Boolean(applicationId),
+    });
     return NextResponse.json({
       applicationId,
       versionName: parsed.versionName.trim(),
@@ -448,11 +452,8 @@ export async function POST(
       signal,
       workflowTraceId,
     });
-    logWorkflowTrace("resume_generation.completed", workflowTraceId, {
-      jobId: id,
-      applicationSaved: Boolean(applicationId),
-    });
   } catch (caught) {
+    logWorkflowTrace("resume_generation.failed", workflowTraceId, { jobId: id });
     console.error("Résumé drafting failed", caught);
     const message = caught instanceof Error && caught.message.startsWith("Sartho")
       ? caught.message
