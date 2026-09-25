@@ -19,7 +19,7 @@ export async function PUT() {
   }
 
   // Newly approved evidence can change how every saved role scores.
-  await rescoreSavedJobs(supabase, user.id);
+  await rescoreSavedJobs(supabase, user.id, { invalidateDeepAnalysis: true });
 
   return NextResponse.json({ confirmed: data?.length ?? 0 });
 }
