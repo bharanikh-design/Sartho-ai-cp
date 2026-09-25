@@ -88,7 +88,16 @@ export function overallMatchScore(analysis: JobAnalysis, alignment: LaneAlignmen
     + breakdown.requirementCoverage * 0.4
     + breakdown.evidenceDepth * 0.25
     + breakdown.priorityLift;
-  return Math.max(0, Math.min(100, Math.round(total)));
+
+  /*
+   * A specialist contradiction is not another small weighting adjustment.
+   * It means the apparent title similarity came from generic role-shape words
+   * while the actual domain context points somewhere else. Keep the opportunity
+   * visible for manual review if other evidence is compelling, but never let
+   * broad transferable skills inflate it into a high-confidence recommendation.
+   */
+  const capped = analysis.specialistConflict ? Math.min(total, 35) : total;
+  return Math.max(0, Math.min(100, Math.round(capped)));
 }
 
 export function scoreBreakdown(analysis: JobAnalysis, alignment: LaneAlignment | null): ScoreBreakdown {
