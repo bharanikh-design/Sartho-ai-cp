@@ -16,6 +16,11 @@ import {
   logWorkflowTrace,
   workflowTraceFromMetadata,
 } from "@/lib/observability/workflow-trace";
+import {
+  beginDurableAiOperation,
+  failDurableAiOperation,
+  succeedDurableAiOperation,
+} from "@/lib/operations/durable-ai";
 
 // Same reasoning as the deep-analysis route: the declared budget has to cover
 // the 90s the provider adapter is allowed to wait, or the host kills the
@@ -132,14 +137,23 @@ const jsonSchema = {
   },
 };
 
+const operationSchema = z.object({
+  operationId: z.string().uuid().optional(),
+});
+
 export async function POST(
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
   const { supabase, user } = await getAuthenticatedUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await context.params;
   if (!z.string().uuid().safeParse(id).success) return NextResponse.json({ error: "Opportunity not found." }, { status: 404 });
+
+  const operationInput = operationSchema.safeParse(await request.json().catch(() => ({})));
+  const requestId = operationInput.success && operationInput.data.operationId
+    ? operationInput.data.operationId
+    : crypto.randomUUID();
 
   const [jobResult, requirementsResult, evidenceResult, rolesResult, profileResult, masterResult] = await Promise.all([
     supabase.from("jobs").select("*").eq("id", id).eq("user_id", user.id).maybeSingle(),
@@ -229,10 +243,51 @@ export async function POST(
     : resumeContentOf(masterResult.data?.master_resume, masterResult.data?.master_resume_text ?? null);
   const masterText = master ? renderResumeText(master) : "";
 
-  const quota = await checkAiQuota(supabase, "resume_draft");
-  if (!quota.allowed) return aiQuotaResponse(quota);
+  let durableOperationId: string | null = null;
+  try {
+    const durable = await beginDurableAiOperation(supabase, user.id, {
+      operation: "resume_generation",
+      resourceId: id,
+      requestId,
+      workflowTraceId,
+    });
+    durableOperationId = durable.row.id;
+
+    if (durable.state === "already_succeeded") {
+      const applicationId = typeof durable.row.result_ref?.applicationId === "string"
+        ? durable.row.result_ref.applicationId
+        : null;
+      return NextResponse.json({
+        applicationId,
+        workflowTraceId,
+        operationId: durable.row.id,
+        reused: true,
+      });
+    }
+
+    if (durable.state === "already_running") {
+      return NextResponse.json({
+        status: "processing",
+        workflowTraceId,
+        operationId: durable.row.id,
+      }, { status: 202 });
+    }
+  } catch (caught) {
+    console.error("Unable to coordinate durable résumé generation", caught);
+    return NextResponse.json({
+      error: "Sartho could not start this résumé safely. Please retry.",
+    }, { status: 503 });
+  }
 
   try {
+    const quota = await checkAiQuota(supabase, "resume_draft");
+    if (!quota.allowed) {
+      if (durableOperationId) {
+        await failDurableAiOperation(supabase, user.id, durableOperationId, new Error("AI quota unavailable."));
+      }
+      return aiQuotaResponse(quota);
+    }
+
     const raw = await generateStructuredJson({
       workload: "quality",
       safetyIdentifier: createSafetyIdentifier(user.id),
@@ -437,6 +492,12 @@ export async function POST(
      */
     const signal = tailoringGain(masterText, draft, (jobResult.data.rule_analysis ?? null) as RuleAnalysis | null);
 
+    if (durableOperationId) {
+      await succeedDurableAiOperation(supabase, user.id, durableOperationId, {
+        jobId: id,
+        applicationId,
+      });
+    }
     logWorkflowTrace("resume_generation.completed", workflowTraceId, {
       jobId: id,
       applicationSaved: Boolean(applicationId),
@@ -453,6 +514,9 @@ export async function POST(
       workflowTraceId,
     });
   } catch (caught) {
+    if (durableOperationId) {
+      await failDurableAiOperation(supabase, user.id, durableOperationId, caught);
+    }
     logWorkflowTrace("resume_generation.failed", workflowTraceId, { jobId: id });
     console.error("Résumé drafting failed", caught);
     const message = caught instanceof Error && caught.message.startsWith("Sartho")

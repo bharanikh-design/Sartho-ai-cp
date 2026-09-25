@@ -530,7 +530,12 @@ export function ResumeStudio({
     setGeneratingId(jobId);
     setError(null);
     try {
-      const response = await fetch(`/api/jobs/${jobId}/resume`, { method: "POST" });
+      const operationId = crypto.randomUUID();
+      const response = await fetch(`/api/jobs/${jobId}/resume`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ operationId }),
+      });
       const result = await response.json() as { error?: string; applicationId?: string };
       if (!response.ok) throw new Error(result.error ?? "Unable to draft the résumé.");
       router.refresh();
