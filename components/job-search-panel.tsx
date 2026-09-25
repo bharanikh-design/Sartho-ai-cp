@@ -322,13 +322,20 @@ export function JobSearchPanel({
     );
   };
 
-  // De-duplicate near-identical reposts and clean scraper artifacts, then split
-  // into strong matches (worth acting on) and weaker ones (collapsed by default).
+  // Relevance tier owns visibility. The old deterministic recommendation is
+  // only a fallback for searches stored before Search Relevance V2 existed.
   const unique = deduplicateSearchResults(results);
-  const strong = unique.filter((result) => result.recommendation !== "skip");
-  const weak = unique.filter((result) => result.recommendation === "skip");
-  const primary = (strong.length ? strong : weak.slice(0, 3)).slice(0, SHORTLIST_LIMIT);
-  const collapsed = strong.length ? weak : weak.slice(3);
+  const visible = unique.filter((result) =>
+    result.relevanceTier === "strong"
+    || result.relevanceTier === "possible"
+    || (!result.relevanceTier && result.recommendation !== "skip"),
+  );
+  const outside = unique.filter((result) =>
+    result.relevanceTier === "outside"
+    || (!result.relevanceTier && result.recommendation === "skip"),
+  );
+  const primary = (visible.length ? visible : outside.slice(0, 3)).slice(0, SHORTLIST_LIMIT);
+  const collapsed = visible.length ? outside : outside.slice(3);
 
   const pageCount = Math.max(1, Math.ceil(primary.length / PAGE_SIZE));
   const currentPage = Math.min(page, pageCount - 1);
@@ -395,8 +402,8 @@ export function JobSearchPanel({
 
       {unique.length ? (
         <>
-          {!strong.length ? (
-            <div className="empty-inline-state">No strong matches against your evidence yet — here are the closest. Adding more approved evidence, or refining your target roles, sharpens these.</div>
+          {!visible.length ? (
+            <div className="empty-inline-state">No strong or possible matches yet — here are the closest roles outside your current search.</div>
           ) : null}
           <div className="application-list" style={{ marginTop: "8px" }}>
             {pageItems.map(renderResult)}
@@ -411,7 +418,7 @@ export function JobSearchPanel({
           {collapsed.length ? (
             <>
               <button type="button" className="secondary-button" onClick={() => setShowWeak((value) => !value)} style={{ marginTop: "12px" }}>
-                {showWeak ? "Hide weaker matches" : `Show ${collapsed.length} weaker match${collapsed.length === 1 ? "" : "es"}`}
+                {showWeak ? "Hide outside-search roles" : `Show ${collapsed.length} outside-search role${collapsed.length === 1 ? "" : "s"}`}
               </button>
               {showWeak ? (
                 <div className="application-list" style={{ marginTop: "8px", opacity: 0.7 }}>
