@@ -1215,6 +1215,8 @@ export function normaliseCriteria(stored: unknown): SearchCriteria {
     earlyCareerPass: value.earlyCareerPass === true,
     advertsRead: count(value.advertsRead),
     offFamily: count(value.offFamily),
+    unrecognisedTargets: strings(value.unrecognisedTargets).length ? strings(value.unrecognisedTargets) : undefined,
+    offMarket: count(value.offMarket),
     families: strings(value.families),
     countryName: typeof value.countryName === "string" ? value.countryName : "",
     countrySource: value.countrySource === "brief" || value.countrySource === "resume" ? value.countrySource : "default",
@@ -1224,6 +1226,8 @@ export function normaliseCriteria(stored: unknown): SearchCriteria {
     roles: strings(value.roles),
     remoteOnly: value.remoteOnly === true,
     providers: strings(value.providers),
+    directEmployersOnly: value.directEmployersOnly === true,
+    agencyOrUnverifiedHidden: count(value.agencyOrUnverifiedHidden),
     providerErrors: strings(value.providerErrors),
     providerTimeouts: Array.isArray(value.providerTimeouts)
       ? value.providerTimeouts.filter((entry) => entry && typeof entry.name === "string").map((entry) => ({
@@ -1251,5 +1255,9 @@ export function normaliseCriteria(stored: unknown): SearchCriteria {
     targetRolesRequested: count(value.targetRolesRequested),
     targetRolesSearched: count(value.targetRolesSearched),
     employersChecked: count(value.employersChecked),
+    candidateContextFingerprint: typeof value.candidateContextFingerprint === "string" && value.candidateContextFingerprint
+      ? value.candidateContextFingerprint
+      : undefined,
+    learnedAffinitySignals: count(value.learnedAffinitySignals),
   };
 }
