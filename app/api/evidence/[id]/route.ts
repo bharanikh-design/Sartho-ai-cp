@@ -43,9 +43,15 @@ export async function PATCH(
   // either way rather than the 500 that `.single()` produced on an empty result.
   if (!data) return NextResponse.json({ error: "Evidence record not found." }, { status: 404 });
 
-  // Approving or rejecting a claim changes the skill profile every saved
-  // opportunity was scored against, so refresh those scores before replying.
-  if (parsed.data.approval_status !== undefined) {
+  /*
+   * Any change to approved Career Truth can change downstream matching.
+   * Approval state is not the only semantic change: editing an approved claim
+   * or its context changes what capabilities the evidence reader can see.
+   */
+  const careerTruthChanged = parsed.data.approval_status !== undefined
+    || (data.approval_status === "approved"
+      && (parsed.data.claim !== undefined || parsed.data.context !== undefined));
+  if (careerTruthChanged) {
     await rescoreSavedJobs(supabase, user.id);
   }
 
