@@ -10,7 +10,7 @@ import { createSafetyIdentifier, generateStructuredJson } from "@/lib/ai/provide
 import { aiQuotaResponse, checkAiQuota } from "@/lib/ai/quota";
 import { getAuthenticatedUser } from "@/lib/auth";
 import { logError } from "@/lib/logger";
-import type { DeepAnalysisSummary, RequirementAssessment } from "@/lib/types";
+import type { DeepAnalysisSummary, RequirementAssessment, RuleAnalysis } from "@/lib/types";
 
 /*
  * Quality-workload analysis waits up to 90s on the provider (see the
@@ -111,6 +111,7 @@ export async function POST(
         "Every met or partially_met assessment must cite one or more supplied evidence IDs.",
         "When evidence is absent or ambiguous, use not_met or unknown honestly.",
         "Separate explicit job requirements from likely recruiter signals. Recruiter signals are inference, not fact.",
+        "semanticJobContext, when supplied, is a prior semantic reading of the advert. Use it to orient the analysis, but the advert text remains authoritative: never turn semantic context into a requirement the advert does not support.",
       ].join(" "),
       prompt: JSON.stringify({
         job: {
@@ -119,6 +120,7 @@ export async function POST(
           location: jobResult.data.location,
           description: jobResult.data.raw_description,
         },
+        semanticJobContext: (jobResult.data.rule_analysis as RuleAnalysis | null)?.semanticContext ?? null,
         approvedEvidence: evidenceResult.data,
       }),
     });
