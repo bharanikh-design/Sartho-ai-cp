@@ -1,10 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { generateStructuredJson } from "@/lib/ai/provider";
 import {
-  loadCandidateWorkflowContext,
   searchIntentFromCandidateContext,
   type CandidateWorkflowContext,
 } from "@/lib/context/candidate-workflow";
+import { evaluateOpportunity, prepareCareerConductor } from "@/lib/workflow/career-conductor";
 import { countryName, normaliseCountryCode } from "@/lib/jobs/countries";
 import { splitMisfiledCompanies } from "@/lib/jobs/employers";
 import { filterableSelections } from "@/lib/jobs/employment-types";
@@ -20,7 +20,6 @@ import {
 import { familyFit, reachFrom, unclassifiedTitles } from "@/lib/matching/job-family";
 import { demandsMoreExperience, requiredExperienceIn } from "@/lib/matching/required-experience";
 import { fetchAdvertText } from "@/lib/jobs/advert-text";
-import { scoreOpportunity } from "@/lib/matching/opportunity-score";
 import { candidateSeniority, isEntryLevelTitle } from "@/lib/matching/title-fit";
 import { seniorityReach } from "@/lib/matching/seniority-reach";
 import { searchSerpApiCached } from "@/lib/jobs/cached-serpapi";
@@ -346,8 +345,12 @@ export async function runBriefSearch(
     return { ok: false, code: "not_configured", error: NOT_CONFIGURED_MESSAGE };
   }
 
-  const workflow = options.workflow ?? await loadCandidateWorkflowContext(supabase, userId);
-  const { candidateContext, career, search: preferences } = workflow;
+  const conductor = options.workflow
+    ? { workflow: options.workflow, contextFingerprint: options.contextFingerprint ?? "" }
+    : await prepareCareerConductor(supabase, userId);
+  const workflow = conductor.workflow;
+  const contextFingerprint = options.contextFingerprint || conductor.contextFingerprint;
+  const { candidateContext, career } = workflow;
   const { profile, roles, evidence, lanes } = career;
 
   /*
@@ -767,7 +770,7 @@ export async function runBriefSearch(
   }
 
   const score = (result: JobSearchResult): ScoredJobMatch => {
-    const scored = scoreOpportunity(result.title, result.description, evidence, roles, lanes);
+    const scored = evaluateOpportunity({ workflow }, result.title, result.description);
     return {
       title: result.title,
       employer: result.employer,
@@ -1045,7 +1048,7 @@ export async function runBriefSearch(
     roles: [...new Set(queries.filter((query) => !query.earlyCareerOnly).map((query) => query.keywords))],
     remoteOnly: contextRemotePreferences.length === 1 && contextRemotePreferences[0] === "Remote",
     providers: Array.from(cascade.used),
-    candidateContextFingerprint: options.contextFingerprint,
+    candidateContextFingerprint: contextFingerprint || undefined,
     learnedAffinitySignals: searchIntent.learnedAffinitySignals,
     directEmployersOnly: searchIntent.directEmployersOnly ?? undefined,
     /*
