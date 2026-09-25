@@ -1,7 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { getCareerWorkspace } from "@/lib/data/career";
 import { generateStructuredJson } from "@/lib/ai/provider";
-import { getSearchPreferences } from "@/lib/data/search";
+import {
+  loadCandidateWorkflowContext,
+  type CandidateWorkflowContext,
+} from "@/lib/context/candidate-workflow";
 import { countryName, normaliseCountryCode } from "@/lib/jobs/countries";
 import { splitMisfiledCompanies } from "@/lib/jobs/employers";
 import { filterableSelections } from "@/lib/jobs/employment-types";
@@ -222,6 +224,10 @@ export type SearchCriteria = {
   targetRolesRequested?: number;
   targetRolesSearched?: number;
   employersChecked?: number;
+  /** Exact Candidate Context snapshot used to execute this search. */
+  candidateContextFingerprint?: string;
+  /** Learned signals present in that context. Observational in this release. */
+  learnedAffinitySignals?: number;
 };
 
 export type BriefSearchFailureCode = "not_configured" | "no_targets" | "country_unsupported" | "provider_error";
@@ -328,16 +334,33 @@ export const NOT_CONFIGURED_MESSAGE =
 export async function runBriefSearch(
   supabase: SupabaseClient,
   userId: string,
-  options: { budgetMs?: number; maxResults?: number } = {},
+  options: {
+    budgetMs?: number;
+    maxResults?: number;
+    workflow?: CandidateWorkflowContext;
+    contextFingerprint?: string;
+  } = {},
 ): Promise<BriefSearchOutcome> {
   if (!isJobSearchConfigured()) {
     return { ok: false, code: "not_configured", error: NOT_CONFIGURED_MESSAGE };
   }
 
-  const [{ profile, roles, evidence, lanes }, preferences] = await Promise.all([
-    getCareerWorkspace(supabase, userId),
-    getSearchPreferences(supabase, userId),
-  ]);
+  const workflow = options.workflow ?? await loadCandidateWorkflowContext(supabase, userId);
+  const { candidateContext, career, search: preferences } = workflow;
+  const { profile, roles, evidence, lanes } = career;
+
+  /*
+   * Search consumes the same canonical context that the rest of the career
+   * workflow sees. Raw records remain available for evidence-grounded scoring,
+   * but intent comes from Candidate Context rather than being reinterpreted in
+   * a parallel search-only path.
+   */
+  const contextRoleNames = candidateContext.explicitIntent.targetRoles.map((signal) => signal.value.name);
+  const contextCountries = candidateContext.explicitIntent.countries.map((signal) => signal.value);
+  const contextLocations = candidateContext.explicitIntent.locations.map((signal) => signal.value);
+  const contextCompanies = candidateContext.explicitIntent.companies.map((signal) => signal.value);
+  const contextEmploymentTypes = candidateContext.explicitIntent.employmentTypes.map((signal) => signal.value);
+  const contextRemotePreferences = candidateContext.explicitIntent.remotePreferences.map((signal) => signal.value);
 
   /*
    * Two different questions, which were being answered with one list.
@@ -358,7 +381,8 @@ export async function runBriefSearch(
     .filter((lane) => lane.active)
     .sort((a, b) => a.priority - b.priority);
   const activeLanes = targetedLanes;
-  if (!activeLanes.length) {
+  const roleNames = contextRoleNames;
+  if (!roleNames.length) {
     return {
       ok: false,
       code: "no_targets",
@@ -371,9 +395,9 @@ export async function runBriefSearch(
    * chose on Search Brief, then the one read from their résumé, then the
    * deployment default (only for briefs saved before country existed).
    */
-  const chosen = preferences.countries.length
-    ? preferences.countries
-    : [preferences.country ?? profile?.country ?? ""];
+  const chosen = contextCountries.length
+    ? contextCountries
+    : [profile?.country ?? ""];
   const markets = [...new Set(
     chosen.map((code) => normaliseCountryCode(code)).filter((code): code is string => Boolean(code)),
   )];
@@ -396,9 +420,8 @@ export async function runBriefSearch(
 
   // Employers typed into the cities list (before companies had a field) are
   // treated as companies here too, so an unsaved brief still searches sensibly.
-  const brief = splitMisfiledCompanies(preferences.targetLocations, preferences.targetCompanies);
-  /* Every target role, because this decides reach rather than spend. */
-  const roleNames = targetedLanes.map((lane) => lane.name);
+  const brief = splitMisfiledCompanies(contextLocations, contextCompanies);
+  /* Every target role comes from the canonical Candidate Context handoff. */
   // Extract the most common domains/skills from the user's evidence to contextualize the search.
   const domainCounts = new Map<string, number>();
   for (const record of (evidence || [])) {
@@ -420,7 +443,7 @@ export async function runBriefSearch(
    * neither source says anything the years filter is simply not applied and the
    * criteria say the question is unanswered.
    */
-  const chosenBand = experienceBand(preferences.experienceLevel);
+  const chosenBand = experienceBand(normaliseExperienceBand(candidateContext.explicitIntent.experienceLevel?.value));
   const resumeBand = experienceBand(bandForYears(profile?.total_experience_years ?? null));
   const band = chosenBand ?? resumeBand;
   const experienceSource: SearchCriteria["experienceSource"] =
@@ -453,8 +476,8 @@ export async function runBriefSearch(
       country,
       locations: brief.locations,
       companies: brief.companies,
-      remotePreferences: preferences.remotePreferences,
-      employmentTypes: preferences.employmentTypes,
+      remotePreferences: contextRemotePreferences,
+      employmentTypes: contextEmploymentTypes,
       entryLevelTerms: earlyCareerPass ? entryLevelTermsFor(country) : undefined,
       resumeSkills,
     }))
@@ -466,8 +489,8 @@ export async function runBriefSearch(
       country: market,
       locations: [],
       companies: [],
-      remotePreferences: preferences.remotePreferences,
-      employmentTypes: preferences.employmentTypes,
+      remotePreferences: contextRemotePreferences,
+      employmentTypes: contextEmploymentTypes,
       /* Each market gets its own vocabulary; "graduate scheme" finds nothing in Sydney. */
       entryLevelTerms: earlyCareerPass ? entryLevelTermsFor(market) : undefined,
       resumeSkills,
@@ -985,10 +1008,10 @@ export async function runBriefSearch(
      * both as "employment types" is how two of four selections looked applied
      * while doing nothing at all.
      */
-    employmentTypes: preferences.employmentTypes.filter(
+    employmentTypes: contextEmploymentTypes.filter(
       (type) => providers.some((provider) => filterableSelections([type], provider).length),
     ),
-    employmentHinted: preferences.employmentTypes.filter(
+    employmentHinted: contextEmploymentTypes.filter(
       (type) => !providers.some((provider) => filterableSelections([type], provider).length),
     ),
     companiesRequested: brief.companies.length,
@@ -1004,7 +1027,7 @@ export async function runBriefSearch(
     offMarket,
     families: reachFrom(heldTitles, roleNames),
     countryName: countryLabel,
-    countrySource: preferences.country ? "brief" : profile?.country ? "resume" : "default",
+    countrySource: contextCountries.length ? "brief" : profile?.country ? "resume" : "default",
     locations: usedLocations,
     broadened,
     companies: brief.companies.slice(0, MAX_COMPANY_QUERIES),
@@ -1018,8 +1041,10 @@ export async function runBriefSearch(
      * and there was no way to tell from the UI what had been asked for.
      */
     roles: [...new Set(queries.filter((query) => !query.earlyCareerOnly).map((query) => query.keywords))],
-    remoteOnly: preferences.remotePreferences.length === 1 && preferences.remotePreferences[0] === "Remote",
+    remoteOnly: contextRemotePreferences.length === 1 && contextRemotePreferences[0] === "Remote",
     providers: Array.from(cascade.used),
+    candidateContextFingerprint: options.contextFingerprint,
+    learnedAffinitySignals: candidateContext.learnedAffinity.signals.length,
     /*
      * Only the failures that changed what came back. A provider behind the one
      * that answered was never reached, so its trouble is a server-log fact
