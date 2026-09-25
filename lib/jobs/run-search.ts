@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { generateStructuredJson } from "@/lib/ai/provider";
+import { createSafetyIdentifier } from "@/lib/ai/provider";
+import { assessSemanticJobs, jobSemanticContextSchema, semanticJobFitSchema } from "@/lib/context/job-context";
 import {
   searchIntentFromCandidateContext,
   type CandidateWorkflowContext,
@@ -88,7 +89,13 @@ export type ScoredJobMatch = {
    */
   platforms: string[];
   applyDirect: boolean;
-  /** Optional model commentary; it never changes the evidence-grounded score. */
+  /** Purpose-built semantic understanding of the job. */
+  semanticContext?: import("@/lib/types").JobSemanticContext;
+  /** Semantic relation to Candidate Context. Explanatory in this release. */
+  semanticFit?: import("@/lib/types").SemanticJobFit;
+  /** Candidate Context fingerprint used for semanticFit. */
+  semanticContextFingerprint?: string;
+  /** Optional semantic commentary; it never changes the canonical score in this PR. */
   screeningInsight?: string | null;
 };
 
@@ -228,6 +235,8 @@ export type SearchCriteria = {
   candidateContextFingerprint?: string;
   /** Learned signals present in that context. Observational in this release. */
   learnedAffinitySignals?: number;
+  /** Shortlisted jobs given purpose-built semantic context in this run. */
+  semanticJobsAssessed?: number;
 };
 
 export type BriefSearchFailureCode = "not_configured" | "no_targets" | "country_unsupported" | "provider_error";
@@ -971,47 +980,56 @@ export async function runBriefSearch(
 
   const preLlmResults: ScoredJobMatch[] = deduplicated.slice(0, options.maxResults ?? 20);
 
-  // Add optional semantic context to the deterministic assessment. The model
-  // cannot alter the score, recommendation, matched evidence, or ordering.
-  const llmScreenedResults = await Promise.all(
-    preLlmResults.map(async (match) => {
-      try {
-        const payload = {
+  /*
+   * Purpose-built semantic Job Context for the final shortlist.
+   *
+   * One bounded batch replaces N generic "screening sentence" model calls.
+   * It understands what each job actually is and how that meaning relates to
+   * Candidate Context. In this PR the result is explanatory only: it may not
+   * inflate, suppress, reorder or otherwise become a second scoring authority.
+   */
+  let semanticJobsAssessed = 0;
+  let semantic = new Map<string, {
+    context: import("@/lib/types").JobSemanticContext;
+    fit: import("@/lib/types").SemanticJobFit;
+  }>();
+  try {
+    semantic = await Promise.race([
+      assessSemanticJobs(
+        candidateContext,
+        preLlmResults.map((match) => ({
+          key: match.url,
           title: match.title,
-          description: match.description.slice(0, 1500), // Prevent context bloat
-          candidateSkills: resumeSkills.join(", "),
-          candidateLevel: level,
-        };
+          employer: match.employer,
+          location: match.location,
+          description: match.description,
+        })),
+        { safetyIdentifier: createSafetyIdentifier(userId) },
+      ),
+      new Promise<Map<string, {
+        context: import("@/lib/types").JobSemanticContext;
+        fit: import("@/lib/types").SemanticJobFit;
+      }>>((_, reject) => setTimeout(() => reject(new Error("Semantic Job Context timed out")), 12_000)),
+    ]);
+    semanticJobsAssessed = semantic.size;
+  } catch (error) {
+    console.warn("Semantic Job Context failed; keeping canonical deterministic results", error);
+  }
 
-        const response = await Promise.race([
-          generateStructuredJson({
-            workload: "fast",
-            system: "Compare the job description with the candidate context. Return one concise, evidence-based observation that helps the candidate assess the role. Do not calculate a score or recommendation.",
-            prompt: JSON.stringify(payload),
-            schemaName: "hr_screening",
-            schema: {
-              type: "object",
-              properties: {
-                justification: { type: "string" }
-              },
-              required: ["justification"],
-              additionalProperties: false,
-            }
-          }),
-          new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 8000))
-        ]) as { justification: string };
+  const semanticallyEnriched = preLlmResults.map((match) => {
+    const assessment = semantic.get(match.url);
+    if (!assessment) return match;
+    return {
+      ...match,
+      semanticContext: assessment.context,
+      semanticFit: assessment.fit,
+      semanticContextFingerprint: contextFingerprint || undefined,
+      screeningInsight: assessment.fit.reason,
+    };
+  });
 
-        return withScreeningInsight(match, response.justification);
-      } catch (error) {
-        console.warn("LLM Screening failed for a job, falling back to heuristic score", error);
-        return match; // Fallback to heuristic
-      }
-    })
-  );
-
-  // Filtering and ordering remain entirely evidence-driven; model output is
-  // display-only context attached to the same deterministic result.
-  const sorted = [...llmScreenedResults].sort((a, b) => b.overallMatch - a.overallMatch);
+  // The canonical score and ordering remain conductor-owned in this PR.
+  const sorted = [...semanticallyEnriched].sort((a, b) => b.overallMatch - a.overallMatch);
   const kept = sorted.filter((match) => match.recommendation !== "skip");
   const results: ScoredJobMatch[] = kept.length ? kept : sorted;
 
@@ -1062,6 +1080,7 @@ export async function runBriefSearch(
     providers: Array.from(cascade.used),
     candidateContextFingerprint: contextFingerprint || undefined,
     learnedAffinitySignals: searchIntent.learnedAffinitySignals,
+    semanticJobsAssessed,
     directEmployersOnly: searchIntent.directEmployersOnly ?? undefined,
     /*
      * Only the failures that changed what came back. A provider behind the one
@@ -1188,6 +1207,15 @@ export function normaliseResults(stored: unknown): ScoredJobMatch[] {
       requiredEvidence: nullableText(value.requiredEvidence),
       platforms: strings(value.platforms),
       applyDirect: value.applyDirect === true,
+      semanticContext: jobSemanticContextSchema.safeParse(value.semanticContext).success
+        ? jobSemanticContextSchema.parse(value.semanticContext)
+        : undefined,
+      semanticFit: semanticJobFitSchema.safeParse(value.semanticFit).success
+        ? semanticJobFitSchema.parse(value.semanticFit)
+        : undefined,
+      semanticContextFingerprint: typeof value.semanticContextFingerprint === "string" && value.semanticContextFingerprint
+        ? value.semanticContextFingerprint
+        : undefined,
       screeningInsight: nullableText(value.screeningInsight),
     }];
   });
@@ -1271,5 +1299,6 @@ export function normaliseCriteria(stored: unknown): SearchCriteria {
       ? value.candidateContextFingerprint
       : undefined,
     learnedAffinitySignals: count(value.learnedAffinitySignals),
+    semanticJobsAssessed: count(value.semanticJobsAssessed),
   };
 }

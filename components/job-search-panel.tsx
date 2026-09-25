@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { deduplicateSearchResults } from "@/lib/jobs/location-guard";
+import type { JobSemanticContext, SemanticJobFit } from "@/lib/types";
 
 /*
  * Real search, on demand. Presses the brief against the jobs provider and shows
@@ -36,6 +37,9 @@ type SearchResult = {
   /** The boards carrying this advert, and whether the employer's site is one. */
   platforms?: string[];
   applyDirect?: boolean;
+  semanticContext?: JobSemanticContext;
+  semanticFit?: SemanticJobFit;
+  semanticContextFingerprint?: string;
   screeningInsight?: string | null;
 };
 
@@ -191,6 +195,9 @@ export function JobSearchPanel({
           location: result.location ?? "",
           sourceUrl: result.url,
           description: result.description,
+          ...(result.semanticContext ? { semanticContext: result.semanticContext } : {}),
+          ...(result.semanticFit ? { semanticFit: result.semanticFit } : {}),
+          ...(result.semanticContextFingerprint ? { semanticContextFingerprint: result.semanticContextFingerprint } : {}),
         }),
       });
       const data = await response.json() as { job?: { id?: string }; error?: string };

@@ -170,6 +170,45 @@ describe("normaliseResults", () => {
     expect(match.matchedSkills).toEqual(["sql"]);
     expect(match.employer).toBeNull();
   });
+
+  it("preserves semantic Job Context across stored-search round trips", () => {
+    const [match] = normaliseResults([{
+      ...stored,
+      semanticContext: {
+        function: "Enterprise service management",
+        specialties: ["ServiceNow", "ITSM"],
+        seniority: "director",
+        roleShape: "delivery_leadership",
+        primaryOutcome: "Lead enterprise service transformation",
+        responsibilities: ["Own delivery"],
+        mandatoryExpertise: ["ServiceNow"],
+        domainContext: ["Enterprise platforms"],
+      },
+      semanticFit: {
+        relation: "aligned",
+        confidence: "high",
+        reason: "The role is directly aligned with the candidate's ServiceNow delivery direction.",
+        conflictDimensions: [],
+        supportingEvidenceRefs: ["evidence-1"],
+      },
+      semanticContextFingerprint: "context-12345678",
+    }]);
+
+    expect(match.semanticContext?.specialties).toEqual(["ServiceNow", "ITSM"]);
+    expect(match.semanticFit?.relation).toBe("aligned");
+    expect(match.semanticContextFingerprint).toBe("context-12345678");
+  });
+
+  it("drops malformed semantic context rather than crashing stored Search", () => {
+    const [match] = normaliseResults([{
+      ...stored,
+      semanticContext: { function: 7 },
+      semanticFit: { relation: "certainly" },
+    }]);
+
+    expect(match.semanticContext).toBeUndefined();
+    expect(match.semanticFit).toBeUndefined();
+  });
 });
 
 describe("withScreeningInsight", () => {

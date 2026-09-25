@@ -1,6 +1,26 @@
 export type ApprovalStatus = "pending" | "approved" | "rejected";
 export type Confidence = "low" | "medium" | "high";
 export type JobRecommendation = "apply" | "review" | "skip";
+export type JobSemanticContext = {
+  /** Market-recognisable function inferred from the work, not just the title. */
+  function: string;
+  specialties: string[];
+  seniority: "entry" | "individual" | "manager" | "senior_manager" | "director" | "executive" | "unknown";
+  roleShape: "hands_on" | "delivery_leadership" | "advisory" | "people_leadership" | "commercial" | "mixed" | "unknown";
+  primaryOutcome: string;
+  responsibilities: string[];
+  mandatoryExpertise: string[];
+  domainContext: string[];
+};
+
+export type SemanticJobFit = {
+  relation: "aligned" | "adjacent" | "conflict" | "unclear";
+  confidence: "low" | "medium" | "high";
+  reason: string;
+  conflictDimensions: Array<"function" | "specialism" | "seniority" | "role_shape">;
+  supportingEvidenceRefs: string[];
+};
+
 export type JobStatus =
   | "saved"
   | "analysed"
@@ -95,6 +115,12 @@ export type RuleAnalysis = {
   /** Legacy fields retained only so previously saved analyses still render. */
   primaryLane?: string;
   technicalHeaviness?: number;
+  /** Purpose-built semantic understanding of the job itself. */
+  semanticContext?: JobSemanticContext;
+  /** Candidate-specific semantic relationship; explanatory in this release. */
+  semanticFit?: SemanticJobFit;
+  /** Candidate Context fingerprint used for semanticFit. */
+  semanticContextFingerprint?: string;
 };
 
 export type JobRecord = {
