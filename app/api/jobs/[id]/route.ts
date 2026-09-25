@@ -8,6 +8,8 @@ import {
   type OutcomeStage,
 } from "@/lib/applications/outcome";
 import type { JobStatus } from "@/lib/types";
+import { recordCandidateInteraction } from "@/lib/data/interaction-memory";
+import type { InteractionEventType } from "@/lib/context/interaction-memory";
 
 const JOB_STATUSES = [
   "saved",
@@ -81,6 +83,15 @@ export async function PATCH(
     return NextResponse.json({ error: "Sartho could not update this opportunity." }, { status: 500 });
   }
 
+  const statusEvent: Partial<Record<JobStatus, InteractionEventType>> = {
+    applied: "status_applied",
+    assessment: "status_assessment",
+    interview: "status_interview",
+    offer: "status_offer",
+    rejected: "status_rejected",
+    withdrawn: "status_withdrawn",
+  };
+
   if (status !== "saved") {
     /*
      * Entering a terminal status records why it ended; any other move clears a
@@ -136,6 +147,25 @@ export async function PATCH(
     if (applicationError) {
       console.error("Unable to update application ledger", applicationError);
       return NextResponse.json({ error: "The opportunity was saved, but its application record could not be updated." }, { status: 500 });
+    }
+  }
+
+  if (current.status !== status && statusEvent[status]) {
+    try {
+      await recordCandidateInteraction(supabase, user.id, {
+        eventType: statusEvent[status]!,
+        source: "pipeline",
+        jobId: id,
+        metadata: isTerminalOutcome(status)
+          ? {
+              previousStatus: current.status,
+              outcomeReason: outcomeReason ?? null,
+            }
+          : { previousStatus: current.status },
+      });
+    } catch (caught) {
+      // The user's pipeline state is authoritative; learning may never block it.
+      console.warn("Unable to record pipeline interaction", caught);
     }
   }
 
