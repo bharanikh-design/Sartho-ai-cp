@@ -21,13 +21,21 @@ export async function loadCandidateWorkflowContext(
    * Callers receive both the canonical context and the raw records needed for
    * evidence-grounded scoring; they do not independently reinterpret intent.
    */
-  const [career, search, interactions] = await Promise.all([
+  const [career, search, interactionResult] = await Promise.all([
     getCareerWorkspace(supabase, userId),
     getSearchPreferences(supabase, userId),
-    getCandidateInteractions(supabase, userId),
+    getCandidateInteractions(supabase, userId)
+      .then((interactions) => ({ ok: true as const, interactions }))
+      .catch((error) => ({ ok: false as const, error })),
   ]);
 
-  const learnedAffinity = deriveLearnedAffinity(interactions);
+  if (!interactionResult.ok) {
+    console.warn("Interaction Memory unavailable; continuing without learned affinity", interactionResult.error);
+  }
+
+  const learnedAffinity = deriveLearnedAffinity(
+    interactionResult.ok ? interactionResult.interactions : [],
+  );
   const candidateContext = buildCandidateContext({
     ...career,
     search,
