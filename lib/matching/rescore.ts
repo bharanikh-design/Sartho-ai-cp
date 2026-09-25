@@ -57,6 +57,7 @@ export async function rescoreSavedJobs(
       const previous = job.rule_analysis as import("@/lib/types").RuleAnalysis | null;
       const ruleAnalysis = {
         ...scored.analysis,
+        scoringContextFingerprint: conductor.contextFingerprint,
         /*
          * Job meaning survives candidate changes. Candidate-specific semantic
          * fit does not: it was produced against an older Candidate Context and
