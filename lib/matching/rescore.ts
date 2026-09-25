@@ -12,7 +12,11 @@ import { evaluateOpportunity, prepareCareerConductor } from "@/lib/workflow/care
 
 const RESCORABLE_STATUSES = new Set(["saved", "analysed", "approved"]);
 
-export async function rescoreSavedJobs(supabase: SupabaseClient, userId: string): Promise<void> {
+export async function rescoreSavedJobs(
+  supabase: SupabaseClient,
+  userId: string,
+  options: { invalidateDeepAnalysis?: boolean } = {},
+): Promise<void> {
   try {
     const jobsResult = await supabase
       .from("jobs")
@@ -24,6 +28,28 @@ export async function rescoreSavedJobs(supabase: SupabaseClient, userId: string)
 
     const conductor = await prepareCareerConductor(supabase, userId);
     const now = new Date().toISOString();
+
+    if (options.invalidateDeepAnalysis) {
+      const jobIds = jobs.map((job) => job.id);
+      if (jobIds.length) {
+        const { error: requirementsError } = await supabase
+          .from("job_requirements")
+          .delete()
+          .in("job_id", jobIds);
+        if (requirementsError) console.warn("Could not invalidate stale job requirements", requirementsError);
+
+        const { error: analysisError } = await supabase
+          .from("jobs")
+          .update({
+            deep_analysis_status: "not_started",
+            deep_analysis_summary: null,
+            deep_analysed_at: null,
+          })
+          .eq("user_id", userId)
+          .in("id", jobIds);
+        if (analysisError) console.warn("Could not mark stale deep analyses for refresh", analysisError);
+      }
+    }
 
     for (const job of jobs) {
       const scored = evaluateOpportunity(conductor, job.title, job.raw_description);
