@@ -25,6 +25,12 @@ const LOW_SIGNAL_EVENTS = new Set<InteractionEventType>([
   "deep_analysis_requested",
 ]);
 
+function missingInteractionTable(error: { code?: string; message?: string } | null | undefined): boolean {
+  if (!error) return false;
+  if (error.code === "42P01" || error.code === "PGRST205") return true;
+  return (error.message ?? "").toLowerCase().includes("candidate_interactions");
+}
+
 function cleanMetadata(value: Record<string, unknown> | undefined): Record<string, unknown> {
   if (!value) return {};
   const encoded = JSON.stringify(value);
@@ -86,6 +92,10 @@ export async function recordCandidateInteraction(
       : query.eq("title", title);
 
     const { data: existing, error } = await query.maybeSingle();
+    if (missingInteractionTable(error)) {
+      console.warn("candidate_interactions is not available yet; run the interaction-memory migration");
+      return { inserted: false };
+    }
     if (error && error.code !== "PGRST116") throw error;
     if (existing) return { inserted: false };
   }
@@ -101,6 +111,10 @@ export async function recordCandidateInteraction(
     source_url: sourceUrl,
     metadata: cleanMetadata(input.metadata),
   });
+  if (missingInteractionTable(error)) {
+    console.warn("candidate_interactions is not available yet; run the interaction-memory migration");
+    return { inserted: false };
+  }
   if (error) throw error;
 
   return { inserted: true };
@@ -118,6 +132,10 @@ export async function getCandidateInteractions(
     .order("occurred_at", { ascending: false })
     .limit(limit);
 
+  if (missingInteractionTable(error)) {
+    console.warn("candidate_interactions is not available yet; learned affinity is temporarily empty");
+    return [];
+  }
   if (error) throw error;
   return (data ?? []) as InteractionEventRecord[];
 }
