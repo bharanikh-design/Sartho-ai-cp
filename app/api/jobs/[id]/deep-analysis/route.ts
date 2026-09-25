@@ -11,6 +11,7 @@ import { aiQuotaResponse, checkAiQuota } from "@/lib/ai/quota";
 import { getAuthenticatedUser } from "@/lib/auth";
 import { logError } from "@/lib/logger";
 import type { DeepAnalysisSummary, RequirementAssessment, RuleAnalysis } from "@/lib/types";
+import { prepareCareerConductor } from "@/lib/workflow/career-conductor";
 
 /*
  * Quality-workload analysis waits up to 90s on the provider (see the
@@ -96,6 +97,8 @@ export async function POST(
   const quota = await checkAiQuota(supabase, "deep_analysis");
   if (!quota.allowed) return aiQuotaResponse(quota);
 
+  const conductor = await prepareCareerConductor(supabase, user.id);
+
   await supabase.from("jobs").update({ deep_analysis_status: "processing" }).eq("id", id).eq("user_id", user.id);
 
   try {
@@ -147,6 +150,7 @@ export async function POST(
     const countedAsMet = (assessment: RequirementAssessment) => assessment === "met" || assessment === "partially_met";
 
     const summary: DeepAnalysisSummary = {
+      candidateContextFingerprint: conductor.contextFingerprint,
       mandatoryMet: mandatory.filter((item) => countedAsMet(item.assessment)).length,
       mandatoryTotal: mandatory.length,
       preferredMet: preferred.filter((item) => countedAsMet(item.assessment)).length,
