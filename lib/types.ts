@@ -121,6 +121,8 @@ export type RuleAnalysis = {
   semanticFit?: SemanticJobFit;
   /** Candidate Context fingerprint used for semanticFit. */
   semanticContextFingerprint?: string;
+  /** Candidate Context fingerprint used for this canonical quick score. */
+  scoringContextFingerprint?: string;
 };
 
 export type JobRecord = {
@@ -161,6 +163,8 @@ export type JobRequirementRecord = {
 };
 
 export type DeepAnalysisSummary = {
+  /** Candidate Context fingerprint used for this requirement mapping. */
+  candidateContextFingerprint?: string;
   mandatoryMet: number;
   mandatoryTotal: number;
   preferredMet: number;
