@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { generateStructuredJson } from "@/lib/ai/provider";
 import {
   loadCandidateWorkflowContext,
+  searchIntentFromCandidateContext,
   type CandidateWorkflowContext,
 } from "@/lib/context/candidate-workflow";
 import { countryName, normaliseCountryCode } from "@/lib/jobs/countries";
@@ -355,12 +356,13 @@ export async function runBriefSearch(
    * but intent comes from Candidate Context rather than being reinterpreted in
    * a parallel search-only path.
    */
-  const contextRoleNames = candidateContext.explicitIntent.targetRoles.map((signal) => signal.value.name);
-  const contextCountries = candidateContext.explicitIntent.countries.map((signal) => signal.value);
-  const contextLocations = candidateContext.explicitIntent.locations.map((signal) => signal.value);
-  const contextCompanies = candidateContext.explicitIntent.companies.map((signal) => signal.value);
-  const contextEmploymentTypes = candidateContext.explicitIntent.employmentTypes.map((signal) => signal.value);
-  const contextRemotePreferences = candidateContext.explicitIntent.remotePreferences.map((signal) => signal.value);
+  const searchIntent = searchIntentFromCandidateContext(candidateContext);
+  const contextRoleNames = searchIntent.roles;
+  const contextCountries = searchIntent.countries;
+  const contextLocations = searchIntent.locations;
+  const contextCompanies = searchIntent.companies;
+  const contextEmploymentTypes = searchIntent.employmentTypes;
+  const contextRemotePreferences = searchIntent.remotePreferences;
 
   /*
    * Two different questions, which were being answered with one list.
@@ -443,7 +445,7 @@ export async function runBriefSearch(
    * neither source says anything the years filter is simply not applied and the
    * criteria say the question is unanswered.
    */
-  const chosenBand = experienceBand(normaliseExperienceBand(candidateContext.explicitIntent.experienceLevel?.value));
+  const chosenBand = experienceBand(normaliseExperienceBand(searchIntent.experienceLevel));
   const resumeBand = experienceBand(bandForYears(profile?.total_experience_years ?? null));
   const band = chosenBand ?? resumeBand;
   const experienceSource: SearchCriteria["experienceSource"] =
@@ -1044,7 +1046,8 @@ export async function runBriefSearch(
     remoteOnly: contextRemotePreferences.length === 1 && contextRemotePreferences[0] === "Remote",
     providers: Array.from(cascade.used),
     candidateContextFingerprint: options.contextFingerprint,
-    learnedAffinitySignals: candidateContext.learnedAffinity.signals.length,
+    learnedAffinitySignals: searchIntent.learnedAffinitySignals,
+    directEmployersOnly: searchIntent.directEmployersOnly ?? undefined,
     /*
      * Only the failures that changed what came back. A provider behind the one
      * that answered was never reached, so its trouble is a server-log fact
