@@ -62,6 +62,13 @@ const checks = [
       .select("id,master_resume,master_resume_text,master_resume_updated_at")
       .limit(0),
   },
+  {
+    label: "durable_ai_operations long-running work coordination",
+    run: () => supabase
+      .from("durable_ai_operations")
+      .select("id,user_id,operation,resource_id,request_id,workflow_trace_id,status,attempt_count,started_at,finished_at,result_ref,updated_at")
+      .limit(0),
+  },
 ];
 
 const failures = [];
