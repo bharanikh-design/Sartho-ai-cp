@@ -4,6 +4,8 @@ import { jobInputSchema } from "./schema";
 import { getAuthenticatedUser } from "@/lib/auth";
 import { canonicalJobUrl } from "@/lib/jobs/source-url";
 import { evaluateOpportunity, prepareCareerConductor } from "@/lib/workflow/career-conductor";
+import { assessSemanticJobs } from "@/lib/context/job-context";
+import { createSafetyIdentifier } from "@/lib/ai/provider";
 
 
 export async function POST(request: Request) {
@@ -13,7 +15,16 @@ export async function POST(request: Request) {
   const parsed = jobInputSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Review the role details and use a secure HTTPS source link." }, { status: 400 });
 
-  const { title, employer, location, sourceUrl, description } = parsed.data;
+  const {
+    title,
+    employer,
+    location,
+    sourceUrl,
+    description,
+    semanticContext,
+    semanticFit,
+    semanticContextFingerprint,
+  } = parsed.data;
 
   /*
    * Read against this user's own evidence. The matcher has no career of its
@@ -22,6 +33,49 @@ export async function POST(request: Request) {
    */
   const conductor = await prepareCareerConductor(supabase, user.id);
   const scored = evaluateOpportunity(conductor, title, description);
+
+  /*
+   * Reuse semantic intelligence only when it was produced from the exact same
+   * Candidate Context. A stored search can be days old; Career Truth or
+   * Direction may have changed since then, making its candidate-specific fit
+   * stale even though the job itself is unchanged.
+   */
+  let semantic = semanticContext && semanticFit
+    && semanticContextFingerprint === conductor.contextFingerprint
+    ? { context: semanticContext, fit: semanticFit }
+    : null;
+
+  if (!semantic) {
+    try {
+      const assessed = await Promise.race([
+        assessSemanticJobs(
+          conductor.workflow.candidateContext,
+          [{ key: "job", title, employer, location, description }],
+          { safetyIdentifier: createSafetyIdentifier(user.id) },
+        ),
+        new Promise<Map<string, {
+          context: import("@/lib/types").JobSemanticContext;
+          fit: import("@/lib/types").SemanticJobFit;
+        }>>((_, reject) => setTimeout(() => reject(new Error("Semantic Job Context timed out")), 10_000)),
+      ]);
+      semantic = assessed.get("job") ?? null;
+    } catch (caught) {
+      console.warn("Semantic Job Context unavailable while saving; keeping canonical match", caught);
+    }
+  }
+
+  const ruleAnalysis = {
+    ...scored.analysis,
+    ...(semantic
+      ? {
+          semanticContext: semantic.context,
+          semanticFit: semantic.fit,
+          semanticContextFingerprint: conductor.contextFingerprint,
+        }
+      : semanticContext
+        ? { semanticContext }
+        : {}),
+  };
 
   /*
    * The same advert saved twice is one advert.
@@ -63,7 +117,7 @@ export async function POST(request: Request) {
         technical_heaviness: scored.evidenceBacking,
         overall_match: scored.overallMatch,
         recommendation: scored.recommendation,
-        rule_analysis: scored.analysis,
+        rule_analysis: ruleAnalysis,
       })
       .eq("id", existingId)
       .eq("user_id", user.id)
@@ -94,7 +148,7 @@ export async function POST(request: Request) {
       technical_heaviness: scored.evidenceBacking,
       overall_match: scored.overallMatch,
       recommendation: scored.recommendation,
-      rule_analysis: scored.analysis,
+      rule_analysis: ruleAnalysis,
     })
     .select("*")
     .single();
