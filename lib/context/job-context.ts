@@ -5,6 +5,7 @@ import type { JobSemanticContext, SemanticJobFit } from "@/lib/types";
 
 export const MAX_SEMANTIC_JOBS_PER_PASS = 12;
 export const SEMANTIC_CHUNK_SIZE = 3;
+export const SEMANTIC_CHUNK_CONCURRENCY = 2;
 
 export const jobSemanticContextSchema = z.object({
   function: z.string().trim().min(2).max(120),
@@ -195,35 +196,41 @@ export async function assessSemanticJobsResilient(
   const groups = chunks(selected, chunkSize);
   let chunksFailed = 0;
 
-  const results = await Promise.allSettled(groups.map(async (group) => {
-    const timeoutMs = options.chunkTimeoutMs ?? 10_000;
-    const result = await Promise.race([
-      assessSemanticJobs(context, group, { safetyIdentifier: options.safetyIdentifier }),
-      new Promise<Map<string, SemanticAssessment>>((_, reject) =>
-        setTimeout(() => reject(new Error("Semantic Job Context chunk timed out")), timeoutMs),
-      ),
-    ]);
-    return { group, result };
-  }));
+  let cursor = 0;
+  const worker = async () => {
+    while (cursor < groups.length) {
+      const index = cursor;
+      cursor += 1;
+      const group = groups[index];
+      const timeoutMs = options.chunkTimeoutMs ?? 10_000;
 
-  results.forEach((result, index) => {
-    const group = groups[index];
-    if (result.status === "rejected") {
-      chunksFailed += 1;
-      for (const job of group) failed.add(job.key);
-      console.warn("Semantic Job Context chunk failed", {
-        jobs: group.length,
-        error: result.reason instanceof Error ? result.reason.message : String(result.reason),
-      });
-      return;
-    }
+      try {
+        const result = await Promise.race([
+          assessSemanticJobs(context, group, { safetyIdentifier: options.safetyIdentifier }),
+          new Promise<Map<string, SemanticAssessment>>((_, reject) =>
+            setTimeout(() => reject(new Error("Semantic Job Context chunk timed out")), timeoutMs),
+          ),
+        ]);
 
-    for (const job of group) {
-      const assessment = result.value.result.get(job.key);
-      if (assessment) assessments.set(job.key, assessment);
-      else failed.add(job.key);
+        for (const job of group) {
+          const assessment = result.get(job.key);
+          if (assessment) assessments.set(job.key, assessment);
+          else failed.add(job.key);
+        }
+      } catch (caught) {
+        chunksFailed += 1;
+        for (const job of group) failed.add(job.key);
+        console.warn("Semantic Job Context chunk failed", {
+          jobs: group.length,
+          error: caught instanceof Error ? caught.message : String(caught),
+        });
+      }
     }
-  });
+  };
+
+  await Promise.all(
+    Array.from({ length: Math.min(SEMANTIC_CHUNK_CONCURRENCY, groups.length) }, worker),
+  );
 
   return {
     assessments,
