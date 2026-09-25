@@ -1,14 +1,11 @@
 import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { getCareerWorkspace } from "@/lib/data/career";
-import { getSearchPreferences } from "@/lib/data/search";
+import { loadCandidateWorkflowContext } from "@/lib/context/candidate-workflow";
 import {
   buildCandidateContext,
   CANDIDATE_CONTEXT_SCHEMA_VERSION,
   type CandidateContext,
 } from "@/lib/context/candidate-context";
-import { deriveLearnedAffinity } from "@/lib/context/interaction-memory";
-import { getCandidateInteractions } from "@/lib/data/interaction-memory";
 
 function sourceFingerprint(context: CandidateContext): string {
   /*
@@ -29,13 +26,8 @@ export async function assembleCandidateContext(
   supabase: SupabaseClient,
   userId: string,
 ): Promise<CandidateContext> {
-  const [{ profile, roles, evidence, lanes }, search, interactions] = await Promise.all([
-    getCareerWorkspace(supabase, userId),
-    getSearchPreferences(supabase, userId),
-    getCandidateInteractions(supabase, userId),
-  ]);
-  const learnedAffinity = deriveLearnedAffinity(interactions);
-  return buildCandidateContext({ profile, roles, evidence, lanes, search, learnedAffinity });
+  const { candidateContext } = await loadCandidateWorkflowContext(supabase, userId);
+  return candidateContext;
 }
 
 /**
