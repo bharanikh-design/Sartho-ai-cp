@@ -90,7 +90,7 @@ export const MAX_LOCATION_QUERIES = 2;
  * Manager" also posted as "Delivery Manager") without letting a generation
  * spend the whole time budget on guesses.
  */
-export const MAX_SUGGESTED_QUERIES = 2;
+export const MAX_SUGGESTED_QUERIES = 5;
 
 /*
  * Every employer a person lists gets searched — the cap used to be four, so
@@ -114,6 +114,8 @@ export function planSearchQueries(input: {
    */
   entryLevelTerms?: string[];
   resumeSkills?: string[];
+  heldTitles?: string[];
+  careerCapabilities?: string[];
   learnedAffinity?: {
     positive: string[];
     negative: string[];
@@ -265,19 +267,23 @@ export async function planSmartSearchQueries(input: Parameters<typeof planSearch
       generateStructuredJson({
         workload: "fast",
         system: [
-          "You expand a candidate's target roles into the other job titles employers post for the same work.",
+          "You expand a candidate's search into market titles recruiters would plausibly consider for the same person.",
           "Return job titles exactly as an employer would write them in a posting headline.",
           "RULES:",
           "1. Plain titles only. No Boolean operators (AND, OR, NOT), no parentheses, no quotes, no minus signs, no wildcards.",
           "2. One title per string, 2 to 5 words. Not a sentence, not a keyword list.",
-          "3. Give alternative titles for the SAME level and line of work — a senior delivery role expands to 'Delivery Director' or 'Programme Director', never to a junior or a sales title.",
-          "4. Do not repeat a title the candidate already gave you.",
-          "5. Learned affinity is weak behavioural context, never permission to change career direction. Use positive affinity only to choose an alternative title compatible with the explicit target roles and evidenced skills. Negative affinity may stop you suggesting an alternative, but must never remove an explicit target role.",
+          "3. Include both equivalent titles and credible adjacent titles at the SAME career level. Adjacent means substantially overlapping function/capabilities, not merely sharing generic words.",
+          "4. Use the person's held titles and evidenced capabilities to discover market vocabulary such as service assurance, service delivery, governance or operations when genuinely supported. Do not invent a new profession.",
+          "5. Never widen into materially different specialist work just because project/manager/consultant words overlap.",
+          "6. Do not repeat a title the candidate already gave you.",
+          "7. Learned affinity is weak behavioural context, never permission to change career direction. Use positive affinity only to choose an alternative title compatible with the explicit target roles and evidenced skills. Negative affinity may stop you suggesting an alternative, but must never remove an explicit target role.",
           "Output JSON: an object with one array property \"keywords\" holding up to 3 strings.",
         ].join("\n"),
         prompt: [
           `Roles: ${input.roles.join(", ")}`,
           `Skills: ${input.resumeSkills.join(", ")}`,
+          input.heldTitles?.length ? `Held titles: ${input.heldTitles.join(", ")}` : "",
+          input.careerCapabilities?.length ? `Evidenced capabilities: ${input.careerCapabilities.join(", ")}` : "",
           input.learnedAffinity?.positive.length
             ? `Weak positive affinity from deliberate/repeated behaviour: ${input.learnedAffinity.positive.join(", ")}`
             : "",
