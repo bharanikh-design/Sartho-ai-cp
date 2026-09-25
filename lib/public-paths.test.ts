@@ -73,6 +73,12 @@ describe("isPublicPath", () => {
     expect(isPublicPath("/terms/")).toBe(true);
   });
 
+  it("keeps Contact public from the global footer", () => {
+    expect(PUBLIC_PATHS).toContain("/contact");
+    expect(isPublicPath("/contact")).toBe(true);
+    expect(isPublicPath("/contact/")).toBe(true);
+  });
+
   it("does not make a page public for merely starting like a legal one", () => {
     expect(isPublicPath("/privacy-settings")).toBe(false);
     expect(isPublicPath("/terms-of-business")).toBe(false);

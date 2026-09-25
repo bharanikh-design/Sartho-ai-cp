@@ -21,7 +21,7 @@ export const metadata = constructMetadata(
  * OAuth brand verification.
  */
 
-const LAST_UPDATED = "13 September 2026";
+const LAST_UPDATED = "25 September 2026";
 
 export default function TermsPage() {
   return (
@@ -39,7 +39,7 @@ export default function TermsPage() {
           </div>
         </div>
         <p className="policy-prose">
-          Sartho is a career copilot. It reads job adverts, assesses them against
+          Sartho is an AI Career Copilot operated under the <strong>WonderfulMinds</strong> brand. It reads job adverts, assesses them against
           evidence you have confirmed about your own career, and helps you build
           résumés from that evidence. Using it requires an account, and you are
           responsible for what happens under yours.
@@ -110,12 +110,13 @@ export default function TermsPage() {
           You can stop using Sartho at any time, and deleting your account
           deletes the data attached to it. Sartho may suspend an account that
           breaks the expectations above. Questions about these terms go to{" "}
-          <a href="mailto:hello@sartho.tech">hello@sartho.tech</a>.
+          <a href="mailto:hello@sartho.tech">hello@sartho.tech</a>. Privacy matters go to{" "}
+          <a href="mailto:privacy@sartho.tech">privacy@sartho.tech</a>.
         </p>
       </section>
 
       <p className="policy-footer">
-        <Link href="/privacy">Privacy</Link>
+        <Link href="/privacy">Privacy</Link> · <Link href="/contact">Contact us</Link>
       </p>
     </div>
   );

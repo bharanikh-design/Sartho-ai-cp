@@ -1,9 +1,13 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
-
-const VISITOR_KEY = "sartho:visitor-id";
+import {
+  ANALYTICS_CONSENT_EVENT,
+  readAnalyticsConsent,
+  VISITOR_KEY,
+  type AnalyticsConsent,
+} from "@/components/privacy-preferences";
 
 function visitorId(): string | null {
   try {
@@ -36,8 +40,24 @@ function referrerHost(): string | null {
  */
 export function AudienceTelemetry() {
   const pathname = usePathname();
+  const [consent, setConsent] = useState<AnalyticsConsent | null>(null);
 
   useEffect(() => {
+    // Initial client-only browser preference sync.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setConsent(readAnalyticsConsent());
+
+    const changed = (event: Event) => {
+      const value = (event as CustomEvent<AnalyticsConsent>).detail;
+      setConsent(value === "granted" || value === "declined" ? value : readAnalyticsConsent());
+    };
+    window.addEventListener(ANALYTICS_CONSENT_EVENT, changed);
+    return () => window.removeEventListener(ANALYTICS_CONSENT_EVENT, changed);
+  }, []);
+
+  useEffect(() => {
+    if (consent !== "granted") return;
+
     const id = visitorId();
     if (!id) return;
 
@@ -51,7 +71,7 @@ export function AudienceTelemetry() {
       }),
       keepalive: true,
     }).catch(() => undefined);
-  }, [pathname]);
+  }, [consent, pathname]);
 
   return null;
 }

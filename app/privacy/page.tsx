@@ -4,196 +4,149 @@ import { constructMetadata } from "@/lib/seo";
 
 export const metadata = constructMetadata(
   "Privacy",
-  "What Sartho stores, what it sends elsewhere, and what it never keeps.",
+  "How Sartho and WonderfulMinds collect, use, store and protect your information.",
   "/privacy",
 );
 
-/*
- * What Sartho actually does with somebody's data.
- *
- * Written from the code rather than from a template. Every claim below was
- * checked against the thing that implements it — the migrations for what is
- * stored, lib/integrations/google.ts for the scopes, extension/manifest.json
- * for the permissions, app/api/resume for what happens to an upload. A privacy
- * policy that describes a product nobody built is worse than none: it is a
- * promise made on behalf of code that never agreed to it.
- *
- * Public, because somebody deciding whether to sign up has to be able to read
- * it before they do. Also required by Google's OAuth brand verification, which
- * is what stops the sign-in screen naming a Supabase project reference instead
- * of Sartho.
- */
-
-const LAST_UPDATED = "13 September 2026";
-
-/* Each item names the thing in the product, not a category of data. */
-const STORED: Array<{ what: string; why: string }> = [
-  {
-    what: "Your account",
-    why: "An email address, and a Google account identifier if you sign in with Google. Held by Supabase Auth, which is what signs you in.",
-  },
-  {
-    what: "Your Career Profile",
-    why: "The roles, evidence and target lanes you confirm. This is the material every match and every résumé is built from, and nothing is used until you have approved it.",
-  },
-  {
-    what: "Roles you save",
-    why: "The advert text, where it came from, its requirements once analysed, and the status you set. Saved so a score can be checked against the source it came from.",
-  },
-  {
-    what: "Résumés you build",
-    why: "Each version, with the evidence each line was drawn from, so a claim can always be traced back to something you approved.",
-  },
-  {
-    what: "Your settings",
-    why: "Search brief, notification preferences, and which integrations you have connected.",
-  },
-];
-
-const NOT_STORED: Array<{ what: string; detail: string }> = [
-  {
-    what: "The résumé file you upload",
-    detail: "It is read in the request that receives it and never written to disk or to storage. What is kept is the file's name, type and size, and how many roles and evidence items came out of it — not the document.",
-  },
-  {
-    what: "Applicant counts and hiring contacts",
-    detail: "Read off a job board at the moment the extension captures a role and shown to you once. Sartho keeps the advert, not a snapshot of how many people had applied on a Tuesday afternoon.",
-  },
-  {
-    what: "Anything in the shared advert cache",
-    detail: "Sartho keeps the job adverts a search returns so the next search is faster and cheaper. Those rows are keyed by the query — the role title and the market — and contain no record of who searched for them.",
-  },
-];
+const LAST_UPDATED = "25 September 2026";
 
 export default function PrivacyPage() {
   return (
-    <div className="page-stack product-page">
+    <div className="page-stack product-page trust-page">
       <ProductPageHeader
-        eyebrow="Sartho"
-        title="Privacy"
-        description={`What Sartho stores, what it sends elsewhere, and what it never keeps. Last updated ${LAST_UPDATED}.`}
+        eyebrow="WonderfulMinds · Sartho"
+        title="Privacy policy"
+        description={"How Sartho collects, uses and protects information. Last updated " + LAST_UPDATED + "."}
       />
 
       <section className="glass-card content-card">
-        <div className="card-header">
-          <div>
-            <h2 className="section-heading">What Sartho stores</h2>
-            <p className="section-subtitle">All of it against your account, and all of it deleted with your account.</p>
-          </div>
-        </div>
-        <dl className="policy-list">
-          {STORED.map((item) => (
-            <div className="policy-item" key={item.what}>
-              <dt>{item.what}</dt>
-              <dd>{item.why}</dd>
-            </div>
-          ))}
-        </dl>
-      </section>
-
-      <section className="glass-card content-card">
-        <div className="card-header">
-          <div>
-            <h2 className="section-heading">What Sartho does not keep</h2>
-            <p className="section-subtitle">Worth stating plainly, because each one is a decision rather than an oversight.</p>
-          </div>
-        </div>
-        <dl className="policy-list">
-          {NOT_STORED.map((item) => (
-            <div className="policy-item" key={item.what}>
-              <dt>{item.what}</dt>
-              <dd>{item.detail}</dd>
-            </div>
-          ))}
-        </dl>
-      </section>
-
-      <section className="glass-card content-card">
-        <div className="card-header">
-          <div>
-            <h2 className="section-heading">Where your data goes</h2>
-            <p className="section-subtitle">Sartho is not the only system that sees it, so here is every one that does.</p>
-          </div>
-        </div>
-        <dl className="policy-list">
-          <div className="policy-item">
-            <dt>Supabase</dt>
-            <dd>Hosts the database and signs you in. Everything in the list above lives there, with row-level security so one account cannot read another&rsquo;s rows.</dd>
-          </div>
-          <div className="policy-item">
-            <dt>Vercel</dt>
-            <dd>Runs and serves the application.</dd>
-          </div>
-          <div className="policy-item">
-            <dt>An AI provider</dt>
-            <dd>
-              Analysing a role and drafting a résumé send the job advert and the
-              evidence you have approved to a large language model. Nothing is
-              sent that you have not confirmed, and the model is never asked to
-              invent a fact about you — it is asked to assess what the advert
-              requires against what you can already evidence.
-            </dd>
-          </div>
-          <div className="policy-item">
-            <dt>Job search providers</dt>
-            <dd>
-              Searching sends the role titles and market from your brief to
-              Google for Jobs (through SerpApi) and to Adzuna. It does not send
-              your name, your evidence or your résumé.
-            </dd>
-          </div>
-          <div className="policy-item">
-            <dt>Google Drive, only if you connect it</dt>
-            <dd>
-              The integration asks for read-only access to your Drive and your
-              email address, so you can import a résumé you already have. It
-              reads the file you pick. You can disconnect it at any time in
-              Integrations, which discards the tokens.
-            </dd>
-          </div>
-        </dl>
-      </section>
-
-      <section className="glass-card content-card">
-        <div className="card-header">
-          <div>
-            <h2 className="section-heading">The browser extension</h2>
-            <p className="section-subtitle">It reads one tab, when you click it, and never on its own.</p>
-          </div>
-        </div>
+        <div className="card-header"><div>
+          <h2 className="section-heading">Who operates Sartho</h2>
+          <p className="section-subtitle">The product and the party responsible for this policy.</p>
+        </div></div>
         <p className="policy-prose">
-          The extension has no standing permission on any job board. Clicking its
-          icon is what grants access, to that tab only, for that moment — which
-          is why it cannot watch you browse. What it reads is the advert on the
-          page you are looking at, and it shows you exactly what it read before
-          anything is sent. A captured role waits in your browser&rsquo;s own
-          storage until Sartho confirms it has been saved, so signing in late or
-          reloading does not lose it.
+          Sartho is an AI Career Copilot operated under the <strong>WonderfulMinds</strong> brand.
+          WonderfulMinds determines how information collected through Sartho is used for the purposes
+          described in this policy. Privacy questions and data requests can be sent to{" "}
+          <a href="mailto:privacy@sartho.tech">privacy@sartho.tech</a>.
         </p>
       </section>
 
       <section className="glass-card content-card">
-        <div className="card-header">
-          <div>
-            <h2 className="section-heading">Your data is yours</h2>
-          </div>
-        </div>
+        <div className="card-header"><div>
+          <h2 className="section-heading">Information we collect</h2>
+          <p className="section-subtitle">Only what is needed to operate the career workflow and improve the service.</p>
+        </div></div>
+        <dl className="policy-list">
+          <div className="policy-item"><dt>Account and profile</dt><dd>Your email address, sign-in provider, name and profile information such as location and work authorisation when you provide them.</dd></div>
+          <div className="policy-item"><dt>Résumé and career information</dt><dd>The original résumé files you upload are kept in private storage so you can retrieve and manage them. Sartho also stores the career roles, evidence, strengths, target roles and résumé versions derived from or created with your information.</dd></div>
+          <div className="policy-item"><dt>Search and opportunity information</dt><dd>Your Search Brief, saved search results, job adverts, job analyses, application stages, outcomes and related preparation material.</dd></div>
+          <div className="policy-item"><dt>Connected services</dt><dd>Connection information and tokens for integrations you choose to enable, such as Google Drive. Access is limited to the permissions required by the integration and can be disconnected.</dd></div>
+          <div className="policy-item"><dt>Logged-in usage</dt><dd>Sartho measures when a signed-in account was last active, observed foreground-use time and visit count. It does not create a page-by-page browsing history for signed-in users.</dd></div>
+          <div className="policy-item"><dt>Optional pre-login analytics</dt><dd>If you allow analytics, Sartho stores a random browser identifier, first and last visit time, visit/page counts, first and last Sartho path, referring host and whether that browser later converted to an account. Sartho does not store an IP address or device fingerprint for this feature.</dd></div>
+        </dl>
+      </section>
+
+      <section className="glass-card content-card">
+        <div className="card-header"><div>
+          <h2 className="section-heading">Why we use it</h2>
+        </div></div>
+        <ul className="policy-bullets">
+          <li>To authenticate you and secure your account.</li>
+          <li>To build and maintain your Career Profile and Candidate Context.</li>
+          <li>To search for roles, assess opportunities and explain matches and gaps.</li>
+          <li>To create résumé and interview-preparation material grounded in information you supplied or approved.</li>
+          <li>To track application progress and learn from outcomes you record.</li>
+          <li>To operate, troubleshoot, secure and improve Sartho.</li>
+          <li>When you allow optional analytics, to understand how many visitors reach Sartho and how often those visits lead to accounts.</li>
+        </ul>
+      </section>
+
+      <section className="glass-card content-card" id="browser-storage">
+        <div className="card-header"><div>
+          <h2 className="section-heading">Cookies and browser storage</h2>
+          <p className="section-subtitle">Necessary storage and optional analytics are treated separately.</p>
+        </div></div>
         <p className="policy-prose">
-          You can edit or delete any role, any piece of evidence and any résumé
-          from inside Sartho. Deleting your account deletes everything attached
-          to it. To ask for a copy of your data, or to have it removed, email{" "}
-          <a href="mailto:privacy@sartho.tech">privacy@sartho.tech</a> and it
-          will be dealt with.
+          Sartho uses necessary browser/session storage for authentication, security, appearance and privacy
+          preferences. The service may not work correctly without this storage.
         </p>
         <p className="policy-prose">
-          Sartho does not sell your data, and does not share it with anybody
-          beyond the services named above.
+          Optional analytics is off until you choose <strong>Allow analytics</strong>. Only after that choice does
+          Sartho create the random anonymous visitor identifier used for pre-login analytics. Choosing
+          <strong> Necessary only</strong> prevents that tracking. You can reopen Cookie Preferences from the
+          footer at any time. Revoking analytics removes that browser&rsquo;s anonymous telemetry record and local
+          visitor identifier where the browser can still identify it.
+        </p>
+        <p className="policy-prose">Sartho does not use advertising cookies or third-party advertising trackers.</p>
+      </section>
+
+      <section className="glass-card content-card">
+        <div className="card-header"><div>
+          <h2 className="section-heading">AI processing</h2>
+        </div></div>
+        <p className="policy-prose">
+          Sartho uses configured AI providers for specific tasks such as résumé extraction, Career Direction,
+          semantic Job Context, requirement analysis, résumé drafting and interview preparation. The provider is
+          sent only the information needed for that task, which may include résumé content, approved career evidence
+          or a job advert. Sartho instructs these systems not to invent facts about you and applies deterministic
+          grounding checks where the workflow requires factual evidence.
         </p>
       </section>
 
-      <p className="policy-footer">
-        <Link href="/terms">Terms of service</Link>
-      </p>
+      <section className="glass-card content-card">
+        <div className="card-header"><div>
+          <h2 className="section-heading">Service providers and international processing</h2>
+        </div></div>
+        <p className="policy-prose">
+          Sartho relies on service providers including Supabase for authentication/database/storage, Vercel for
+          application hosting, configured AI providers for AI workloads, and job-search providers such as Google
+          for Jobs through SerpApi and Adzuna. Connected services such as Google are used only when you choose to
+          connect them. These providers may process information in countries different from yours.
+        </p>
+        <p className="policy-prose">
+          Job-search queries send search terms and market information to job providers; they do not need your résumé
+          or full Career Profile to perform the search.
+        </p>
+      </section>
+
+      <section className="glass-card content-card">
+        <div className="card-header"><div><h2 className="section-heading">Retention and deletion</h2></div></div>
+        <p className="policy-prose">
+          Account data is retained while your Sartho account and its associated career records are needed to provide
+          the service. You can delete your data or delete your account from Sartho&rsquo;s account controls.
+          Account deletion removes the career records and stored résumé uploads associated with the account.
+        </p>
+        <p className="policy-prose">
+          Anonymous analytics is separate from account data. If the browser that created the anonymous identifier
+          revokes analytics consent, Sartho attempts to delete the matching anonymous telemetry record immediately.
+        </p>
+      </section>
+
+      <section className="glass-card content-card">
+        <div className="card-header"><div><h2 className="section-heading">Your choices and rights</h2></div></div>
+        <ul className="policy-bullets">
+          <li>Review and edit the career information held in your account.</li>
+          <li>Disconnect optional integrations.</li>
+          <li>Decline or later revoke optional analytics.</li>
+          <li>Delete your career data while keeping the login, or delete the account entirely.</li>
+          <li>Ask for access, correction, deletion or other privacy assistance by contacting us.</li>
+        </ul>
+        <p className="policy-prose">
+          Sartho does not sell personal information to advertisers and does not use your career information to
+          serve third-party advertising.
+        </p>
+      </section>
+
+      <section className="glass-card content-card">
+        <div className="card-header"><div><h2 className="section-heading">Contact</h2></div></div>
+        <p className="policy-prose">
+          Privacy and data requests: <a href="mailto:privacy@sartho.tech">privacy@sartho.tech</a>.<br />
+          General enquiries: <a href="mailto:hello@sartho.tech">hello@sartho.tech</a>.
+        </p>
+      </section>
+
+      <p className="policy-footer"><Link href="/terms">Terms of service</Link> · <Link href="/contact">Contact us</Link></p>
     </div>
   );
 }

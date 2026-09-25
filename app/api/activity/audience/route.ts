@@ -68,3 +68,26 @@ export async function POST(request: Request) {
 
   return new NextResponse(null, { status: 204 });
 }
+
+
+export async function DELETE(request: Request) {
+  const parsed = z.object({ visitorId: z.string().uuid() }).safeParse(await request.json().catch(() => null));
+  if (!parsed.success) return new NextResponse(null, { status: 204 });
+
+  let admin;
+  try {
+    admin = createAdminClient();
+  } catch {
+    return new NextResponse(null, { status: 204 });
+  }
+
+  const { error } = await admin
+    .from("anonymous_visitors")
+    .delete()
+    .eq("visitor_id", parsed.data.visitorId);
+
+  if (!missingTable(error) && error) {
+    console.warn("Unable to revoke anonymous audience telemetry", { code: error.code });
+  }
+  return new NextResponse(null, { status: 204 });
+}
