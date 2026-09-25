@@ -93,13 +93,38 @@ export function titleSubject(title: string): string[] {
     .filter((word) => word.length > 1 && !NOISE.has(word) && !seniorityWords.has(word));
 }
 
+/*
+ * Words that describe the role shape rather than the specialism. They are useful
+ * for finding a comparable title, but they must not be allowed to erase the
+ * subject matter around them. "Project Manager" is a role shape; SAP/FICO,
+ * ServiceNow/ITSM, AML/KYC and cybersecurity are the context that tells us
+ * whether two Project Manager roles are actually comparable.
+ */
+const ROLE_SHAPE_WORDS = new Set([
+  "project", "program", "programme", "portfolio", "delivery", "implementation",
+  "solution", "solutions", "manager", "management", "lead", "leader", "director",
+  "head", "consultant", "consulting", "analyst", "architect", "engineer",
+  "specialist", "owner", "officer", "coordinator", "principal", "associate",
+]);
+
+function specialistTerms(subject: string[]): string[] {
+  return subject.filter((word) => !ROLE_SHAPE_WORDS.has(word));
+}
+
 function subjectOverlap(job: string[], held: string[]): number {
   if (!job.length || !held.length) return 0;
+
+  /*
+   * Jaccard similarity makes unmatched qualifiers count on both sides.
+   * The previous implementation divided by the shorter title, which made
+   * "SAP FICO Project Manager & Solution Architect" a 100% title match for
+   * "Project Manager" because the one surviving generic word was present.
+   */
+  const jobSet = new Set(job);
   const heldSet = new Set(held);
-  const hits = job.filter((word) => heldSet.has(word)).length;
-  // Measured against the shorter side, so "Analyst" against "Business Analyst"
-  // is a strong partial match rather than a weak one.
-  return hits / Math.min(job.length, held.length);
+  const hits = [...jobSet].filter((word) => heldSet.has(word)).length;
+  const union = new Set([...jobSet, ...heldSet]).size;
+  return union ? hits / union : 0;
 }
 
 /**
@@ -154,12 +179,34 @@ export function scoreTitleFit(
   const jobLevel = seniorityOf(jobTitle);
   if (!jobSubject.length) return { score: 0, closest: null, closestIsHeld: false, seniorityGap: 0 };
 
+  /*
+   * Build a profile-level specialist context from every held and targeted title.
+   * This is deliberately data-driven: there is no "ban SAP" list. If the job
+   * carries specialist terms and the person's own titles carry different
+   * specialist terms, generic role-shape overlap is not allowed to dominate.
+   */
+  const candidateSpecialists = new Set(
+    [...heldTitles, ...targetTitles].flatMap((title) => specialistTerms(titleSubject(title))),
+  );
+  const jobSpecialists = specialistTerms(jobSubject);
+  const specialistConflict = jobSpecialists.length > 0
+    && candidateSpecialists.size > 0
+    && !jobSpecialists.some((word) => candidateSpecialists.has(word));
+
   let best = { score: 0, closest: null as string | null, level: jobLevel, held: false };
 
   const consider = (title: string, weight: number, held: boolean) => {
     const overlap = subjectOverlap(jobSubject, titleSubject(title));
     if (overlap <= 0) return;
-    const score = Math.round(overlap * 100 * weight);
+
+    let score = Math.round(overlap * 100 * weight);
+    /*
+     * A contradictory specialist context is a hard ceiling, not a small
+     * deduction. Other evidence can still make the opportunity worth reading,
+     * but title similarity alone cannot manufacture a high match.
+     */
+    if (specialistConflict) score = Math.min(score, 20);
+
     if (score > best.score) best = { score, closest: title, level: seniorityOf(title), held };
   };
 
