@@ -11,6 +11,11 @@ import { skillsForRole } from "@/lib/resume/skills";
 import { RESUME_WRITING_RULES } from "@/lib/resume/writing";
 import type { RuleAnalysis } from "@/lib/types";
 import { resumeVersionName, saveResumeDraft } from "@/lib/resume/save";
+import {
+  createWorkflowTraceId,
+  logWorkflowTrace,
+  workflowTraceFromMetadata,
+} from "@/lib/observability/workflow-trace";
 
 // Same reasoning as the deep-analysis route: the declared budget has to cover
 // the 90s the provider adapter is allowed to wait, or the host kills the
@@ -193,6 +198,12 @@ export async function POST(
   if (!evidenceResult.data?.length) {
     return NextResponse.json({ error: "No approved résumé-safe evidence is available." }, { status: 400 });
   }
+
+  const workflowTraceId =
+    workflowTraceFromMetadata(jobResult.data.rule_analysis)
+    ?? workflowTraceFromMetadata(jobResult.data.deep_analysis_summary)
+    ?? createWorkflowTraceId();
+  logWorkflowTrace("resume_generation.started", workflowTraceId, { jobId: id });
 
   type CareerRole = {
     id: string;
@@ -435,6 +446,11 @@ export async function POST(
       /* Whether this draft started from the person's own document or from the evidence. */
       tailoredFromMaster: Boolean(masterText),
       signal,
+      workflowTraceId,
+    });
+    logWorkflowTrace("resume_generation.completed", workflowTraceId, {
+      jobId: id,
+      applicationSaved: Boolean(applicationId),
     });
   } catch (caught) {
     console.error("Résumé drafting failed", caught);
