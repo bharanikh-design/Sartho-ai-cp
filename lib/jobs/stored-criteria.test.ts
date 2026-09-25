@@ -114,6 +114,9 @@ describe("normaliseCriteria", () => {
       semanticRescued: 3,
       semanticExcluded: 4,
       familyWarnings: 5,
+      semanticChunksAttempted: 4,
+      semanticChunksFailed: 1,
+      semanticJobsFailed: 3,
     });
 
     expect(criteria.candidateContextFingerprint).toBe("context-fingerprint-123");
@@ -124,6 +127,9 @@ describe("normaliseCriteria", () => {
     expect(criteria.semanticRescued).toBe(3);
     expect(criteria.semanticExcluded).toBe(4);
     expect(criteria.familyWarnings).toBe(5);
+    expect(criteria.semanticChunksAttempted).toBe(4);
+    expect(criteria.semanticChunksFailed).toBe(1);
+    expect(criteria.semanticJobsFailed).toBe(3);
   });
 });
 
