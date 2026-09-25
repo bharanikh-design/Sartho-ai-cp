@@ -20,7 +20,7 @@ export async function rescoreSavedJobs(
   try {
     const jobsResult = await supabase
       .from("jobs")
-      .select("id,title,raw_description,status")
+      .select("id,title,raw_description,status,rule_analysis")
       .eq("user_id", userId);
 
     const jobs = (jobsResult.data ?? []).filter((job) => RESCORABLE_STATUSES.has(job.status));
@@ -54,11 +54,22 @@ export async function rescoreSavedJobs(
     for (const job of jobs) {
       const scored = evaluateOpportunity(conductor, job.title, job.raw_description);
 
+      const previous = job.rule_analysis as import("@/lib/types").RuleAnalysis | null;
+      const ruleAnalysis = {
+        ...scored.analysis,
+        /*
+         * Job meaning survives candidate changes. Candidate-specific semantic
+         * fit does not: it was produced against an older Candidate Context and
+         * must be re-established by Search/Preview/Save/Deep Analysis.
+         */
+        ...(previous?.semanticContext ? { semanticContext: previous.semanticContext } : {}),
+      };
+
       await supabase
         .from("jobs")
         .update({
           recommendation: scored.recommendation,
-          rule_analysis: scored.analysis,
+          rule_analysis: ruleAnalysis,
           technical_heaviness: scored.evidenceBacking,
           overall_match: scored.overallMatch,
           updated_at: now,
