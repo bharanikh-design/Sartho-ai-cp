@@ -207,3 +207,29 @@ Do not reintroduce:
 - unbounded model calls across the entire provider result set
 
 Any future search optimization must preserve these invariants or update this contract and its Golden Search tests in the same PR.
+
+
+## Semantic resilience invariant
+
+Semantic Job Context is not allowed to be all-or-nothing.
+
+- the bounded shortlist is evaluated in small chunks;
+- at most two semantic chunks run concurrently;
+- one failed/slow chunk must not erase successful chunks;
+- failed jobs are recorded explicitly in search diagnostics;
+- if a job was selected into the bounded semantic shortlist and its semantic chunk fails, it may degrade to **Possible** rather than disappear;
+- deterministic specialist conflicts remain **Outside** even during semantic outage;
+- jobs outside the bounded semantic shortlist do not get promoted by outage fallback.
+
+A provider outage must never turn a healthy retrieved market into a one-result page solely because semantic assessment failed.
+
+## Retrieval completion invariant
+
+Raw result count alone is not enough to stop provider retrieval.
+
+Before the search may stop with `enough_results`:
+
+1. every explicit target role must have run at least once; and
+2. every bounded semantic market-title expansion must have run at least once.
+
+Aggregator company/title combinations may remain after that point because named-company direct portals run independently and the broad role/semantic market coverage is already complete.

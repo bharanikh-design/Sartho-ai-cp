@@ -10,6 +10,8 @@ export type RelevanceCandidate = {
   requirementCoverage: number;
   applyDirect: boolean;
   familyWithinReach: boolean;
+  specialistConflict: boolean;
+  semanticAttempted: boolean;
 };
 
 export type RelevanceDecision = {
@@ -67,9 +69,38 @@ export function decideSearchRelevance(
     }
   }
 
-  // No/unclear semantic answer: preserve the old conservative safety boundary.
-  // A role with weak title/family vocabulary needs semantic confirmation before
-  // it may be rescued into the visible feed.
+  /*
+   * A deterministic specialist contradiction remains a safety boundary during
+   * semantic failure. The outage fallback must never turn "SAP FICO" into a
+   * plausible ServiceNow role merely because the model call did not answer.
+   */
+  if (candidate.specialistConflict) {
+    return {
+      tier: "outside",
+      reason: "The role carries a specialist context that conflicts with the candidate's established direction.",
+      semanticUsed: false,
+      rescued: false,
+    };
+  }
+
+  /*
+   * Graceful degradation for the bounded semantic shortlist.
+   *
+   * If Sartho deliberately selected this job for semantic review but that
+   * particular chunk failed, retain it as Possible when the deterministic
+   * evidence is at least plausible. This is bounded by semanticAttempted, so a
+   * provider outage cannot promote the whole raw market into the visible feed.
+   */
+  if (candidate.semanticAttempted && (!candidate.familyWithinReach || candidate.titleFit < 35)) {
+    return {
+      tier: "possible",
+      reason: "Semantic review was temporarily unavailable; retained as a bounded possible match because it was selected among the strongest candidates for deeper review.",
+      semanticUsed: false,
+      rescued: true,
+    };
+  }
+
+  // Jobs outside the bounded semantic shortlist keep the conservative fallback.
   if (!candidate.familyWithinReach || candidate.titleFit < 35) {
     return {
       tier: "outside",

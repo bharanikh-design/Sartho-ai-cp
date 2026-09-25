@@ -19,6 +19,8 @@ function candidate(
     requirementCoverage: 65,
     applyDirect: false,
     familyWithinReach: false,
+    specialistConflict: false,
+    semanticAttempted: true,
     ...overrides,
   };
 }
@@ -62,6 +64,36 @@ describe("Search Relevance V2", () => {
 
     expect(result.tier).toBe("strong");
     expect(result.rescued).toBe(true);
+  });
+
+  it("keeps a bounded semantic candidate visible when the semantic layer is unavailable", () => {
+    const result = decideSearchRelevance(
+      candidate("semantic-timeout", {
+        titleFit: 4,
+        familyWithinReach: false,
+        recommendation: "skip",
+        semanticAttempted: true,
+      }),
+    );
+
+    expect(result.tier).toBe("possible");
+    expect(result.rescued).toBe(true);
+    expect(result.semanticUsed).toBe(false);
+  });
+
+  it("never uses outage fallback to rescue a deterministic specialist conflict", () => {
+    const result = decideSearchRelevance(
+      candidate("sap-outage", {
+        specialistConflict: true,
+        semanticAttempted: true,
+        titleFit: 20,
+        requirementCoverage: 90,
+        overallMatch: 35,
+      }),
+    );
+
+    expect(result.tier).toBe("outside");
+    expect(result.rescued).toBe(false);
   });
 
   it("does not rescue a high-confidence specialist conflict", () => {
