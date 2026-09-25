@@ -1,47 +1,20 @@
-import { PlatformHero } from "@/components/platform-hero";
-import { ProductCarousel } from "@/components/landing/product-carousel";
 import { FrontDoor } from "@/components/landing/front-door";
 
 /*
- * The front door: sign in where you land.
+ * The front door, and only the front door.
  *
- * This page has been rebuilt more than once and each early attempt put something
- * in front of the thing people came for. So there is no screen in front of
- * anything: Google, GitHub and Apple are on the page you arrive at, and
- * everything explaining the product is underneath them for whoever wants it.
+ * The signed-out home is the hero — brand, promise, what the product does in
+ * three lines, and the way in — with the global site footer beneath it. The
+ * longer explainer that used to sit under it (product carousel, feature grid,
+ * the "what it will not do" panel) has been removed at the product owner's
+ * request.
  *
- * That "underneath" is not decoration. Google's OAuth brand verification rejects
- * an application whose home page is a login form and nothing else — "your
- * homepage is behind a login page" is the exact refusal that sent this page
- * through three rewrites. A page that signs you in and also says what it is
- * satisfies both, which is what should have been built first.
+ * The page is still not a bare login form, which is what Google's OAuth brand
+ * verification rejects: the hero states what Sartho is (headline, lead and the
+ * three capability lines) and the footer carries Privacy and Terms. If brand
+ * verification ever asks for more prose again, the explainer sections are in
+ * git history and drop straight back in beneath <FrontDoor />.
  */
 export function SignedOutHome() {
-  return (
-    <div className="landing">
-      <FrontDoor />
-
-      <div className="landing-body" id="what-it-does">
-        <ProductCarousel />
-
-        <PlatformHero signedOut />
-
-        <section className="glass-card content-card landing-limit">
-          <div className="card-header">
-            <div>
-              <h2 className="section-heading">What it will not do</h2>
-              <p className="section-subtitle">The constraint the whole product is built around.</p>
-            </div>
-          </div>
-          <p className="policy-prose">
-            It will not invent a qualification, inflate a figure, or describe you
-            as something you have not evidenced. A requirement you cannot support
-            is reported as a gap rather than quietly filled in. That is a
-            deliberate limit: a tool that writes you into a job you cannot do is
-            not helping, it is arranging an interview you cannot survive.
-          </p>
-        </section>
-      </div>
-    </div>
-  );
+  return <FrontDoor />;
 }

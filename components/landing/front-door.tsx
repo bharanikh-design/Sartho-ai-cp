@@ -62,7 +62,7 @@ export function FrontDoor() {
               and helps you get there with confidence.
             </p>
 
-            <ul className="fd-features">
+            <ul className="fd-features" id="what-it-does">
               {FEATURES.map(({ title, sub, icon: Icon }) => (
                 <li className="fd-feature" key={title}>
                   <span className="fd-feature-icon" aria-hidden="true">
