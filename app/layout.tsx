@@ -20,6 +20,7 @@ import "./ai-career-workspaces.css";
 import "./product-system.css";
 import "./landing.css";
 import "./welcome.css";
+import "./trust.css";
 /*
  * Last import wins. The monochrome layer redefines the palette tokens as pure
  * black/white and flattens every gradient, for both data-theme="dark" and
@@ -28,6 +29,8 @@ import "./welcome.css";
 import "./monochrome.css";
 import { AppShell } from "@/components/app-shell";
 import { AudienceTelemetry } from "@/components/audience-telemetry";
+import { PrivacyPreferences } from "@/components/privacy-preferences";
+import { SiteFooter } from "@/components/site-footer";
 import { siteMetadata } from "@/lib/site-metadata";
 
 /*
@@ -56,6 +59,8 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
         */}
         
         <AppShell>{children}</AppShell>
+        <SiteFooter />
+        <PrivacyPreferences />
       </body>
     </html>
   );
