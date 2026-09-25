@@ -21,6 +21,17 @@ export function DeepAnalysisPanel({
     setRunning(true);
     setError(null);
     try {
+      void fetch("/api/candidate/interactions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          eventType: "deep_analysis_requested",
+          source: "pipeline",
+          jobId,
+        }),
+        keepalive: true,
+      }).catch(() => undefined);
+
       const response = await fetch(`/api/jobs/${jobId}/deep-analysis`, { method: "POST" });
       const result = await response.json() as { error?: string };
       if (!response.ok) throw new Error(result.error ?? "Deep analysis failed.");
