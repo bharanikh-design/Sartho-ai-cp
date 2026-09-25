@@ -46,9 +46,9 @@ varying float v_tw;
 const float PI = 3.14159265;
 
 void main() {
-  // The particle travels down the spine over time and wraps, so the ribbon is a
-  // current rather than a fixed constellation.
-  float t = fract(a_t + u_time * u_flow * a_speed * 0.05);
+  // The particle rises up the spine over time and wraps, so the ribbon reads as
+  // a current lifting rather than a fixed constellation — upward for hope.
+  float t = fract(a_t - u_time * u_flow * a_speed * 0.05);
 
   // Spine — the double sine mirrored from ribbonSpine() in ribbon-field.ts.
   float sway = sin(u_time * 0.18) * 0.5 + 0.5;

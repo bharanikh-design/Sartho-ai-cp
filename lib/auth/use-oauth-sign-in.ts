@@ -15,9 +15,11 @@ import { AUTH_ORIGIN, isAllowedAuthOrigin, resolveAuthOrigin } from "@/lib/site"
  * them through this hook. Only the presentation differs.
  *
  * Supabase names the LinkedIn provider "linkedin_oidc"; the bare "linkedin" id
- * is the retired OAuth 2.0 one and is rejected.
+ * is the retired OAuth 2.0 one and is rejected. LinkedIn OIDC must be enabled in
+ * the Supabase dashboard for the middle button to complete — until it is, a
+ * click returns "provider is not enabled", which friendlyAuthMessage explains.
  */
-export const PROVIDERS = ["google", "github", "apple"] as const;
+export const PROVIDERS = ["google", "linkedin_oidc", "apple"] as const;
 export type Provider = (typeof PROVIDERS)[number];
 
 export function friendlyAuthMessage(message: string): string {

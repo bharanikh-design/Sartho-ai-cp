@@ -1,8 +1,8 @@
 /*
  * The provider marks, kept as their real brand colours.
  *
- * Google's four-colour mark and the black GitHub/Apple glyphs are recognised by
- * shape and colour; a monochrome Google 'G' reads as a placeholder, not as
+ * Google's four-colour mark, LinkedIn's blue and the Apple glyph are recognised
+ * by shape and colour; a monochrome Google 'G' reads as a placeholder, not as
  * "sign in with Google". These are the only spots of brand colour the front
  * door borrows, and they are deliberately left true rather than tinted to match
  * the page.
@@ -19,10 +19,13 @@ export function GoogleIcon() {
   );
 }
 
-export function GitHubIcon() {
+export function LinkedInIcon() {
   return (
     <svg width="21" height="21" viewBox="0 0 24 24" aria-hidden="true">
-      <path fill="currentColor" d="M12 .7a11.5 11.5 0 0 0-3.64 22.41c.58.1.79-.25.79-.56v-2.23c-3.22.7-3.9-1.37-3.9-1.37-.52-1.34-1.28-1.7-1.28-1.7-1.05-.72.08-.71.08-.71 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.57-.29-5.27-1.29-5.27-5.73 0-1.27.45-2.3 1.19-3.11-.12-.29-.52-1.47.11-3.07 0 0 .97-.31 3.16 1.19a10.9 10.9 0 0 1 5.76 0c2.2-1.5 3.16-1.19 3.16-1.19.63 1.6.23 2.78.11 3.07.74.81 1.19 1.84 1.19 3.11 0 4.45-2.71 5.43-5.29 5.72.42.36.79 1.07.79 2.16v3.2c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .7Z" />
+      <path
+        fill="#0A66C2"
+        d="M22.22 0H1.77C.79 0 0 .77 0 1.72v20.56C0 23.23.79 24 1.77 24h20.45c.98 0 1.78-.77 1.78-1.72V1.72C24 .77 23.2 0 22.22 0ZM7.12 20.45H3.56V9h3.56v11.45ZM5.34 7.43a2.06 2.06 0 1 1 0-4.12 2.06 2.06 0 0 1 0 4.12Zm15.11 13.02h-3.56v-5.57c0-1.33-.02-3.04-1.85-3.04-1.85 0-2.13 1.45-2.13 2.94v5.67H9.35V9h3.41v1.56h.05c.48-.9 1.63-1.85 3.36-1.85 3.6 0 4.27 2.37 4.27 5.45v6.29Z"
+      />
     </svg>
   );
 }
@@ -37,6 +40,6 @@ export function AppleIcon() {
 
 export const PROVIDER_META = {
   google: { label: "Google", Icon: GoogleIcon },
-  github: { label: "GitHub", Icon: GitHubIcon },
+  linkedin_oidc: { label: "LinkedIn", Icon: LinkedInIcon },
   apple: { label: "Apple", Icon: AppleIcon },
 } as const;
