@@ -36,11 +36,11 @@ export async function assembleCandidateContext(
  * learning loop can compare snapshots, append behavioural affinity and audit
  * exactly which source changed the candidate model.
  */
-export async function snapshotCandidateContext(
+export async function persistCandidateContextSnapshot(
   supabase: SupabaseClient,
   userId: string,
+  context: CandidateContext,
 ): Promise<{ context: CandidateContext; fingerprint: string; inserted: boolean }> {
-  const context = await assembleCandidateContext(supabase, userId);
   const fingerprint = sourceFingerprint(context);
 
   const { data: existing, error: readError } = await supabase
@@ -63,6 +63,14 @@ export async function snapshotCandidateContext(
   if (error) throw error;
 
   return { context, fingerprint, inserted: true };
+}
+
+export async function snapshotCandidateContext(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<{ context: CandidateContext; fingerprint: string; inserted: boolean }> {
+  const context = await assembleCandidateContext(supabase, userId);
+  return persistCandidateContextSnapshot(supabase, userId, context);
 }
 
 export { sourceFingerprint };
