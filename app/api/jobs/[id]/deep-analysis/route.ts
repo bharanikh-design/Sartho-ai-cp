@@ -158,19 +158,18 @@ export async function POST(
     }, { status: 503 });
   }
 
-  const quota = await checkAiQuota(supabase, "deep_analysis");
-  if (!quota.allowed) {
-    if (durableOperationId) {
-      await failDurableAiOperation(supabase, user.id, durableOperationId, new Error("AI quota unavailable."));
-    }
-    return aiQuotaResponse(quota);
-  }
-
-  const conductor = await prepareCareerConductor(supabase, user.id);
-
-  await supabase.from("jobs").update({ deep_analysis_status: "processing" }).eq("id", id).eq("user_id", user.id);
-
   try {
+    const quota = await checkAiQuota(supabase, "deep_analysis");
+    if (!quota.allowed) {
+      if (durableOperationId) {
+        await failDurableAiOperation(supabase, user.id, durableOperationId, new Error("AI quota unavailable."));
+      }
+      return aiQuotaResponse(quota);
+    }
+
+    await supabase.from("jobs").update({ deep_analysis_status: "processing" }).eq("id", id).eq("user_id", user.id);
+    const conductor = await prepareCareerConductor(supabase, user.id);
+
     const raw = await generateStructuredJson({
       workload: "quality",
       safetyIdentifier: createSafetyIdentifier(user.id),
