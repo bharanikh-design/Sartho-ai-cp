@@ -10,6 +10,11 @@ import {
 import type { JobStatus } from "@/lib/types";
 import { recordCandidateInteraction } from "@/lib/data/interaction-memory";
 import type { InteractionEventType } from "@/lib/context/interaction-memory";
+import {
+  createWorkflowTraceId,
+  logWorkflowTrace,
+  workflowTraceFromMetadata,
+} from "@/lib/observability/workflow-trace";
 
 const JOB_STATUSES = [
   "saved",
@@ -60,7 +65,7 @@ export async function PATCH(
    */
   const { data: current, error: currentError } = await supabase
     .from("jobs")
-    .select("status")
+    .select("status,rule_analysis,deep_analysis_summary")
     .eq("id", id)
     .eq("user_id", user.id)
     .maybeSingle();
@@ -70,6 +75,11 @@ export async function PATCH(
     return NextResponse.json({ error: "Sartho could not update this opportunity." }, { status: 500 });
   }
   if (!current) return NextResponse.json({ error: "Opportunity not found." }, { status: 404 });
+
+  const workflowTraceId =
+    workflowTraceFromMetadata(current.rule_analysis)
+    ?? workflowTraceFromMetadata(current.deep_analysis_summary)
+    ?? createWorkflowTraceId();
 
   const { data: job, error: jobError } = await supabase
     .from("jobs")
@@ -162,8 +172,9 @@ export async function PATCH(
           ? {
               previousStatus: current.status,
               outcomeReason: outcomeReason ?? null,
+              workflowTraceId,
             }
-          : { previousStatus: current.status },
+          : { previousStatus: current.status, workflowTraceId },
       });
     } catch (caught) {
       // The user's pipeline state is authoritative; learning may never block it.
@@ -171,7 +182,15 @@ export async function PATCH(
     }
   }
 
-  return NextResponse.json({ job });
+  if (current.status !== status) {
+    logWorkflowTrace("pipeline.status_changed", workflowTraceId, {
+      jobId: id,
+      from: current.status,
+      to: status,
+    });
+  }
+
+  return NextResponse.json({ job, workflowTraceId });
 }
 
 export async function DELETE(
