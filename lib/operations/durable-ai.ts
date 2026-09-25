@@ -45,7 +45,7 @@ async function readExisting(
   userId: string,
   operation: DurableAiOperationKind,
   requestId: string,
-): Promise<DurableAiOperationRow> {
+): Promise<DurableAiOperationRow | null> {
   const { data, error } = await supabase
     .from("durable_ai_operations")
     .select("*")
@@ -55,8 +55,28 @@ async function readExisting(
     .maybeSingle();
 
   if (error) throw error;
-  if (!data) throw new Error("Durable AI operation disappeared after idempotency conflict.");
-  return rowFrom(data);
+  return data ? rowFrom(data) : null;
+}
+
+async function readRunningForResource(
+  supabase: SupabaseClient,
+  userId: string,
+  operation: DurableAiOperationKind,
+  resourceId: string,
+): Promise<DurableAiOperationRow | null> {
+  const { data, error } = await supabase
+    .from("durable_ai_operations")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("operation", operation)
+    .eq("resource_id", resourceId)
+    .eq("status", "running")
+    .order("started_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data ? rowFrom(data) : null;
 }
 
 export async function beginDurableAiOperation(
@@ -102,6 +122,39 @@ export async function beginDurableAiOperation(
   }
 
   let existing = await readExisting(supabase, userId, input.operation, input.requestId);
+
+  if (!existing && input.resourceId) {
+    const running = await readRunningForResource(supabase, userId, input.operation, input.resourceId);
+    if (running) {
+      const runningDisposition = classifyExistingOperation(running);
+      if (runningDisposition === "already_running") {
+        return { state: "already_running", row: running };
+      }
+
+      const staleFinishedAt = new Date().toISOString();
+      const { error: staleError } = await supabase
+        .from("durable_ai_operations")
+        .update({
+          status: "failed",
+          finished_at: staleFinishedAt,
+          updated_at: staleFinishedAt,
+          last_error_code: "stale_reclaimed",
+          last_error_message: "A later request reclaimed this operation after its running lease expired.",
+        })
+        .eq("id", running.id)
+        .eq("user_id", userId)
+        .eq("status", "running")
+        .eq("attempt_count", running.attempt_count);
+
+      if (staleError) throw staleError;
+      return beginDurableAiOperation(supabase, userId, input);
+    }
+  }
+
+  if (!existing) {
+    throw inserted.error ?? new Error("Durable AI operation conflict could not be resolved.");
+  }
+
   const disposition = classifyExistingOperation(existing);
 
   if (disposition === "already_succeeded") {
@@ -135,12 +188,20 @@ export async function beginDurableAiOperation(
     .select("*")
     .maybeSingle();
 
+  if (reclaimed.error?.code === "23505" && input.resourceId) {
+    const running = await readRunningForResource(supabase, userId, input.operation, input.resourceId);
+    if (running) return { state: "already_running", row: running };
+  }
   if (reclaimed.error) throw reclaimed.error;
   if (reclaimed.data) {
     return { state: "started", row: rowFrom(reclaimed.data) };
   }
 
   existing = await readExisting(supabase, userId, input.operation, input.requestId);
+  if (!existing && input.resourceId) {
+    existing = await readRunningForResource(supabase, userId, input.operation, input.resourceId);
+  }
+  if (!existing) throw new Error("Durable AI operation could not be recovered after a retry race.");
   const afterRace = classifyExistingOperation(existing);
   return {
     state: afterRace === "already_succeeded" ? "already_succeeded" : "already_running",
