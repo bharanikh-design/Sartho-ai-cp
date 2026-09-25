@@ -2,7 +2,6 @@ import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { loadCandidateWorkflowContext } from "@/lib/context/candidate-workflow";
 import {
-  buildCandidateContext,
   CANDIDATE_CONTEXT_SCHEMA_VERSION,
   type CandidateContext,
 } from "@/lib/context/candidate-context";
