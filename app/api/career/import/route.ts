@@ -335,7 +335,7 @@ export async function POST(request: Request) {
      * existing open opportunities must be re-evaluated through the same
      * conductor that Search/Preview/Save use.
      */
-    await rescoreSavedJobs(supabase, userId);
+    await rescoreSavedJobs(supabase, userId, { invalidateDeepAnalysis: true });
 
     const counts = (applied ?? {}) as Record<string, number>;
     send({
