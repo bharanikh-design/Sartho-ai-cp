@@ -89,6 +89,37 @@ export function JobSearchPanel({
   const PAGE_SIZE = 8;
   const SHORTLIST_LIMIT = 16;
 
+  async function remember(
+    eventType: "search_result_viewed" | "search_result_saved",
+    result: SearchResult,
+    jobId?: string,
+  ) {
+    try {
+      await fetch("/api/candidate/interactions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          eventType,
+          source: "search",
+          ...(jobId ? { jobId } : {
+            title: result.title,
+            employer: result.employer,
+            location: result.location,
+            sourceUrl: result.url,
+          }),
+          metadata: {
+            provider: result.source,
+            recommendation: result.recommendation,
+            overallMatch: result.overallMatch,
+          },
+        }),
+        keepalive: true,
+      });
+    } catch {
+      // Learning must never block search, save or navigation.
+    }
+  }
+
   async function runSearch() {
     setStatus("loading");
     setError(null);
@@ -162,9 +193,10 @@ export function JobSearchPanel({
           description: result.description,
         }),
       });
-      const data = await response.json() as { job?: unknown; error?: string };
+      const data = await response.json() as { job?: { id?: string }; error?: string };
       if (!response.ok || !data.job) throw new Error(data.error ?? "Could not save this role.");
       setSavedUrls((urls) => [...urls, result.url]);
+      if (data.job.id) void remember("search_result_saved", result, data.job.id);
     } catch (caught) {
       setSaveError(caught instanceof Error ? caught.message : "Could not save this role.");
     } finally {
@@ -263,7 +295,16 @@ export function JobSearchPanel({
               {savingUrl === result.url ? "Saving…" : "Save to pipeline"}
             </button>
           )}
-          <a href={result.url} target="_blank" rel="noreferrer" className="secondary-button" style={{ whiteSpace: "nowrap", textAlign: "center" }}>View ↗</a>
+          <a
+            href={result.url}
+            target="_blank"
+            rel="noreferrer"
+            className="secondary-button"
+            style={{ whiteSpace: "nowrap", textAlign: "center" }}
+            onClick={() => { void remember("search_result_viewed", result); }}
+          >
+            View ↗
+          </a>
         </div>
       </article>
     );
