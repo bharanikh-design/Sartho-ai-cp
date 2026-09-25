@@ -7,6 +7,8 @@ import {
   CANDIDATE_CONTEXT_SCHEMA_VERSION,
   type CandidateContext,
 } from "@/lib/context/candidate-context";
+import { deriveLearnedAffinity } from "@/lib/context/interaction-memory";
+import { getCandidateInteractions } from "@/lib/data/interaction-memory";
 
 function sourceFingerprint(context: CandidateContext): string {
   /*
@@ -27,11 +29,13 @@ export async function assembleCandidateContext(
   supabase: SupabaseClient,
   userId: string,
 ): Promise<CandidateContext> {
-  const [{ profile, roles, evidence, lanes }, search] = await Promise.all([
+  const [{ profile, roles, evidence, lanes }, search, interactions] = await Promise.all([
     getCareerWorkspace(supabase, userId),
     getSearchPreferences(supabase, userId),
+    getCandidateInteractions(supabase, userId),
   ]);
-  return buildCandidateContext({ profile, roles, evidence, lanes, search });
+  const learnedAffinity = deriveLearnedAffinity(interactions);
+  return buildCandidateContext({ profile, roles, evidence, lanes, search, learnedAffinity });
 }
 
 /**
