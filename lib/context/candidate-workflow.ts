@@ -36,3 +36,37 @@ export async function loadCandidateWorkflowContext(
 
   return { candidateContext, career, search };
 }
+
+
+export type SearchIntentHandoff = {
+  roles: string[];
+  countries: string[];
+  locations: string[];
+  companies: string[];
+  employmentTypes: string[];
+  remotePreferences: string[];
+  experienceLevel: string | null;
+  directEmployersOnly: boolean | null;
+  learnedAffinitySignals: number;
+};
+
+/**
+ * The explicit contract between Candidate Context and Search.
+ *
+ * Search consumes user-declared intent through this handoff. Learned affinity is
+ * counted so the downstream engine knows it exists, but it is not translated
+ * into filters or ranking in this release.
+ */
+export function searchIntentFromCandidateContext(context: CandidateContext): SearchIntentHandoff {
+  return {
+    roles: context.explicitIntent.targetRoles.map((signal) => signal.value.name),
+    countries: context.explicitIntent.countries.map((signal) => signal.value),
+    locations: context.explicitIntent.locations.map((signal) => signal.value),
+    companies: context.explicitIntent.companies.map((signal) => signal.value),
+    employmentTypes: context.explicitIntent.employmentTypes.map((signal) => signal.value),
+    remotePreferences: context.explicitIntent.remotePreferences.map((signal) => signal.value),
+    experienceLevel: context.explicitIntent.experienceLevel?.value ?? null,
+    directEmployersOnly: context.explicitIntent.directEmployersOnly?.value ?? null,
+    learnedAffinitySignals: context.learnedAffinity.signals.length,
+  };
+}
