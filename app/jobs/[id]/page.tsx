@@ -97,6 +97,15 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
                 <p className="match-gap">Not yet evidenced: {analysis.cautionSignals.join(", ")}</p>
               ) : null}
               <p className="analysis-explanation">{analysis.explanation}</p>
+              {analysis.semanticContext ? (
+                <p className="analysis-explanation">
+                  <strong>Role context:</strong> {analysis.semanticContext.function}
+                  {analysis.semanticContext.specialties.length
+                    ? ` · ${analysis.semanticContext.specialties.slice(0, 3).join(", ")}`
+                    : ""}
+                  {analysis.semanticFit ? <> · <strong>Semantic read:</strong> {analysis.semanticFit.reason}</> : null}
+                </p>
+              ) : null}
             </div>
           ) : <div className="empty-inline-state">No preliminary analysis is stored for this role.</div>}
         </article>
