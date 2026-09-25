@@ -37,7 +37,12 @@ export default async function DashboardPage({
    * bookmark or a reload — the callback sets this and the cinematic clears it.
    */
   await searchParams;
-  const driveConnected = (await connectionStatus(user.id)).connected;
+  let driveConnected = false;
+  try {
+    driveConnected = (await connectionStatus(user.id)).connected;
+  } catch (error) {
+    console.warn("Drive connection status unavailable; dashboard remains usable", error);
+  }
 
   const dashboard = await loadDashboardData(supabase, user.id);
   const { journeyResult, jobs, applications } = dashboard;
