@@ -20,6 +20,7 @@ const JOB_STATUSES = [
   "assessment",
   "interview",
   "offer",
+  "hired",
   "rejected",
   "withdrawn",
 ] as const satisfies readonly JobStatus[];
@@ -88,6 +89,7 @@ export async function PATCH(
     assessment: "status_assessment",
     interview: "status_interview",
     offer: "status_offer",
+    hired: "status_hired",
     rejected: "status_rejected",
     withdrawn: "status_withdrawn",
   };
