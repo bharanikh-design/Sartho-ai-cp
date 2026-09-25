@@ -163,6 +163,11 @@ export type TitleFit = {
   closestIsHeld: boolean;
   /** Levels the job sits above their strongest comparable title. Negative means below. */
   seniorityGap: number;
+  /**
+   * True when the job and the person's own titles carry different specialist
+   * contexts and only generic role-shape words overlap.
+   */
+  specialistConflict: boolean;
 };
 
 /**
@@ -177,7 +182,7 @@ export function scoreTitleFit(
 ): TitleFit {
   const jobSubject = titleSubject(jobTitle);
   const jobLevel = seniorityOf(jobTitle);
-  if (!jobSubject.length) return { score: 0, closest: null, closestIsHeld: false, seniorityGap: 0 };
+  if (!jobSubject.length) return { score: 0, closest: null, closestIsHeld: false, seniorityGap: 0, specialistConflict: false };
 
   /*
    * Build a profile-level specialist context from every held and targeted title.
@@ -213,7 +218,7 @@ export function scoreTitleFit(
   for (const title of heldTitles) consider(title, 1, true);
   for (const title of targetTitles) consider(title, 0.85, false);
 
-  if (!best.closest) return { score: 0, closest: null, closestIsHeld: false, seniorityGap: 0 };
+  if (!best.closest) return { score: 0, closest: null, closestIsHeld: false, seniorityGap: 0, specialistConflict: false };
 
   /*
    * A job two or more levels above anything held is a genuine stretch. The
@@ -229,5 +234,6 @@ export function scoreTitleFit(
     closest: best.closest,
     closestIsHeld: best.held,
     seniorityGap,
+    specialistConflict,
   };
 }
