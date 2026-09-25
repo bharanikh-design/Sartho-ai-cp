@@ -124,6 +124,12 @@ describe("scoreTitleFit", () => {
     expect(fit.specialistConflict).toBe(true);
     expect(fit.score).toBeLessThanOrEqual(20);
   });
+
+  it("does not treat a credible neighbouring family as a specialist contradiction", () => {
+    const fit = scoreTitleFit("Data Analyst", ["Business Analyst"], []);
+    expect(fit.specialistConflict).toBe(false);
+    expect(fit.score).toBeGreaterThan(0);
+  });
 });
 
 /*
