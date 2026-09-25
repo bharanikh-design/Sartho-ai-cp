@@ -6,6 +6,12 @@ import {
   type CandidateContext,
 } from "@/lib/context/candidate-context";
 
+function missingSnapshotTable(error: { code?: string; message?: string } | null | undefined): boolean {
+  if (!error) return false;
+  if (error.code === "42P01" || error.code === "PGRST205") return true;
+  return (error.message ?? "").toLowerCase().includes("candidate_context_snapshots");
+}
+
 function sourceFingerprint(context: CandidateContext): string {
   /*
    * generatedAt is deliberately excluded: two snapshots of identical source
@@ -51,6 +57,10 @@ export async function persistCandidateContextSnapshot(
     .eq("source_fingerprint", fingerprint)
     .maybeSingle();
 
+  if (missingSnapshotTable(readError)) {
+    console.warn("candidate_context_snapshots is not available yet; continuing with runtime provenance");
+    return { context, fingerprint, inserted: false };
+  }
   if (readError && readError.code !== "PGRST116") throw readError;
   if (existing) return { context, fingerprint, inserted: false };
 
@@ -60,6 +70,10 @@ export async function persistCandidateContextSnapshot(
     source_fingerprint: fingerprint,
     context,
   });
+  if (missingSnapshotTable(error)) {
+    console.warn("candidate_context_snapshots is not available yet; continuing with runtime provenance");
+    return { context, fingerprint, inserted: false };
+  }
   if (error) throw error;
 
   return { context, fingerprint, inserted: true };
