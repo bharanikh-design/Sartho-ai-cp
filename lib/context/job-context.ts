@@ -134,7 +134,23 @@ export function groundSemanticAssessments(
   raw: unknown,
 ): Map<string, { context: JobSemanticContext; fit: SemanticJobFit }> {
   const selected = jobs.slice(0, MAX_SEMANTIC_JOBS_PER_PASS);
-  return groundSemanticAssessments(context, selected, raw);
+  const parsed = semanticAssessmentSchema.parse(raw);
+  const requested = new Set(selected.map((job) => job.key));
+  const allowedRefs = allowedEvidenceRefs(context);
+  const result = new Map<string, { context: JobSemanticContext; fit: SemanticJobFit }>();
+
+  for (const item of parsed.jobs) {
+    if (!requested.has(item.key) || result.has(item.key)) continue;
+    result.set(item.key, {
+      context: item.context,
+      fit: {
+        ...item.fit,
+        supportingEvidenceRefs: item.fit.supportingEvidenceRefs.filter((ref) => allowedRefs.has(ref)),
+      },
+    });
+  }
+
+  return result;
 }
 
 export async function assessSemanticJobs(
@@ -174,21 +190,5 @@ export async function assessSemanticJobs(
     }),
   });
 
-  const parsed = semanticAssessmentSchema.parse(raw);
-  const requested = new Set(selected.map((job) => job.key));
-  const allowedRefs = allowedEvidenceRefs(context);
-  const result = new Map<string, { context: JobSemanticContext; fit: SemanticJobFit }>();
-
-  for (const item of parsed.jobs) {
-    if (!requested.has(item.key) || result.has(item.key)) continue;
-    result.set(item.key, {
-      context: item.context,
-      fit: {
-        ...item.fit,
-        supportingEvidenceRefs: item.fit.supportingEvidenceRefs.filter((ref) => allowedRefs.has(ref)),
-      },
-    });
-  }
-
-  return result;
+  return groundSemanticAssessments(context, selected, raw);
 }
