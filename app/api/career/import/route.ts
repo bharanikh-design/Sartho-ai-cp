@@ -331,6 +331,25 @@ export async function POST(request: Request) {
     }
 
     /*
+     * If this account has no master résumé yet, the completed upload becomes
+     * the default automatically. Explicit user selection still wins because
+     * the helper changes nothing when a master already exists.
+     */
+    if (!isMaster) {
+      const { data: defaulted, error: masterDefaultError } = await supabase.rpc(
+        "ensure_master_resume_import",
+        { p_import_id: importId },
+      );
+      if (masterDefaultError) {
+        const missing = masterDefaultError.code === "PGRST202"
+          || (masterDefaultError.message ?? "").includes("ensure_master_resume_import");
+        if (!missing) console.warn("Could not default the first résumé as master", masterDefaultError);
+      } else if (defaulted === true) {
+        isMaster = true;
+      }
+    }
+
+    /*
      * Career Truth changed. Propagate it before declaring the import complete:
      * existing open opportunities must be re-evaluated through the same
      * conductor that Search/Preview/Save use.
