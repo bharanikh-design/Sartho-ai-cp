@@ -4,6 +4,7 @@ import { DeleteOpportunityButton } from "@/components/delete-opportunity-button"
 import { DeepAnalysisPanel } from "@/components/deep-analysis-panel";
 import { JobStatusSelect } from "@/components/job-status-select";
 import { ProductPageHeader } from "@/components/product-page-header";
+import { InteractionBeacon } from "@/components/interaction-beacon";
 import { requireUser } from "@/lib/auth";
 import { getJobWorkspace } from "@/lib/data/jobs";
 import { presentRuleAnalysis } from "@/lib/matching/present-rule-analysis";
@@ -45,6 +46,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
 
   return (
     <div className="page-stack">
+      <InteractionBeacon jobId={job.id} />
       <ProductPageHeader
         eyebrow="Opportunity decision"
         title={job.title}
