@@ -8,6 +8,7 @@ export const INTERACTION_EVENT_TYPES = [
   "status_assessment",
   "status_interview",
   "status_offer",
+  "status_hired",
   "status_withdrawn",
   "status_rejected",
 ] as const;
@@ -56,6 +57,7 @@ const EVENT_STRENGTH: Record<InteractionEventType, number> = {
   status_assessment: 0.85,
   status_interview: 0.92,
   status_offer: 1,
+  status_hired: 1,
   status_withdrawn: 0.8,
   status_rejected: 0.75,
 };
@@ -111,6 +113,7 @@ export function deriveLearnedAffinity(events: InteractionEventRecord[]): Learned
       case "status_assessment":
       case "status_interview":
       case "status_offer":
+      case "status_hired":
         bucket.marketPositive += weight;
         break;
       case "status_withdrawn":
