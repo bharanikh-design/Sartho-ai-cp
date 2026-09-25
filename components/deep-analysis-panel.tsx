@@ -32,7 +32,12 @@ export function DeepAnalysisPanel({
         keepalive: true,
       }).catch(() => undefined);
 
-      const response = await fetch(`/api/jobs/${jobId}/deep-analysis`, { method: "POST" });
+      const operationId = crypto.randomUUID();
+      const response = await fetch(`/api/jobs/${jobId}/deep-analysis`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ operationId }),
+      });
       const result = await response.json() as { error?: string };
       if (!response.ok) throw new Error(result.error ?? "Deep analysis failed.");
       router.refresh();
@@ -43,7 +48,7 @@ export function DeepAnalysisPanel({
     }
   }
 
-  const buttonLabel = running
+  const buttonLabel = running || status === "processing"
     ? "Matching your Career Profile…"
     : status === "complete"
       ? "Run deep analysis again"
@@ -57,7 +62,7 @@ export function DeepAnalysisPanel({
         type="button"
         className="primary-button"
         onClick={() => void runAnalysis()}
-        disabled={running || !approvedEvidenceCount}
+        disabled={running || status === "processing" || !approvedEvidenceCount}
       >
         {buttonLabel} <span aria-hidden="true">✦</span>
       </button>
