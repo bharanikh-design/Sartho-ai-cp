@@ -366,6 +366,16 @@ export async function runBriefSearch(
   const contextCompanies = searchIntent.companies;
   const contextEmploymentTypes = searchIntent.employmentTypes;
   const contextRemotePreferences = searchIntent.remotePreferences;
+  const learnedAffinity = {
+    positive: candidateContext.learnedAffinity.signals
+      .filter((signal) => signal.value.polarity === "positive" && signal.confidence >= 0.5)
+      .slice(0, 3)
+      .map((signal) => signal.value.concept),
+    negative: candidateContext.learnedAffinity.signals
+      .filter((signal) => signal.value.polarity === "negative" && signal.confidence >= 0.6)
+      .slice(0, 3)
+      .map((signal) => signal.value.concept),
+  };
 
   /*
    * Two different questions, which were being answered with one list.
@@ -485,6 +495,7 @@ export async function runBriefSearch(
       employmentTypes: contextEmploymentTypes,
       entryLevelTerms: earlyCareerPass ? entryLevelTermsFor(country) : undefined,
       resumeSkills,
+      learnedAffinity,
     }))
   ];
 
@@ -499,6 +510,7 @@ export async function runBriefSearch(
       /* Each market gets its own vocabulary; "graduate scheme" finds nothing in Sydney. */
       entryLevelTerms: earlyCareerPass ? entryLevelTermsFor(market) : undefined,
       resumeSkills,
+      learnedAffinity,
     })));
     queries.push(...additionalQueries.flat());
   }
