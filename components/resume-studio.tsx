@@ -11,8 +11,9 @@ import { resumeVersionName } from "@/lib/resume/save";
 import { suggestResumeFor, type PastResume } from "@/lib/resume/suggest";
 import { renderResumeText, resumeContentOf, type ResumeContent } from "@/lib/resume/content";
 import { ResumeDocument, type BulletCoach } from "@/components/resume-document";
-import { RESUME_TEMPLATES, resumeTemplate, type ResumeTemplate } from "@/lib/resume/templates";
+import { RESUME_TEMPLATES, resumeTemplate, type ResumeTemplate, type ResumeTemplateId } from "@/lib/resume/templates";
 import { RESUME_MARKETS, resumeMarket } from "@/lib/resume/markets";
+import { recommendTemplate } from "@/lib/resume/template-recommendation";
 import { ResumeImport } from "@/components/resume-import";
 import { ResumeUploads } from "@/components/resume-uploads";
 import { AtsGatePanel } from "@/components/ats-gate-panel";
@@ -155,6 +156,44 @@ function MagicWand() {
         className="studio-wand-spark studio-wand-spark-three"
       />
     </svg>
+  );
+}
+
+/*
+ * Sartho's own pick for this résumé, offered rather than applied.
+ *
+ * The chips beside this already mark the templates that suit the chosen
+ * market. That is a fact about the market; this is a reading of the document —
+ * an engineering-led résumé wants the layout that gives standards and
+ * certifications their own standing wherever it is going, and a senior
+ * consulting career wants an executive hierarchy rather than a skills-first
+ * one. `recommendTemplate` has always computed it and nothing ever asked.
+ *
+ * Silent when it agrees with what is already selected. A recommendation that
+ * restates your own choice back at you teaches people to stop reading them.
+ */
+function TemplateSuggestion({
+  content,
+  onApply,
+}: {
+  content: ResumeContent;
+  onApply: (template: ResumeTemplateId) => void;
+}) {
+  const suggestion = recommendTemplate(content, content.market);
+  if (suggestion.template === content.template) return null;
+
+  const suggested = resumeTemplate(suggestion.template);
+  return (
+    <div className="studio-template-suggestion">
+      <div>
+        <strong>Sartho would use {suggested.name}</strong>
+        <p>{suggestion.reason}</p>
+        {suggestion.marketNote ? <p>{suggestion.marketNote}</p> : null}
+      </div>
+      <button type="button" className="secondary-button" onClick={() => onApply(suggestion.template)}>
+        Use {suggested.name}
+      </button>
+    </div>
   );
 }
 
@@ -1013,6 +1052,22 @@ return (
                 <strong>{resumeTemplate(content.template).description}</strong>{" "}
                 {resumeTemplate(content.template).bestFor} Every template offered here is single-column and parser-safe.
               </small>
+
+              {/*
+                * What Sartho would pick, read off what this résumé actually
+                * says rather than off the market alone. `recommendTemplate`
+                * has existed since the templates were researched and was
+                * called by nothing, so the product had an opinion about every
+                * person's layout and never once offered it.
+                *
+                * Shown only when it disagrees with the current choice, and it
+                * never changes the choice on its own: the person decides, the
+                * same way they decide everything else here.
+                */}
+              <TemplateSuggestion
+                content={content}
+                onApply={(template) => setContent({ ...content, template })}
+              />
             </div>
           ) : null}
 

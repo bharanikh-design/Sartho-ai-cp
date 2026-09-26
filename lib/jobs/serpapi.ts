@@ -1,3 +1,4 @@
+import { serpapiScheduleWords } from "@/lib/jobs/employment-types";
 import { countryName } from "@/lib/jobs/countries";
 import type { JobSearchQuery, JobSearchResult } from "@/lib/jobs/search-provider";
 
@@ -288,15 +289,13 @@ export function isNoResultsMessage(error: string): boolean {
  * Google's own word for the listing's working pattern, as it reports it:
  * "Full-time", "Part-time", "Contractor", "Internship". Matched loosely
  * because the spelling varies by market and a hyphen should not lose a job.
+ *
+ * The vocabulary moved to EMPLOYMENT_TYPES. It was declared here, while the
+ * function that tells a person which of their selections were applied read
+ * `canFilter` over in employment-types.ts — so the filter and the report of
+ * the filter had no shared fact between them, and the report said "hint"
+ * about every type this list narrows on. One table now answers both.
  */
-const SCHEDULE_WORDS: Record<string, string[]> = {
-  "Full-time": ["full time", "fulltime", "permanent"],
-  "Part-time": ["part time", "parttime"],
-  Contract: ["contract", "contractor", "temporary", "temp"],
-  Permanent: ["permanent", "full time", "fulltime"],
-  Internship: ["intern", "internship"],
-  "Graduate programme": ["intern", "internship", "graduate"],
-};
 
 /**
  * Keep only the listings whose reported schedule matches what was asked for.
@@ -308,7 +307,7 @@ const SCHEDULE_WORDS: Record<string, string[]> = {
  * them all.
  */
 export function keepScheduleTypes(jobs: SerpApiJob[], selected: string[]): SerpApiJob[] {
-  const wanted = selected.flatMap((id) => SCHEDULE_WORDS[id] ?? []);
+  const wanted = serpapiScheduleWords(selected);
   if (!wanted.length) return jobs;
 
   return jobs.filter((job) => {
