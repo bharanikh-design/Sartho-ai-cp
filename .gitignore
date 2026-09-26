@@ -29,3 +29,7 @@ public/sartho-extension.zip
 # TypeScript incremental build cache — regenerated on every build.
 tsconfig.tsbuildinfo
 .gemini-probe/
+
+# Playwright end-to-end output — regenerated on every run, never committed.
+test-results/
+playwright-report/
