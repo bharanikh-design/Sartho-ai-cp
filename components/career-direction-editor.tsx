@@ -306,7 +306,7 @@ export function CareerDirectionEditor({
                   <span aria-hidden="true">{aiStatus === "loading" ? "✦" : "↻"}</span>
                   {aiStatus === "loading" ? "Refreshing…" : "Refresh"}
                 </button>
-                {visibleSuggestions.length > 0 && aiStatus !== "loading" ? (
+                {visibleSuggestions.length > 0 && aiStatus !== "loading" && rail.pages > 1 ? (
                   <div className="direction-rail-nav" aria-label="Browse suggestions">
                     <span className="direction-rail-count" aria-live="polite">{rail.page} of {rail.pages}</span>
                     <button type="button" onClick={() => scrollRail(-1)} disabled={!rail.canPrev} aria-label="Previous suggestions">‹</button>

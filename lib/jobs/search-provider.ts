@@ -406,7 +406,16 @@ export function mapJSearchResult(raw: JSearchResult): JobSearchResult | null {
   if (!raw || typeof raw !== "object") return null;
   const title = raw.job_title?.trim();
   const applyOptions = Array.isArray(raw.apply_options) ? raw.apply_options : [];
-  const url = (raw.job_apply_link || raw.job_google_link || applyOptions[0]?.apply_link)?.trim();
+  /*
+   * Send the person to a real posting they can act on. Prefer the direct apply
+   * link, then a direct-employer apply option, then any apply option, and only
+   * then Google for Jobs' own deep-link — which is flaky and often opens a
+   * generic jobs panel on an unrelated listing, so it must never win over a real
+   * apply URL. "View" going to a generic Google search is a broken promise.
+   */
+  const directApply = applyOptions.find((option) => option?.is_direct === true && option?.apply_link)?.apply_link;
+  const anyApply = applyOptions.find((option) => option?.apply_link)?.apply_link;
+  const url = (raw.job_apply_link || directApply || anyApply || raw.job_google_link)?.trim();
   const description = raw.job_description?.trim();
   
   const employer = raw.employer_name?.trim();

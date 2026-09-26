@@ -109,6 +109,51 @@ describe("mapJSearchResult", () => {
     expect(mapJSearchResult({ employer_name: "X", job_description: "d", job_apply_link: "https://x" })).toBeNull();
     expect(mapJSearchResult({ job_title: "T", job_apply_link: "https://x" })).toBeNull();
   });
+
+  it("prefers a real apply link over Google for Jobs' own deep-link", () => {
+    // The bug: 'View' opened a generic Google Jobs page instead of the posting.
+    const result = mapJSearchResult({
+      job_title: "ITSM Manager",
+      employer_name: "Thales",
+      job_description: "Lead ITSM operations across the enterprise.",
+      job_google_link: "https://www.google.com/search?q=ITSM+Manager&ibp=htl;jobs",
+      apply_options: [
+        { publisher: "JobzMall", apply_link: "https://jobzmall.com/thales/itsm-manager", is_direct: false },
+        { publisher: "Thales", apply_link: "https://careers.thalesgroup.com/itsm-manager", is_direct: true },
+      ],
+    });
+    // The direct-employer option wins over both any-apply and the google link.
+    expect(result?.url).toBe("https://careers.thalesgroup.com/itsm-manager");
+  });
+
+  it("uses any apply option before the Google deep-link, and google before a bare search", () => {
+    const withApplyOption = mapJSearchResult({
+      job_title: "Data Analyst",
+      employer_name: "Acme",
+      job_description: "Analyse data for Acme.",
+      job_google_link: "https://www.google.com/search?q=Data+Analyst&ibp=htl;jobs",
+      apply_options: [{ publisher: "LinkedIn", apply_link: "https://linkedin.com/jobs/123" }],
+    });
+    expect(withApplyOption?.url).toBe("https://linkedin.com/jobs/123");
+
+    // Only the Google deep-link exists → use it (still a real listing link).
+    const onlyGoogle = mapJSearchResult({
+      job_title: "Data Analyst",
+      employer_name: "Acme",
+      job_description: "Analyse data for Acme.",
+      job_google_link: "https://www.google.com/search?q=Data+Analyst&ibp=htl;jobs",
+    });
+    expect(onlyGoogle?.url).toBe("https://www.google.com/search?q=Data+Analyst&ibp=htl;jobs");
+
+    // Nothing at all → the bare-search fallback keeps the card from being a dead end.
+    const nothing = mapJSearchResult({
+      job_title: "Data Analyst",
+      employer_name: "Acme",
+      job_description: "Analyse data for Acme.",
+    });
+    expect(nothing?.url).toContain("google.com/search?q=");
+    expect(nothing?.url).toContain("Data%20Analyst");
+  });
 });
 
 /*

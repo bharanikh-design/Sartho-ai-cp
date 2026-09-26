@@ -80,10 +80,23 @@
 .direction-ai-message { margin-top: 13px; padding: 11px 13px; border-radius: 10px; color: #d9eee4; background: rgba(255,255,255,.07); font-size: var(--text-xs); }
 .direction-ai-message.is-error { color: #ffe0e4; background: rgba(173, 50, 72, .22); }
 
-.direction-suggestion-rail { display: flex; gap: 12px; overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x mandatory; padding: 18px 26px 22px; border-top: 1px solid rgba(255,255,255,.11); scrollbar-width: none; outline: none; }
+/*
+ * Cards grow to fill when there are few (so one or two suggestions read as
+ * featured cards, not stranded in an empty band) and scroll when there are many.
+ * `safe center` keeps them centred when they fit, but falls back to start-align
+ * when they overflow, so the first card is always reachable by scroll.
+ */
+.direction-suggestion-rail { display: flex; flex-wrap: nowrap; justify-content: safe center; gap: 12px; overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x mandatory; padding: 18px 26px 22px; border-top: 1px solid rgba(255,255,255,.11); scrollbar-width: none; outline: none; }
 .direction-suggestion-rail::-webkit-scrollbar { display: none; }
 .direction-suggestion-rail:focus-visible { box-shadow: inset 0 0 0 2px rgba(145, 207, 178, .5); }
-.direction-suggestion-card { display: flex; flex: 0 0 min(340px, 84vw); min-height: 250px; flex-direction: column; padding: 22px 22px 20px; border: 1px solid rgba(255,255,255,.1); border-radius: var(--radius-card); color: var(--text); background: var(--glass); scroll-snap-align: start; }
+.direction-suggestion-card { display: flex; flex: 1 0 min(320px, 84vw); max-width: 460px; min-height: 250px; flex-direction: column; padding: 22px 22px 20px; border: 1px solid rgba(255,255,255,.1); border-radius: var(--radius-card); color: var(--text); background: var(--glass); scroll-snap-align: start; }
+/* One or two suggestions should read as generous, featured cards rather than a
+   small card adrift in a wide band. Three or more keep the compact, scrollable
+   sizing. :has() sizes the cards by how many the rail holds; where it is not
+   supported the cards simply stay at their base width — still centred, never
+   broken. */
+.direction-suggestion-rail:not(:has(> .direction-suggestion-card:nth-of-type(2))) .direction-suggestion-card { max-width: 640px; }
+.direction-suggestion-rail:has(> .direction-suggestion-card:nth-of-type(2)):not(:has(> .direction-suggestion-card:nth-of-type(3))) .direction-suggestion-card { max-width: 520px; }
 .suggestion-card-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .suggestion-card-top > span { padding: 6px 8px; border-radius: 999px; color: #246048; background: #e7f4ee; font-size: var(--text-2xs); font-weight: 800; letter-spacing: .05em; text-transform: uppercase; }
 .direction-suggestion-card.is-adjacent .suggestion-card-top > span { color: #685118; background: #faf1d7; }
