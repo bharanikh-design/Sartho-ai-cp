@@ -159,6 +159,12 @@ export function SearchPlanEditor({
         targetLocations: locations,
         targetCompanies: companies,
         remotePreferences,
+        /*
+         * Omitted until now, and the schema defaults a missing value to false —
+         * so every save of any other field silently switched "Direct employers
+         * only" back off. The toggle could not be turned on at all.
+         */
+        directEmployersOnly,
       }),
     });
     setStatus(response.ok ? "saved" : "error");
@@ -408,7 +414,13 @@ export function SearchPlanEditor({
           <div className="search-criteria-row" id="job-source">
             <label>
               <strong>Who should the job come from?</strong>
-              <small>Choose direct employers to hide agency and unverified reposts. Sartho keeps a vacancy only when an employer careers channel can be verified.</small>
+              {/*
+                * Says what the filter does, which is narrower than what this
+                * line used to claim. Nothing verifies a careers channel and
+                * nothing identifies agencies by name — guessing that from a
+                * company name hides real employers.
+                */}
+              <small>Hides listings that lead to a search results page instead of a real application, so every role you see can actually be applied for. Where an employer&rsquo;s own careers page is known, Sartho sends you there first.</small>
             </label>
             <div className="work-model-options" role="group" aria-label="Job source" style={{ marginTop: 0 }}>
               <button type="button" aria-pressed={!directEmployersOnly} className={!directEmployersOnly ? "is-selected" : ""} onClick={() => setDirectEmployersOnly(false)}>Employers + agencies</button>

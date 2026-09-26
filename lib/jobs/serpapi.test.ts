@@ -134,6 +134,25 @@ describe("mapSerpApiResult", () => {
     expect(mapSerpApiResult({ ...advert, apply_options: [] })?.url).toBe("https://google.com/search?q=job");
   });
 
+  /*
+   * Reported live from a Singapore search. Google for Jobs carried the vacancy
+   * "via MyCareersFuture" — the Singapore government's own job bank — and the
+   * card still opened a Google results page, because an unrecognised board
+   * loses to Google's own listing page. The boards were the thing missing, not
+   * the ranking.
+   */
+  it("prefers a Singapore board over Google's own listing page", () => {
+    expect(mapSerpApiResult({
+      ...advert,
+      apply_options: [{ title: "MyCareersFuture", link: "https://www.mycareersfuture.gov.sg/job/123" }],
+    })?.url).toBe("https://www.mycareersfuture.gov.sg/job/123");
+
+    expect(mapSerpApiResult({
+      ...advert,
+      apply_options: [{ title: "foundit", link: "https://www.foundit.sg/job/456" }],
+    })?.url).toBe("https://www.foundit.sg/job/456");
+  });
+
   /* A card with no link is a tease; better to drop the record. */
   it("drops a record with nowhere to send anybody", () => {
     expect(mapSerpApiResult({ ...advert, apply_options: [], share_link: undefined })).toBeNull();

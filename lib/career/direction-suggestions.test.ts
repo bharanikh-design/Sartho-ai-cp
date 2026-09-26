@@ -90,6 +90,34 @@ describe("the seniority and function guard", () => {
     expect(suggest(["Sales Director"], { ...entryLevelAnalyst, allowFunctionChange: true })).toEqual([]);
   });
 
+  /*
+   * The opposite failure, reported live: a ServiceNow Solution Architect with
+   * twelve years behind them saw a single role on the page beside "AI could not
+   * create grounded suggestions right now".
+   *
+   * "Architect" carries no seniority word, so the guard read them as mid-level
+   * and dropped every leadership direction the model had been asked to propose.
+   * On a round where the model proposed only leadership moves, nothing survived
+   * at all — and an empty grounded set is thrown, which is the error the page
+   * was showing.
+   */
+  describe("a senior individual contributor", () => {
+    const seniorArchitect = {
+      heldTitles: ["ServiceNow Solution Architect"],
+      totalExperienceYears: 12,
+      allowFunctionChange: false,
+    };
+
+    it("is offered the leadership moves a decade of evidence supports", () => {
+      expect(suggest(["ITSM Manager", "Service Delivery Director", "ServiceNow Delivery Lead"], seniorArchitect))
+        .toEqual(["ITSM Manager", "Service Delivery Director", "ServiceNow Delivery Lead"]);
+    });
+
+    it("still refuses a different line of work", () => {
+      expect(suggest(["Sales Manager"], seniorArchitect)).toEqual([]);
+    });
+  });
+
   it("leaves suggestions alone when no guard is supplied", () => {
     const ungated = groundDirectionSuggestions(
       { suggestions: [{

@@ -159,6 +159,19 @@ const KNOWN_BOARDS = [
   "monster.com", "dice.com", "builtin.com", "wellfound.com", "totaljobs.com",
   "reed.co.uk", "efinancialcareers.", "naukri.com", "jobstreet.com", "jobsdb.com",
   "jora.com", "careerjet.", "jobleads.com", "bebee.com", "adzuna.",
+  /*
+   * Singapore and the wider APAC market, which this list did not cover.
+   *
+   * MyCareersFuture is the Singapore government's own job bank and Google for
+   * Jobs routinely carries its listings — "via MyCareersFuture" sits in
+   * apply_options beside LinkedIn. Unrecognised, it lost to Google's own
+   * listing page below, so a Singapore vacancy with a perfectly good
+   * government apply link sent the person to a Google search instead. foundit
+   * (Monster's rebrand across APAC) had exactly the same problem, and
+   * "monster.com" did not match "foundit.sg".
+   */
+  "mycareersfuture.gov.sg", "mycareersfuture.sg", "foundit.", "monsterapac.",
+  "jobsbank.gov.sg", "techinasia.com", "glints.com", "nodeflair.com",
   /* Applicant tracking systems: these are the employer's own front door. */
   "myworkdayjobs.com", "workday.com", "greenhouse.io", "lever.co",
   "smartrecruiters.com", "workable.com", "ashbyhq.com", "bamboohr.com",

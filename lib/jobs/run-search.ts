@@ -37,6 +37,7 @@ import {
   type SearchRelevanceTier,
 } from "@/lib/jobs/search-relevance";
 import { createProviderCascade } from "@/lib/jobs/provider-cascade";
+import { keepWorkModels } from "@/lib/jobs/work-model";
 import {
   MAX_COMPANY_QUERIES,
   MAX_LOCATION_QUERIES,
@@ -199,6 +200,13 @@ export type SearchCriteria = {
   companies: string[];
   roles: string[];
   remoteOnly: boolean;
+  /**
+   * The working patterns the person asked for, and how many adverts were
+   * removed for stating a different one. Reported because this filter was
+   * decorative until now: saying what it did is how that stays visible.
+   */
+  workModels?: string[];
+  workModelHidden?: number;
   providers: string[];
   /** Whether this run intentionally hid unverified/agency postings. */
   directEmployersOnly?: boolean;
@@ -373,6 +381,52 @@ function readRequirement(text: string): { requiredYears: number | null; required
     requiredYears: required.minYears,
     requiredEvidence: required.evidence,
   };
+}
+
+/**
+ * A destination that is a search engine's results page rather than a vacancy.
+ *
+ * Google for Jobs hands back its own listing page — `share_link`, a
+ * google.com/search URL — whenever it knows of no real apply route, and both
+ * providers fall back to a bare Google search rather than leave a card with
+ * nowhere to go. That is a reasonable last resort with the filter off and the
+ * exact thing "Direct employers only" exists to remove.
+ *
+ * Matched on the /search path, not the host alone: careers.google.com is
+ * Google's own careers site, which is a direct employer like any other.
+ */
+export function isSearchEnginePage(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    const host = parsed.hostname.toLowerCase().replace(/^www\./, "");
+    const isGoogle = host === "google.com" || host.startsWith("google.");
+    return isGoogle && parsed.pathname.startsWith("/search");
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * "Direct employers only", actually applied.
+ *
+ * The toggle promises to hide agency and unverified reposts. The plainest
+ * breach of that promise is a card whose only destination is a search engine,
+ * so those are what this removes — it does not guess at which employers are
+ * agencies, because guessing from a company name hides real employers.
+ *
+ * It never empties the page. A filter that leaves nothing is worse than the
+ * reposts it removed, so it stands down and reports honestly that it hid
+ * nothing rather than claiming a hidden count for results it put back.
+ */
+export function applyDirectEmployerFilter<T extends { url: string }>(
+  ranked: T[],
+  directOnly: boolean,
+): { kept: T[]; hidden: number } {
+  if (!directOnly) return { kept: ranked, hidden: 0 };
+
+  const kept = ranked.filter((match) => !isSearchEnginePage(match.url));
+  if (!kept.length) return { kept: ranked, hidden: 0 };
+  return { kept, hidden: ranked.length - kept.length };
 }
 
 export function retrievalBreadthComplete(
@@ -1154,8 +1208,40 @@ export async function runBriefSearch(
    */
   const visible = sortByRelevance(relevant.filter((match) => match.relevanceTier !== "outside"));
   const fallback = sortByRelevance(relevant);
-  const results: ScoredJobMatch[] = (visible.length ? visible : fallback)
-    .slice(0, options.maxResults ?? 20);
+  const ranked = visible.length ? visible : fallback;
+
+  /*
+   * "Direct employers only" was read from the brief, stored, and reported in
+   * the criteria — and never applied to a single result. The toggle has been
+   * decorative since it shipped.
+   *
+   * It promises to hide agency and unverified reposts, and the plainest breach
+   * of that promise is a card whose only destination is a search engine: "View"
+   * opened a Google results page rather than a vacancy, which is not an
+   * application by anybody's reading.
+   *
+   * Deliberately narrow. This removes destinations that are not an application;
+   * it does not guess at which employers are agencies, because guessing from a
+   * company name hides real employers. And it never empties the page — a filter
+   * that leaves nothing is worse than the reposts it removed, so it stands down
+   * and reports honestly that it hid nothing.
+   */
+  const { kept: directKept, hidden: agencyOrUnverifiedHidden } = applyDirectEmployerFilter(
+    ranked,
+    searchIntent.directEmployersOnly === true,
+  );
+
+  /*
+   * "How do you want to work?", applied for the first time. Read off the
+   * advert rather than asked of the provider — see lib/jobs/work-model.ts.
+   */
+  const { kept: workModelKept, hidden: workModelHidden } = keepWorkModels(
+    directKept,
+    contextRemotePreferences,
+    (match) => `${match.title}. ${match.location ?? ""}. ${match.description}`,
+  );
+
+  const results: ScoredJobMatch[] = workModelKept.slice(0, options.maxResults ?? 20);
 
   const criteria: SearchCriteria = {
     workflowTraceId,
@@ -1201,6 +1287,8 @@ export async function runBriefSearch(
      */
     roles: [...new Set(queries.filter((query) => !query.earlyCareerOnly).map((query) => query.keywords))],
     remoteOnly: contextRemotePreferences.length === 1 && contextRemotePreferences[0] === "Remote",
+    workModels: contextRemotePreferences.length ? contextRemotePreferences : undefined,
+    workModelHidden: workModelHidden || undefined,
     providers: Array.from(cascade.used),
     candidateContextFingerprint: contextFingerprint || undefined,
     learnedAffinitySignals: searchIntent.learnedAffinitySignals,
@@ -1212,6 +1300,8 @@ export async function runBriefSearch(
     semanticJobsFailed,
     familyWarnings,
     directEmployersOnly: searchIntent.directEmployersOnly ?? undefined,
+    /* Reposts with nowhere real to apply, removed by the toggle above. */
+    agencyOrUnverifiedHidden: agencyOrUnverifiedHidden || undefined,
     /*
      * Only the failures that changed what came back. A provider behind the one
      * that answered was never reached, so its trouble is a server-log fact
@@ -1250,13 +1340,25 @@ export async function runBriefSearch(
    * browser tab for thirty minutes; closing it meant spending provider calls
    * again to see the same roles.
    */
-  const { error: storeError } = await supabase.from("search_results").upsert({
-    user_id: userId,
-    results,
-    criteria,
-    searched_at: new Date().toISOString(),
-  });
-  if (storeError) console.error("Could not store search results", { code: storeError.code });
+  /*
+   * A run that found nothing does not overwrite a run that found something.
+   *
+   * The upsert was unconditional, so one bad run — every provider timed out,
+   * or a filter removed the lot — replaced a good stored set with an empty
+   * one. getStoredSearch then answers null for an empty array, the page loads
+   * with no results, and the panel starts a fresh live search on every single
+   * visit from then on. The row that exists to stop Sartho paying twice was
+   * the thing that guaranteed it.
+   */
+  if (results.length) {
+    const { error: storeError } = await supabase.from("search_results").upsert({
+      user_id: userId,
+      results,
+      criteria,
+      searched_at: new Date().toISOString(),
+    });
+    if (storeError) console.error("Could not store search results", { code: storeError.code });
+  }
 
   logWorkflowTrace("search.completed", workflowTraceId, {
     results: results.length,
@@ -1413,6 +1515,8 @@ export function normaliseCriteria(stored: unknown): SearchCriteria {
     companies: strings(value.companies),
     roles: strings(value.roles),
     remoteOnly: value.remoteOnly === true,
+    workModels: strings(value.workModels).length ? strings(value.workModels) : undefined,
+    workModelHidden: count(value.workModelHidden),
     providers: strings(value.providers),
     directEmployersOnly: value.directEmployersOnly === true,
     agencyOrUnverifiedHidden: count(value.agencyOrUnverifiedHidden),

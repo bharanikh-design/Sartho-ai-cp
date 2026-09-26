@@ -43,7 +43,12 @@ export type ResumeTemplateId =
   | "innovator"
   | "atlas"
   | "systems"
-  | "engineering";
+  | "engineering"
+  | "delivery"
+  | "graduate"
+  | "clinical"
+  | "scholar"
+  | "meridian";
 
 /*
  * What the Word file does, per template.
@@ -99,6 +104,20 @@ export type ResumeTemplatePdf = {
    * is the conventional place after the career.
    */
   skillsPlacement?: "top" | "bottom";
+  /**
+   * Where the certifications block sits. "top" puts it directly under the
+   * profile, ahead of the career — which is where a PMP, a PE licence, a
+   * nursing registration or a CPA is read first, and in regulated and
+   * licensed work it is read before anything else on the page. Defaults to
+   * sitting after the career, with the education.
+   */
+  certificationsPlacement?: "top" | "bottom";
+  /**
+   * Where education sits. "top" is for the résumé of somebody whose degree is
+   * their strongest evidence — a graduate, or a career changer — and it is
+   * wrong for everybody else, which is why it is not the default.
+   */
+  educationPlacement?: "top" | "bottom";
   /** Sidebar only. */
   sidebarWidth?: number;
   sidebarInk?: string;
@@ -194,6 +213,76 @@ export const RESUME_TEMPLATES: ResumeTemplate[] = [
       skillsPlacement: "bottom",
     },
     docx: { font: "Georgia", nameAlign: "left", nameSize: 32, bodySize: 22, headingSize: 23, headingUpper: true, headingRule: true },
+  },
+  {
+    id: "delivery",
+    name: "Delivery",
+    description: "Certifications and skills sit above the career, so a PMP or PRINCE2 is read before the first role. Ruled sans headings, dates hard right.",
+    bestFor: "Project, programme and delivery managers, PMO and transformation leads — where the certification and the size of what you ran are the first two questions.",
+    atsSafe: true,
+    pdf: {
+      font: "Helvetica", layout: "single", accent: "#1d4ed8", ink: "#131a24", muted: "#5a6472",
+      nameSize: 23, nameAlign: "left", nameCaps: false, nameTracking: 0,
+      heading: "rule", headingSize: 9.4, headingCaps: true, bodySize: 9.2, lineHeight: 1.36, pagePadding: 42,
+      skillsPlacement: "top", certificationsPlacement: "top",
+    },
+    docx: { font: "Calibri", nameAlign: "left", nameSize: 32, bodySize: 22, headingSize: 23, headingUpper: true, headingRule: true },
+  },
+  {
+    id: "graduate",
+    name: "Graduate",
+    description: "Education and skills first, then projects and what experience there is, with generous air. Built to fill a page and a half honestly rather than pad three.",
+    bestFor: "Students, new graduates and career changers, where the degree and the projects are the strongest evidence on the page.",
+    atsSafe: true,
+    pdf: {
+      font: "Helvetica", layout: "single", accent: "#047857", ink: "#13201b", muted: "#586a62",
+      nameSize: 24, nameAlign: "left", nameCaps: false, nameTracking: 0,
+      heading: "plain", headingSize: 9.4, headingCaps: true, bodySize: 9.3, lineHeight: 1.42, pagePadding: 46,
+      skillsPlacement: "top", educationPlacement: "top",
+    },
+    docx: { font: "Calibri", nameAlign: "left", nameSize: 33, bodySize: 22, headingSize: 24, headingUpper: true, headingRule: false },
+  },
+  {
+    id: "clinical",
+    name: "Clinical",
+    description: "Registrations and licences directly under the profile, then practice history. Quiet serif, ruled headings, nothing decorative anywhere.",
+    bestFor: "Nursing, medicine, allied health, pharmacy and any licensed practice, where the registration is checked before the experience is read.",
+    atsSafe: true,
+    pdf: {
+      font: "Times-Roman", layout: "single", accent: "#0f5132", ink: "#151d18", muted: "#5b665f",
+      nameSize: 23, nameAlign: "left", nameCaps: false, nameTracking: 0,
+      heading: "rule", headingSize: 9.6, headingCaps: true, bodySize: 9.4, lineHeight: 1.38, pagePadding: 44,
+      certificationsPlacement: "top",
+    },
+    docx: { font: "Georgia", nameAlign: "left", nameSize: 31, bodySize: 22, headingSize: 24, headingUpper: true, headingRule: true },
+  },
+  {
+    id: "scholar",
+    name: "Scholar",
+    description: "Serif with wide leading and mixed-case headings between rules, education above the career and room for publications as a section of their own.",
+    bestFor: "Academic, research and policy posts, and anywhere a publication list and a degree outrank a job title.",
+    atsSafe: true,
+    pdf: {
+      font: "Times-Roman", layout: "single", accent: "#3730a3", ink: "#16161f", muted: "#5d5f70",
+      nameSize: 24, nameAlign: "center", nameCaps: false, nameTracking: 0,
+      heading: "doubleRule", headingSize: 10.2, headingCaps: false, bodySize: 9.6, lineHeight: 1.5, pagePadding: 50,
+      educationPlacement: "top",
+    },
+    docx: { font: "Cambria", nameAlign: "center", nameSize: 34, bodySize: 22, headingSize: 22, headingUpper: false, headingRule: true },
+  },
+  {
+    id: "meridian",
+    name: "Meridian",
+    description: "A fuller, formal document: the name centred in tracked capitals, certifications high, skills grouped, and room for the detail a two-to-three page CV carries.",
+    bestFor: "Gulf, India and the wider APAC market, and senior hires anywhere a complete credential history is expected rather than a one-page summary.",
+    atsSafe: true,
+    pdf: {
+      font: "Times-Roman", layout: "single", accent: "#155e75", ink: "#141b1e", muted: "#576670",
+      nameSize: 24, nameAlign: "center", nameCaps: true, nameTracking: 1.2,
+      heading: "doubleRule", headingSize: 9.6, headingCaps: true, bodySize: 9.5, lineHeight: 1.44, pagePadding: 44,
+      skillsPlacement: "top", certificationsPlacement: "top",
+    },
+    docx: { font: "Georgia", nameAlign: "center", nameSize: 34, bodySize: 22, headingSize: 23, headingUpper: true, headingRule: true },
   },
   {
     id: "classic",

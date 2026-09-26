@@ -9,6 +9,8 @@ import { getAuthenticatedUser } from "@/lib/auth";
 import { connectionStatus } from "@/lib/integrations/store";
 import { buildCareerCommandCentre } from "@/lib/dashboard/command-centre";
 import { loadDashboardData } from "@/lib/dashboard/load-dashboard";
+import { DailyBriefCard } from "@/components/daily-brief-card";
+import { buildDailyBrief } from "@/lib/dashboard/daily-brief";
 
 export const dynamic = "force-dynamic";
 
@@ -52,6 +54,20 @@ export default async function DashboardPage({
   const pendingSteps = journey.steps.filter((s) => !s.complete);
   const approvedEvidence = workspace.evidence.filter((item) => item.approval_status === "approved").length;
   const pendingEvidence = workspace.evidence.filter((item) => item.approval_status === "pending").length;
+  const firstName = ((user.user_metadata?.full_name as string | undefined) ?? user.email?.split("@")[0] ?? "there").split(" ")[0];
+  /*
+   * What Sartho says out loud when somebody walks in. Built from the same
+   * workspace everything else on this page reads, and deliberately quiet when
+   * there is nothing worth saying.
+   */
+  const dailyBrief = buildDailyBrief({
+    now: new Date(),
+    lastSeenAt: dashboard.lastSeenAt,
+    firstName,
+    jobs,
+    pendingEvidence,
+    search: dashboard.search,
+  });
   const commandCentre = buildCareerCommandCentre({
     journey,
     jobs,
@@ -59,7 +75,6 @@ export default async function DashboardPage({
     approvedEvidence,
     pendingEvidence,
   });
-  const firstName = ((user.user_metadata?.full_name as string | undefined) ?? user.email?.split("@")[0] ?? "there").split(" ")[0];
 
   /*
    * Everything Sartho does rests on approved evidence, so before a résumé
@@ -119,7 +134,7 @@ export default async function DashboardPage({
       <Link href="/welcome" className="tour-replay-link" title="Take the Sartho product tour" aria-label="Take the Sartho product tour"><span aria-hidden="true">▶</span> Tour</Link>
       <ProductPageHeader
         eyebrow="Career Command Centre"
-        title={`Welcome back, ${firstName}.`}
+        title="Where your search stands."
         description="One connected view from Career Profile to outcome. Sartho uses your live workspace to explain what matters now and where to go next."
         metric={{ value: pendingSteps.length.toString(), label: pendingSteps.length === 1 ? "action required" : "actions required", href: "/journey" }}
       />
@@ -129,6 +144,12 @@ export default async function DashboardPage({
           Some opportunity or application data is temporarily unavailable. Your Career Profile and Journey are still current.
         </div>
       ) : null}
+
+      {/*
+        * Before the tiles, because it is the only part of the page that talks.
+        * The greeting moved off the page header so it is said once, here.
+        */}
+      <DailyBriefCard brief={dailyBrief} />
 
       {/*
         * Directly under the header, above the nudge.
