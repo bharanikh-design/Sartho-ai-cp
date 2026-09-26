@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { SemanticJobFit } from "@/lib/types";
 import {
+  affinityDelta,
+  blendRankingScore,
   decideSearchRelevance,
   selectSemanticCandidates,
   sortByRelevance,
@@ -157,5 +159,70 @@ describe("Search Relevance V2", () => {
     ];
     expect(sortByRelevance(rows).map((row) => row.relevanceTier))
       .toEqual(["strong", "possible", "outside"]);
+  });
+
+  it("orders within a tier by rankingScore when present, falling back to overallMatch", () => {
+    const rows = [
+      { overallMatch: 60, relevanceTier: "strong" as const, rankingScore: 60 },
+      // Lower evidence score, but the blend lifted it — it should lead.
+      { overallMatch: 50, relevanceTier: "strong" as const, rankingScore: 72 },
+      { overallMatch: 90, relevanceTier: "possible" as const },
+    ];
+    expect(sortByRelevance(rows).map((row) => row.overallMatch)).toEqual([50, 60, 90]);
+  });
+});
+
+describe("blendRankingScore", () => {
+  it("returns the deterministic score unchanged when no AI signals are present (AI-down = today)", () => {
+    expect(blendRankingScore(70)).toBe(70);
+    expect(blendRankingScore(0)).toBe(0);
+    expect(blendRankingScore(100)).toBe(100);
+  });
+
+  it("lifts an aligned semantic fit and sinks a conflict, scaled by confidence", () => {
+    expect(blendRankingScore(60, { semanticFit: fit("aligned", "", "high") })).toBe(70);
+    expect(blendRankingScore(60, { semanticFit: fit("adjacent", "", "high") })).toBe(64);
+    expect(blendRankingScore(60, { semanticFit: fit("conflict", "", "high") })).toBe(48);
+    // Lower confidence => smaller nudge.
+    expect(blendRankingScore(60, { semanticFit: fit("aligned", "", "low") })).toBe(63);
+    // "unclear" contributes nothing.
+    expect(blendRankingScore(60, { semanticFit: fit("unclear", "") })).toBe(60);
+  });
+
+  it("applies a bounded affinity nudge and clamps out-of-range deltas", () => {
+    expect(blendRankingScore(50, { affinityDelta: 1 })).toBe(58);
+    expect(blendRankingScore(50, { affinityDelta: -1 })).toBe(42);
+    expect(blendRankingScore(50, { affinityDelta: 0.5 })).toBe(54);
+    // Out-of-range and non-finite deltas cannot exceed the cap or throw.
+    expect(blendRankingScore(50, { affinityDelta: 99 })).toBe(58);
+    expect(blendRankingScore(50, { affinityDelta: Number.NaN })).toBe(50);
+  });
+
+  it("never leaves the 0–100 range even when signals stack", () => {
+    expect(blendRankingScore(98, { semanticFit: fit("aligned", ""), affinityDelta: 1 })).toBe(100);
+    expect(blendRankingScore(3, { semanticFit: fit("conflict", ""), affinityDelta: -1 })).toBe(0);
+  });
+});
+
+describe("affinityDelta", () => {
+  it("is zero when the person has no affinity signals (so the blend is a no-op)", () => {
+    expect(affinityDelta("Senior ServiceNow Architect, remote", [], [])).toBe(0);
+  });
+
+  it("raises for positive-concept hits and lowers for negative-concept hits", () => {
+    expect(affinityDelta("Remote ServiceNow platform role", ["remote"], ["sales"])).toBeCloseTo(0.5);
+    expect(affinityDelta("On-site enterprise sales manager", ["remote"], ["sales"])).toBeCloseTo(-0.6);
+    // Both present: they partly offset.
+    expect(affinityDelta("Remote sales role", ["remote"], ["sales"])).toBeCloseTo(-0.1);
+  });
+
+  it("matches whole words only and ignores case, so it never fires on substrings", () => {
+    expect(affinityDelta("Salesforce administrator", [], ["sales"])).toBe(0); // not "sales"
+    expect(affinityDelta("REMOTE-first team", ["remote"], [])).toBeCloseTo(0.5);
+  });
+
+  it("clamps to [-1, 1] however many concepts hit", () => {
+    const text = "remote hybrid flexible async distributed";
+    expect(affinityDelta(text, ["remote", "hybrid", "flexible", "async", "distributed"], [])).toBe(1);
   });
 });

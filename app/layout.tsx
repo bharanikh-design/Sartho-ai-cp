@@ -4,7 +4,6 @@ import localFont from "next/font/local";
 import "./globals.css";
 import "./auth.css";
 import "./auth-refinement.css";
-import "./product.css";
 import "./onboarding.css";
 import "./shell-refinement.css";
 import "./account-and-journey.css";
