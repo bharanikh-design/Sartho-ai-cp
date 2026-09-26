@@ -389,3 +389,77 @@ describe("a validated destination is canonical, not just parseable", () => {
     }
   });
 });
+
+/*
+ * Codex's third and fourth findings on this PR, both downstream consequences
+ * of ranking a real apply link above Google's page rather than defects in the
+ * ranking itself. Worth keeping together: each is a contract somewhere else in
+ * the app that the mapper quietly stopped honouring.
+ */
+describe("a chosen destination honours the contracts around it", () => {
+  const advert = {
+    title: "ITSM Manager",
+    company_name: "Somewhere",
+    description: "Own the ITSM practice.",
+    share_link: "https://www.google.com/search?q=acme",
+  };
+
+  it("never picks an http destination the save route would reject", () => {
+    /*
+     * app/api/jobs/schema.ts accepts sourceUrl only when it starts with
+     * https://. Before the reordering an unrecognised http option lost to the
+     * https share_link; afterwards it won, and "Save to pipeline" 400d every
+     * time on that card. A card you cannot save is worse than one pointing at
+     * Google's listing, so the mapper is held to the save route's contract.
+     */
+    expect(chooseApplyUrl({ ...advert, apply_options: [{ link: "http://jobs.example.org/1" }] }))
+      .toBe("https://www.google.com/search?q=acme");
+  });
+
+  it("still prefers an https board over Google", () => {
+    expect(chooseApplyUrl({ ...advert, apply_options: [{ link: "https://jobs.example.org/1" }] }))
+      .toBe("https://jobs.example.org/1");
+  });
+
+  it("drops the card when http is genuinely the only option", () => {
+    expect(chooseApplyUrl({
+      title: "ITSM Manager",
+      company_name: "Somewhere",
+      description: "Own the ITSM practice.",
+      apply_options: [{ link: "http://jobs.example.org/1" }],
+    })).toBeNull();
+  });
+});
+
+describe("canonicalising a URL does not re-alert a vacancy", () => {
+  it("matches a stored URL against its canonical form", async () => {
+    const { selectNewMatches } = await import("@/lib/notifications/match-alerts");
+    const result = {
+      title: "ITSM Manager", employer: "Acme", location: "Melbourne", url: "https://example.com/",
+      salary: null, source: "Google for Jobs", overallMatch: 90, recommendation: "strong",
+      matchedSkills: [],
+    };
+
+    /*
+     * seen_job_matches holds what earlier runs wrote — uncanonicalised, so
+     * "https://example.com" with no trailing slash. Compared as exact strings
+     * that stops matching the moment the mapper returns parsed.href, and the
+     * same vacancy is emailed twice against a once-ever promise.
+     */
+    expect(selectNewMatches([result as never], ["https://example.com"]), "no trailing slash").toEqual([]);
+    expect(selectNewMatches([result as never], ["HTTPS://EXAMPLE.COM/"]), "host case folded").toEqual([]);
+    expect(selectNewMatches([result as never], ["https://example.com/"]), "already canonical").toEqual([]);
+  });
+
+  it("still alerts a genuinely new vacancy", () => {
+    /* The guard must not swallow everything — a different URL is still new. */
+    return import("@/lib/notifications/match-alerts").then(({ selectNewMatches }) => {
+      const result = {
+        title: "ITSM Manager", employer: "Acme", location: "Melbourne", url: "https://example.com/new",
+        salary: null, source: "Google for Jobs", overallMatch: 90, recommendation: "strong",
+        matchedSkills: [],
+      };
+      expect(selectNewMatches([result as never], ["https://example.com/"])).toHaveLength(1);
+    });
+  });
+});
