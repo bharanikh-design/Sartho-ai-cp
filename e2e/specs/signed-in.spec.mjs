@@ -213,3 +213,101 @@ test.describe("The daily briefing", () => {
     }
   });
 });
+
+/*
+ * The interview coach, in a browser.
+ *
+ * Its route and grounding library were built long before anything rendered
+ * them, and two CTAs pointed at `#interview-coach` — an id no markup carried.
+ * Nothing caught it because no test ever loaded a job page: the seed had
+ * `jobs: []`. These load the real page against the real route handlers.
+ */
+test.describe("The interview coach", () => {
+  const JOB = "11111111-1111-4111-8111-111111111111";
+
+  test("the anchor two CTAs point at actually resolves", async ({ page }) => {
+    await page.goto(`/jobs/${JOB}#interview-coach`);
+
+    const coach = page.locator("#interview-coach");
+    await expect(coach, "the id the Command Centre links to").toHaveCount(1);
+    await expect(coach).toBeVisible();
+    await expect(coach.getByRole("heading", { name: "Interview coach" })).toBeVisible();
+  });
+
+  test("offers to prepare, and says what it will draw on", async ({ page }) => {
+    await page.goto(`/jobs/${JOB}`);
+    const coach = page.locator("#interview-coach");
+
+    /* Analysis is complete and evidence is approved, so it is not blocked. */
+    const prepare = coach.getByRole("button", { name: /Prepare for this interview/ });
+    await expect(prepare).toBeVisible();
+    await expect(prepare).toBeEnabled();
+    await expect(coach).toContainText(/mapped requirement/);
+  });
+
+  test("the Command Centre's interview CTA leads somewhere real", async ({ page }) => {
+    /*
+     * The whole failure in one assertion: follow the product's own top action
+     * and land on an element that exists.
+     */
+    await page.goto("/interview-prep");
+    const row = page.locator(`a[href="/jobs/${JOB}#interview-coach"]`).first();
+    await expect(row).toBeVisible();
+    await row.click();
+
+    await expect(page).toHaveURL(new RegExp(`/jobs/${JOB}`));
+    await expect(page.locator("#interview-coach")).toBeVisible();
+  });
+});
+
+test.describe("Next action on an application", () => {
+  const JOB = "11111111-1111-4111-8111-111111111111";
+
+  test("can be typed and saved against the real route", async ({ page }) => {
+    await page.goto(`/jobs/${JOB}`);
+
+    const field = page.locator(".next-action-field");
+    await expect(field).toBeVisible();
+
+    const action = field.getByLabel("Next action for this application");
+    const date = field.getByLabel("Date for this next action");
+    const save = field.getByRole("button", { name: /^Save$/ });
+
+    /* A date with no action is a deadline for nothing, so it is not offered. */
+    await expect(date).toBeDisabled();
+    await expect(save).toBeDisabled();
+
+    await action.fill("Call the hiring manager");
+    await expect(date).toBeEnabled();
+    await expect(save).toBeEnabled();
+
+    /* Clearing the action clears the day with it — the server rule, mirrored. */
+    await date.fill("2026-10-02");
+    await action.fill("");
+    await expect(date).toBeDisabled();
+    await expect(date).toHaveValue("");
+  });
+});
+
+test.describe("Every outbound link is a real destination", () => {
+  test("no View link sends anybody to a search engine", async ({ page }) => {
+    await page.goto("/search-plan");
+    await expect(page.getByRole("heading", { name: "Best matches" })).toBeVisible();
+
+    const views = page.locator("#find-roles .application-row").getByRole("link", { name: /^View/ });
+    const count = await views.count();
+    expect(count, "there are matches to check").toBeGreaterThan(0);
+
+    for (let i = 0; i < count; i += 1) {
+      const href = await views.nth(i).getAttribute("href");
+      /*
+       * The bug reported three times. Both mappers could pick Google's own
+       * results page over a real apply link; neither can now.
+       */
+      expect(href, `View #${i} points at a search engine`).not.toMatch(/google\.[a-z.]+\/search/);
+      expect(href, `View #${i} is not a real URL`).toMatch(/^https?:\/\//);
+      await expect(views.nth(i)).toHaveAttribute("target", "_blank");
+      await expect(views.nth(i)).toHaveAttribute("rel", /noreferrer/);
+    }
+  });
+});

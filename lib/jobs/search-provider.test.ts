@@ -145,14 +145,28 @@ describe("mapJSearchResult", () => {
     });
     expect(onlyGoogle?.url).toBe("https://www.google.com/search?q=Data+Analyst&ibp=htl;jobs");
 
-    // Nothing at all → the bare-search fallback keeps the card from being a dead end.
+    /*
+     * Nothing at all → no card.
+     *
+     * This asserted the opposite: that the mapper built
+     * `google.com/search?q=Data%20Analyst%20Acme%20job` and shipped a card
+     * pointing at it. The comment directly above that code called "View going
+     * to a generic Google search" a broken promise, and the fallback was the
+     * broken promise — a query Sartho wrote itself, not a vacancy and not even
+     * Google's listing for one. It is the third reported instance of "View
+     * still goes to Google search".
+     *
+     * Corrected to the new contract rather than kept: a record with no apply
+     * link, no direct-employer option and no Google deep-link has nowhere to
+     * send anybody, so it is dropped — the same rule mapSerpApiResult has
+     * always applied beside it.
+     */
     const nothing = mapJSearchResult({
       job_title: "Data Analyst",
       employer_name: "Acme",
       job_description: "Analyse data for Acme.",
     });
-    expect(nothing?.url).toContain("google.com/search?q=");
-    expect(nothing?.url).toContain("Data%20Analyst");
+    expect(nothing).toBeNull();
   });
 });
 

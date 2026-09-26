@@ -417,11 +417,22 @@ export function mapJSearchResult(raw: JSearchResult): JobSearchResult | null {
   const anyApply = applyOptions.find((option) => option?.apply_link)?.apply_link;
   const url = (raw.job_apply_link || directApply || anyApply || raw.job_google_link)?.trim();
   const description = raw.job_description?.trim();
-  
-  const employer = raw.employer_name?.trim();
-  const finalUrl = url || (title ? `https://www.google.com/search?q=${encodeURIComponent(`${title} ${employer || ""} job`.trim())}` : undefined);
-  
-  if (!title || !finalUrl || !description) return null;
+
+  /*
+   * No link means no card.
+   *
+   * This used to manufacture one — `google.com/search?q=<title> <employer> job`
+   * — three lines under a comment declaring that exact thing a broken promise.
+   * So a record with no apply route anywhere became a card whose "View" ran a
+   * Google search Sartho had written itself, which is not a vacancy and not
+   * even Google's listing for one.
+   *
+   * Dropped instead, which is what mapSerpApiResult already does beside this
+   * ("a card with no link is a tease"). Records reaching here have no apply
+   * link, no direct-employer option, and no Google deep-link, so there was
+   * never anywhere to send anybody.
+   */
+  if (!title || !url || !description) return null;
   const location = [raw.job_city, raw.job_state, raw.job_country]
     .map((part) => part?.trim())
     .filter((part): part is string => Boolean(part))
@@ -432,7 +443,7 @@ export function mapJSearchResult(raw: JSearchResult): JobSearchResult | null {
     employer: raw.employer_name?.trim() || null,
     location,
     description,
-    url: finalUrl,
+    url,
     salary: formatSalary(raw.job_min_salary, raw.job_max_salary),
     postedAt: raw.job_posted_at_datetime_utc?.trim() || null,
     /*

@@ -583,6 +583,41 @@ describe("chooseApplyUrl", () => {
     })).toBe("https://www.google.com/search?q=acme#job");
   });
 
+  /*
+   * The bug a person reported three times: "View still goes to Google search".
+   *
+   * Both earlier attempts read it as a gap in KNOWN_BOARDS and added the
+   * boards that had been named. That fixes those boards and leaves every other
+   * board pointing at Google, because share_link sat above links[0] — so any
+   * advert whose only apply route was an unlisted board lost to a search page
+   * with a real apply link sitting right there in apply_options.
+   */
+  describe("a real apply link beats Google's results page", () => {
+    const withLink = (link: string) => ({
+      company_name: "Acme",
+      share_link: "https://www.google.com/search?q=acme#job",
+      apply_options: [{ title: "Somewhere", link }],
+    });
+
+    for (const link of [
+      "https://jobs.some-regional-board.com/vacancy/1",
+      "https://careers.bigco.example/apply/22",
+      "https://www.stellenanzeigen.de/job/9",
+      "https://hh.ru/vacancy/12345",
+      "https://apply.workforcenow.adp.com/jobs/7",
+    ]) {
+      it(`sends you to ${new URL(link).hostname}, not a search page`, () => {
+        expect(chooseApplyUrl(withLink(link))).toBe(link);
+      });
+    }
+
+    it("holds for a board that is on no list anywhere", () => {
+      /* The point of the fix: the allowlist cannot be completed, so do not rely on it. */
+      const url = "https://vacatures.example.nl/12";
+      expect(chooseApplyUrl(withLink(url))).toBe(url);
+    });
+  });
+
   it("still uses an unrecognised host rather than showing nothing", () => {
     /* A card with no link is a tease; a long shot beats no shot. */
     expect(chooseApplyUrl({

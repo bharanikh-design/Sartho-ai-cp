@@ -222,3 +222,58 @@ describe("stress", () => {
     expect(mapped?.description.length).toBeGreaterThan(100_000);
   });
 });
+
+/*
+ * The third report of "View still goes to Google search", traced to two
+ * separate places that each preferred a Google page over a real destination.
+ */
+describe("View never lands on a search engine", () => {
+  it("JSearch drops a record with no apply route rather than inventing one", async () => {
+    const { mapJSearchResult } = await import("@/lib/jobs/search-provider");
+    /*
+     * This used to become google.com/search?q=<title> <employer> job — a query
+     * Sartho wrote itself, three lines under a comment calling that a broken
+     * promise. A record with nothing to apply to is not a card.
+     */
+    expect(mapJSearchResult({
+      job_title: "ITSM Manager",
+      employer_name: "Acme",
+      job_description: "Own the ITSM practice.",
+    } as never)).toBeNull();
+  });
+
+  it("JSearch still maps a record that has a real apply link", async () => {
+    const { mapJSearchResult } = await import("@/lib/jobs/search-provider");
+    const mapped = mapJSearchResult({
+      job_title: "ITSM Manager",
+      employer_name: "Acme",
+      job_description: "Own the ITSM practice.",
+      job_apply_link: "https://acme.com/careers/1",
+    } as never);
+    expect(mapped?.url).toBe("https://acme.com/careers/1");
+  });
+
+  it("no mapper hands back a search page while a real link exists", async () => {
+    const { mapSerpApiResult } = await import("@/lib/jobs/serpapi");
+    const { mapJSearchResult } = await import("@/lib/jobs/search-provider");
+
+    const serp = mapSerpApiResult({
+      title: "ITSM Manager",
+      company_name: "Acme",
+      description: "Own the ITSM practice.",
+      share_link: "https://www.google.com/search?q=acme",
+      apply_options: [{ title: "Board", link: "https://vacatures.example.nl/12" }],
+    });
+    const jsearch = mapJSearchResult({
+      job_title: "ITSM Manager",
+      employer_name: "Acme",
+      job_description: "Own the ITSM practice.",
+      apply_options: [{ apply_link: "https://vacatures.example.nl/12" }],
+    } as never);
+
+    for (const mapped of [serp, jsearch]) {
+      expect(mapped?.url, "mapped to a search page").not.toMatch(/google\.[a-z.]+\/search/);
+      expect(mapped?.url).toBe("https://vacatures.example.nl/12");
+    }
+  });
+});
