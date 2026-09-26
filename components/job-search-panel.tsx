@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { searchFilterNotes } from "@/lib/jobs/search-notes";
 import { deduplicateSearchResults } from "@/lib/jobs/location-guard";
 import type { JobSemanticContext, SemanticJobFit } from "@/lib/types";
 
@@ -87,6 +88,7 @@ export function JobSearchPanel({
   const [error, setError] = useState<string | null>(null);
   const [results, setResults] = useState<SearchResult[]>(initialResults);
   const [criteria, setCriteria] = useState<SearchCriteria | null>(initialCriteria);
+  const filterNotes = searchFilterNotes(criteria);
   const [lastRun, setLastRun] = useState<string | null>(searchedAt);
   const [savingUrl, setSavingUrl] = useState<string | null>(null);
   const [savedUrls, setSavedUrls] = useState<string[]>([]);
@@ -381,6 +383,24 @@ export function JobSearchPanel({
             <strong className="search-source-badge" key={provider}>{provider === "Google for Jobs (SerpApi)" ? "Google Jobs" : provider === "Google for Jobs" ? "JSearch" : provider}</strong>
           ))}
         </div>
+      ) : null}
+
+      {/*
+        * What was taken off this page, and why.
+        *
+        * runBriefSearch has always counted the adverts each filter removed and
+        * the providers that failed, written all of it onto the criteria it
+        * hands back, and stored it. Nothing rendered any of it — so a filter
+        * could remove half the results and the only evidence was a shorter
+        * list, which reads as a thin market rather than as a filter working.
+        *
+        * Empty when nothing was filtered, so this costs a person nothing on
+        * the runs where there is nothing to say.
+        */}
+      {status === "ready" && filterNotes.length ? (
+        <ul className="search-filter-notes" aria-label="What was filtered from these results">
+          {filterNotes.map((note) => <li key={note.id}>{note.text}</li>)}
+        </ul>
       ) : null}
 
       {status === "loading" ? (

@@ -28,15 +28,29 @@ export type EmploymentType = {
    * A hint is weaker than a filter, and the UI says which one each got.
    */
   queryHint: string;
+  /*
+   * Google's own words for this working pattern, as it reports them on a
+   * listing's `detected_extensions.schedule_type`.
+   *
+   * This is how SerpApi narrows: not by a request parameter, which it has
+   * none of, but by reading the pattern back off each result. It lives here
+   * rather than in serpapi.ts so that the thing deciding what to filter and
+   * the thing *reporting* what was filtered cannot drift apart — which is
+   * exactly how the report came to say "hint" about a real filter.
+   *
+   * Matched loosely because the spelling varies by market and a hyphen
+   * should not lose somebody a job.
+   */
+  serpapiSchedule?: string[];
 };
 
 export const EMPLOYMENT_TYPES: EmploymentType[] = [
-  { id: "Full-time", adzunaParam: "full_time", jsearchValue: "FULLTIME", queryHint: "full time" },
-  { id: "Part-time", adzunaParam: "part_time", jsearchValue: "PARTTIME", queryHint: "part time" },
-  { id: "Contract", adzunaParam: "contract", jsearchValue: "CONTRACTOR", queryHint: "contract" },
-  { id: "Permanent", adzunaParam: "permanent", queryHint: "permanent" },
-  { id: "Internship", jsearchValue: "INTERN", queryHint: "internship" },
-  { id: "Graduate programme", queryHint: "graduate program" },
+  { id: "Full-time", adzunaParam: "full_time", jsearchValue: "FULLTIME", queryHint: "full time", serpapiSchedule: ["full time", "fulltime", "permanent"] },
+  { id: "Part-time", adzunaParam: "part_time", jsearchValue: "PARTTIME", queryHint: "part time", serpapiSchedule: ["part time", "parttime"] },
+  { id: "Contract", adzunaParam: "contract", jsearchValue: "CONTRACTOR", queryHint: "contract", serpapiSchedule: ["contract", "contractor", "temporary", "temp"] },
+  { id: "Permanent", adzunaParam: "permanent", queryHint: "permanent", serpapiSchedule: ["permanent", "full time", "fulltime"] },
+  { id: "Internship", jsearchValue: "INTERN", queryHint: "internship", serpapiSchedule: ["intern", "internship"] },
+  { id: "Graduate programme", queryHint: "graduate program", serpapiSchedule: ["intern", "internship", "graduate"] },
 ];
 
 export type ProviderName = "adzuna" | "jsearch" | "serpapi";
@@ -59,6 +73,33 @@ export type ProviderName = "adzuna" | "jsearch" | "serpapi";
 export function canFilter(type: EmploymentType, provider: ProviderName): boolean {
   if (provider === "serpapi") return false;
   return provider === "adzuna" ? Boolean(type.adzunaParam) : Boolean(type.jsearchValue);
+}
+
+/**
+ * Whether the provider really narrows the results on this type, by any means.
+ *
+ * `canFilter` answers a narrower question — can it be asked for in the request
+ * — and that is the right question for query hints. It is the wrong question
+ * for telling a person what happened to their search, and using it for both
+ * made the report exactly backwards for SerpApi.
+ *
+ * SerpApi cannot ask Google to filter, so `canFilter` is false and the brief
+ * called every selection a hint. But `keepScheduleTypes` then removes every
+ * listing whose reported schedule disagrees — a real filter, applied after the
+ * results come back, and the strictest treatment any of the three providers
+ * gives. A person who ticked Contract was told it was only a hint while their
+ * results were being filtered on it.
+ */
+export function narrowsResults(type: EmploymentType, provider: ProviderName): boolean {
+  if (provider === "serpapi") return Boolean(type.serpapiSchedule?.length);
+  return canFilter(type, provider);
+}
+
+/** Google's schedule words for a selection, for the post-filter in serpapi.ts. */
+export function serpapiScheduleWords(selected: string[]): string[] {
+  return [...new Set(
+    selected.flatMap((id) => employmentType(id)?.serpapiSchedule ?? []),
+  )];
 }
 
 /*
@@ -94,7 +135,7 @@ export function filterableSelections(selected: string[], provider: ProviderName)
 
   return selected.filter((id) => {
     const type = employmentType(id);
-    return type ? canFilter(type, provider) : false;
+    return type ? narrowsResults(type, provider) : false;
   });
 }
 
@@ -134,6 +175,17 @@ export function adzunaEmploymentParams(selected: string[]): string[] {
 
 /** Words to fold into the query text for selections THIS provider cannot filter. */
 export function employmentQueryHints(selected: string[], provider: ProviderName): string[] {
+  /*
+   * Never for SerpApi, and this is a guard rather than an accident of the
+   * data. Appending "full time" to a SerpApi query has already killed the
+   * entire search once: Google matches every added term, so
+   * "Servicenow Delivery Director full time" is a four-term match against a
+   * title that is rare to begin with, and Google answered with nothing at all.
+   * SerpApi narrows on schedule after the results instead — see
+   * narrowsResults above — so it needs neither a parameter nor a word.
+   */
+  if (provider === "serpapi") return [];
+
   return [...new Set(
     selected
       .map((id) => employmentType(id))

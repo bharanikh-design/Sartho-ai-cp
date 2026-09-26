@@ -1348,3 +1348,13 @@ h2.resume-doc-heading.resume-doc-field { margin-bottom: 0; border-bottom: 1px so
 .studio-markets small strong { color: var(--text-secondary); }
 /* Named by the chosen market's own table, so it changes as the market does. */
 .studio-template-pick { border-radius: 999px; padding: 1px 6px; color: #7fc9a2; background: rgba(107,207,147,.14); font-size: var(--text-2xs); font-weight: 700; letter-spacing: .04em; }
+
+/*
+ * Sartho's template pick, offered under the chip row. Styled as an aside
+ * rather than a banner: it is an opinion about the document, not a warning,
+ * and it disappears entirely once the person agrees with it.
+ */
+.studio-template-suggestion { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-top: 12px; padding: 13px 15px; border: 1px dashed var(--line-bright); border-radius: 14px; }
+.studio-template-suggestion > div { flex: 1 1 260px; min-width: 0; }
+.studio-template-suggestion strong { display: block; color: var(--text); font-size: var(--text-xs); }
+.studio-template-suggestion p { margin: 5px 0 0; color: var(--text-secondary); font-size: var(--text-2xs); line-height: 1.55; }

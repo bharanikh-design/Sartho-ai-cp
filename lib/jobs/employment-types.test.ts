@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { EMPLOYMENT_TYPES, adzunaEmploymentParams, canFilter, earlyCareerSelections, employmentQueryHints, employmentType, filterableSelections, isEmploymentType, jsearchEmploymentTypes } from "./employment-types";
+import { EMPLOYMENT_TYPES, adzunaEmploymentParams, canFilter, earlyCareerSelections, employmentQueryHints, employmentType, filterableSelections, isEmploymentType, jsearchEmploymentTypes, narrowsResults, serpapiScheduleWords } from "./employment-types";
 
 describe("employment types", () => {
   it("reaches each provider in that provider's own language", () => {
@@ -48,23 +48,52 @@ describe("employment types", () => {
 });
 
 /*
- * SerpApi cannot filter employment type, and the claim that it could cost a
- * whole search: a hand-built `employment_type:FULLTIME` chip returned nothing
- * from Google, on every filtered search, while the unfiltered probe kept
- * reporting the provider healthy.
+ * SerpApi cannot ask Google to filter employment type, and the claim that it
+ * could cost a whole search: a hand-built `employment_type:FULLTIME` chip
+ * returned nothing from Google on every filtered search, while the unfiltered
+ * probe kept reporting the provider healthy.
+ *
+ * Two assertions in here have been corrected rather than kept, because they
+ * described the consequence of a bug:
+ *
+ *   - `employmentQueryHints(..., "serpapi")` returned the words. Nothing in
+ *     production ever asked it for them — search-provider.ts only ever passes
+ *     "adzuna" — so this locked in a landmine rather than a behaviour. Putting
+ *     "full time" into a SerpApi query is the *other* way this search has been
+ *     killed: Google matches every term added, so the words come back with
+ *     nothing. It now refuses, by a guard rather than by luck.
+ *
+ *   - `filterableSelections(..., "serpapi")` returned nothing, so the brief
+ *     told people every selection was a hint. keepScheduleTypes was filtering
+ *     on all of them the whole time. The report was not merely incomplete, it
+ *     was backwards, and this test was holding it that way.
  */
 describe("what SerpApi can actually narrow", () => {
   const fullTime = employmentType("Full-time")!;
   const internship = employmentType("Internship")!;
 
-  it("never claims to filter, whatever the type", () => {
+  it("never claims Google will filter it for us", () => {
+    /* Unchanged, and still the point: there is no request parameter to use. */
     for (const type of EMPLOYMENT_TYPES) {
       expect(canFilter(type, "serpapi")).toBe(false);
     }
   });
 
-  it("sends every selection through as a query hint instead", () => {
-    expect(employmentQueryHints(["Full-time", "Internship"], "serpapi")).toEqual(["full time", "internship"]);
+  it("puts no employment words into the query", () => {
+    expect(employmentQueryHints(["Full-time", "Internship"], "serpapi")).toEqual([]);
+    for (const type of EMPLOYMENT_TYPES) {
+      expect(employmentQueryHints([type.id], "serpapi"), type.id).toEqual([]);
+    }
+  });
+
+  it("narrows on every type after the results instead", () => {
+    for (const type of EMPLOYMENT_TYPES) {
+      expect(narrowsResults(type, "serpapi"), type.id).toBe(true);
+    }
+  });
+
+  it("reports those selections as filtered, because they were", () => {
+    expect(filterableSelections(["Full-time", "Contract"], "serpapi")).toEqual(["Full-time", "Contract"]);
   });
 
   /* The other two are unchanged: this was a SerpApi mistake, not a shared one. */
@@ -73,10 +102,35 @@ describe("what SerpApi can actually narrow", () => {
     expect(canFilter(fullTime, "jsearch")).toBe(true);
     expect(canFilter(internship, "jsearch")).toBe(true);
     expect(canFilter(internship, "adzuna")).toBe(false);
+    expect(narrowsResults(internship, "adzuna")).toBe(false);
+    expect(narrowsResults(fullTime, "adzuna")).toBe(true);
+  });
+});
+
+/*
+ * serpapi.ts used to declare the schedule vocabulary itself while the report
+ * of what got filtered read canFilter over here — two facts about one filter,
+ * with nothing holding them together. This is the guard on the single table
+ * that replaced them.
+ */
+describe("the schedule vocabulary", () => {
+  it("covers every employment type, so none is silently unfilterable", () => {
+    for (const type of EMPLOYMENT_TYPES) {
+      expect(type.serpapiSchedule?.length, `${type.id} has no schedule words`).toBeTruthy();
+    }
   });
 
-  it("reports nothing as filterable on SerpApi", () => {
-    expect(filterableSelections(["Full-time", "Contract"], "serpapi")).toEqual([]);
+  it("gathers the words for a selection without duplicating them", () => {
+    /* Full-time and Permanent overlap on "permanent" and "fulltime". */
+    const words = serpapiScheduleWords(["Full-time", "Permanent"]);
+    expect(new Set(words).size).toBe(words.length);
+    expect(words).toContain("full time");
+    expect(words).toContain("permanent");
+  });
+
+  it("returns nothing for a selection it does not know", () => {
+    expect(serpapiScheduleWords(["Whenever I feel like it"])).toEqual([]);
+    expect(serpapiScheduleWords([])).toEqual([]);
   });
 });
 
