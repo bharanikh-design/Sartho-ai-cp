@@ -6,7 +6,6 @@ import "./auth.css";
 import "./auth-refinement.css";
 import "./product.css";
 import "./onboarding.css";
-import "./onboarding-responsive.css";
 import "./shell-refinement.css";
 import "./account-and-journey.css";
 import "./workspace.css";
