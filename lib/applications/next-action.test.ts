@@ -56,8 +56,18 @@ describe("normaliseNextAction", () => {
   });
 
   it("drops a date that has no action attached to it", () => {
-    /* A deadline for nothing. Clearing the action clears the day with it. */
+    /*
+     * A deadline for nothing. Clearing the action clears the day with it.
+     *
+     * NextActionField mirrors this rule in the browser — clearing the text
+     * field also clears the date — and it has to. When only the server applied
+     * it the two disagreed: the save was correct, but the component kept the
+     * old date in state, so the greyed-out input still held a day the person
+     * had deleted and handed it back the moment they typed a new action.
+     */
     expect(normaliseNextAction(null, "2026-10-02")).toEqual({ nextAction: null, nextActionDate: null });
+    expect(normaliseNextAction("", "2026-10-02")).toEqual({ nextAction: null, nextActionDate: null });
+    expect(normaliseNextAction("   ", "2026-10-02")).toEqual({ nextAction: null, nextActionDate: null });
   });
 
   it("keeps the action when the date is unusable rather than losing both", () => {

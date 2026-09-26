@@ -132,15 +132,28 @@ export function InterviewCoachPanel(props: Props) {
                   </details>
                 ) : (
                   /*
-                   * Not an omission. The route's prompt allows forward-looking
-                   * and judgment questions to cite nothing, and grounding
-                   * strips any id that was not an approved record — so "no
-                   * evidence" here means this one is genuinely about how you
-                   * think, and saying so is more useful than leaving a gap the
-                   * person reads as a bug.
+                   * States what is true, and no more.
+                   *
+                   * This said "Judgment question — answer from how you would
+                   * approach it, not from a past example", which the data does
+                   * not support. An empty array has two causes that cannot be
+                   * told apart here: the route's prompt does allow a
+                   * forward-looking question to cite nothing, but
+                   * keepGroundedIds also silently drops every id that was not
+                   * an approved record — so an experience question whose
+                   * citations were wrong lands in exactly this branch. Telling
+                   * somebody not to use a past example for a question that is
+                   * asking for one is the failure this whole product is meant
+                   * to avoid: stating something it cannot evidence.
+                   *
+                   * The honest line covers both, and is useful either way.
                    */
-                  <div className="interview-question-judgment">
-                    Judgment question — answer from how you would approach it, not from a past example.
+                  <div className="interview-question-unevidenced">
+                    <strong>Nothing from your Career Profile is attached to this one.</strong>
+                    <span>
+                      If it is asking how you would approach something, answer from your thinking.
+                      If you reach for a past example, make sure it is one you can stand behind.
+                    </span>
                   </div>
                 )}
 

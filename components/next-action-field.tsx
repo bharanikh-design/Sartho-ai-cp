@@ -66,7 +66,20 @@ export function NextActionField({
           value={action}
           maxLength={200}
           placeholder="Follow up with the hiring manager"
-          onChange={(event) => { setAction(event.target.value); setSaved(false); }}
+          onChange={(event) => {
+            const next = event.target.value;
+            setAction(next);
+            /*
+             * Clearing the action clears the day with it, because the server
+             * already does: normaliseNextAction drops a date with nothing
+             * attached. Without this the form and the server disagree — the
+             * date input greys out still holding the old value, `dirty` never
+             * settles, and typing a new action weeks later re-enables the
+             * field on a date the person deleted and saves it.
+             */
+            if (!next.trim()) setDate("");
+            setSaved(false);
+          }}
           aria-label="Next action for this application"
         />
       </label>
