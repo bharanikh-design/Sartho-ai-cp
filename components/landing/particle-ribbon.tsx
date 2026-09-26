@@ -55,16 +55,21 @@ void main() {
   float v = a_v;
   float t = u_time + u_phase;
   float sx = spineX(v, t) + u_xoff + u_pointer.x * 0.012;
-  // The cross-section twists along the length, and the twist travels over time —
-  // this is what makes the strand read as folding silk rather than a flat band.
-  float th = v * PI * 3.0 + t * 0.9;
-  float halfWidth = 0.078 * (0.55 + 0.45 * sin(v * PI));
-  float x = sx + a_u * halfWidth * cos(th);      // narrows to a bright edge when side-on
+  // The cross-section twists along the length, and the twist travels over time.
+  // Fewer, broader folds (1.6π over the length) so it reads as a sheet of silk
+  // rather than thin threads.
+  float th = v * PI * 1.6 + t * 0.8;
+  // A wide ribbon that keeps most of its width through the twist — a floor of
+  // 55% means it never collapses to an invisible line at the half-turns, so the
+  // fabric stays substantial and visible at any viewport height.
+  float halfWidth = 0.095 * (0.55 + 0.45 * sin(v * PI));
+  float x = sx + a_u * halfWidth * (0.55 + 0.45 * abs(cos(th)));
   float y = v + u_pointer.y * 0.008;
   gl_Position = vec4(x * 2.0 - 1.0, 1.0 - y * 2.0, 0.0, 1.0);
   v_v = v;
   v_u = a_u;
-  v_shade = 0.5 + 0.5 * sin(th + a_u * 0.6);      // folds catching light
+  // Folds catching light — broad light and dark bands travelling the sheet.
+  v_shade = 0.5 + 0.5 * sin(th + a_u * 1.4);
 }
 `;
 
@@ -78,8 +83,11 @@ varying float v_u;
 varying float v_shade;
 void main() {
   vec3 color = mix(u_colorFar, u_colorNear, v_v);
-  color *= (0.45 + v_shade);                       // sheen from the folds
-  float edge = smoothstep(0.0, 0.4, 1.0 - abs(v_u));
+  // High base brightness so the whole sheet reads as lit silk; the folds add
+  // highlights on top rather than being the only thing visible. A low floor made
+  // the ribbon vanish wherever a fold was mid-turn, which looked like nothing.
+  color *= (0.4 + 0.55 * v_shade);
+  float edge = smoothstep(0.0, 0.5, 1.0 - abs(v_u));
   float ends = smoothstep(0.0, 0.12, v_v) * smoothstep(1.0, 0.86, v_v);
   float a = edge * ends * u_intensity;
   gl_FragColor = vec4(color * a, a);               // premultiplied — serves both blends
@@ -166,7 +174,7 @@ const THEME_SETTINGS: Record<
     colorFar: [0.34, 0.28, 0.82],
     colorNear: [0.2, 0.44, 0.9],
     intensity: 0.5,
-    fabricScale: 1.05,
+    fabricScale: 0.8,
     additive: false,
   },
 };
@@ -174,9 +182,9 @@ const THEME_SETTINGS: Record<
 // Three silk strands: [time phase, horizontal offset, base weight]. Overlapping
 // at different phases gives the woven depth of fabric rather than one flat band.
 const STRANDS: Array<[number, number, number]> = [
-  [0.0, 0.0, 0.62],
-  [1.7, 0.03, 0.42],
-  [3.4, -0.025, 0.3],
+  [0.0, 0.0, 0.4],
+  [1.7, 0.05, 0.26],
+  [3.4, -0.045, 0.18],
 ];
 
 // A pleasant, well-twisted pose for the reduced-motion still frame.
@@ -355,13 +363,16 @@ export function ParticleRibbon({ className }: { className?: string }) {
       // 1. Silk strands, back to front.
       context.useProgram(fabricProgram);
       context.bindBuffer(context.ARRAY_BUFFER, fabricBuf);
+      // Each vertex is two floats (v, u), so the stride is 8 bytes. Reading it at
+      // 16 collapsed the ribbon to a degenerate line — the bug that made the silk
+      // look like a faint streak instead of a sheet.
       if (fabricLoc.a_v >= 0) {
         context.enableVertexAttribArray(fabricLoc.a_v);
-        context.vertexAttribPointer(fabricLoc.a_v, 1, context.FLOAT, false, 16, 0);
+        context.vertexAttribPointer(fabricLoc.a_v, 1, context.FLOAT, false, 8, 0);
       }
       if (fabricLoc.a_u >= 0) {
         context.enableVertexAttribArray(fabricLoc.a_u);
-        context.vertexAttribPointer(fabricLoc.a_u, 1, context.FLOAT, false, 16, 4);
+        context.vertexAttribPointer(fabricLoc.a_u, 1, context.FLOAT, false, 8, 4);
       }
       context.uniform1f(fabricLoc.u.u_time, time);
       context.uniform2f(fabricLoc.u.u_pointer, px, py);
