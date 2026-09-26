@@ -160,15 +160,25 @@ export default async function DashboardPage({
         </article>
 
         <div className="career-pulse-stack" aria-label="Career health">
-          <Link href="/career-profile" className="career-pulse-mini is-profile">
-            <small>Profile intelligence</small><strong>{approvedEvidence}</strong><span>approved evidence items</span>
-            {pendingEvidence ? <em>{pendingEvidence} awaiting your review</em> : <em>Evidence is up to date</em>}
+          {/*
+            * Each tile earns its place by being a next step, not a statistic.
+            * The evidence tile leads with what needs a decision when something
+            * does; otherwise it is a calm link into the Career Profile. It used
+            * to point at /career-profile, which does not exist — a dead tile.
+            */}
+          <Link href="/career-truth" className="career-pulse-mini is-profile">
+            <small>Career profile</small>
+            {pendingEvidence ? (
+              <><strong>{pendingEvidence}</strong><span>to review</span><em>Approve before Sartho uses it →</em></>
+            ) : (
+              <><strong>{approvedEvidence}</strong><span>evidence approved</span><em>Review your Career Profile →</em></>
+            )}
           </Link>
           <Link href="/applications" className="career-pulse-mini">
-            <small>Opportunities</small><strong>{jobs.filter((job) => job.recommendation === "apply").length}</strong><span>strong matches</span><em>{jobs.length} roles tracked</em>
+            <small>Opportunities</small><strong>{jobs.filter((job) => job.recommendation === "apply").length}</strong><span>strong matches</span><em>See matched roles →</em>
           </Link>
           <Link href="/resume-studio" className="career-pulse-mini">
-            <small>Résumé readiness</small><strong>{journey.steps.find((step) => step.id === "resume")?.complete ? "Ready" : "Next"}</strong><span>career source of truth</span><em>Open Résumé Studio</em>
+            <small>Résumé readiness</small><strong>{journey.steps.find((step) => step.id === "resume")?.complete ? "Ready" : "Next"}</strong><span>your master résumé</span><em>Open Résumé Studio →</em>
           </Link>
         </div>
       </section>
@@ -184,33 +194,32 @@ export default async function DashboardPage({
         </div>
       </section>
 
-      <section className="career-changes" aria-labelledby="career-changes-title">
-        <div className="career-changes-heading"><div><p className="product-system-eyebrow">Career intelligence</p><h2 id="career-changes-title">What Sartho sees now</h2></div><span>Grounded in your live workspace</span></div>
-        <div className="career-change-grid">
-          <article className="career-change-card"><span className="career-change-spark" aria-hidden="true">✦</span><small>Evidence</small><strong>{approvedEvidence} approved</strong><p>{pendingEvidence ? `${pendingEvidence} item${pendingEvidence === 1 ? "" : "s"} need your decision.` : "Your evidence base is currently reviewed."}</p></article>
-          <article className="career-change-card"><span className="career-change-spark" aria-hidden="true">↗</span><small>Opportunity signal</small><strong>{jobs.filter((job) => job.recommendation === "apply").length} strong matches</strong><p>Roles marked Apply have evidence-backed fit, not keyword similarity alone.</p></article>
-          <article className="career-change-card"><span className="career-change-spark" aria-hidden="true">◎</span><small>Current focus</small><strong>{journey.current.title}</strong><p>{journey.current.reason}</p></article>
-        </div>
-      </section>
-
-      <section className="command-centre-review" aria-labelledby="review-queue-title">
-        <div className="command-centre-review-heading">
-          <div>
-            <p className="product-system-eyebrow">Your review queue</p>
-            <h2 id="review-queue-title">Decisions that need you</h2>
+      {/*
+        * The review queue is the only place on the page that asks for a
+        * decision, so it renders only when there is one to make. An empty
+        * "Decisions that need you" with nothing under it is the informational
+        * clutter this page is meant to shed.
+        */}
+      {commandCentre.reviewItems.length ? (
+        <section className="command-centre-review" aria-labelledby="review-queue-title">
+          <div className="command-centre-review-heading">
+            <div>
+              <p className="product-system-eyebrow">Your review queue</p>
+              <h2 id="review-queue-title">Decisions that need you</h2>
+            </div>
+            <span>Sartho recommends; you approve</span>
           </div>
-          <span>Sartho recommends; you approve</span>
-        </div>
-        <div className="command-centre-review-list">
-          {commandCentre.reviewItems.map((item) => (
-            <Link href={item.href} className={`command-centre-review-item is-${item.tone}`} key={item.label}>
-              <span className="command-centre-review-status" aria-hidden="true" />
-              <span><strong>{item.label}</strong><small>{item.detail}</small></span>
-              <b aria-hidden="true">→</b>
-            </Link>
-          ))}
-        </div>
-      </section>
+          <div className="command-centre-review-list">
+            {commandCentre.reviewItems.map((item) => (
+              <Link href={item.href} className={`command-centre-review-item is-${item.tone}`} key={item.label}>
+                <span className="command-centre-review-status" aria-hidden="true" />
+                <span><strong>{item.label}</strong><small>{item.detail}</small></span>
+                <b aria-hidden="true">→</b>
+              </Link>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
     </div>
     </>

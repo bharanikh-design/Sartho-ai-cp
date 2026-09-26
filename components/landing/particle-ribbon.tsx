@@ -12,10 +12,15 @@ import { generateParticles, packParticles, RIBBON_STRIDE } from "@/lib/landing/r
  *      time, so they fold and catch light like flowing silk.
  *   2. A dusting of particles rising up the same spine, for the sense of lift.
  *
+ * The parametric fabric is the one from the approved design concept, ported here
+ * verbatim: a tight twist (three half-turns down the length) and a narrow width,
+ * so it reads as folded, luminous silk rather than a broad flat band. An earlier
+ * retune widened it and cut the folds to make it "a sheet", which flattened it to
+ * a thin wispy streak — this restores the concept's exact pose and weights.
+ *
  * The particle field's arrangement is owned and tested in lib/landing/ribbon-field;
- * the fabric is a parametric strip animated entirely in its vertex shader. Both
- * move on the GPU, so the whole scene runs at sixty frames a second without
- * touching the main thread.
+ * the fabric is animated entirely in its vertex shader. Both move on the GPU, so
+ * the whole scene runs at sixty frames a second without touching the main thread.
  *
  * It is decoration, so it never gets in the way:
  *   - prefers-reduced-motion draws one still frame and starts no loop;
@@ -55,16 +60,19 @@ void main() {
   float v = a_v;
   float t = u_time + u_phase;
   float sx = spineX(v, t) + u_xoff + u_pointer.x * 0.012;
-  // The cross-section twists along the length, and the twist travels over time —
-  // this is what makes the strand read as folding silk rather than a flat band.
+  // The cross-section twists three half-turns down the length, and the twist
+  // travels over time — the tight fold count is what reads as flowing silk.
   float th = v * PI * 3.0 + t * 0.9;
-  float halfWidth = 0.078 * (0.55 + 0.45 * sin(v * PI));
-  float x = sx + a_u * halfWidth * cos(th);      // narrows to a bright edge when side-on
+  // A narrow ribbon whose width bulges in the middle. The plain cos() lets the
+  // cross-section pass through edge-on, which is exactly what carves the folds.
+  float halfWidth = 0.06 * (0.55 + 0.45 * sin(v * PI));
+  float x = sx + a_u * halfWidth * cos(th);
   float y = v + u_pointer.y * 0.008;
   gl_Position = vec4(x * 2.0 - 1.0, 1.0 - y * 2.0, 0.0, 1.0);
   v_v = v;
   v_u = a_u;
-  v_shade = 0.5 + 0.5 * sin(th + a_u * 0.6);      // folds catching light
+  // Folds catching light — bands of highlight and shadow travelling the sheet.
+  v_shade = 0.5 + 0.5 * sin(th + a_u * 0.6);
 }
 `;
 
@@ -78,7 +86,9 @@ varying float v_u;
 varying float v_shade;
 void main() {
   vec3 color = mix(u_colorFar, u_colorNear, v_v);
-  color *= (0.45 + v_shade);                       // sheen from the folds
+  // The lit folds carry the sheen; a modest base keeps the turned-away face dim
+  // so the fabric has depth rather than reading as one flat glow.
+  color *= (0.45 + 1.0 * v_shade);
   float edge = smoothstep(0.0, 0.4, 1.0 - abs(v_u));
   float ends = smoothstep(0.0, 0.12, v_v) * smoothstep(1.0, 0.86, v_v);
   float a = edge * ends * u_intensity;
@@ -106,7 +116,7 @@ void main() {
   // Rises up the spine over time and wraps — a current lifting, for hope.
   float t = fract(a_t - u_time * u_flow * a_speed * 0.05);
   float sx = spineX(t, u_time);
-  float width = 0.09 * (0.5 + a_depth * 0.9);
+  float width = 0.075 * (0.5 + a_depth * 0.9);
   float breathe = 1.0 + sin(u_time * 0.5 + a_phase) * 0.06;
   float nx = sx + a_across * width * breathe;
   float ny = t;
@@ -166,17 +176,19 @@ const THEME_SETTINGS: Record<
     colorFar: [0.34, 0.28, 0.82],
     colorNear: [0.2, 0.44, 0.9],
     intensity: 0.5,
-    fabricScale: 1.05,
+    fabricScale: 0.8,
     additive: false,
   },
 };
 
 // Three silk strands: [time phase, horizontal offset, base weight]. Overlapping
 // at different phases gives the woven depth of fabric rather than one flat band.
+// Weights and offsets are the concept's — calm enough that additive stacking
+// stays violet/blue instead of blowing out to white.
 const STRANDS: Array<[number, number, number]> = [
-  [0.0, 0.0, 0.62],
-  [1.7, 0.03, 0.42],
-  [3.4, -0.025, 0.3],
+  [0.0, 0.0, 0.42],
+  [1.7, 0.025, 0.28],
+  [3.4, -0.02, 0.2],
 ];
 
 // A pleasant, well-twisted pose for the reduced-motion still frame.
@@ -355,13 +367,15 @@ export function ParticleRibbon({ className }: { className?: string }) {
       // 1. Silk strands, back to front.
       context.useProgram(fabricProgram);
       context.bindBuffer(context.ARRAY_BUFFER, fabricBuf);
+      // Each vertex is two floats (v, u), so the stride is 8 bytes and the two
+      // attributes are read at offsets 0 and 4.
       if (fabricLoc.a_v >= 0) {
         context.enableVertexAttribArray(fabricLoc.a_v);
-        context.vertexAttribPointer(fabricLoc.a_v, 1, context.FLOAT, false, 16, 0);
+        context.vertexAttribPointer(fabricLoc.a_v, 1, context.FLOAT, false, 8, 0);
       }
       if (fabricLoc.a_u >= 0) {
         context.enableVertexAttribArray(fabricLoc.a_u);
-        context.vertexAttribPointer(fabricLoc.a_u, 1, context.FLOAT, false, 16, 4);
+        context.vertexAttribPointer(fabricLoc.a_u, 1, context.FLOAT, false, 8, 4);
       }
       context.uniform1f(fabricLoc.u.u_time, time);
       context.uniform2f(fabricLoc.u.u_pointer, px, py);
