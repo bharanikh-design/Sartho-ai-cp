@@ -121,6 +121,12 @@
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   cursor: default;
+  /*
+   * The dialog above this already animated in; its backdrop did not, so the
+   * dim snapped on a frame before the card moved. Fading it first and a little
+   * slower puts them in the order the eye expects.
+   */
+  animation: profileBackdropIn .22s ease both;
 }
 
 .profile-protection-dialog {
@@ -237,6 +243,8 @@
   from { opacity: 0; transform: translateY(10px) scale(.98); }
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
+
+@keyframes profileBackdropIn { from { opacity: 0; } to { opacity: 1; } }
 
 @keyframes routeLightFlow {
   from { left: -130px; }

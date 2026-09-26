@@ -1348,3 +1348,41 @@ h2.resume-doc-heading.resume-doc-field { margin-bottom: 0; border-bottom: 1px so
 .studio-markets small strong { color: var(--text-secondary); }
 /* Named by the chosen market's own table, so it changes as the market does. */
 .studio-template-pick { border-radius: 999px; padding: 1px 6px; color: #7fc9a2; background: rgba(107,207,147,.14); font-size: var(--text-2xs); font-weight: 700; letter-spacing: .04em; }
+
+/* ---- Dialog entrance ----------------------------------------------------
+ * The source and expand dialogs appeared fully formed: one frame without
+ * them, the next frame a dimmed page and a card at full size. Nothing tells
+ * you where the card came from, so it reads as the page breaking rather than
+ * a panel opening.
+ *
+ * Two motions, deliberately different speeds. The dim settles first and a
+ * little slower, so the page recedes and the card then arrives on top of a
+ * surface that has already changed — which is the order the eye expects. The
+ * card's own travel is 8px and its scale 0.98, small enough to register as
+ * arrival rather than as a zoom.
+ *
+ * Matches @keyframes profileDialogIn in account-and-journey.css, which is the
+ * existing dialog convention in this codebase.
+ */
+@keyframes studioDialogVeil { from { opacity: 0; } to { opacity: 1; } }
+@keyframes studioDialogIn {
+  from { opacity: 0; transform: translateY(8px) scale(.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.studio-source-modal,
+.studio-overlay { animation: studioDialogVeil .22s ease both; }
+.studio-source-modal-panel,
+.studio-overlay-panel { animation: studioDialogIn .24s cubic-bezier(.2,.8,.2,1) both; animation-delay: .04s; }
+
+/*
+ * Reduced motion drops the travel and keeps the fades. A cross-fade is not the
+ * kind of movement that setting is asking us to stop, and the dim is what
+ * separates the dialog from the page behind it rather than decoration — so
+ * only the transform goes. This matches how .profile-protection-dialog is
+ * already handled in account-and-journey.css.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .studio-source-modal-panel,
+  .studio-overlay-panel { animation-name: studioDialogVeil; animation-delay: 0s; }
+}
