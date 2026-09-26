@@ -277,3 +277,69 @@ describe("View never lands on a search engine", () => {
     }
   });
 });
+
+/*
+ * Found by Codex on the fix above, and introduced by it: ranking a real apply
+ * link over Google's page meant a malformed one got ranked over it too, so
+ * rubbish that used to be reachable only when an advert had no share_link
+ * became reachable whenever it had one.
+ */
+describe("a View destination is always somewhere a browser can go", () => {
+  const advertWithGoogle = {
+    title: "ITSM Manager",
+    company_name: "Acme",
+    description: "Own the ITSM practice.",
+    share_link: "https://www.google.com/search?q=acme",
+  };
+
+  for (const link of [
+    "http://",
+    "https://",
+    "/relative/path",
+    "¬¬¬",
+    "not a url",
+    "",
+    "   ",
+  ]) {
+    it(`falls back to Google rather than serving ${JSON.stringify(link)}`, () => {
+      expect(chooseApplyUrl({ ...advertWithGoogle, apply_options: [{ link }] }))
+        .toBe("https://www.google.com/search?q=acme");
+    });
+  }
+
+  /*
+   * These parse as valid URLs and report no hostname, so a host check alone
+   * lets them through — and both execute from an href on click. The scheme
+   * allowlist is what stops them.
+   */
+  for (const link of [
+    "javascript:alert(1)",
+    "data:text/html,<script>alert(1)</script>",
+    "vbscript:msgbox(1)",
+    "file:///etc/passwd",
+    "mailto:someone@example.com",
+  ]) {
+    it(`never serves ${link.split(":")[0]}: from an advert`, () => {
+      const chosen = chooseApplyUrl({ ...advertWithGoogle, apply_options: [{ link }] });
+      expect(chosen).toBe("https://www.google.com/search?q=acme");
+      expect(chosen).not.toContain(link);
+    });
+  }
+
+  it("serves nothing at all when the rubbish is the only option", () => {
+    /* No share_link either, so there is genuinely nowhere to send anybody. */
+    expect(chooseApplyUrl({
+      title: "ITSM Manager",
+      company_name: "Acme",
+      description: "Own the ITSM practice.",
+      apply_options: [{ link: "javascript:alert(1)" }, { link: "http://" }],
+    })).toBeNull();
+  });
+
+  it("still picks the real link when it sits beside rubbish", () => {
+    expect(chooseApplyUrl({
+      ...advertWithGoogle,
+      apply_options: [{ link: "javascript:alert(1)" }, { link: "https://vacatures.example.nl/12" }],
+    })).toBe("https://vacatures.example.nl/12");
+  });
+});

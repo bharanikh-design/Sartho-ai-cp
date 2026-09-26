@@ -220,7 +220,20 @@ export function chooseApplyUrl(raw: SerpApiJob): string | null {
   const employer = (raw.company_name ?? "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "");
   const links = (raw.apply_options ?? [])
     .map((option) => option?.link?.trim())
-    .filter((link): link is string => Boolean(link));
+    .filter((link): link is string => Boolean(link))
+    /*
+     * Validated before anything ranks them. `apply_options` is provider data,
+     * so a link can be "http://", a bare path, or a scheme that has no
+     * business in an href at all — and every one of those lands in an
+     * <a href target="_blank"> on the results page.
+     *
+     * This had to move up here rather than sit at the plausible step. The old
+     * order reached links[0] only when there was no share_link, so rubbish was
+     * rare; ranking a real link above Google's page made it reachable whenever
+     * a share_link exists, which is most adverts. Filtering the list once
+     * fixes both, and takes `javascript:` and `data:` out of an href for good.
+     */
+    .filter(isUsableDestination);
 
   const own = employer.length >= 3
     ? links.find((link) => hostOf(link).replace(/[^a-z0-9]+/g, "").includes(employer))
@@ -256,6 +269,22 @@ const THROWAWAY_HOSTS = [
   "github.io", "web.app", "firebaseapp.com", "onrender.com", "replit.app",
   "repl.co", "surge.sh", "fly.dev", "ngrok.io", "workers.dev",
 ];
+
+/**
+ * Somewhere a browser can actually be sent: http(s), with a real host.
+ *
+ * Deliberately a scheme allowlist rather than a blocklist. `javascript:` and
+ * `data:` are the ones that matter — both parse cleanly as URLs, both report
+ * an empty hostname, and both execute when a person clicks the link.
+ */
+function isUsableDestination(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return (parsed.protocol === "https:" || parsed.protocol === "http:") && Boolean(parsed.hostname);
+  } catch {
+    return false;
+  }
+}
 
 function isThrowawayHost(url: string): boolean {
   const host = hostOf(url);
