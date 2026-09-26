@@ -144,11 +144,38 @@ export function candidateSeniority(heldTitles: string[], totalExperienceYears: n
    * treated as entry level whatever their title said, and the title only takes
    * over once there is enough history to support it.
    */
-  const years = totalExperienceYears ?? 0;
+  /*
+   * `?? 0` does not catch NaN, and every comparison against NaN is false — so a
+   * corrupt or unparsed year count fell through every band to 4, the manager
+   * grade, and handed the person a seniority they had not earned. Infinity did
+   * the same. Anything that is not a real, positive number is treated as an
+   * unanswered question, exactly as null already was.
+   */
+  const years = Number.isFinite(totalExperienceYears) && (totalExperienceYears as number) > 0
+    ? (totalExperienceYears as number)
+    : 0;
   const fromYears: SeniorityLevel = years < 2 ? 0 : years < 4 ? 1 : years < 8 ? 2 : years < 12 ? 3 : 4;
 
   if (fromTitles === null) return fromYears;
-  return Math.min(fromTitles, fromYears + 1) as SeniorityLevel;
+  /*
+   * Years are a floor as well as a ceiling, and only the ceiling was here.
+   *
+   * `min(title, years + 1)` tempers an inflated title, which is what it was
+   * written for. But it also lets a modest title drag an experienced person
+   * down: "Architect", "Consultant" and "Specialist" carry no seniority word,
+   * so seniorityOf reads them as the unqualified 2 — and a ServiceNow Solution
+   * Architect with a decade behind them came out level 2, the same as somebody
+   * four years in.
+   *
+   * That number is a hard filter in two places. Career Direction dropped every
+   * leadership direction it was asked to suggest them as "more than one grade
+   * above", leaving a single role on the page beside an error; the job search
+   * hid the same roles for the same reason.
+   *
+   * So the years set the floor, the title may lift it by one, and an inflated
+   * title is still tempered to one grade above the years. Nobody moves down.
+   */
+  return Math.max(fromYears, Math.min(fromTitles, fromYears + 1)) as SeniorityLevel;
 }
 
 export type TitleFit = {

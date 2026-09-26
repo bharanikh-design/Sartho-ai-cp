@@ -69,6 +69,19 @@ describe("candidateSeniority", () => {
   it("lets the title lead once there is history to support it", () => {
     expect(candidateSeniority(["Senior Business Analyst"], 9)).toBe(3);
   });
+
+  /*
+   * The opposite failure, reported live. "Architect", "Consultant" and
+   * "Specialist" carry no seniority word, so seniorityOf reads them as the
+   * unqualified 2 — and a ServiceNow Solution Architect with twelve years came
+   * out level 2, the same as somebody four years in. That number is a hard
+   * filter in Career Direction and in the job search, so both hid every
+   * leadership role the person was ready for.
+   */
+  it("does not let a modest title drag an experienced person down", () => {
+    expect(candidateSeniority(["ServiceNow Solution Architect"], 12)).toBe(4);
+    expect(candidateSeniority(["Consultant"], 10)).toBe(3);
+  });
 });
 
 describe("scoreTitleFit", () => {
