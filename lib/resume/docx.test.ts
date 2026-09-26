@@ -5,6 +5,7 @@ import type { ResumeContent } from "@/lib/resume/content";
 
 const document: ResumeContent = {
   template: "classic",
+  market: "global",
   name: "Bharani Kumar K",
   targetRole: "Business Analyst",
   contact: { email: "bharani@example.com", phone: "+61 400 000 000", location: "Melbourne", linkedin: "", website: "" },

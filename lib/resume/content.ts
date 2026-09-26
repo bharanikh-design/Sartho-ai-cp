@@ -28,6 +28,7 @@
 
 /** The literal heading the encoder writes above the summary paragraph. */
 import { DEFAULT_TEMPLATE, normaliseTemplate, type ResumeTemplateId } from "@/lib/resume/templates";
+import { DEFAULT_MARKET, normaliseMarket, type ResumeMarket } from "@/lib/resume/markets";
 
 export const SUMMARY_HEADING = "PROFESSIONAL SUMMARY";
 
@@ -176,6 +177,16 @@ export type ResumeContent = {
    * different employers can reasonably want different typography.
    */
   template: ResumeTemplateId;
+  /**
+   * The market this résumé is written for.
+   *
+   * A decision about this document rather than a preference about the app: a
+   * draft aimed at Dallas and one aimed at Dubai disagree about page size,
+   * length and what belongs on the page, and a person may reasonably keep
+   * both. It drives the PDF's paper size and the guidance shown in the
+   * Studio.
+   */
+  market: ResumeMarket;
 };
 
 /*
@@ -261,6 +272,7 @@ export function emptyContent(): ResumeContent {
     skillGroups: [],
     certifications: [],
     template: DEFAULT_TEMPLATE,
+    market: DEFAULT_MARKET,
   };
 }
 
@@ -604,6 +616,7 @@ export function parseResumeContent(stored: unknown): ResumeContent | null {
     skillGroups,
     certifications,
     template: normaliseTemplate(value.template),
+    market: normaliseMarket(value.market),
   };
   const sourceImportId = text(value.sourceImportId).trim();
   if (sourceImportId) content.sourceImportId = sourceImportId;

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { DEFAULT_TEMPLATE, RESUME_TEMPLATE_IDS } from "@/lib/resume/templates";
+import { DEFAULT_MARKET, RESUME_MARKET_IDS } from "@/lib/resume/markets";
 
 /*
  * The document, as it arrives from a browser.
@@ -85,6 +86,13 @@ export const resumeContentSchema = z.object({
    * anywhere, because `.catch()` is doing exactly what it was asked to.
    */
   template: z.enum(RESUME_TEMPLATE_IDS).catch(DEFAULT_TEMPLATE).default(DEFAULT_TEMPLATE),
+  /*
+   * The destination market. Same treatment as the template above, and for the
+   * same reason: unrecognised falls back rather than rejecting a document
+   * somebody has spent an hour on, and the id list is read from the market
+   * table so adding a market cannot silently fail to save.
+   */
+  market: z.enum(RESUME_MARKET_IDS).catch(DEFAULT_MARKET).default(DEFAULT_MARKET),
   /* The upload a master was laid out from. Carried, never required. */
   sourceImportId: z.string().uuid().optional(),
 });

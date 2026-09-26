@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { ResumeBullet, ResumeContent } from "@/lib/resume/content";
 import { DEFAULT_TEMPLATE } from "@/lib/resume/templates";
+import { DEFAULT_MARKET } from "@/lib/resume/markets";
 
 /*
  * Laying an uploaded résumé out as a document the editor can open.
@@ -187,6 +188,7 @@ export function contentFromStructuredUpload(
 
   return {
     template: DEFAULT_TEMPLATE,
+    market: DEFAULT_MARKET,
     name: parsed.name.trim(),
     targetRole: parsed.targetRole.trim(),
     contact: {

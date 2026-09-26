@@ -17,6 +17,7 @@ import { MASTER_RESUME_RULES, MASTER_RESUME_SCHEMA, masterResumeOutput } from "@
 import { REPAIR_RULES, REPAIR_SCHEMA, acceptRepairs, linesNeedingRepair, remainingFaults } from "@/lib/resume/polish";
 import { skillsFromEvidence } from "@/lib/resume/skills";
 import { DEFAULT_TEMPLATE } from "@/lib/resume/templates";
+import { DEFAULT_MARKET } from "@/lib/resume/markets";
 
 /*
  * The master résumé: the one that is not about any particular advert.
@@ -243,6 +244,7 @@ export async function POST() {
      */
     const content: ResumeContent = {
       template: DEFAULT_TEMPLATE,
+      market: DEFAULT_MARKET,
       name: (profileResult.data?.full_name ?? "").trim(),
       targetRole: parsed.headline.trim(),
       contact: {

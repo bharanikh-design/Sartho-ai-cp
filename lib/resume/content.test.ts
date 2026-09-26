@@ -18,6 +18,7 @@ import {
 
 const document: ResumeContent = {
   template: "classic",
+  market: "global",
   name: "Bharani Kumar K",
   targetRole: "Business Analyst",
   contact: emptyContact(),

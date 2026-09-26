@@ -17,6 +17,34 @@ export const RESUME_MARKETS: ResumeMarketProfile[] = [
   { id:"global", name:"Global", flag:"🌐", pageSize:"A4", length:"2 pages is the safest default; preserve more when seniority requires it", photo:"avoid", personalDetails:"Use only professional contact information.", spelling:"British", winners:["modern","executive","systems"], guidance:"Use a conservative ATS-safe format when the destination market is unknown." },
 ];
 
-export function resumeMarket(id: string | null | undefined) {
-  return RESUME_MARKETS.find((market) => market.id === id) ?? RESUME_MARKETS[6];
+/*
+ * The market a résumé is written for, alongside the template it is set in.
+ *
+ * This table has existed since the markets were researched and was read by
+ * nothing: page size, length, photo policy and spelling were all described
+ * here while every PDF came out A4 with no guidance attached. It is the
+ * document's own decision — two drafts for two countries can reasonably
+ * disagree — so it travels with the document, exactly as the template does.
+ */
+export const DEFAULT_MARKET: ResumeMarket = "global";
+
+/** Every id, for the stored-document schema above all. */
+export const RESUME_MARKET_IDS = RESUME_MARKETS.map((market) => market.id) as [ResumeMarket, ...ResumeMarket[]];
+
+const byId = new Map(RESUME_MARKETS.map((market) => [market.id, market]));
+
+/** A stored market id, or the default when it is missing or unrecognised. */
+export function normaliseMarket(value: unknown): ResumeMarket {
+  return typeof value === "string" && byId.has(value as ResumeMarket)
+    ? (value as ResumeMarket)
+    : DEFAULT_MARKET;
+}
+
+export function resumeMarket(id: string | null | undefined): ResumeMarketProfile {
+  return byId.get(normaliseMarket(id)) as ResumeMarketProfile;
+}
+
+/** What react-pdf needs, from what the market table says. */
+export function pageSizeFor(id: string | null | undefined): "A4" | "LETTER" {
+  return resumeMarket(id).pageSize === "Letter" ? "LETTER" : "A4";
 }
