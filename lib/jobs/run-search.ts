@@ -1082,6 +1082,11 @@ export async function runBriefSearch(
   let semanticRescued = 0;
   let semanticExcluded = 0;
 
+  // Kill-switch: set SARTHO_RANKING_BLEND=off to restore pure deterministic
+  // ordering. When off, no rankingScore is attached, so sortByRelevance falls
+  // back to overallMatch — byte-for-byte today's behaviour — with one env change.
+  const rankingBlendEnabled = process.env.SARTHO_RANKING_BLEND !== "off";
+
   const relevant = deduplicated.map((match) => {
     const familyWithinReach = familyReachByUrl.get(match.url) ?? true;
     const assessment = semantic.get(match.url);
@@ -1104,12 +1109,14 @@ export async function runBriefSearch(
     if (decision.tier === "outside") semanticExcluded += 1;
 
     // Learned-affinity nudge, read against the role's own text. Bounded, and
-    // zero when the person has no affinity signals yet.
-    const affinity = affinityDelta(
-      `${match.title}. ${match.description}`,
-      learnedAffinity.positive,
-      learnedAffinity.negative,
-    );
+    // zero when the person has no affinity signals yet (or the blend is off).
+    const affinity = rankingBlendEnabled
+      ? affinityDelta(
+          `${match.title}. ${match.description}`,
+          learnedAffinity.positive,
+          learnedAffinity.negative,
+        )
+      : 0;
 
     return {
       ...match,
@@ -1124,11 +1131,16 @@ export async function runBriefSearch(
       relevanceTier: decision.tier,
       // Ordering-only blend: the deterministic score nudged by semantic fit and
       // affinity. With neither signal it equals overallMatch, so ordering — and
-      // the whole feed on an AI outage — is exactly today's behaviour.
-      rankingScore: blendRankingScore(match.overallMatch, {
-        semanticFit: assessment?.fit,
-        affinityDelta: affinity,
-      }),
+      // the whole feed on an AI outage — is exactly today's behaviour. When the
+      // kill-switch is off we attach nothing, so ordering is the deterministic score.
+      ...(rankingBlendEnabled
+        ? {
+            rankingScore: blendRankingScore(match.overallMatch, {
+              semanticFit: assessment?.fit,
+              affinityDelta: affinity,
+            }),
+          }
+        : {}),
       relevanceReason: decision.reason,
       semanticRescued: decision.rescued,
       screeningInsight: assessment?.fit.reason ?? decision.reason,
