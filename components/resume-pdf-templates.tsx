@@ -1,237 +1,448 @@
 "use client";
 
-import {
-  Document,
-  Page,
-  Text,
-  View,
-  StyleSheet,
-} from "@react-pdf/renderer";
-import {
-  type ResumeContent,
-} from "@/lib/resume/content";
+import { Document, Page, Text, View } from "@react-pdf/renderer";
+import type { ResumeContent } from "@/lib/resume/content";
+import { resumeTemplate, type ResumeTemplatePdf } from "@/lib/resume/templates";
 
+/*
+ * One renderer, driven by the template's own tokens.
+ *
+ * What was here before was two hardcoded stylesheets and this:
+ *
+ *     const isTech = ["modern", "impact", "innovator"].includes(content.template);
+ *
+ * Ten templates therefore produced two documents. Systems, Engineering,
+ * Classic, Executive, Editorial and Compact were byte-identical; "Innovator"
+ * and "Atlas" describe a two-column design and rendered a single column;
+ * "Compact" could not compact. The on-screen preview reads the tokens, so what
+ * a person chose and previewed was not what they downloaded — the template
+ * choice was discarded at the one moment it mattered, which is the same bug
+ * lib/resume/templates.ts says at the top was already fixed. It was fixed for
+ * the Word file and for the preview. Not here.
+ *
+ * Worse than the design drift: this renderer emitted only summary, roles,
+ * education and a comma-joined skills line. `sections`, `skillGroups` and
+ * `certifications` were dropped on the floor — so a person with a PE licence
+ * or an AWS certification downloaded a PDF without it. The ATS Gate then read
+ * the PDF back, could not find the certification it knew was in the document,
+ * and reported "Files lose facts when parsed", blaming the parser for what
+ * this file discarded.
+ *
+ * So: every token is read, every field is rendered, and the page size is no
+ * longer hardcoded to A4 — a résumé for the US market is Letter.
+ */
 
-// ---------------------------------------------------------------------------
-// 1. CONSULTING CLASSIC (Big 4 / Finance Standard)
-// Strictly single column, serif font, highly dense, chronological.
-// ---------------------------------------------------------------------------
-const classicStyles = StyleSheet.create({
-  page: { padding: 36, fontFamily: 'Times-Roman', backgroundColor: '#FFFFFF', color: '#000000' },
-  header: { textAlign: 'center', marginBottom: 16 },
-  name: { fontSize: 24, fontWeight: 'bold', textTransform: 'uppercase', marginBottom: 4 },
-  contact: { fontSize: 10, flexDirection: 'row', justifyContent: 'center', flexWrap: 'wrap', gap: 6 },
-  section: { marginBottom: 12 },
-  sectionHeading: { 
-    fontSize: 12, 
-    fontWeight: 'bold', 
-    textTransform: 'uppercase', 
-    borderBottom: '1px solid #000', 
-    paddingBottom: 2, 
-    marginBottom: 8 
-  },
-  itemHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 2 },
-  itemTitle: { fontSize: 11, fontWeight: 'bold' },
-  itemDate: { fontSize: 11 },
-  itemSubtitle: { fontSize: 11, fontStyle: 'italic', marginBottom: 4 },
-  bullet: { flexDirection: 'row', marginBottom: 3 },
-  bulletPoint: { width: 12, fontSize: 10 },
-  bulletText: { flex: 1, fontSize: 10, lineHeight: 1.3 },
-  summary: { fontSize: 10, lineHeight: 1.3, marginBottom: 12 },
-  skills: { fontSize: 10, lineHeight: 1.4 }
-});
+export type ResumePageSize = "A4" | "LETTER";
 
-export function ConsultingClassicPdf({ content }: { content: ResumeContent }) {
-  const contactParts = [
-    content.contact.phone,
-    content.contact.email,
-    content.contact.location,
-    content.contact.linkedin
-  ].filter(Boolean);
+const SPACE = { section: 11, item: 9, bullet: 3.2 };
 
-  return (
-    <Document title={content.name ? `${content.name} - Resume` : "Résumé"}>
-      <Page size="A4" style={classicStyles.page}>
-        
-        {/* Header */}
-        <View style={classicStyles.header}>
-          <Text style={classicStyles.name}>{content.name}</Text>
-          <View style={classicStyles.contact}>
-            {contactParts.map((part, i) => (
-              <Text key={i}>{part}{i < contactParts.length - 1 ? '  |' : ''}</Text>
-            ))}
-          </View>
-        </View>
-
-        {/* Professional Summary */}
-        {content.summary && (
-          <View style={classicStyles.section}>
-             <Text style={classicStyles.sectionHeading}>Professional Summary</Text>
-             <Text style={classicStyles.summary}>{content.summary}</Text>
-          </View>
-        )}
-
-        {/* Education */}
-        {content.education.length > 0 && (
-          <View style={classicStyles.section}>
-            <Text style={classicStyles.sectionHeading}>Education</Text>
-            {content.education.map((edu, i) => (
-              <View key={i} style={{ marginBottom: 6 }}>
-                <View style={classicStyles.itemHeader}>
-                  <Text style={classicStyles.itemTitle}>{edu.institution}</Text>
-                  <Text style={classicStyles.itemDate}>{edu.year}</Text>
-                </View>
-                <Text style={classicStyles.itemSubtitle}>{edu.qualification}</Text>
-              </View>
-            ))}
-          </View>
-        )}
-
-        {/* Experience */}
-        {content.roles.length > 0 && (
-          <View style={classicStyles.section}>
-            <Text style={classicStyles.sectionHeading}>Professional Experience</Text>
-            {content.roles.map((role) => (
-              <View key={role.id} style={{ marginBottom: 10 }}>
-                <View style={classicStyles.itemHeader}>
-                  <Text style={classicStyles.itemTitle}>{role.employer}{role.location ? ` - ${role.location}` : ''}</Text>
-                  <Text style={classicStyles.itemDate}>{`${role.start}${role.end ? ` - ${role.end}` : (role.current ? " - Present" : "")}`}</Text>
-                </View>
-                <Text style={classicStyles.itemSubtitle}>{role.title}</Text>
-                
-                {role.bullets.map((bullet) => (
-                  <View key={bullet.id} style={classicStyles.bullet}>
-                    <Text style={classicStyles.bulletPoint}>•</Text>
-                    <Text style={classicStyles.bulletText}>{bullet.text}</Text>
-                  </View>
-                ))}
-              </View>
-            ))}
-          </View>
-        )}
-
-        {/* Skills */}
-        {content.skills.length > 0 && (
-          <View style={classicStyles.section}>
-            <Text style={classicStyles.sectionHeading}>Skills & Additional Information</Text>
-            <Text style={classicStyles.skills}>{content.skills.join(', ')}</Text>
-          </View>
-        )}
-      </Page>
-    </Document>
-  );
+function contactLine(content: ResumeContent): string[] {
+  const { email, phone, location, linkedin, website } = content.contact;
+  return [phone, email, location, linkedin, website].map((part) => part?.trim()).filter(Boolean) as string[];
 }
 
-// ---------------------------------------------------------------------------
-// 2. TECH MINIMALIST (FAANG / Startup Standard)
-// Clean sans-serif, left-aligned header, highly scannable, single column.
-// ---------------------------------------------------------------------------
-const techStyles = StyleSheet.create({
-  page: { padding: 40, fontFamily: 'Helvetica', backgroundColor: '#FFFFFF', color: '#1a1a1a' },
-  header: { marginBottom: 20 },
-  name: { fontSize: 26, fontWeight: 'bold', letterSpacing: -0.5, marginBottom: 4 },
-  targetRole: { fontSize: 14, color: '#555', marginBottom: 8 },
-  contact: { fontSize: 9, color: '#666', flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  section: { marginBottom: 16 },
-  sectionHeading: { 
-    fontSize: 11, 
-    fontWeight: 'bold', 
-    textTransform: 'uppercase', 
-    color: '#444',
-    letterSpacing: 1,
-    marginBottom: 8 
-  },
-  itemHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 2 },
-  itemTitle: { fontSize: 12, fontWeight: 'bold' },
-  itemEmployer: { fontSize: 11, color: '#444', marginBottom: 6 },
-  itemDate: { fontSize: 10, color: '#666' },
-  bullet: { flexDirection: 'row', marginBottom: 4 },
-  bulletPoint: { width: 10, fontSize: 10, color: '#666' },
-  bulletText: { flex: 1, fontSize: 10, lineHeight: 1.4, color: '#333' },
-  skillsContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
-  skillItem: { fontSize: 10, color: '#333' }
-});
-
-export function TechMinimalistPdf({ content }: { content: ResumeContent }) {
-  const contactParts = [content.contact.phone, content.contact.email, content.contact.linkedin].filter(Boolean);
-
-  return (
-    <Document title={content.name ? `${content.name} - Resume` : "Résumé"}>
-      <Page size="A4" style={techStyles.page}>
-        <View style={techStyles.header}>
-          <Text style={techStyles.name}>{content.name}</Text>
-          {content.targetRole && <Text style={techStyles.targetRole}>{content.targetRole}</Text>}
-          <View style={techStyles.contact}>
-            {contactParts.map((part, i) => (
-              <Text key={i}>{part}{i < contactParts.length - 1 ? '  •' : ''}</Text>
-            ))}
-          </View>
-        </View>
-
-        {content.summary && (
-          <View style={techStyles.section}>
-            <Text style={techStyles.sectionHeading}>Summary</Text>
-            <Text style={{ fontSize: 10, lineHeight: 1.4, color: '#333' }}>{content.summary}</Text>
-          </View>
-        )}
-        
-        {content.roles.length > 0 && (
-          <View style={techStyles.section}>
-            <Text style={techStyles.sectionHeading}>Experience</Text>
-            {content.roles.map((role) => (
-              <View key={role.id} style={{ marginBottom: 12 }}>
-                <View style={techStyles.itemHeader}>
-                  <Text style={techStyles.itemTitle}>{role.title}</Text>
-                  <Text style={techStyles.itemDate}>{`${role.start}${role.end ? ` - ${role.end}` : (role.current ? " - Present" : "")}`}</Text>
-                </View>
-                <Text style={techStyles.itemEmployer}>{role.employer}{role.location ? ` • ${role.location}` : ''}</Text>
-                
-                {role.bullets.map((bullet) => (
-                  <View key={bullet.id} style={techStyles.bullet}>
-                    <Text style={techStyles.bulletPoint}>-</Text>
-                    <Text style={techStyles.bulletText}>{bullet.text}</Text>
-                  </View>
-                ))}
-              </View>
-            ))}
-          </View>
-        )}
-
-        {/* Education */}
-        {content.education.length > 0 && (
-          <View style={techStyles.section}>
-            <Text style={techStyles.sectionHeading}>Education</Text>
-            {content.education.map((edu, i) => (
-              <View key={i} style={{ marginBottom: 6 }}>
-                <View style={techStyles.itemHeader}>
-                  <Text style={techStyles.itemTitle}>{edu.institution}</Text>
-                  <Text style={techStyles.itemDate}>{edu.year}</Text>
-                </View>
-                <Text style={techStyles.itemEmployer}>{edu.qualification}</Text>
-              </View>
-            ))}
-          </View>
-        )}
-        
-        {/* Skills */}
-        {content.skills.length > 0 && (
-          <View style={techStyles.section}>
-            <Text style={techStyles.sectionHeading}>Skills</Text>
-            <Text style={{ fontSize: 10, lineHeight: 1.4, color: '#333' }}>{content.skills.join(', ')}</Text>
-          </View>
-        )}
-      </Page>
-    </Document>
-  );
+/** The date range as a résumé writes it, never as a parsed date. */
+function dateRange(role: { start: string; end: string; current: boolean }): string {
+  const start = role.start?.trim() ?? "";
+  const end = role.current ? "Present" : (role.end?.trim() ?? "");
+  if (start && end) return `${start} – ${end}`;
+  return start || end;
 }
 
-export function ResumePdfRenderer({ content }: { content: ResumeContent }) {
-  // Smart Template Mapping: map modern/impact/innovator to TechMinimalist, else ConsultingClassic
-  const isTech = ["modern", "impact", "innovator"].includes(content.template);
-  
-  if (isTech) {
-    return <TechMinimalistPdf content={content} />;
+/*
+ * The five heading treatments the tokens describe. Each one is a real
+ * difference on the page, which is the whole point of a template.
+ */
+function SectionHeading({ pdf, children }: { pdf: ResumeTemplatePdf; children: string }) {
+  const label = pdf.headingCaps ? children.toUpperCase() : children;
+  /*
+   * No letterspacing on a heading, however well it would set.
+   *
+   * A PDF renders tracked text by positioning each glyph separately, and every
+   * text extractor — including the one behind the ATS Gate, and whatever a real
+   * applicant tracking system uses — then reads "CERTIFICATIONS" back as
+   * "C E RT I F I C AT I O N S". Section headings are the landmarks a parser
+   * navigates by, so they stay untracked. The name may still be tracked where
+   * a template asks for it: that is one line, it is set as a design decision,
+   * and the Word file beside it is the one the parser is given.
+   */
+  const base = {
+    fontSize: pdf.headingSize,
+    fontFamily: pdf.font,
+    fontWeight: "bold" as const,
+  };
+
+  if (pdf.heading === "bar") {
+    return (
+      <View style={{ backgroundColor: pdf.accent, paddingVertical: 3, paddingHorizontal: 6, marginBottom: 6 }}>
+        <Text style={{ ...base, color: "#ffffff" }}>{label}</Text>
+      </View>
+    );
   }
-  
-  return <ConsultingClassicPdf content={content} />;
+
+  if (pdf.heading === "edge") {
+    return (
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 5 }}>
+        <View style={{ width: 14, height: 2.4, backgroundColor: pdf.accent }} />
+        <Text style={{ ...base, color: pdf.accent }}>{label}</Text>
+      </View>
+    );
+  }
+
+  if (pdf.heading === "doubleRule") {
+    return (
+      <View style={{ borderTopWidth: 0.8, borderBottomWidth: 0.8, borderColor: pdf.accent, paddingVertical: 2.5, marginBottom: 6 }}>
+        <Text style={{ ...base, color: pdf.accent }}>{label}</Text>
+      </View>
+    );
+  }
+
+  if (pdf.heading === "rule") {
+    return (
+      <View style={{ borderBottomWidth: 0.8, borderColor: pdf.accent, paddingBottom: 2.5, marginBottom: 6 }}>
+        <Text style={{ ...base, color: pdf.accent }}>{label}</Text>
+      </View>
+    );
+  }
+
+  return <Text style={{ ...base, color: pdf.accent, marginBottom: 5 }}>{label}</Text>;
 }
+
+function Bullets({ pdf, bullets }: { pdf: ResumeTemplatePdf; bullets: Array<{ id: string; text: string }> }) {
+  return (
+    <>
+      {bullets.filter((bullet) => bullet.text?.trim()).map((bullet) => (
+        <View key={bullet.id} style={{ flexDirection: "row", marginBottom: SPACE.bullet }}>
+          <Text style={{ width: 10, fontSize: pdf.bodySize, color: pdf.muted }}>•</Text>
+          <Text style={{ flex: 1, fontSize: pdf.bodySize, lineHeight: pdf.lineHeight, color: pdf.ink }}>
+            {bullet.text}
+          </Text>
+        </View>
+      ))}
+    </>
+  );
+}
+
+function SkillsBlock({ pdf, content }: { pdf: ResumeTemplatePdf; content: ResumeContent }) {
+  const groups = content.skillGroups.filter((group) => group.skills.length);
+
+  /*
+   * Grouped skills are rendered as groups. This is the form engineering and
+   * technical recruiters expect, and it was being flattened away entirely.
+   */
+  if (groups.length) {
+    return (
+      <View>
+        {groups.map((group) => (
+          <View key={group.id} style={{ flexDirection: "row", marginBottom: 3.5 }}>
+            <Text style={{ fontSize: pdf.bodySize, fontFamily: pdf.font, fontWeight: "bold", color: pdf.ink, width: 96 }}>
+              {group.name}
+            </Text>
+            <Text style={{ flex: 1, fontSize: pdf.bodySize, lineHeight: pdf.lineHeight, color: pdf.ink }}>
+              {group.skills.join(", ")}
+            </Text>
+          </View>
+        ))}
+      </View>
+    );
+  }
+
+  if (!content.skills.length) return null;
+  return (
+    <Text style={{ fontSize: pdf.bodySize, lineHeight: pdf.lineHeight, color: pdf.ink }}>
+      {content.skills.join(" · ")}
+    </Text>
+  );
+}
+
+function Experience({ pdf, content }: { pdf: ResumeTemplatePdf; content: ResumeContent }) {
+  if (!content.roles.length) return null;
+  return (
+    <View style={{ marginBottom: SPACE.section }}>
+      <SectionHeading pdf={pdf}>Experience</SectionHeading>
+      {content.roles.map((role) => (
+        <View key={role.id} style={{ marginBottom: SPACE.item }} wrap={false}>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "baseline" }}>
+            <Text style={{ fontSize: pdf.bodySize + 1.1, fontFamily: pdf.font, fontWeight: "bold", color: pdf.ink, flex: 1 }}>
+              {role.title}
+            </Text>
+            <Text style={{ fontSize: pdf.bodySize - 0.3, color: pdf.muted }}>{dateRange(role)}</Text>
+          </View>
+          <Text style={{ fontSize: pdf.bodySize, color: pdf.muted, marginBottom: 3.5 }}>
+            {[role.employer, role.location].filter((part) => part?.trim()).join(" · ")}
+          </Text>
+          <Bullets pdf={pdf} bullets={role.bullets} />
+        </View>
+      ))}
+    </View>
+  );
+}
+
+function Certifications({ pdf, content }: { pdf: ResumeTemplatePdf; content: ResumeContent }) {
+  if (!content.certifications.length) return null;
+  return (
+    <View style={{ marginBottom: SPACE.section }}>
+      <SectionHeading pdf={pdf}>Certifications</SectionHeading>
+      {content.certifications.map((entry) => (
+        <View key={entry.id} style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 2.6 }}>
+          <Text style={{ fontSize: pdf.bodySize, color: pdf.ink, flex: 1 }}>
+            {[entry.name, entry.issuer].filter((part) => part?.trim()).join(" — ")}
+          </Text>
+          {entry.year?.trim() ? <Text style={{ fontSize: pdf.bodySize - 0.3, color: pdf.muted }}>{entry.year}</Text> : null}
+        </View>
+      ))}
+    </View>
+  );
+}
+
+function Education({ pdf, content }: { pdf: ResumeTemplatePdf; content: ResumeContent }) {
+  if (!content.education.length) return null;
+  return (
+    <View style={{ marginBottom: SPACE.section }}>
+      <SectionHeading pdf={pdf}>Education</SectionHeading>
+      {content.education.map((entry) => (
+        <View key={entry.id} style={{ marginBottom: 4 }}>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "baseline" }}>
+            <Text style={{ fontSize: pdf.bodySize, fontFamily: pdf.font, fontWeight: "bold", color: pdf.ink, flex: 1 }}>
+              {entry.qualification}
+            </Text>
+            {entry.year?.trim() ? <Text style={{ fontSize: pdf.bodySize - 0.3, color: pdf.muted }}>{entry.year}</Text> : null}
+          </View>
+          <Text style={{ fontSize: pdf.bodySize, color: pdf.muted }}>{entry.institution}</Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+/** Everything that is not dated employment: projects, publications, a heading somebody made up. */
+function CustomSections({ pdf, content }: { pdf: ResumeTemplatePdf; content: ResumeContent }) {
+  const sections = content.sections.filter((section) => section.heading?.trim() || section.bullets.length);
+  if (!sections.length) return null;
+  return (
+    <>
+      {sections.map((section) => (
+        <View key={section.id} style={{ marginBottom: SPACE.section }}>
+          <SectionHeading pdf={pdf}>{section.heading || "Additional"}</SectionHeading>
+          <Bullets pdf={pdf} bullets={section.bullets} />
+        </View>
+      ))}
+    </>
+  );
+}
+
+function Header({ pdf, content, align }: { pdf: ResumeTemplatePdf; content: ResumeContent; align: "left" | "center" }) {
+  const parts = contactLine(content);
+  return (
+    <View style={{ marginBottom: 13, textAlign: align }}>
+      <Text
+        style={{
+          fontSize: pdf.nameSize,
+          fontFamily: pdf.font,
+          fontWeight: "bold",
+          color: pdf.ink,
+          letterSpacing: pdf.nameTracking,
+          textTransform: pdf.nameCaps ? "uppercase" : "none",
+        }}
+      >
+        {content.name}
+      </Text>
+      {content.targetRole?.trim() ? (
+        <Text style={{ fontSize: pdf.bodySize + 2, color: pdf.accent, marginTop: 2.5 }}>{content.targetRole}</Text>
+      ) : null}
+      {parts.length ? (
+        <Text style={{ fontSize: pdf.bodySize - 0.4, color: pdf.muted, marginTop: 4, lineHeight: 1.4 }}>
+          {parts.join("  ·  ")}
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
+function Summary({ pdf, content }: { pdf: ResumeTemplatePdf; content: ResumeContent }) {
+  if (!content.summary?.trim()) return null;
+  return (
+    <View style={{ marginBottom: SPACE.section }}>
+      <SectionHeading pdf={pdf}>Profile</SectionHeading>
+      <Text style={{ fontSize: pdf.bodySize, lineHeight: pdf.lineHeight, color: pdf.ink }}>{content.summary}</Text>
+    </View>
+  );
+}
+
+function SkillsSection({ pdf, content }: { pdf: ResumeTemplatePdf; content: ResumeContent }) {
+  if (!content.skills.length && !content.skillGroups.length) return null;
+  return (
+    <View style={{ marginBottom: SPACE.section }}>
+      <SectionHeading pdf={pdf}>Skills</SectionHeading>
+      <SkillsBlock pdf={pdf} content={content} />
+    </View>
+  );
+}
+
+/** The career column, shared by both layouts. */
+function MainColumn({ pdf, content, includeEducation }: {
+  pdf: ResumeTemplatePdf;
+  content: ResumeContent;
+  includeEducation: boolean;
+}) {
+  /*
+   * The order is the template's, not this file's. Which block leads is most of
+   * what separates a delivery manager's résumé from a graduate's: a PMP is
+   * read before the first role, a licence before any of it, and a degree leads
+   * only for somebody whose degree is their strongest evidence.
+   *
+   * `includeEducation` is false on the sidebar layouts, where education and
+   * skills live in the sidebar instead.
+   */
+  const skillsTop = pdf.skillsPlacement === "top";
+  const certificationsTop = pdf.certificationsPlacement === "top";
+  const educationTop = pdf.educationPlacement === "top";
+
+  return (
+    <>
+      <Summary pdf={pdf} content={content} />
+      {educationTop && includeEducation ? <Education pdf={pdf} content={content} /> : null}
+      {certificationsTop ? <Certifications pdf={pdf} content={content} /> : null}
+      {skillsTop && includeEducation ? <SkillsSection pdf={pdf} content={content} /> : null}
+      <Experience pdf={pdf} content={content} />
+      {certificationsTop ? null : <Certifications pdf={pdf} content={content} />}
+      {!educationTop && includeEducation ? <Education pdf={pdf} content={content} /> : null}
+      <CustomSections pdf={pdf} content={content} />
+      {!skillsTop && includeEducation ? <SkillsSection pdf={pdf} content={content} /> : null}
+    </>
+  );
+}
+
+function SidebarHeading({ pdf, children }: { pdf: ResumeTemplatePdf; children: string }) {
+  return (
+    <Text
+      style={{
+        fontSize: pdf.headingSize - 0.4,
+        fontFamily: pdf.font,
+        fontWeight: "bold",
+        color: pdf.sidebarInk ?? "#ffffff",
+        marginBottom: 5,
+      }}
+    >
+      {children.toUpperCase()}
+    </Text>
+  );
+}
+
+export function ResumePdfRenderer({ content, pageSize = "A4" }: {
+  content: ResumeContent;
+  pageSize?: ResumePageSize;
+}) {
+  const pdf = resumeTemplate(content.template).pdf;
+  const title = content.name ? `${content.name} — Résumé` : "Résumé";
+
+  if (pdf.layout === "sidebar") {
+    const width = pdf.sidebarWidth ?? 176;
+    const sidebarInk = pdf.sidebarInk ?? "#ffffff";
+    const sidebarMuted = pdf.sidebarMuted ?? "#c9d4d2";
+    const groups = content.skillGroups.filter((group) => group.skills.length);
+
+    return (
+      <Document title={title}>
+        <Page
+          size={pageSize}
+          style={{
+            fontFamily: pdf.font,
+            backgroundColor: "#ffffff",
+            color: pdf.ink,
+            paddingTop: 30,
+            paddingBottom: 34,
+            paddingRight: 32,
+            paddingLeft: width + 24,
+          }}
+        >
+          {/*
+            * Fixed, so the colour runs the full height of every page rather
+            * than stopping where page one's content did.
+            */}
+          <View fixed style={{ position: "absolute", top: 0, bottom: 0, left: 0, width, backgroundColor: pdf.accent }} />
+
+          {/* Sidebar content belongs on the first page only. */}
+          <View style={{ position: "absolute", top: 30, left: 0, width, paddingHorizontal: 18 }}>
+            <Text style={{ fontSize: pdf.nameSize - 2, fontFamily: pdf.font, fontWeight: "bold", color: sidebarInk }}>
+              {content.name}
+            </Text>
+            {content.targetRole?.trim() ? (
+              <Text style={{ fontSize: pdf.bodySize, color: sidebarMuted, marginTop: 3, marginBottom: 12 }}>
+                {content.targetRole}
+              </Text>
+            ) : <View style={{ height: 12 }} />}
+
+            {contactLine(content).length ? (
+              <View style={{ marginBottom: 14 }}>
+                <SidebarHeading pdf={pdf}>Contact</SidebarHeading>
+                {contactLine(content).map((part) => (
+                  <Text key={part} style={{ fontSize: pdf.bodySize - 0.6, color: sidebarMuted, marginBottom: 2.4, lineHeight: 1.35 }}>
+                    {part}
+                  </Text>
+                ))}
+              </View>
+            ) : null}
+
+            {groups.length || content.skills.length ? (
+              <View style={{ marginBottom: 14 }}>
+                <SidebarHeading pdf={pdf}>Skills</SidebarHeading>
+                {groups.length ? groups.map((group) => (
+                  <View key={group.id} style={{ marginBottom: 6 }}>
+                    <Text style={{ fontSize: pdf.bodySize - 0.6, fontFamily: pdf.font, fontWeight: "bold", color: sidebarInk, marginBottom: 1.5 }}>
+                      {group.name}
+                    </Text>
+                    <Text style={{ fontSize: pdf.bodySize - 0.6, color: sidebarMuted, lineHeight: 1.35 }}>
+                      {group.skills.join(", ")}
+                    </Text>
+                  </View>
+                )) : (
+                  <Text style={{ fontSize: pdf.bodySize - 0.6, color: sidebarMuted, lineHeight: 1.4 }}>
+                    {content.skills.join(", ")}
+                  </Text>
+                )}
+              </View>
+            ) : null}
+
+            {content.education.length ? (
+              <View>
+                <SidebarHeading pdf={pdf}>Education</SidebarHeading>
+                {content.education.map((entry) => (
+                  <View key={entry.id} style={{ marginBottom: 5 }}>
+                    <Text style={{ fontSize: pdf.bodySize - 0.6, fontFamily: pdf.font, fontWeight: "bold", color: sidebarInk, lineHeight: 1.3 }}>
+                      {entry.qualification}
+                    </Text>
+                    <Text style={{ fontSize: pdf.bodySize - 0.8, color: sidebarMuted, lineHeight: 1.3 }}>
+                      {[entry.institution, entry.year].filter((part) => part?.trim()).join(" · ")}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            ) : null}
+          </View>
+
+          <MainColumn pdf={pdf} content={content} includeEducation={false} />
+        </Page>
+      </Document>
+    );
+  }
+
+  return (
+    <Document title={title}>
+      <Page
+        size={pageSize}
+        style={{
+          fontFamily: pdf.font,
+          backgroundColor: "#ffffff",
+          color: pdf.ink,
+          padding: pdf.pagePadding || 40,
+        }}
+      >
+        <Header pdf={pdf} content={content} align={pdf.nameAlign} />
+        <MainColumn pdf={pdf} content={content} includeEducation />
+      </Page>
+    </Document>
+  );
+}
+
+export default ResumePdfRenderer;
