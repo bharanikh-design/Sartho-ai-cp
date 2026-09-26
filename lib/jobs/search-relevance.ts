@@ -186,13 +186,57 @@ export function selectSemanticCandidates<T extends RelevanceCandidate>(
   return [...selected.values()];
 }
 
-export function sortByRelevance<T extends { relevanceTier?: SearchRelevanceTier; overallMatch: number }>(
+/**
+ * The bounded ranking blend, used to order roles *within* a tier.
+ *
+ * The deterministic `overallMatch` is the floor and the dominant term. Semantic
+ * fit and learned affinity apply only *bounded* adjustments on top, so a role
+ * the keywords underrate but the evidence-grounded semantic read likes — or one
+ * aligned with what this person actually engages with — can rise a few places,
+ * and a semantic conflict can sink, without either signal overriding the
+ * evidence score, emptying the feed, or flooding it with off-target roles.
+ *
+ * Crucially: with no AI signals present this returns `overallMatch` unchanged,
+ * so a semantic/affinity outage ranks results exactly as the deterministic
+ * matcher does today. The blend can only ever reorder; it never gates.
+ */
+export type RankingSignals = {
+  semanticFit?: SemanticJobFit;
+  /** Learned-affinity nudge in [-1, 1]: positive concept hits raise, negative lower. */
+  affinityDelta?: number;
+};
+
+// Bounds are deliberately small relative to the 0–100 score: the AI can move a
+// role a few places, not leap it past the evidence.
+const SEMANTIC_BONUS = { aligned: 10, adjacent: 4, conflict: -12 } as const;
+const CONFIDENCE_WEIGHT = { high: 1, medium: 0.66, low: 0.33 } as const;
+const AFFINITY_MAX = 8;
+
+export function blendRankingScore(overallMatch: number, signals: RankingSignals = {}): number {
+  const base = Math.max(0, Math.min(100, overallMatch));
+  let adjustment = 0;
+
+  const fit = signals.semanticFit;
+  if (fit && fit.relation !== "unclear") {
+    adjustment += SEMANTIC_BONUS[fit.relation] * CONFIDENCE_WEIGHT[fit.confidence];
+  }
+
+  if (typeof signals.affinityDelta === "number" && Number.isFinite(signals.affinityDelta)) {
+    adjustment += Math.max(-1, Math.min(1, signals.affinityDelta)) * AFFINITY_MAX;
+  }
+
+  return Math.max(0, Math.min(100, Math.round(base + adjustment)));
+}
+
+export function sortByRelevance<T extends { relevanceTier?: SearchRelevanceTier; overallMatch: number; rankingScore?: number }>(
   candidates: T[],
 ): T[] {
   const rank: Record<SearchRelevanceTier, number> = { strong: 0, possible: 1, outside: 2 };
+  // Within a tier, order by the blended ranking score when present, otherwise by
+  // the deterministic score — so nothing changes when no AI signal was attached.
   return [...candidates].sort((a, b) => {
     const tierA = rank[a.relevanceTier ?? "possible"];
     const tierB = rank[b.relevanceTier ?? "possible"];
-    return tierA - tierB || b.overallMatch - a.overallMatch;
+    return tierA - tierB || (b.rankingScore ?? b.overallMatch) - (a.rankingScore ?? a.overallMatch);
   });
 }
