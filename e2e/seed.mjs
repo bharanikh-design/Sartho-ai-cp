@@ -187,7 +187,12 @@ export const SEED = {
   search_results: [{
     id: "search-1",
     user_id: TEST_USER_ID,
-    searched_at: now,
+    /*
+     * Relative to the run, not a fixed date: the daily brief compares this
+     * against the last visit below, and a hardcoded timestamp would quietly
+     * stop being "after the last visit" as real time moved past it.
+     */
+    searched_at: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
     criteria: { countries: ["au"], roles: ["Principal Platform Engineer"], locations: ["Melbourne"] },
     results: [match({
       title: "Principal Platform Engineer",
@@ -218,7 +223,19 @@ export const SEED = {
   job_requirements: [],
   notification_preferences: [],
   integration_connections: [],
-  user_activity: [],
+  /*
+   * A visit that ended twenty hours ago. The browser heartbeat has not run on
+   * this page load yet, so the dashboard's server render still sees this row —
+   * which is exactly how the daily brief knows the person has been away and
+   * that the search above landed while they were gone.
+   */
+  user_activity: [{
+    user_id: TEST_USER_ID,
+    first_seen_at: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+    last_seen_at: new Date(Date.now() - 20 * 60 * 60 * 1000).toISOString(),
+    active_seconds: 4_200,
+    visit_count: 9,
+  }],
   candidate_interactions: [],
   candidate_context_snapshots: [],
   durable_ai_operations: [],

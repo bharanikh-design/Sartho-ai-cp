@@ -7,7 +7,7 @@
  * stubbed, patched or conditionally branched for tests.
  */
 import { test as base, expect } from "@playwright/test";
-import { AUTH_COOKIE_NAME, APP_URL, sessionCookie } from "../session.mjs";
+import { AUTH_COOKIE_NAME, APP_URL, sessionCookie, sessionCookieValue } from "../session.mjs";
 
 /*
  * The fixture is declared here rather than in a helper module on purpose:
@@ -143,5 +143,73 @@ base.describe("Signed out", () => {
     await page.goto(`${APP_URL}/career-direction`);
     await expect(page).toHaveURL(/\/login/);
     await context.close();
+  });
+});
+
+/*
+ * The daily briefing. The seed puts the last visit twenty hours ago and the
+ * last search one hour ago, so the roles genuinely arrived while the person
+ * was away — which is the only circumstance in which the brief is allowed to
+ * call them new.
+ */
+test.describe("The daily briefing", () => {
+  /*
+   * Asserted on the server-rendered HTML rather than through the browser.
+   *
+   * The brief is decided on the server, and the page's own heartbeat reports
+   * the person present within a second of hydration — so a retrying DOM
+   * assertion races the very signal under test and eventually reads "you are
+   * still here". Fetching the document is what the brief actually is.
+   */
+  test("greets the person and reports the real state of their workspace", async ({ request }) => {
+    const response = await request.get(`${APP_URL}/`, {
+      headers: { Cookie: `${AUTH_COOKIE_NAME}=${sessionCookieValue()}` },
+    });
+    expect(response.status()).toBe(200);
+    const html = await response.text();
+
+    /* Time-of-day greeting, addressed to the person by their first name. */
+    expect(html).toMatch(/Good (morning|afternoon|evening), Evie\./);
+
+    /* Counts read off the seeded workspace, not invented. */
+    expect(html).toMatch(/2 (new )?roles/);
+    expect(html).toContain("1 career fact to reconcile");
+  });
+
+  /*
+   * The rule that keeps the brief worth reading.
+   *
+   * By the time this runs the browser has been reporting in for several specs,
+   * so the person is present — and a brief that still announced the same two
+   * roles as "new" would be lying. It is only allowed to say "new" about
+   * something that arrived while they were genuinely away, which is covered
+   * exhaustively in lib/dashboard/daily-brief.test.ts.
+   */
+  test("does not call anything new while the person is still here", async ({ request }) => {
+    const response = await request.get(`${APP_URL}/`, {
+      headers: { Cookie: `${AUTH_COOKIE_NAME}=${sessionCookieValue()}` },
+    });
+    const html = await response.text();
+
+    expect(html).toContain("Here is where things stand.");
+    expect(html).not.toContain("new roles matched your brief");
+  });
+
+  test("renders in the browser with a steer at the end", async ({ page }) => {
+    await page.goto("/");
+    const brief = page.locator(".daily-brief");
+    await expect(brief).toBeVisible();
+    await expect(brief.locator("h2")).toContainText("Evie");
+    await expect(brief.locator(".daily-brief-closing")).not.toBeEmpty();
+  });
+
+  test("every line is a real way into the workspace", async ({ page }) => {
+    await page.goto("/");
+    const links = page.locator(".daily-brief-list a");
+    await expect(links.first()).toBeVisible();
+
+    for (const link of await links.all()) {
+      await expect(link).toHaveAttribute("href", /^\/(search-plan|applications|career-truth|interview-prep)/);
+    }
   });
 });
