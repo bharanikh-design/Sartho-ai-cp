@@ -1340,13 +1340,25 @@ export async function runBriefSearch(
    * browser tab for thirty minutes; closing it meant spending provider calls
    * again to see the same roles.
    */
-  const { error: storeError } = await supabase.from("search_results").upsert({
-    user_id: userId,
-    results,
-    criteria,
-    searched_at: new Date().toISOString(),
-  });
-  if (storeError) console.error("Could not store search results", { code: storeError.code });
+  /*
+   * A run that found nothing does not overwrite a run that found something.
+   *
+   * The upsert was unconditional, so one bad run — every provider timed out,
+   * or a filter removed the lot — replaced a good stored set with an empty
+   * one. getStoredSearch then answers null for an empty array, the page loads
+   * with no results, and the panel starts a fresh live search on every single
+   * visit from then on. The row that exists to stop Sartho paying twice was
+   * the thing that guaranteed it.
+   */
+  if (results.length) {
+    const { error: storeError } = await supabase.from("search_results").upsert({
+      user_id: userId,
+      results,
+      criteria,
+      searched_at: new Date().toISOString(),
+    });
+    if (storeError) console.error("Could not store search results", { code: storeError.code });
+  }
 
   logWorkflowTrace("search.completed", workflowTraceId, {
     results: results.length,

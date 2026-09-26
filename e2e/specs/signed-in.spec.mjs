@@ -16,9 +16,14 @@ import { AUTH_COOKIE_NAME, APP_URL, sessionCookie } from "../session.mjs";
  * `test.describe` the runner refuses.
  */
 const test = base.extend({
-  context: async ({ context }, use) => {
+  /*
+   * The second argument is Playwright's "provide this value to the test" hook.
+   * It is conventionally named `use`, which eslint-config-next then reports as
+   * a misplaced React `use()` call, so it is named `runTest` here instead.
+   */
+  context: async ({ context }, runTest) => {
     await context.addCookies([sessionCookie()]);
-    await use(context);
+    await runTest(context);
   },
 });
 
@@ -38,15 +43,31 @@ test.describe("Career Direction, signed in", () => {
     /* `dismissed` is honoured: the third seeded suggestion is filtered out. */
     await expect(rail.locator("h3", { hasText: "Site Reliability Engineer" })).toHaveCount(0);
 
-    /* The saved target lanes reached the client. */
-    await expect(page.getByText("Principal Platform Engineer").first()).toBeVisible();
+    /* The two saved target lanes arrived, in priority order. */
+    await expect(page.getByRole("textbox", { name: "Priority 1" })).toHaveValue("Principal Platform Engineer");
+    await expect(page.getByRole("textbox", { name: "Priority 2" })).toHaveValue("Head of Developer Experience");
   });
 
-  test("the page renders from seeded rows, not from an empty state", async ({ page }) => {
+  test("the grounding line counts real approved evidence, not the seed total", async ({ page }) => {
     await page.goto("/career-direction");
-    /* The header metric counts the two seeded active lanes. */
-    await expect(page.locator(".product-system-header")).toContainText("selected priorities");
-    await expect(page.locator("body")).not.toContainText("Upload your résumé first");
+    /*
+     * Three evidence rows are seeded and one is `pending`, so the page must say
+     * two — the whole getCareerWorkspace → filter → render path ran for real.
+     */
+    await expect(page.locator(".direction-ai-advisor"))
+      .toContainText("Grounded in 2 approved career facts across 1 roles");
+  });
+
+  test("adding a suggested role moves it into the priority list", async ({ page }) => {
+    await page.goto("/career-direction");
+
+    const card = page.locator(".direction-suggestion-card", { hasText: "Director of Platform Engineering" });
+    await card.getByRole("button", { name: "Add to my priorities →" }).click();
+
+    /* The card flips to its added state and the role becomes the third priority. */
+    await expect(card.getByRole("button", { name: /Added to priorities/ })).toBeDisabled();
+    await expect(page.getByRole("textbox", { name: "Priority 3" }))
+      .toHaveValue("Director of Platform Engineering");
   });
 });
 

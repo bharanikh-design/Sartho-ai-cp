@@ -2,7 +2,15 @@ import { defineConfig, devices } from "@playwright/test";
 
 const APP_PORT = Number(process.env.E2E_APP_PORT ?? 3100);
 const MOCK_PORT = Number(process.env.MOCK_SUPABASE_PORT ?? 54321);
-const APP_URL = `http://127.0.0.1:${APP_PORT}`;
+/*
+ * `localhost` for the app: Next 16 only serves /_next/static and the HMR socket
+ * to an origin in `allowedDevOrigins`, and 127.0.0.1 is not one by default —
+ * the page would render server-side and then never hydrate.
+ *
+ * `127.0.0.1` for the mock, which is what fixes the auth cookie's name:
+ * supabase-js derives it as `sb-${hostname.split(".")[0]}-auth-token`.
+ */
+const APP_URL = `http://localhost:${APP_PORT}`;
 const SUPABASE_URL = `http://127.0.0.1:${MOCK_PORT}`;
 
 /*
@@ -32,7 +40,18 @@ export default defineConfig({
       env: { MOCK_SUPABASE_PORT: String(MOCK_PORT) },
     },
     {
-      command: `npx next dev -p ${APP_PORT}`,
+      /*
+       * E2E_SERVER_MODE=start runs the production server instead, which is what
+       * CI should do. It needs a build made with the same NEXT_PUBLIC_SUPABASE_URL,
+       * because Next inlines NEXT_PUBLIC_* into the client bundle at build time:
+       *
+       *   NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321 \
+       *   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_e2e_placeholder \
+       *   npm run build
+       */
+      command: process.env.E2E_SERVER_MODE === "start"
+        ? `npx next start -p ${APP_PORT}`
+        : `npx next dev -p ${APP_PORT}`,
       cwd: new URL("..", import.meta.url).pathname,
       url: `${APP_URL}/privacy`,
       reuseExistingServer: !process.env.CI,
@@ -43,7 +62,6 @@ export default defineConfig({
         NEXT_PUBLIC_SUPABASE_URL: SUPABASE_URL,
         NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_e2e_placeholder",
         SUPABASE_SERVICE_ROLE_KEY: "sb_secret_e2e_placeholder",
-        NODE_ENV: "development",
       },
     },
   ],
