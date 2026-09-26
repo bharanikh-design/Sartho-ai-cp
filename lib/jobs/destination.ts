@@ -60,12 +60,23 @@ export function canonicalDestination(url: string | null | undefined): string | n
  * Normalising both sides through here fixes that without migrating the table.
  * Anything unparseable falls back to the trimmed original, so a row in some
  * older shape still compares equal to itself.
+ *
+ * http and https collapse to one key, and that is the whole reason this is
+ * separate from `canonicalDestination` rather than a flag on it. Destinations
+ * are https-only now, so the mapper can never again emit the http form of a
+ * vacancy — which means every legacy `http://` row would stay permanently
+ * unmatched and every one of those vacancies would be emailed a second time.
+ * Two URLs differing only in scheme are the same page, so treating them as one
+ * identity costs nothing and is what keeps the once-ever promise across the
+ * change.
  */
 export function destinationKey(url: string | null | undefined): string {
   const trimmed = (url ?? "").trim();
   if (!trimmed) return "";
   try {
-    return new URL(trimmed).href;
+    const parsed = new URL(trimmed);
+    if (parsed.protocol === "http:") parsed.protocol = "https:";
+    return parsed.href;
   } catch {
     return trimmed;
   }

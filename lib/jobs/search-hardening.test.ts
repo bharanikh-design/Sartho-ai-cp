@@ -451,6 +451,38 @@ describe("canonicalising a URL does not re-alert a vacancy", () => {
     expect(selectNewMatches([result as never], ["https://example.com/"]), "already canonical").toEqual([]);
   });
 
+  it("matches a legacy http row against the https form it is now returned as", async () => {
+    const { selectNewMatches } = await import("@/lib/notifications/match-alerts");
+    /*
+     * The interaction between the two fixes above, and the reason the history
+     * key collapses schemes. Destinations are https-only now, so the mapper
+     * can never emit the http form of a vacancy again — every legacy http row
+     * in seen_job_matches would stay permanently unmatched and every one of
+     * those vacancies would be emailed a second time.
+     */
+    const result = {
+      title: "ITSM Manager", employer: "Acme", location: "Melbourne",
+      url: "https://jobs.example.com/42",
+      salary: null, source: "Google for Jobs", overallMatch: 90, recommendation: "strong",
+      matchedSkills: [],
+    };
+    expect(selectNewMatches([result as never], ["http://jobs.example.com/42"]), "legacy http row").toEqual([]);
+    expect(selectNewMatches([result as never], ["HTTP://Jobs.Example.COM/42"]), "legacy, mixed case").toEqual([]);
+  });
+
+  it("does not collapse two genuinely different vacancies", () => {
+    /* Scheme is the only thing folded — a different path is still new. */
+    return import("@/lib/notifications/match-alerts").then(({ selectNewMatches }) => {
+      const result = {
+        title: "ITSM Manager", employer: "Acme", location: "Melbourne",
+        url: "https://jobs.example.com/43",
+        salary: null, source: "Google for Jobs", overallMatch: 90, recommendation: "strong",
+        matchedSkills: [],
+      };
+      expect(selectNewMatches([result as never], ["http://jobs.example.com/42"])).toHaveLength(1);
+    });
+  });
+
   it("still alerts a genuinely new vacancy", () => {
     /* The guard must not swallow everything — a different URL is still new. */
     return import("@/lib/notifications/match-alerts").then(({ selectNewMatches }) => {
