@@ -47,21 +47,21 @@ void main() {
   // The cross-section twists along the length and the twist travels over time,
   // so the flat band of points reads as a ribbon turning in space.
   float th = v * PI * 1.9 + u_time * 0.3;
-  float width = 0.125 * (0.4 + 0.6 * sin(v * PI));     // bulging in the middle
+  float width = 0.11 * (0.4 + 0.6 * sin(v * PI));       // tighter, bulging in the middle
   float across = a_u * width * cos(th);
   float depth = a_u * sin(th);                          // -1 far .. +1 near face
   float x = sx + across + u_pointer.x * 0.012;
   float y = v + u_pointer.y * 0.008;
   gl_Position = vec4(x * 2.0 - 1.0, 1.0 - y * 2.0, 0.0, 1.0);
   float d = depth * 0.5 + 0.5;                          // 0 far .. 1 near
-  // Finer points so the band reads as a smooth stream, not scattered dots.
-  gl_PointSize = (0.5 + d * 2.0 + a_seed * 0.9) * u_dpr;
-  // A brighter core down the centre of the band gives the ribbon a defined line
-  // of light, with particles fanning out and dimming toward the edges.
-  float core = smoothstep(0.55, 0.0, abs(a_u));
+  // Fine points so the band reads as a smooth luminous stream, not scattered dots.
+  gl_PointSize = (0.45 + d * 1.8 + a_seed * 0.8) * u_dpr;
+  // A bright, tight core down the centre gives the ribbon a defined line of
+  // light; particles fan out and dim toward the edges.
+  float core = smoothstep(0.42, 0.0, abs(a_u));
   // Fade the ends so the ribbon dissolves into the dark rather than cutting off.
   float ends = smoothstep(0.0, 0.08, v) * smoothstep(1.0, 0.9, v);
-  v_alpha = ends * (0.12 + d * 0.5 + core * 0.42);
+  v_alpha = ends * (0.1 + d * 0.45 + core * 0.72);
   v_depth = d;
   v_tw = a_seed;
 }
@@ -93,9 +93,9 @@ const THEME_SETTINGS: Record<
   { colorFar: [number, number, number]; colorNear: [number, number, number]; intensity: number; additive: boolean }
 > = {
   dark: {
-    colorFar: [0.42, 0.4, 0.98], // violet undertone
-    colorNear: [0.46, 0.8, 1.0], // bright blue lead
-    intensity: 1.05,
+    colorFar: [0.5, 0.46, 1.0], // violet undertone
+    colorNear: [0.4, 0.78, 1.0], // bright electric-blue lead
+    intensity: 1.15,
     additive: true,
   },
   light: {
@@ -175,7 +175,7 @@ export function ParticleRibbon({ className }: { className?: string }) {
       typeof window.matchMedia === "function" &&
       window.matchMedia("(pointer: coarse)").matches;
     const small = window.innerWidth < 760;
-    const count = small || coarse ? 3200 : 6500;
+    const count = small || coarse ? 3800 : 8000;
 
     const gl =
       (canvas.getContext("webgl", {
