@@ -343,3 +343,49 @@ describe("a View destination is always somewhere a browser can go", () => {
     })).toBe("https://vacatures.example.nl/12");
   });
 });
+
+/*
+ * Codex's second finding on this PR, and the subtler of the two: a URL that
+ * passes validation and still breaks in the browser.
+ *
+ * `https:example.com/jobs/1` — no slashes — parses with hostname
+ * "example.com", so a boolean check waves it through unchanged. The browser
+ * then resolves that raw string against the document base, and because the
+ * scheme matches the page's it is treated as relative:
+ * https://sartho.app/example.com/jobs/1. Same origin, dead link, validated.
+ */
+describe("a validated destination is canonical, not just parseable", () => {
+  const advert = {
+    title: "ITSM Manager",
+    company_name: "Somewhere",
+    description: "Own the ITSM practice.",
+  };
+  /* Resolved against an https page, the way the results panel renders it. */
+  const asBrowserReads = (href: string | null) => new URL(href ?? "", "https://sartho.app/").href;
+
+  for (const [input, expected] of [
+    ["https:example.com/jobs/1", "https://example.com/jobs/1"],
+    ["https:/example.com/jobs/1", "https://example.com/jobs/1"],
+    ["https://example.com/jobs/1", "https://example.com/jobs/1"],
+    ["HTTPS://Example.COM/jobs/1", "https://example.com/jobs/1"],
+  ]) {
+    it(`stores ${JSON.stringify(input)} as something a browser reads the same way`, () => {
+      const chosen = chooseApplyUrl({ ...advert, apply_options: [{ link: input }] });
+      expect(chosen).toBe(expected);
+      /* The assertion that actually matters: it does not become same-origin. */
+      expect(asBrowserReads(chosen)).toBe(expected);
+      expect(asBrowserReads(chosen)).not.toContain("sartho.app");
+    });
+  }
+
+  it("canonicalises Google's own page too, since it is rendered the same way", () => {
+    expect(chooseApplyUrl({ ...advert, share_link: "https:www.google.com/search?q=x" }))
+      .toBe("https://www.google.com/search?q=x");
+  });
+
+  it("does not let a non-canonical form smuggle past the scheme check", () => {
+    for (const link of ["javascript:alert(1)", "data:text/html,x", "ftp:example.com/x"]) {
+      expect(chooseApplyUrl({ ...advert, apply_options: [{ link }] }), link).toBeNull();
+    }
+  });
+});

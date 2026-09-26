@@ -233,7 +233,8 @@ export function chooseApplyUrl(raw: SerpApiJob): string | null {
      * a share_link exists, which is most adverts. Filtering the list once
      * fixes both, and takes `javascript:` and `data:` out of an href for good.
      */
-    .filter(isUsableDestination);
+    .map(canonicalDestination)
+    .filter((link): link is string => link !== null);
 
   const own = employer.length >= 3
     ? links.find((link) => hostOf(link).replace(/[^a-z0-9]+/g, "").includes(employer))
@@ -254,7 +255,7 @@ export function chooseApplyUrl(raw: SerpApiJob): string | null {
   if (plausible) return plausible;
 
   /* Then Google's page, and only then a mirror — a long shot beats no shot. */
-  return raw.share_link?.trim() || links[0] || null;
+  return canonicalDestination(raw.share_link ?? "") || links[0] || null;
 }
 
 /*
@@ -271,18 +272,36 @@ const THROWAWAY_HOSTS = [
 ];
 
 /**
- * Somewhere a browser can actually be sent: http(s), with a real host.
+ * Somewhere a browser can actually be sent, written the way a browser reads it.
  *
- * Deliberately a scheme allowlist rather than a blocklist. `javascript:` and
- * `data:` are the ones that matter — both parse cleanly as URLs, both report
- * an empty hostname, and both execute when a person clicks the link.
+ * Returns the canonical serialisation rather than a yes/no, because validating
+ * the input and then returning the input is not the same thing. A
+ * non-canonical form like `https:example.com/jobs/1` — no slashes — parses
+ * with hostname "example.com", so a boolean check passes it through unchanged;
+ * the browser then resolves that raw string against the document base and,
+ * because the scheme matches the page's, treats it as relative:
+ *
+ *     new URL("https:example.com/jobs/1", "https://sartho.app/")
+ *       -> https://sartho.app/example.com/jobs/1
+ *
+ * A same-origin path, and a dead View button that passed validation.
+ * Returning `parsed.href` makes the stored value unambiguous.
+ *
+ * The scheme test is an allowlist rather than a blocklist, so anything
+ * unanticipated fails closed. `javascript:` and `data:` are why it exists:
+ * both parse cleanly, both report an empty hostname, and both execute when
+ * somebody clicks the link.
  */
-function isUsableDestination(url: string): boolean {
+function canonicalDestination(url: string): string | null {
+  const trimmed = url.trim();
+  if (!trimmed) return null;
   try {
-    const parsed = new URL(url);
-    return (parsed.protocol === "https:" || parsed.protocol === "http:") && Boolean(parsed.hostname);
+    const parsed = new URL(trimmed);
+    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") return null;
+    if (!parsed.hostname) return null;
+    return parsed.href;
   } catch {
-    return false;
+    return null;
   }
 }
 
