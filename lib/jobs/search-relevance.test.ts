@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { SemanticJobFit } from "@/lib/types";
 import {
+  affinityDelta,
   blendRankingScore,
   decideSearchRelevance,
   selectSemanticCandidates,
@@ -200,5 +201,28 @@ describe("blendRankingScore", () => {
   it("never leaves the 0–100 range even when signals stack", () => {
     expect(blendRankingScore(98, { semanticFit: fit("aligned", ""), affinityDelta: 1 })).toBe(100);
     expect(blendRankingScore(3, { semanticFit: fit("conflict", ""), affinityDelta: -1 })).toBe(0);
+  });
+});
+
+describe("affinityDelta", () => {
+  it("is zero when the person has no affinity signals (so the blend is a no-op)", () => {
+    expect(affinityDelta("Senior ServiceNow Architect, remote", [], [])).toBe(0);
+  });
+
+  it("raises for positive-concept hits and lowers for negative-concept hits", () => {
+    expect(affinityDelta("Remote ServiceNow platform role", ["remote"], ["sales"])).toBeCloseTo(0.5);
+    expect(affinityDelta("On-site enterprise sales manager", ["remote"], ["sales"])).toBeCloseTo(-0.6);
+    // Both present: they partly offset.
+    expect(affinityDelta("Remote sales role", ["remote"], ["sales"])).toBeCloseTo(-0.1);
+  });
+
+  it("matches whole words only and ignores case, so it never fires on substrings", () => {
+    expect(affinityDelta("Salesforce administrator", [], ["sales"])).toBe(0); // not "sales"
+    expect(affinityDelta("REMOTE-first team", ["remote"], [])).toBeCloseTo(0.5);
+  });
+
+  it("clamps to [-1, 1] however many concepts hit", () => {
+    const text = "remote hybrid flexible async distributed";
+    expect(affinityDelta(text, ["remote", "hybrid", "flexible", "async", "distributed"], [])).toBe(1);
   });
 });

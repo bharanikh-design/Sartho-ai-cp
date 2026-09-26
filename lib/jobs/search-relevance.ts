@@ -212,6 +212,29 @@ const SEMANTIC_BONUS = { aligned: 10, adjacent: 4, conflict: -12 } as const;
 const CONFIDENCE_WEIGHT = { high: 1, medium: 0.66, low: 0.33 } as const;
 const AFFINITY_MAX = 8;
 
+/**
+ * A gentle learned-affinity nudge in [-1, 1] from whether the role's text names
+ * concepts the person has shown a preference for (raises) or against (lowers).
+ * Deliberately conservative: a single positive hit is a small lift, a negative
+ * hit a slightly larger caution, and the whole thing is clamped so affinity can
+ * only ever nudge ordering, never dominate the evidence score.
+ */
+export function affinityDelta(
+  text: string,
+  positive: readonly string[],
+  negative: readonly string[],
+): number {
+  const haystack = ` ${text.toLowerCase().replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim()} `;
+  const hit = (concept: string) => {
+    const c = concept.toLowerCase().replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim();
+    return c.length > 2 && haystack.includes(` ${c} `);
+  };
+  let delta = 0;
+  for (const concept of positive) if (hit(concept)) delta += 0.5;
+  for (const concept of negative) if (hit(concept)) delta -= 0.6;
+  return Math.max(-1, Math.min(1, delta));
+}
+
 export function blendRankingScore(overallMatch: number, signals: RankingSignals = {}): number {
   const base = Math.max(0, Math.min(100, overallMatch));
   let adjustment = 0;

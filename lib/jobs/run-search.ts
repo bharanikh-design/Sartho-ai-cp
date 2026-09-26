@@ -29,6 +29,8 @@ import { findEmployerPortal, searchEmployerDirectly } from "@/lib/jobs/company-c
 import { createSearchCacheStore } from "@/lib/jobs/search-cache-store";
 import { deduplicateSearchResults, isMarketLocationConsistent } from "@/lib/jobs/location-guard";
 import {
+  affinityDelta,
+  blendRankingScore,
   decideSearchRelevance,
   selectSemanticCandidates,
   sortByRelevance,
@@ -105,6 +107,13 @@ export type ScoredJobMatch = {
   semanticContextFingerprint?: string;
   /** Semantic relevance tier. This orders visibility; it is not a second numeric score. */
   relevanceTier?: SearchRelevanceTier;
+  /**
+   * Bounded ordering score used only to sort roles WITHIN a tier: the
+   * deterministic overallMatch nudged by semantic fit and learned affinity. It
+   * never changes the displayed evidence match and never gates visibility;
+   * absent it, ordering falls back to overallMatch (today's behaviour).
+   */
+  rankingScore?: number;
   /** Why the role is strong, possible or outside the search. */
   relevanceReason?: string;
   /** True when semantics rescued a role old title/family rules would have discarded. */
@@ -1094,6 +1103,14 @@ export async function runBriefSearch(
     if (decision.rescued) semanticRescued += 1;
     if (decision.tier === "outside") semanticExcluded += 1;
 
+    // Learned-affinity nudge, read against the role's own text. Bounded, and
+    // zero when the person has no affinity signals yet.
+    const affinity = affinityDelta(
+      `${match.title}. ${match.description}`,
+      learnedAffinity.positive,
+      learnedAffinity.negative,
+    );
+
     return {
       ...match,
       workflowTraceId,
@@ -1105,6 +1122,13 @@ export async function runBriefSearch(
           }
         : {}),
       relevanceTier: decision.tier,
+      // Ordering-only blend: the deterministic score nudged by semantic fit and
+      // affinity. With neither signal it equals overallMatch, so ordering — and
+      // the whole feed on an AI outage — is exactly today's behaviour.
+      rankingScore: blendRankingScore(match.overallMatch, {
+        semanticFit: assessment?.fit,
+        affinityDelta: affinity,
+      }),
       relevanceReason: decision.reason,
       semanticRescued: decision.rescued,
       screeningInsight: assessment?.fit.reason ?? decision.reason,
