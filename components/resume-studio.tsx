@@ -1625,7 +1625,16 @@ return (
                   Find a role in Opportunities
                 </Link>
               ) : (
-                <a href="#uploads" className="secondary-button">Upload your résumé</a>
+                /*
+                 * This was `<a href="#uploads">`, and no element on the page
+                 * has that id — so the one action offered to somebody with no
+                 * evidence yet, on the empty state that exists to tell them
+                 * what to do next, did nothing at all. The upload dialog it
+                 * meant is rendered a few lines below; open that.
+                 */
+                <button type="button" className="secondary-button" onClick={() => setSourceManagerOpen(true)}>
+                  Upload your résumé
+                </button>
               )}
             </div>
             {error && generatingId === null ? <p className="inline-error" role="alert">{error}</p> : null}

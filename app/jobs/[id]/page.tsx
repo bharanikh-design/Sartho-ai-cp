@@ -2,7 +2,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { DeleteOpportunityButton } from "@/components/delete-opportunity-button";
 import { DeepAnalysisPanel } from "@/components/deep-analysis-panel";
+import { InterviewCoachPanel } from "@/components/interview-coach-panel";
 import { JobStatusSelect } from "@/components/job-status-select";
+import { NextActionField } from "@/components/next-action-field";
 import { ProductPageHeader } from "@/components/product-page-header";
 import { InteractionBeacon } from "@/components/interaction-beacon";
 import { requireUser } from "@/lib/auth";
@@ -60,6 +62,17 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
           <p>{reach.warning}</p>
         </div>
       ) : null}
+
+      {/*
+        * Beside the stage, because they are the same thought: where this is,
+        * and what you do about it next. The Command Centre has always been
+        * able to lead with the answer; until now nothing could record one.
+        */}
+      <NextActionField
+        jobId={job.id}
+        initialAction={application?.next_action ?? null}
+        initialDate={application?.next_action_date ?? null}
+      />
 
       <section className="dashboard-grid job-summary-grid">
         <article className="glass-card content-card">
@@ -182,6 +195,20 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
           </div>
         </section>
       )}
+
+      {/*
+        * The destination of every "Open AI interview coach" link in the
+        * product. The Command Centre makes this its top action once a role
+        * reaches interview stage, and every row on /interview-prep points
+        * here — both at `#interview-coach`, which until now was an id no
+        * markup carried, so the click scrolled nowhere.
+        */}
+      <InterviewCoachPanel
+        jobId={job.id}
+        analysisComplete={job.deep_analysis_status === "complete"}
+        requirementCount={requirements.length}
+        approvedEvidenceCount={approvedEvidence?.length ?? 0}
+      />
 
       <div className="page-footer-actions">
         <div className="job-detail-management">
