@@ -69,12 +69,25 @@ export function searchFilterNotes(criteria: Diagnostics | null | undefined): Sea
    * because it is the one line here that is about Sartho rather than about
    * something the person asked for. A provider dropping out is otherwise
    * indistinguishable, from this page, from a market with nothing in it.
+   *
+   * These are whole sentences, not provider names. `errorsThatCostResults()`
+   * returns what `record()` built — "Google for Jobs (SerpApi) is not
+   * configured.", "Adzuna: 429 Too Many Requests" — already run through
+   * `readable()` to strip a vendor's upsell link. Treating them as names
+   * produced "Google for Jobs (SerpApi) is not configured. did not answer on
+   * this run", so the diagnostics follow the sentence rather than being
+   * conscripted into it.
    */
-  const failed = (criteria.providerErrors ?? []).filter((name) => typeof name === "string" && name.trim());
+  const failed = (criteria.providerErrors ?? [])
+    .filter((message): message is string => typeof message === "string" && Boolean(message.trim()))
+    .map((message) => message.trim())
+    /* Terminated so they read as sentences whichever way the provider phrased it. */
+    .map((message) => (/[.!?]$/.test(message) ? message : `${message}.`));
+
   if (failed.length) {
     notes.push({
       id: "provider-trouble",
-      text: `${failed.join(" and ")} did not answer on this run, so there may be more out there than you can see here.`,
+      text: `Not every source answered on this run, so there may be more out there than you can see here. ${[...new Set(failed)].join(" ")}`,
     });
   }
 

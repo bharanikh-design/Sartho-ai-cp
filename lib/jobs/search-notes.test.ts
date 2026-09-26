@@ -43,16 +43,49 @@ describe("searchFilterNotes", () => {
     expect(text({ agencyOrUnverifiedHidden: 2 })).toContain("2 listings hidden");
   });
 
-  it("names providers that did not answer", () => {
-    const notes = searchFilterNotes({ providerErrors: ["Adzuna", "JSearch"] });
+  /*
+   * These fixtures are the real shape, and the first version of this test was
+   * not: it passed bare names like ["Adzuna", "JSearch"], so it happily proved
+   * a sentence that could never be produced. What errorsThatCostResults()
+   * actually returns is whatever record() built in provider-cascade.ts — a
+   * whole sentence, sometimes ending in a full stop and sometimes not. Joining
+   * those as if they were names gave "Google for Jobs (SerpApi) is not
+   * configured. did not answer on this run".
+   */
+  const NOT_CONFIGURED = "Google for Jobs (SerpApi) is not configured.";
+  const RATE_LIMITED = "Adzuna: 429 Too Many Requests";
+
+  it("reports providers that did not answer, as the sentences they are", () => {
+    const notes = searchFilterNotes({ providerErrors: [NOT_CONFIGURED] });
     expect(notes[0].id).toBe("provider-trouble");
-    expect(notes[0].text).toContain("Adzuna and JSearch");
+    expect(notes[0].text).toContain(NOT_CONFIGURED);
+    /* The diagnostic follows the sentence; it is never the subject of one. */
+    expect(notes[0].text).not.toMatch(/configured\.\s*did not answer/);
     /*
      * Phrased as a limit on what is visible rather than as a failure. The
      * person cannot act on a provider outage; what they can act on is knowing
      * the list is shorter than the market.
      */
     expect(notes[0].text).toMatch(/more out there than you can see/);
+  });
+
+  it("terminates a diagnostic that does not punctuate itself", () => {
+    const text = searchFilterNotes({ providerErrors: [RATE_LIMITED] })[0].text;
+    expect(text).toContain("Adzuna: 429 Too Many Requests.");
+    expect(text).not.toContain("Requests..");
+  });
+
+  it("keeps several diagnostics readable side by side", () => {
+    const text = searchFilterNotes({ providerErrors: [NOT_CONFIGURED, RATE_LIMITED] })[0].text;
+    expect(text).toContain(NOT_CONFIGURED);
+    expect(text).toContain("Adzuna: 429 Too Many Requests.");
+    /* No "and" welding two sentences into one ungrammatical clause. */
+    expect(text).not.toContain("configured. and");
+  });
+
+  it("does not repeat the same diagnostic twice", () => {
+    const text = searchFilterNotes({ providerErrors: [RATE_LIMITED, RATE_LIMITED] })[0].text;
+    expect(text.match(/429 Too Many Requests/g)).toHaveLength(1);
   });
 
   it("puts the filters the person set before the one they did not", () => {
@@ -75,6 +108,6 @@ describe("searchFilterNotes", () => {
 
   it("ignores blank provider names rather than printing an empty one", () => {
     expect(searchFilterNotes({ providerErrors: ["", "   "] })).toEqual([]);
-    expect(text({ providerErrors: ["", "Adzuna"] })).toContain("Adzuna did not answer");
+    expect(text({ providerErrors: ["", RATE_LIMITED] })).toContain("Adzuna: 429 Too Many Requests.");
   });
 });
