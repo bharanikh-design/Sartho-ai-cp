@@ -66,6 +66,7 @@ export default async function SearchPlanPage() {
         initialLocations={split.locations}
         initialCompanies={split.companies}
         initialRemotePreferences={preferences.remotePreferences}
+        initialDirectEmployersOnly={preferences.directEmployersOnly ?? false}
         targetLanes={lanes}
         movedCompanies={split.moved}
       />

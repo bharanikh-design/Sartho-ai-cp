@@ -159,6 +159,12 @@ export function SearchPlanEditor({
         targetLocations: locations,
         targetCompanies: companies,
         remotePreferences,
+        /*
+         * Omitted until now, and the schema defaults a missing value to false —
+         * so every save of any other field silently switched "Direct employers
+         * only" back off. The toggle could not be turned on at all.
+         */
+        directEmployersOnly,
       }),
     });
     setStatus(response.ok ? "saved" : "error");
