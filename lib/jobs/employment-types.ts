@@ -73,7 +73,25 @@ export function earlyCareerSelections(selected: string[]): string[] {
   return selected.filter((id) => EARLY_CAREER_TYPES.some((early) => early.toLowerCase() === id.trim().toLowerCase()));
 }
 
+/**
+ * The selections this provider will really narrow on, given the whole set.
+ *
+ * Asked per selection, this over-reported. Adzuna treats contract=1 and
+ * permanent=1 as mutually exclusive and 400s on both, so adzunaEmploymentParams
+ * drops the pair — and somebody who ticked Contract and Permanent had two
+ * selections reported to them as applied filters while the request carried
+ * neither. Reading the params that are actually sent keeps the criteria honest
+ * about what narrowed the search.
+ */
 export function filterableSelections(selected: string[], provider: ProviderName): string[] {
+  if (provider === "adzuna") {
+    const sent = new Set(adzunaEmploymentParams(selected));
+    return selected.filter((id) => {
+      const param = employmentType(id)?.adzunaParam;
+      return Boolean(param && sent.has(param));
+    });
+  }
+
   return selected.filter((id) => {
     const type = employmentType(id);
     return type ? canFilter(type, provider) : false;
