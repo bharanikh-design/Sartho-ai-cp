@@ -12,6 +12,15 @@
   --glass-strong: rgba(16, 20, 29, 0.82);
   --line: rgba(255, 255, 255, 0.095);
   --line-bright: rgba(255, 255, 255, 0.16);
+  /*
+   * Card corner scale — one ladder for the whole product, so surfaces stop
+   * drifting between 12/14/15/16/17/18/19/22/28px. control = inputs/chips,
+   * card = tiles, panel = sections, hero = the one lead card on a screen.
+   */
+  --radius-control: 12px;
+  --radius-card: 16px;
+  --radius-panel: 20px;
+  --radius-hero: 22px;
   --blue: #79a8ff;
   --blue-strong: #4d8dff;
   --violet: #a68cff;
