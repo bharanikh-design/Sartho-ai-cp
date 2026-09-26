@@ -3,6 +3,7 @@
 import { Document, Page, Text, View } from "@react-pdf/renderer";
 import type { ResumeContent } from "@/lib/resume/content";
 import { resumeTemplate, type ResumeTemplatePdf } from "@/lib/resume/templates";
+import { pageSizeFor } from "@/lib/resume/markets";
 
 /*
  * One renderer, driven by the template's own tokens.
@@ -329,11 +330,18 @@ function SidebarHeading({ pdf, children }: { pdf: ResumeTemplatePdf; children: s
   );
 }
 
-export function ResumePdfRenderer({ content, pageSize = "A4" }: {
+export function ResumePdfRenderer({ content, pageSize }: {
   content: ResumeContent;
+  /** Overrides the market's paper. Only tests need this. */
   pageSize?: ResumePageSize;
 }) {
   const pdf = resumeTemplate(content.template).pdf;
+  /*
+   * The market chooses the paper. A résumé for the US prints on Letter and
+   * everywhere else on A4 — which the market table has said since it was
+   * written, while this file hardcoded A4 for everyone.
+   */
+  const paper = pageSize ?? pageSizeFor(content.market);
   const title = content.name ? `${content.name} — Résumé` : "Résumé";
 
   if (pdf.layout === "sidebar") {
@@ -345,7 +353,7 @@ export function ResumePdfRenderer({ content, pageSize = "A4" }: {
     return (
       <Document title={title}>
         <Page
-          size={pageSize}
+          size={paper}
           style={{
             fontFamily: pdf.font,
             backgroundColor: "#ffffff",
@@ -430,7 +438,7 @@ export function ResumePdfRenderer({ content, pageSize = "A4" }: {
   return (
     <Document title={title}>
       <Page
-        size={pageSize}
+        size={paper}
         style={{
           fontFamily: pdf.font,
           backgroundColor: "#ffffff",

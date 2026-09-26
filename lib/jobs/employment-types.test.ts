@@ -79,3 +79,20 @@ describe("what SerpApi can actually narrow", () => {
     expect(filterableSelections(["Full-time", "Contract"], "serpapi")).toEqual([]);
   });
 });
+
+/*
+ * Adzuna 400s on contract=1 and permanent=1 together, so adzunaEmploymentParams
+ * drops the pair. Reported per selection, that told somebody two filters were
+ * applied while the request carried neither.
+ */
+describe("what Adzuna actually narrowed on", () => {
+  it("reports a selection only when its flag is really sent", () => {
+    expect(adzunaEmploymentParams(["Contract", "Permanent"])).toEqual([]);
+    expect(filterableSelections(["Contract", "Permanent"], "adzuna")).toEqual([]);
+  });
+
+  it("still reports the ones that are sent", () => {
+    expect(filterableSelections(["Full-time", "Contract"], "adzuna")).toEqual(["Full-time", "Contract"]);
+    expect(filterableSelections(["Full-time", "Contract", "Permanent"], "adzuna")).toEqual(["Full-time"]);
+  });
+});

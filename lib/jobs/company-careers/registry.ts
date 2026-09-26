@@ -81,25 +81,56 @@ export const EMPLOYER_PORTALS: EmployerPortalConfig[] = [
   },
 ];
 
-export function findEmployerPortal(employerName: string): EmployerPortalConfig | null {
-  const clean = employerName.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+/**
+ * Lower-case alphanumerics, so punctuation and casing cannot lose a match.
+ *
+ * Accents are folded rather than deleted. Stripping them outright turned
+ * "AtkinsRéalis" into "atkinsralis", which matches nothing a person would
+ * type — and an employer saved with its proper spelling would then never be
+ * found by the chip they typed without it. Folding makes both sides
+ * "atkinsrealis". The hardcoded list below happens to hold no accented names,
+ * which is why this never showed up before somebody could save their own.
+ */
+export function employerKey(employerName: string): string {
+  return employerName
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+}
+
+/**
+ * The careers portal for an employer, preferring the person's own.
+ *
+ * `saved` holds the sources somebody verified themselves on the Search Brief.
+ * They win over this file's nine hardcoded companies deliberately: a person
+ * who pasted their employer's careers URL and watched Sartho prove it knows
+ * their target better than a static list compiled here does, and they may well
+ * mean a different tenant of a company this list already names.
+ */
+export function findEmployerPortal(
+  employerName: string,
+  saved: EmployerPortalConfig[] = [],
+): EmployerPortalConfig | null {
+  const clean = employerKey(employerName);
   if (!clean) return null;
 
-  return (
-    EMPLOYER_PORTALS.find((portal) => {
-      const idMatch = portal.id.toLowerCase() === clean;
-      const nameMatch = portal.name.toLowerCase().replace(/[^a-z0-9]/g, "") === clean;
-      const aliasMatch = portal.aliases.some((alias) => alias.toLowerCase().replace(/[^a-z0-9]/g, "") === clean);
-      return idMatch || nameMatch || aliasMatch;
-    }) ?? null
-  );
+  const matches = (portal: EmployerPortalConfig) => {
+    const idMatch = portal.id.toLowerCase() === clean;
+    const nameMatch = employerKey(portal.name) === clean;
+    const aliasMatch = portal.aliases.some((alias) => employerKey(alias) === clean);
+    return idMatch || nameMatch || aliasMatch;
+  };
+
+  return saved.find(matches) ?? EMPLOYER_PORTALS.find(matches) ?? null;
 }
 
 export async function searchEmployerDirectly(
   employerName: string,
   query: DirectCareerQuery,
+  saved: EmployerPortalConfig[] = [],
 ): Promise<JobSearchResult[]> {
-  const portal = findEmployerPortal(employerName);
+  const portal = findEmployerPortal(employerName, saved);
   if (!portal) return [];
 
   if (portal.type === "workday") {
@@ -107,6 +138,14 @@ export async function searchEmployerDirectly(
   }
   if (portal.type === "greenhouse") {
     return searchGreenhousePortal(portal, query);
+  }
+  /*
+   * Lever was imported here and never called, so a Lever careers page could be
+   * verified on the Search Brief and then searched zero times — the one ATS
+   * where "✓ Connected" was guaranteed to lead nowhere.
+   */
+  if (portal.type === "lever") {
+    return searchLeverPortal(portal, query);
   }
   return [];
 }

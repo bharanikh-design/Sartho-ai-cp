@@ -26,6 +26,7 @@ import { candidateSeniority, isEntryLevelTitle } from "@/lib/matching/title-fit"
 import { seniorityReach } from "@/lib/matching/seniority-reach";
 import { searchSerpApiCached } from "@/lib/jobs/cached-serpapi";
 import { findEmployerPortal, searchEmployerDirectly } from "@/lib/jobs/company-careers/registry";
+import { loadEmployerCareerSources } from "@/lib/jobs/company-careers/saved-sources";
 import { createSearchCacheStore } from "@/lib/jobs/search-cache-store";
 import { deduplicateSearchResults, isMarketLocationConsistent } from "@/lib/jobs/location-guard";
 import {
@@ -865,6 +866,13 @@ export async function runBriefSearch(
    */
   if (brief.companies.length) {
     /*
+     * The careers pages this person verified themselves, which take
+     * precedence over the nine hardcoded companies in the registry. Loaded
+     * once for the whole employer pass; an empty list is exactly the
+     * behaviour there was before it existed.
+     */
+    const savedSources = await loadEmployerCareerSources(supabase, userId);
+    /*
      * Said out loud, per employer, because this is the one source that is free,
      * unmetered and aimed exactly where the person pointed it — and it was the
      * least visible thing in the search.
@@ -878,7 +886,7 @@ export async function runBriefSearch(
      * the page would look exactly the same as if they had all been searched.
      */
     const directQueries = brief.companies.slice(0, MAX_COMPANY_QUERIES).map(async (employer) => {
-      if (!findEmployerPortal(employer)) {
+      if (!findEmployerPortal(employer, savedSources)) {
         employerPortals.push({ employer, status: "unknown", found: 0 });
         return;
       }
@@ -893,7 +901,7 @@ export async function runBriefSearch(
             )].slice(0, 8);
         const batches = await Promise.all(terms.map((searchText) => searchEmployerDirectly(employer, {
           employer, searchText, country, limit: 10,
-        })));
+        }, savedSources)));
         const directMatches = deduplicateSearchResults(batches.flat());
         for (const item of directMatches) {
           if (!byUrl.has(item.url)) byUrl.set(item.url, item);

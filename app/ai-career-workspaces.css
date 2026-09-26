@@ -1331,3 +1331,20 @@ h2.resume-doc-heading.resume-doc-field { margin-bottom: 0; border-bottom: 1px so
 .suggestion-reality-check span{display:flex;gap:8px}.suggestion-reality-check strong{min-width:58px;color:var(--text)}
 .suggestion-market-link{display:inline-flex;margin:4px 0 12px;color:var(--mint);font-size:var(--text-xs);font-weight:750;text-decoration:none}
 .suggestion-market-link:hover{text-decoration:underline}
+
+/*
+ * Where the résumé is going.
+ *
+ * Sits above the template row because it narrows it: the market decides the
+ * paper, the spelling and how long the document should be, and it marks which
+ * templates suit it. Same chip language as the templates so the two read as
+ * one decision rather than two unrelated toolbars.
+ */
+.studio-markets { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 10px; }
+.studio-market-chip { display: inline-flex; align-items: center; gap: 6px; border: 1px solid rgba(255,255,255,.1); border-radius: 999px; padding: 5px 12px; color: var(--text-secondary); background: rgba(255,255,255,.02); font-family: var(--font-sans); font-size: var(--text-xs); cursor: pointer; }
+.studio-market-chip:hover { border-color: rgba(255,255,255,.24); color: var(--text); }
+.studio-market-chip.is-selected { border-color: rgba(107,207,147,.55); color: var(--text); background: rgba(107,207,147,.12); }
+.studio-markets small { flex-basis: 100%; margin-top: 2px; color: var(--text-tertiary); font-size: var(--text-2xs); line-height: 1.55; }
+.studio-markets small strong { color: var(--text-secondary); }
+/* Named by the chosen market's own table, so it changes as the market does. */
+.studio-template-pick { border-radius: 999px; padding: 1px 6px; color: #7fc9a2; background: rgba(107,207,147,.14); font-size: var(--text-2xs); font-weight: 700; letter-spacing: .04em; }

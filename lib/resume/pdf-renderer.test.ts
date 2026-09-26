@@ -120,12 +120,31 @@ describe("the template choice reaches the file", () => {
   }, 60_000);
 });
 
+/** The page box in points, which is what actually differs between papers. */
+async function pageSizeOf(bytes: Uint8Array): Promise<string> {
+  const { getDocumentProxy } = await import("unpdf");
+  const document = await getDocumentProxy(new Uint8Array(bytes));
+  const page = await document.getPage(1);
+  const [, , width, height] = page.view as number[];
+  return `${Math.round(width)}x${Math.round(height)}`;
+}
+
 describe("page size", () => {
-  /* A4 was hardcoded, so a résumé for the US market could not be Letter. */
-  it("honours Letter as well as A4", async () => {
-    const content = await fixture("modern");
-    const a4 = await renderPdf(content, "A4");
-    const letter = await renderPdf(content, "LETTER");
-    expect(a4.byteLength).not.toBe(letter.byteLength);
+  /*
+   * A4 was hardcoded, so a résumé for the United States could not be Letter —
+   * while lib/resume/markets.ts had said `pageSize: "Letter"` for the US since
+   * it was written. A4 is 595x842pt; Letter is 612x792pt.
+   */
+  it("takes the paper from the market, with no caller involved", async () => {
+    const au = await renderPdf({ ...(await fixture("modern")), market: "au" });
+    const us = await renderPdf({ ...(await fixture("modern")), market: "us" });
+
+    expect(await pageSizeOf(au)).toBe("595x842");
+    expect(await pageSizeOf(us)).toBe("612x792");
+  }, 60_000);
+
+  it("still lets a caller override the paper", async () => {
+    const forced = await renderPdf({ ...(await fixture("modern")), market: "au" }, "LETTER");
+    expect(await pageSizeOf(forced)).toBe("612x792");
   }, 30_000);
 });

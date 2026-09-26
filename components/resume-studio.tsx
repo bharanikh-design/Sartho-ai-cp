@@ -12,6 +12,7 @@ import { suggestResumeFor, type PastResume } from "@/lib/resume/suggest";
 import { renderResumeText, resumeContentOf, type ResumeContent } from "@/lib/resume/content";
 import { ResumeDocument, type BulletCoach } from "@/components/resume-document";
 import { RESUME_TEMPLATES, resumeTemplate, type ResumeTemplate } from "@/lib/resume/templates";
+import { RESUME_MARKETS, resumeMarket } from "@/lib/resume/markets";
 import { ResumeImport } from "@/components/resume-import";
 import { ResumeUploads } from "@/components/resume-uploads";
 import { AtsGatePanel } from "@/components/ats-gate-panel";
@@ -160,10 +161,13 @@ function MagicWand() {
 function TemplateChip({
   template,
   selected,
+  recommended,
   onSelect,
 }: {
   template: ResumeTemplate;
   selected: boolean;
+  /** Named by the chosen market's own table as one that suits it. */
+  recommended: boolean;
   onSelect: () => void;
 }) {
   return (
@@ -179,6 +183,7 @@ function TemplateChip({
         {template.pdf.layout === "sidebar" ? <i /> : null}
       </span>
       <span className="studio-template-name">{template.name}</span>
+      {recommended ? <span className="studio-template-pick" title="Suits the market you chose">Suits this market</span> : null}
       {!template.atsSafe ? <span className="studio-template-flag" title="Send the Word file to an applicant tracking system">Designed</span> : null}
     </button>
   );
@@ -901,6 +906,7 @@ export function ResumeStudio({
                     key={template.id}
                     template={template}
                     selected={content.template === template.id}
+                    recommended={resumeMarket(content.market).winners.includes(template.id)}
                     onSelect={() => setContent({ ...content, template: template.id })}
                   />
                 ))}
@@ -956,6 +962,36 @@ return (
             * the gallery of ten that every other builder sells is mostly
             * two-column layouts that get people filtered out.
             */}
+          {/*
+            * Where the résumé is going, which decides the paper it prints on
+            * and most of what belongs on it. The market table has described
+            * all of this since it was written and nothing read it: every PDF
+            * came out A4 and no guidance reached anybody.
+            */}
+          {!isOlderVersion && !isExpanded ? (
+            <div className="studio-markets" role="radiogroup" aria-label="Target market">
+              {RESUME_MARKETS.map((market) => (
+                <button
+                  key={market.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={content.market === market.id}
+                  className={`studio-market-chip${content.market === market.id ? " is-selected" : ""}`}
+                  onClick={() => setContent({ ...content, market: market.id })}
+                >
+                  <span aria-hidden="true">{market.flag}</span> {market.name}
+                </button>
+              ))}
+              <small>
+                <strong>
+                  {resumeMarket(content.market).pageSize} paper · {resumeMarket(content.market).spelling} spelling
+                </strong>{" "}
+                {resumeMarket(content.market).length}. {resumeMarket(content.market).personalDetails}{" "}
+                {resumeMarket(content.market).guidance}
+              </small>
+            </div>
+          ) : null}
+
           {!isOlderVersion && !isExpanded ? (
             <div className="studio-templates" role="radiogroup" aria-label="Résumé template">
               {PROFESSIONAL_TEMPLATES.map((template) => (
@@ -963,6 +999,7 @@ return (
                   key={template.id}
                   template={template}
                   selected={content.template === template.id}
+                  recommended={resumeMarket(content.market).winners.includes(template.id)}
                   onSelect={() => setContent({ ...content, template: template.id })}
                 />
               ))}

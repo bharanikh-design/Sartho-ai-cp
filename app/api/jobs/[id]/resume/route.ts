@@ -6,6 +6,7 @@ import { aiQuotaResponse, checkAiQuota } from "@/lib/ai/quota";
 import { getAuthenticatedUser } from "@/lib/auth";
 import { evidenceIdsIn, renderResumeText, resumeContentOf, type ResumeBullet, type ResumeContent, type ResumeRole } from "@/lib/resume/content";
 import { DEFAULT_TEMPLATE } from "@/lib/resume/templates";
+import { DEFAULT_MARKET } from "@/lib/resume/markets";
 import { tailoringGain } from "@/lib/resume/ats";
 import { skillsForRole } from "@/lib/resume/skills";
 import { RESUME_WRITING_RULES } from "@/lib/resume/writing";
@@ -432,6 +433,7 @@ export async function POST(
      */
     const content: ResumeContent = {
       template: DEFAULT_TEMPLATE,
+      market: DEFAULT_MARKET,
       name: (profileResult.data?.full_name ?? "").trim(),
       targetRole: parsed.targetRole.trim(),
       contact: {

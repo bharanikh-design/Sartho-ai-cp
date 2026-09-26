@@ -142,6 +142,7 @@ describe("resume templates", () => {
  */
 describe("the Word file follows the template", () => {
   const base = {
+    market: "global" as const,
     name: "A name",
     targetRole: "Business Analyst",
     contact: { email: "a@example.com", phone: "", location: "Sydney", linkedin: "", website: "" },
