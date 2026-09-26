@@ -172,84 +172,6 @@
   right: 0;
 }
 
-/* ---- the CTA ------------------------------------------------------------- */
-
-.fd-cta {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  gap: 9px;
-  padding: 11px 20px;
-  border: 1px solid var(--fd-line-bright);
-  border-radius: 999px;
-  color: var(--text);
-  background: color-mix(in srgb, var(--text) 5%, transparent);
-  cursor: pointer;
-  font: inherit;
-  font-size: 14.5px;
-  font-weight: 560;
-  letter-spacing: -0.01em;
-  overflow: hidden;
-  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease,
-    background 0.2s ease;
-}
-/* A slow highlight travelling the button's edge, lifted on hover. */
-.fd-cta::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  padding: 1px;
-  background: conic-gradient(
-    from var(--fd-cta-angle, 0deg),
-    transparent 0 66%,
-    var(--fd-violet) 80%,
-    var(--fd-blue) 88%,
-    transparent 96%
-  );
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  opacity: 0.5;
-  animation: fdSweep 6s linear infinite;
-  pointer-events: none;
-}
-.fd-cta:hover {
-  transform: translateY(-2px);
-  border-color: transparent;
-  background: color-mix(in srgb, var(--fd-violet) 12%, transparent);
-  box-shadow: var(--fd-glow);
-}
-.fd-cta:hover::before {
-  opacity: 1;
-}
-.fd-cta-arrow {
-  transition: transform 0.2s ease;
-}
-.fd-cta:hover .fd-cta-arrow {
-  transform: translateX(3px);
-}
-
-.fd-nav-toggle {
-  display: none;
-  flex-direction: column;
-  gap: 5px;
-  width: 42px;
-  height: 42px;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid var(--fd-line-bright);
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--text) 5%, transparent);
-  cursor: pointer;
-}
-.fd-nav-toggle-bar {
-  width: 18px;
-  height: 1.6px;
-  border-radius: 2px;
-  background: var(--text);
-}
-
 /* ---- the stage ----------------------------------------------------------- */
 
 .fd-stage {
@@ -269,13 +191,22 @@
   transform: translate3d(calc(var(--fd-px, 0) * 6px), calc(var(--fd-py, 0) * 4px), 0);
   transition: transform 0.3s ease-out;
 }
+/*
+ * The three short taglines — the eyebrow here and the two baseline lines below —
+ * are meant to carry the brand's voice, so they are set to stand forward rather
+ * than whisper: larger, heavier, and painted in the violet→blue brand gradient
+ * so they read as lit type rather than grey caption text.
+ */
 .fd-eyebrow {
   margin: 0 0 clamp(20px, 2.4vw, 30px);
-  color: var(--text-tertiary);
-  font-size: 12.5px;
-  font-weight: 500;
-  letter-spacing: 0.16em;
+  font-size: clamp(13px, 1.05vw, 15.5px);
+  font-weight: 680;
+  letter-spacing: 0.15em;
   text-transform: uppercase;
+  background: linear-gradient(90deg, var(--fd-violet), var(--fd-blue) 65%, var(--fd-violet));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 .fd-headline {
   margin: 0;
@@ -350,16 +281,6 @@
   syntax: "<angle>";
   inherits: false;
   initial-value: 0deg;
-}
-@property --fd-cta-angle {
-  syntax: "<angle>";
-  inherits: false;
-  initial-value: 0deg;
-}
-@keyframes fdSweep {
-  to {
-    --fd-cta-angle: 360deg;
-  }
 }
 @keyframes fdBorderSweep {
   to {
@@ -575,14 +496,24 @@
   justify-content: space-between;
   gap: 16px;
   padding-top: clamp(12px, 2vh, 20px);
-  color: var(--text-tertiary);
-  font-size: 11.5px;
-  font-weight: 500;
-  letter-spacing: 0.16em;
+  font-size: clamp(12px, 0.95vw, 14px);
+  font-weight: 680;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
 }
+/* Both baseline lines carry the same lit brand gradient as the eyebrow, so the
+   bottom of the screen reads as a deliberate close rather than fine print. */
+.fd-baseline-brand,
 .fd-baseline-note {
-  color: color-mix(in srgb, var(--text) 32%, transparent);
+  background: linear-gradient(90deg, var(--fd-violet), var(--fd-blue));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.fd-baseline-note {
+  /* background-image, not the background shorthand — the shorthand would reset
+     background-clip back to border-box and paint a solid bar over the text. */
+  background-image: linear-gradient(90deg, var(--fd-blue), var(--fd-violet));
 }
 
 /* ---- light theme --------------------------------------------------------- */
@@ -635,50 +566,9 @@
     opacity: 0.5;
   }
 
-  /* Navigation collapses into a disclosure so Get Started is never crowded. */
-  .fd-nav-toggle {
-    display: flex;
-  }
+  /* Two short links stay inline beside the brand — no disclosure to hide them. */
   .fd-nav-links {
-    position: absolute;
-    top: calc(100% + 10px);
-    right: 0;
-    z-index: 6;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 6px;
-    min-width: 220px;
-    padding: 12px;
-    border: 1px solid var(--fd-line-bright);
-    border-radius: 16px;
-    background: var(--fd-card-bg);
-    box-shadow: var(--fd-card-shadow);
-    opacity: 0;
-    transform: translateY(-6px);
-    pointer-events: none;
-    transition: opacity 0.16s ease, transform 0.16s ease;
-  }
-  .fd-nav {
-    position: relative;
-  }
-  .fd-nav-links.is-open {
-    opacity: 1;
-    transform: none;
-    pointer-events: auto;
-  }
-  .fd-nav-link {
-    padding: 9px 10px;
-    border-radius: 9px;
-  }
-  .fd-nav-link::after {
-    display: none;
-  }
-  .fd-nav-link:hover {
-    background: color-mix(in srgb, var(--text) 7%, transparent);
-  }
-  .fd-cta {
-    justify-content: center;
-    margin-top: 4px;
+    gap: clamp(16px, 4vw, 28px);
   }
 }
 
@@ -713,7 +603,6 @@
   }
   .fd-card-inner,
   .fd-border-sweep,
-  .fd-cta::before,
   .fd-provider::before,
   .fd-provider[aria-busy="true"] {
     animation: none;
@@ -721,5 +610,32 @@
   /* The ring holds as a faint static halo rather than disappearing. */
   .fd-provider::before {
     opacity: 0.3;
+  }
+}
+
+/* ---- one screen: hero and footer together, no scroll (desktop) ----------- */
+/*
+ * The signed-out page should read as a single, complete screen — the hero and
+ * the site footer visible at once, without scrolling. :has scopes this to the
+ * front-door pages only (they are the only ones carrying .fd), so the signed-in
+ * app is untouched. The body becomes the column: the hero takes the space above
+ * the footer, and the footer sits at the bottom of the same viewport. Only on
+ * desktop, where it fits; narrow screens keep their natural stacked scroll.
+ */
+@media (min-width: 941px) {
+  body:has(.fd) {
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+  }
+  body:has(.fd) .fd {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+  body:has(.fd) .fd-shell {
+    min-height: 0;
+  }
+  body:has(.fd) .site-footer {
+    margin-top: 0;
   }
 }
