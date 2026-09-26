@@ -218,9 +218,55 @@ export const SEED = {
     })],
   }],
 
-  jobs: [],
-  applications: [],
-  job_requirements: [],
+  /*
+   * One analysed job, so the interview coach has something to render against.
+   * It had none, which is why nothing in the browser ever noticed that the
+   * #interview-coach anchor two CTAs pointed at did not exist.
+   */
+  jobs: [{
+    id: "11111111-1111-4111-8111-111111111111",
+    user_id: TEST_USER_ID,
+    title: "Principal Platform Engineer",
+    employer: "Atlassian",
+    location: "Melbourne, AU",
+    source_url: "https://example.test/jobs/principal-platform-engineer",
+    raw_description: "Own the internal developer platform for 40 product teams.",
+    status: "interview",
+    recommendation: "strong",
+    technical_heaviness: 0.8,
+    rule_analysis: null,
+    deep_analysis_status: "complete",
+    deep_analysis_summary: {
+      mandatoryMet: 2, mandatoryTotal: 3,
+      preferredMet: 1, preferredTotal: 2,
+      honestGaps: ["Direct people leadership at scale"],
+      recruiterSignals: ["Platform maturity"],
+    },
+    created_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+    updated_at: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+  }],
+  applications: [{
+    id: "22222222-2222-4222-8222-222222222222",
+    user_id: TEST_USER_ID,
+    job_id: "11111111-1111-4111-8111-111111111111",
+    status: "interview",
+    next_action: null,
+    next_action_date: null,
+    created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+    updated_at: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+  }],
+  job_requirements: [{
+    id: "33333333-3333-4333-8333-333333333333",
+    job_id: "11111111-1111-4111-8111-111111111111",
+    requirement_text: "Ten years running platform engineering groups.",
+    requirement_type: "mandatory",
+    assessment: "met",
+    confidence: "high",
+    category: "Experience",
+    rationale: "Twelve years on internal developer platforms.",
+    matched_evidence_ids: [],
+    created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+  }],
   notification_preferences: [],
   integration_connections: [],
   /*

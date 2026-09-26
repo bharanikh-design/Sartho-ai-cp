@@ -1,4 +1,5 @@
 import { serpapiScheduleWords } from "@/lib/jobs/employment-types";
+import { canonicalDestination } from "@/lib/jobs/destination";
 import { countryName } from "@/lib/jobs/countries";
 import type { JobSearchQuery, JobSearchResult } from "@/lib/jobs/search-provider";
 
@@ -192,14 +193,49 @@ function hostOf(url: string): string {
 /**
  * The best place to send somebody, and null when there is nowhere real.
  *
- * Order: the employer's own site, then a job board or applicant tracking
- * system, then Google's listing page, then anything else that is left.
+ * Order: the employer's own site, then a recognised job board or applicant
+ * tracking system, then any other apply link the advert carries, and only
+ * then Google's own listing page.
+ *
+ * That last step is the whole point, and it was the other way round for a
+ * long time. `share_link` is a google.com/search URL — Google's results page
+ * for the vacancy, not the vacancy — and it sat ABOVE `links[0]`. So an
+ * advert whose only apply route was a board missing from KNOWN_BOARDS was
+ * sent to a Google search even though a perfectly good apply link was sitting
+ * right there in `apply_options`.
+ *
+ * This shipped as a "View goes to Google" bug three times. Twice it was
+ * treated as a gap in KNOWN_BOARDS and fixed by adding the boards that had
+ * been reported — which fixes those boards and leaves every other board on
+ * earth pointing at Google. The list cannot be completed; the ordering can.
+ *
+ * The reason it was ordered that way is real, though, and is kept: some
+ * apply_options are dead scraper mirrors on free hosting, and Google's page
+ * at least opens on something. So the tie is broken on what the host looks
+ * like rather than on a binary "is it on the list". A vacancy at
+ * jobs.some-regional-board.com is a place to apply and outranks a search
+ * results page; a vacancy at a random netlify.app subdomain is a mirror and
+ * does not.
  */
 export function chooseApplyUrl(raw: SerpApiJob): string | null {
   const employer = (raw.company_name ?? "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "");
   const links = (raw.apply_options ?? [])
     .map((option) => option?.link?.trim())
-    .filter((link): link is string => Boolean(link));
+    .filter((link): link is string => Boolean(link))
+    /*
+     * Validated before anything ranks them. `apply_options` is provider data,
+     * so a link can be "http://", a bare path, or a scheme that has no
+     * business in an href at all — and every one of those lands in an
+     * <a href target="_blank"> on the results page.
+     *
+     * This had to move up here rather than sit at the plausible step. The old
+     * order reached links[0] only when there was no share_link, so rubbish was
+     * rare; ranking a real link above Google's page made it reachable whenever
+     * a share_link exists, which is most adverts. Filtering the list once
+     * fixes both, and takes `javascript:` and `data:` out of an href for good.
+     */
+    .map(canonicalDestination)
+    .filter((link): link is string => link !== null);
 
   const own = employer.length >= 3
     ? links.find((link) => hostOf(link).replace(/[^a-z0-9]+/g, "").includes(employer))
@@ -212,10 +248,54 @@ export function chooseApplyUrl(raw: SerpApiJob): string | null {
   });
   if (board) return board;
 
-  const share = raw.share_link?.trim();
-  if (share) return share;
+  /*
+   * An unrecognised but plausible host is still somewhere a person can apply.
+   * Google's results page is not, so it outranks one.
+   */
+  const plausible = links.find((link) => !isGoogleResultsPage(link) && !isThrowawayHost(link));
+  if (plausible) return plausible;
 
-  return links[0] ?? null;
+  /* Then Google's page, and only then a mirror — a long shot beats no shot. */
+  return canonicalDestination(raw.share_link ?? "") || links[0] || null;
+}
+
+/*
+ * Free application-hosting domains, where a scraped copy of a vacancy lives
+ * rather than the vacancy. No employer and no job board serves an advert from
+ * a random subdomain of one of these, so a link here is a mirror that has
+ * probably already gone dead — worth less than Google's own listing page,
+ * though still worth more than sending somebody nowhere at all.
+ */
+const THROWAWAY_HOSTS = [
+  "netlify.app", "vercel.app", "herokuapp.com", "glitch.me", "pages.dev",
+  "github.io", "web.app", "firebaseapp.com", "onrender.com", "replit.app",
+  "repl.co", "surge.sh", "fly.dev", "ngrok.io", "workers.dev",
+];
+
+function isThrowawayHost(url: string): boolean {
+  const host = hostOf(url);
+  return THROWAWAY_HOSTS.some((bad) => host === bad || host.endsWith(`.${bad}`));
+}
+
+/**
+ * A google.com/search URL, which is a results page rather than a vacancy.
+ *
+ * Kept here as well as in run-search.ts because the two answer different
+ * questions at different moments: this one stops a Google page being *chosen*
+ * as an advert's destination, while `isSearchEnginePage` decides whether to
+ * hide a card that already has one. Matched on the /search path, not the host,
+ * so careers.google.com — Google's own careers site, a direct employer like
+ * any other — is never mistaken for one.
+ */
+function isGoogleResultsPage(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    const host = parsed.hostname.toLowerCase().replace(/^www\./, "");
+    const isGoogle = host === "google.com" || host.startsWith("google.");
+    return isGoogle && parsed.pathname.startsWith("/search");
+  } catch {
+    return false;
+  }
 }
 
 /** Pure mapping from one SerpApi record to Sartho's shape — kept testable. */

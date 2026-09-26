@@ -222,3 +222,276 @@ describe("stress", () => {
     expect(mapped?.description.length).toBeGreaterThan(100_000);
   });
 });
+
+/*
+ * The third report of "View still goes to Google search", traced to two
+ * separate places that each preferred a Google page over a real destination.
+ */
+describe("View never lands on a search engine", () => {
+  it("JSearch drops a record with no apply route rather than inventing one", async () => {
+    const { mapJSearchResult } = await import("@/lib/jobs/search-provider");
+    /*
+     * This used to become google.com/search?q=<title> <employer> job — a query
+     * Sartho wrote itself, three lines under a comment calling that a broken
+     * promise. A record with nothing to apply to is not a card.
+     */
+    expect(mapJSearchResult({
+      job_title: "ITSM Manager",
+      employer_name: "Acme",
+      job_description: "Own the ITSM practice.",
+    } as never)).toBeNull();
+  });
+
+  it("JSearch still maps a record that has a real apply link", async () => {
+    const { mapJSearchResult } = await import("@/lib/jobs/search-provider");
+    const mapped = mapJSearchResult({
+      job_title: "ITSM Manager",
+      employer_name: "Acme",
+      job_description: "Own the ITSM practice.",
+      job_apply_link: "https://acme.com/careers/1",
+    } as never);
+    expect(mapped?.url).toBe("https://acme.com/careers/1");
+  });
+
+  it("no mapper hands back a search page while a real link exists", async () => {
+    const { mapSerpApiResult } = await import("@/lib/jobs/serpapi");
+    const { mapJSearchResult } = await import("@/lib/jobs/search-provider");
+
+    const serp = mapSerpApiResult({
+      title: "ITSM Manager",
+      company_name: "Acme",
+      description: "Own the ITSM practice.",
+      share_link: "https://www.google.com/search?q=acme",
+      apply_options: [{ title: "Board", link: "https://vacatures.example.nl/12" }],
+    });
+    const jsearch = mapJSearchResult({
+      job_title: "ITSM Manager",
+      employer_name: "Acme",
+      job_description: "Own the ITSM practice.",
+      apply_options: [{ apply_link: "https://vacatures.example.nl/12" }],
+    } as never);
+
+    for (const mapped of [serp, jsearch]) {
+      expect(mapped?.url, "mapped to a search page").not.toMatch(/google\.[a-z.]+\/search/);
+      expect(mapped?.url).toBe("https://vacatures.example.nl/12");
+    }
+  });
+});
+
+/*
+ * Found by Codex on the fix above, and introduced by it: ranking a real apply
+ * link over Google's page meant a malformed one got ranked over it too, so
+ * rubbish that used to be reachable only when an advert had no share_link
+ * became reachable whenever it had one.
+ */
+describe("a View destination is always somewhere a browser can go", () => {
+  const advertWithGoogle = {
+    title: "ITSM Manager",
+    company_name: "Acme",
+    description: "Own the ITSM practice.",
+    share_link: "https://www.google.com/search?q=acme",
+  };
+
+  for (const link of [
+    "http://",
+    "https://",
+    "/relative/path",
+    "¬¬¬",
+    "not a url",
+    "",
+    "   ",
+  ]) {
+    it(`falls back to Google rather than serving ${JSON.stringify(link)}`, () => {
+      expect(chooseApplyUrl({ ...advertWithGoogle, apply_options: [{ link }] }))
+        .toBe("https://www.google.com/search?q=acme");
+    });
+  }
+
+  /*
+   * These parse as valid URLs and report no hostname, so a host check alone
+   * lets them through — and both execute from an href on click. The scheme
+   * allowlist is what stops them.
+   */
+  for (const link of [
+    "javascript:alert(1)",
+    "data:text/html,<script>alert(1)</script>",
+    "vbscript:msgbox(1)",
+    "file:///etc/passwd",
+    "mailto:someone@example.com",
+  ]) {
+    it(`never serves ${link.split(":")[0]}: from an advert`, () => {
+      const chosen = chooseApplyUrl({ ...advertWithGoogle, apply_options: [{ link }] });
+      expect(chosen).toBe("https://www.google.com/search?q=acme");
+      expect(chosen).not.toContain(link);
+    });
+  }
+
+  it("serves nothing at all when the rubbish is the only option", () => {
+    /* No share_link either, so there is genuinely nowhere to send anybody. */
+    expect(chooseApplyUrl({
+      title: "ITSM Manager",
+      company_name: "Acme",
+      description: "Own the ITSM practice.",
+      apply_options: [{ link: "javascript:alert(1)" }, { link: "http://" }],
+    })).toBeNull();
+  });
+
+  it("still picks the real link when it sits beside rubbish", () => {
+    expect(chooseApplyUrl({
+      ...advertWithGoogle,
+      apply_options: [{ link: "javascript:alert(1)" }, { link: "https://vacatures.example.nl/12" }],
+    })).toBe("https://vacatures.example.nl/12");
+  });
+});
+
+/*
+ * Codex's second finding on this PR, and the subtler of the two: a URL that
+ * passes validation and still breaks in the browser.
+ *
+ * `https:example.com/jobs/1` — no slashes — parses with hostname
+ * "example.com", so a boolean check waves it through unchanged. The browser
+ * then resolves that raw string against the document base, and because the
+ * scheme matches the page's it is treated as relative:
+ * https://sartho.app/example.com/jobs/1. Same origin, dead link, validated.
+ */
+describe("a validated destination is canonical, not just parseable", () => {
+  const advert = {
+    title: "ITSM Manager",
+    company_name: "Somewhere",
+    description: "Own the ITSM practice.",
+  };
+  /* Resolved against an https page, the way the results panel renders it. */
+  const asBrowserReads = (href: string | null) => new URL(href ?? "", "https://sartho.app/").href;
+
+  for (const [input, expected] of [
+    ["https:example.com/jobs/1", "https://example.com/jobs/1"],
+    ["https:/example.com/jobs/1", "https://example.com/jobs/1"],
+    ["https://example.com/jobs/1", "https://example.com/jobs/1"],
+    ["HTTPS://Example.COM/jobs/1", "https://example.com/jobs/1"],
+  ]) {
+    it(`stores ${JSON.stringify(input)} as something a browser reads the same way`, () => {
+      const chosen = chooseApplyUrl({ ...advert, apply_options: [{ link: input }] });
+      expect(chosen).toBe(expected);
+      /* The assertion that actually matters: it does not become same-origin. */
+      expect(asBrowserReads(chosen)).toBe(expected);
+      expect(asBrowserReads(chosen)).not.toContain("sartho.app");
+    });
+  }
+
+  it("canonicalises Google's own page too, since it is rendered the same way", () => {
+    expect(chooseApplyUrl({ ...advert, share_link: "https:www.google.com/search?q=x" }))
+      .toBe("https://www.google.com/search?q=x");
+  });
+
+  it("does not let a non-canonical form smuggle past the scheme check", () => {
+    for (const link of ["javascript:alert(1)", "data:text/html,x", "ftp:example.com/x"]) {
+      expect(chooseApplyUrl({ ...advert, apply_options: [{ link }] }), link).toBeNull();
+    }
+  });
+});
+
+/*
+ * Codex's third and fourth findings on this PR, both downstream consequences
+ * of ranking a real apply link above Google's page rather than defects in the
+ * ranking itself. Worth keeping together: each is a contract somewhere else in
+ * the app that the mapper quietly stopped honouring.
+ */
+describe("a chosen destination honours the contracts around it", () => {
+  const advert = {
+    title: "ITSM Manager",
+    company_name: "Somewhere",
+    description: "Own the ITSM practice.",
+    share_link: "https://www.google.com/search?q=acme",
+  };
+
+  it("never picks an http destination the save route would reject", () => {
+    /*
+     * app/api/jobs/schema.ts accepts sourceUrl only when it starts with
+     * https://. Before the reordering an unrecognised http option lost to the
+     * https share_link; afterwards it won, and "Save to pipeline" 400d every
+     * time on that card. A card you cannot save is worse than one pointing at
+     * Google's listing, so the mapper is held to the save route's contract.
+     */
+    expect(chooseApplyUrl({ ...advert, apply_options: [{ link: "http://jobs.example.org/1" }] }))
+      .toBe("https://www.google.com/search?q=acme");
+  });
+
+  it("still prefers an https board over Google", () => {
+    expect(chooseApplyUrl({ ...advert, apply_options: [{ link: "https://jobs.example.org/1" }] }))
+      .toBe("https://jobs.example.org/1");
+  });
+
+  it("drops the card when http is genuinely the only option", () => {
+    expect(chooseApplyUrl({
+      title: "ITSM Manager",
+      company_name: "Somewhere",
+      description: "Own the ITSM practice.",
+      apply_options: [{ link: "http://jobs.example.org/1" }],
+    })).toBeNull();
+  });
+});
+
+describe("canonicalising a URL does not re-alert a vacancy", () => {
+  it("matches a stored URL against its canonical form", async () => {
+    const { selectNewMatches } = await import("@/lib/notifications/match-alerts");
+    const result = {
+      title: "ITSM Manager", employer: "Acme", location: "Melbourne", url: "https://example.com/",
+      salary: null, source: "Google for Jobs", overallMatch: 90, recommendation: "strong",
+      matchedSkills: [],
+    };
+
+    /*
+     * seen_job_matches holds what earlier runs wrote — uncanonicalised, so
+     * "https://example.com" with no trailing slash. Compared as exact strings
+     * that stops matching the moment the mapper returns parsed.href, and the
+     * same vacancy is emailed twice against a once-ever promise.
+     */
+    expect(selectNewMatches([result as never], ["https://example.com"]), "no trailing slash").toEqual([]);
+    expect(selectNewMatches([result as never], ["HTTPS://EXAMPLE.COM/"]), "host case folded").toEqual([]);
+    expect(selectNewMatches([result as never], ["https://example.com/"]), "already canonical").toEqual([]);
+  });
+
+  it("matches a legacy http row against the https form it is now returned as", async () => {
+    const { selectNewMatches } = await import("@/lib/notifications/match-alerts");
+    /*
+     * The interaction between the two fixes above, and the reason the history
+     * key collapses schemes. Destinations are https-only now, so the mapper
+     * can never emit the http form of a vacancy again — every legacy http row
+     * in seen_job_matches would stay permanently unmatched and every one of
+     * those vacancies would be emailed a second time.
+     */
+    const result = {
+      title: "ITSM Manager", employer: "Acme", location: "Melbourne",
+      url: "https://jobs.example.com/42",
+      salary: null, source: "Google for Jobs", overallMatch: 90, recommendation: "strong",
+      matchedSkills: [],
+    };
+    expect(selectNewMatches([result as never], ["http://jobs.example.com/42"]), "legacy http row").toEqual([]);
+    expect(selectNewMatches([result as never], ["HTTP://Jobs.Example.COM/42"]), "legacy, mixed case").toEqual([]);
+  });
+
+  it("does not collapse two genuinely different vacancies", () => {
+    /* Scheme is the only thing folded — a different path is still new. */
+    return import("@/lib/notifications/match-alerts").then(({ selectNewMatches }) => {
+      const result = {
+        title: "ITSM Manager", employer: "Acme", location: "Melbourne",
+        url: "https://jobs.example.com/43",
+        salary: null, source: "Google for Jobs", overallMatch: 90, recommendation: "strong",
+        matchedSkills: [],
+      };
+      expect(selectNewMatches([result as never], ["http://jobs.example.com/42"])).toHaveLength(1);
+    });
+  });
+
+  it("still alerts a genuinely new vacancy", () => {
+    /* The guard must not swallow everything — a different URL is still new. */
+    return import("@/lib/notifications/match-alerts").then(({ selectNewMatches }) => {
+      const result = {
+        title: "ITSM Manager", employer: "Acme", location: "Melbourne", url: "https://example.com/new",
+        salary: null, source: "Google for Jobs", overallMatch: 90, recommendation: "strong",
+        matchedSkills: [],
+      };
+      expect(selectNewMatches([result as never], ["https://example.com/"])).toHaveLength(1);
+    });
+  });
+});

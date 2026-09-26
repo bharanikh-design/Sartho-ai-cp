@@ -1,3 +1,4 @@
+import { destinationKey } from "@/lib/jobs/destination";
 import type { ScoredJobMatch, SearchCriteria } from "@/lib/jobs/run-search";
 
 /*
@@ -18,11 +19,20 @@ export type AlertMatch = Pick<
 
 /** Strong, unseen matches, best first, capped. Pure. */
 export function selectNewMatches(results: ScoredJobMatch[], seenUrls: Iterable<string>): AlertMatch[] {
-  const seen = new Set(seenUrls);
+  /*
+   * Compared on a shared canonical key, not as raw strings.
+   *
+   * seen_job_matches holds URLs written before the mapper canonicalised what
+   * it returns, so `https://example.com` is stored where `https://example.com/`
+   * now arrives. As exact strings those stop matching and the same vacancy is
+   * emailed a second time, against a once-ever promise. Normalising both sides
+   * fixes it without migrating the table.
+   */
+  const seen = new Set([...seenUrls].map(destinationKey));
   const byKey = new Set<string>();
   return results
     .filter((result) => result.recommendation !== "skip")
-    .filter((result) => !seen.has(result.url))
+    .filter((result) => !seen.has(destinationKey(result.url)))
     .filter((result) => {
       // Near-identical reposts (same title + employer) count once.
       const key = `${result.title}|${result.employer ?? ""}`.toLowerCase().trim();
