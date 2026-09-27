@@ -1,8 +1,6 @@
 import Link from "next/link";
 import { OnboardingCarousel } from "@/components/onboarding-carousel";
 import { ProductPageHeader } from "@/components/product-page-header";
-import { JourneyNudgeCard } from "@/components/journey-nudge-card";
-import { ProfileScorecard } from "@/components/profile-scorecard";
 import { ResumeImport } from "@/components/resume-import";
 import { SignedOutHome } from "@/components/signed-out-home";
 import { getAuthenticatedUser } from "@/lib/auth";
@@ -152,14 +150,17 @@ export default async function DashboardPage({
       <DailyBriefCard brief={dailyBrief} />
 
       {/*
-        * Directly under the header, above the nudge.
+        * Directly under the header.
         *
-        * It was below the nudge on the reasoning that somebody mid-flow wants
+        * It sat lower once, on the reasoning that somebody mid-flow wants
         * their next step first. That is true and it made the card the third
         * thing on a long page — which for anybody who had not already found
         * the extension or the master résumé meant they never did. A four-tile
         * card is read in two seconds; the next step is still immediately under
         * it.
+        *
+        * "Above the nudge" is how this used to read. JourneyNudgeCard was
+        * imported and never rendered, so there was no nudge to be above.
         */}
 
       <section className="career-pulse" aria-labelledby="career-pulse-title">

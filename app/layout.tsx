@@ -18,7 +18,6 @@ import "./ai-career-workspaces.css";
 import "./product-system.css";
 import "./landing.css";
 import "./front-door.css";
-import "./welcome.css";
 import "./trust.css";
 /*
  * Last import wins. The monochrome layer redefines the palette tokens as pure

@@ -439,6 +439,26 @@ export function isSearchEnginePage(url: string): boolean {
  * it does not guess at which employers are agencies, because guessing from a
  * company name hides real employers.
  */
+/**
+ * Whether a scored role is worth putting in front of somebody.
+ *
+ * Named because the search now decides when it has found *enough* by counting
+ * these, and the old measure — how many URLs had been collected — was the
+ * single most damaging thing about thin result pages. It stopped at
+ * twenty-five raw results, every one of which could then be discarded by
+ * scoring and the destination filters, with the queries that might have found
+ * real matches already skipped.
+ *
+ * Deliberately the cheap half of the truth. `recommendation` comes from local
+ * scoring and `isSearchEnginePage` is a string test, so both can run inside
+ * the retrieval loop; the relevance tier and work-model filters cost more and
+ * run later, and can still remove some of what this counts. That makes it an
+ * over-estimate — but of the right quantity, which the URL count never was.
+ */
+export function isWorthShowing(match: { recommendation: string; url: string }): boolean {
+  return match.recommendation !== "skip" && !isSearchEnginePage(match.url);
+}
+
 export function dropSearchEnginePages<T extends { url: string }>(
   ranked: T[],
 ): { kept: T[]; hidden: number } {
@@ -907,6 +927,53 @@ export async function runBriefSearch(
     return lead === "serpapi" ? SERPAPI_CONCURRENCY : 1;
   };
 
+  const score = (result: JobSearchResult): ScoredJobMatch => {
+    const scored = evaluateOpportunity({ workflow }, result.title, result.description);
+    return {
+      title: result.title,
+      employer: result.employer,
+      location: result.location,
+      url: result.url,
+      salary: result.salary,
+      postedAt: result.postedAt,
+      source: result.source,
+      description: result.description,
+      overallMatch: scored.overallMatch,
+      recommendation: scored.recommendation,
+      matchedSkills: scored.analysis.matchedSkills?.map((skill) => skill.name).slice(0, 6) ?? [],
+      titleFit: scored.breakdown.titleFit,
+      requirementCoverage: scored.breakdown.requirementCoverage,
+      specialistConflict: scored.analysis.specialistConflict,
+      closestTitle: scored.analysis.closestTitle ?? null,
+      closestIsHeld: scored.analysis.closestIsHeld ?? false,
+      requirementsRead: scored.analysis.requirementsRead ?? 0,
+      missingRequirements: scored.analysis.missingRequirements?.slice(0, 4) ?? [],
+      /*
+       * Read from the snippet for now. The full advert is opened below for the
+       * roles that survive the free filters, which is where this usually gets
+       * its answer — the snippet is the marketing paragraph, and no advert
+       * states its experience requirement there.
+       */
+      ...readRequirement(`${result.title}. ${result.description}`),
+      platforms: result.platforms,
+      applyDirect: result.applyDirect,
+      screeningInsight: null,
+    };
+  };
+
+  /*
+   * Scored as results arrive, so the loop can tell how many roles it has
+   * actually found rather than how many URLs it has collected.
+   *
+   * `score` is pure and local — `evaluateOpportunity` reads the workflow held
+   * in memory — so doing it here costs nothing. The expensive relevance work
+   * happens later and is unaffected.
+   */
+  const scoredByUrl = new Map<string, ScoredJobMatch>();
+  const usableCount = () => Array.from(scoredByUrl.values()).filter(isWorthShowing).length;
+  /* The widening decision below asks the same question. */
+  const strongCount = usableCount;
+
   async function run(list: JobSearchQuery[]) {
     let index = 0;
     while (index < list.length) {
@@ -949,7 +1016,9 @@ export async function runBriefSearch(
       })));
       for (const { query, results } of responses) {
         for (const result of results) {
-          if (!byUrl.has(result.url)) byUrl.set(result.url, result);
+          if (byUrl.has(result.url)) continue;
+          byUrl.set(result.url, result);
+          scoredByUrl.set(result.url, score(result));
         }
         queriesRun++;
         if (query.targetRole) searchedTargetRoles.add(query.targetRole.toLowerCase());
@@ -959,12 +1028,29 @@ export async function runBriefSearch(
       lastQueryEndedAt = Date.now();
 
       /*
-       * Enough, rather than out of time: twenty-five roles found and every
-       * lane asked about at least once. The remaining queries are narrower
-       * variations that would mostly return the same adverts again.
+       * Enough, rather than out of time: twenty-five roles worth showing, and
+       * every lane asked about at least once. The remaining queries are
+       * narrower variations that would mostly return the same adverts again.
+       *
+       * Counted in roles that survive scoring, not in URLs collected. It was
+       * `byUrl.size >= 25`, which counted raw results before seniority,
+       * location, experience, relevance and destination filtering had run —
+       * so all twenty-five could be discarded afterwards while the queries
+       * that might have found real matches were already skipped. The person
+       * saw three roles and concluded the market was empty; the search had
+       * stopped looking after twenty-five candidates.
+       *
+       * It got worse the stricter the brief: every filter that removes more
+       * made the shortfall bigger, because nothing went back to look again.
+       *
+       * `usableCount` is still optimistic — the relevance tier and work-model
+       * filters run later and can remove more — but it counts the same thing
+       * the page will show rather than a number with no relationship to it.
+       * The budget guards above remain the backstop, so a thin market costs
+       * time rather than running forever.
        */
       if (
-        byUrl.size >= 25
+        usableCount() >= 25
         && retrievalBreadthComplete(queries, searchedTargetRoles, searchedSuggestedKeywords)
       ) {
         queriesSkipped += list.length - index;
@@ -1045,39 +1131,6 @@ export async function runBriefSearch(
     return { ok: false, code: "provider_error", error: `Jobs provider error: ${cascade.errorsThatCostResults().join("; ")}` };
   }
 
-  const score = (result: JobSearchResult): ScoredJobMatch => {
-    const scored = evaluateOpportunity({ workflow }, result.title, result.description);
-    return {
-      title: result.title,
-      employer: result.employer,
-      location: result.location,
-      url: result.url,
-      salary: result.salary,
-      postedAt: result.postedAt,
-      source: result.source,
-      description: result.description,
-      overallMatch: scored.overallMatch,
-      recommendation: scored.recommendation,
-      matchedSkills: scored.analysis.matchedSkills?.map((skill) => skill.name).slice(0, 6) ?? [],
-      titleFit: scored.breakdown.titleFit,
-      requirementCoverage: scored.breakdown.requirementCoverage,
-      specialistConflict: scored.analysis.specialistConflict,
-      closestTitle: scored.analysis.closestTitle ?? null,
-      closestIsHeld: scored.analysis.closestIsHeld ?? false,
-      requirementsRead: scored.analysis.requirementsRead ?? 0,
-      missingRequirements: scored.analysis.missingRequirements?.slice(0, 4) ?? [],
-      /*
-       * Read from the snippet for now. The full advert is opened below for the
-       * roles that survive the free filters, which is where this usually gets
-       * its answer — the snippet is the marketing paragraph, and no advert
-       * states its experience requirement there.
-       */
-      ...readRequirement(`${result.title}. ${result.description}`),
-      platforms: result.platforms,
-      applyDirect: result.applyDirect,
-      screeningInsight: null,
-    };
-  };
 
   /*
    * Location intelligence, step one: the cities are the first radius, not the
@@ -1085,19 +1138,21 @@ export async function runBriefSearch(
    * roles are searched again with no city, so the rest of the country is
    * covered — and the criteria say so, rather than silently mixing the two.
    */
-  const scoredByUrl = new Map<string, ScoredJobMatch>();
-  const strongCount = () => Array.from(scoredByUrl.values()).filter((item) => item.recommendation !== "skip").length;
-  for (const [url, result] of byUrl) scoredByUrl.set(url, score(result));
+  /* Anything the loop did not reach — the employer-direct pass, mainly. */
+  for (const [url, result] of byUrl) if (!scoredByUrl.has(url)) scoredByUrl.set(url, score(result));
 
   const usedLocations = brief.locations.slice(0, MAX_LOCATION_QUERIES);
   let broadened = false;
   if (usedLocations.length && strongCount() < MIN_STRONG_BEFORE_WIDENING && !cascade.exhausted() && (Date.now() - startedAt < budgetMs - 2_500)) {
     broadened = true;
-    const before = new Set(byUrl.keys());
     await run(widenToCountry(queries));
-    for (const [url, result] of byUrl) {
-      if (!before.has(url)) scoredByUrl.set(url, score(result));
-    }
+    /*
+     * `run` scores as it collects, so this only catches anything that
+     * reached `byUrl` by another route. It used to re-score everything the
+     * widening added, which was harmless — `score` is pure — but meant three
+     * places deciding separately what had been scored.
+     */
+    for (const [url, result] of byUrl) if (!scoredByUrl.has(url)) scoredByUrl.set(url, score(result));
   }
 
   /*
