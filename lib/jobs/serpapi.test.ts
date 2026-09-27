@@ -586,7 +586,7 @@ describe("chooseApplyUrl", () => {
   /*
    * The bug a person reported three times: "View still goes to Google search".
    *
-   * Both earlier attempts read it as a gap in KNOWN_BOARDS and added the
+   * Both earlier attempts read it as a gap in the known-host list and added the
    * boards that had been named. That fixes those boards and leaves every other
    * board pointing at Google, because share_link sat above links[0] — so any
    * advert whose only apply route was an unlisted board lost to a search page

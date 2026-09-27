@@ -24,12 +24,13 @@
 
 export type SearchFilterNote = {
   /** Stable key for React, and for asserting on the right note in a test. */
-  id: "direct-employers" | "work-model" | "provider-trouble";
+  id: "job-board" | "direct-employers" | "work-model" | "provider-trouble";
   text: string;
 };
 
 type Diagnostics = {
   agencyOrUnverifiedHidden?: number;
+  jobBoardHidden?: number;
   workModelHidden?: number;
   workModels?: string[];
   providerErrors?: string[];
@@ -52,6 +53,21 @@ function shown(value: number | undefined): number {
 export function searchFilterNotes(criteria: Diagnostics | null | undefined): SearchFilterNote[] {
   if (!criteria) return [];
   const notes: SearchFilterNote[] = [];
+
+  /*
+   * First, because it is the only line here the person can act on in one
+   * click, and the only filter that can legitimately leave them with nothing.
+   * "Direct employers only" is a deliberate choice; a short page under it is
+   * the setting working, not the market being empty — but that is only true
+   * if the page says so and says which button undoes it.
+   */
+  const jobBoard = shown(criteria.jobBoardHidden);
+  if (jobBoard) {
+    notes.push({
+      id: "job-board",
+      text: `${listing(jobBoard)} hidden — you would apply through a job board rather than the employer’s own site or hiring system. That is “Direct employers only”; switch to “Employers + agencies” to see them.`,
+    });
+  }
 
   const agency = shown(criteria.agencyOrUnverifiedHidden);
   if (agency) {

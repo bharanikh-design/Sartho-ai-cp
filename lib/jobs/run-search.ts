@@ -28,6 +28,7 @@ import { searchSerpApiCached } from "@/lib/jobs/cached-serpapi";
 import { findEmployerPortal, searchEmployerDirectly } from "@/lib/jobs/company-careers/registry";
 import { loadEmployerCareerSources } from "@/lib/jobs/company-careers/saved-sources";
 import { createSearchCacheStore } from "@/lib/jobs/search-cache-store";
+import { isDirectEmployerDestination } from "@/lib/jobs/destination";
 import { deduplicateSearchResults, isMarketLocationConsistent } from "@/lib/jobs/location-guard";
 import {
   affinityDelta,
@@ -209,9 +210,11 @@ export type SearchCriteria = {
   workModels?: string[];
   workModelHidden?: number;
   providers: string[];
-  /** Whether this run intentionally hid unverified/agency postings. */
+  /** Whether this run intentionally hid job-board reposts. */
   directEmployersOnly?: boolean;
   agencyOrUnverifiedHidden?: number;
+  /** Listings removed because they route through a job board, not the employer. */
+  jobBoardHidden?: number;
   providerErrors?: string[];
   /**
    * Providers that ran out of time, and how often. Said out loud because a
@@ -441,6 +444,49 @@ export function dropSearchEnginePages<T extends { url: string }>(
 ): { kept: T[]; hidden: number } {
   const kept = ranked.filter((match) => !isSearchEnginePage(match.url));
   return { kept, hidden: ranked.length - kept.length };
+}
+
+/**
+ * "Direct employers only", meaning something at last.
+ *
+ * The toggle shipped decorative and stayed that way. Its entire
+ * implementation was removing search-engine dead ends, and once that became
+ * unconditional — it is not a preference; a card that leads to a search box
+ * is not a vacancy — the control was left doing nothing at all while its
+ * label still promised a choice. This gives it the one honest distinction
+ * the data supports: does applying take you to the employer, or to a
+ * marketplace reposting them?
+ *
+ * `isDirectEmployerDestination` draws that line, and draws it leniently. An
+ * employer's own domain qualifies, and so does their applicant tracking
+ * system — a Greenhouse or Workday link is that employer's hiring pipeline
+ * under a vendor's roof, not a third party standing in the way. Only hosts
+ * recognised as job boards are removed. Crucially an *unfamiliar* host is
+ * kept: the likeliest explanation for one is a careers site whose domain
+ * does not string-match the company name, and hiding unless recognised would
+ * bury the very employers this setting exists to surface.
+ *
+ * It still does not guess at agencies from a company name. Nothing here
+ * identifies an agency, and the old comments warning that such a guess hides
+ * real employers remain correct — which is exactly why the rule is about
+ * where the link goes rather than who is named on it.
+ *
+ * No stand-down, and unlike the one removed from `dropSearchEnginePages`
+ * that is safe rather than reckless. What this removes are real jobs, not
+ * dead ends, so an empty page is a genuine loss — but it can only happen to
+ * somebody who deliberately chose the strict option, the note under the
+ * results names the count and says which button brings them back, and the
+ * default setting never removes a single listing. A filter the person can
+ * undo in one click is theirs to be wrong about; quietly overriding it would
+ * be the same lie the old stand-down told.
+ */
+export function keepDirectEmployers<T extends { url: string; employer?: string | null }>(
+  matches: T[],
+  directOnly: boolean,
+): { kept: T[]; hidden: number } {
+  if (!directOnly) return { kept: matches, hidden: 0 };
+  const kept = matches.filter((match) => isDirectEmployerDestination(match.url, match.employer));
+  return { kept, hidden: matches.length - kept.length };
 }
 
 /**
@@ -1264,16 +1310,25 @@ export async function runBriefSearch(
    *
    * Destinations that are not an application come out inside this, before the
    * fallback picks a set — `rankApplicable` explains why that order is the
-   * load-bearing part. It is not gated on `directEmployersOnly`: that toggle
-   * describes a preference between employers and agencies, but "leads nowhere
-   * you can apply" was never a matter of taste.
+   * load-bearing part. That removal is gated on nothing: "leads nowhere you
+   * can apply" was never a matter of taste.
+   *
+   * The person's own choice of sources is applied first, for the same
+   * ordering reason. Both filters run before the fallback chooses, so when
+   * the in-scope matches are all job-board reposts it can reach for a
+   * direct-employer role slightly outside scope rather than being handed a
+   * set that is about to be emptied underneath it.
    *
    * This is also the choke point. `results` below is the single value that
    * becomes the API response, the stored `search_results` row and the set the
    * alert mailer compares against, so a listing removed here cannot reappear
    * on any of those three paths.
    */
-  const { ranked, hidden: agencyOrUnverifiedHidden } = rankApplicable(relevant);
+  const { kept: fromChosenSources, hidden: jobBoardHidden } = keepDirectEmployers(
+    relevant,
+    searchIntent.directEmployersOnly === true,
+  );
+  const { ranked, hidden: agencyOrUnverifiedHidden } = rankApplicable(fromChosenSources);
 
   /*
    * "How do you want to work?", applied for the first time. Read off the
@@ -1352,6 +1407,7 @@ export async function runBriefSearch(
      * stored search rather than improve anything a person can see.
      */
     agencyOrUnverifiedHidden: agencyOrUnverifiedHidden || undefined,
+    jobBoardHidden: jobBoardHidden || undefined,
     /*
      * Only the failures that changed what came back. A provider behind the one
      * that answered was never reached, so its trouble is a server-log fact
@@ -1583,6 +1639,7 @@ export function normaliseCriteria(stored: unknown): SearchCriteria {
     providers: strings(value.providers),
     directEmployersOnly: value.directEmployersOnly === true,
     agencyOrUnverifiedHidden: count(value.agencyOrUnverifiedHidden),
+    jobBoardHidden: count(value.jobBoardHidden),
     providerErrors: strings(value.providerErrors),
     providerTimeouts: Array.isArray(value.providerTimeouts)
       ? value.providerTimeouts.filter((entry) => entry && typeof entry.name === "string").map((entry) => ({
