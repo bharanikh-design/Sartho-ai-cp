@@ -1431,6 +1431,19 @@ export function normaliseResults(stored: unknown): ScoredJobMatch[] {
     const url = text(value.url);
     if (!title || !url) return [];
 
+    /*
+     * A stored result whose destination is a search engine is dropped on the
+     * way back out, not just on the way in.
+     *
+     * The mapper stopped choosing Google's results page over a real apply
+     * link, but search results are persisted — so every row written before
+     * that still points where it always did, and "re-run your search" is not
+     * a fix a person should have to be told. A card whose View button opens a
+     * Google search is not an opportunity, and it is worth less than the gap
+     * where it used to be.
+     */
+    if (isSearchEnginePage(url)) return [];
+
     return [{
       title,
       url,

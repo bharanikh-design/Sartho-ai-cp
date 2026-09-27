@@ -503,3 +503,46 @@ describe("canonicalising a URL does not re-alert a vacancy", () => {
     });
   });
 });
+
+/*
+ * The reason "View goes to Google" survived three fixes at the mapper: search
+ * results are persisted. Every fix applied to how a result is chosen, and
+ * nothing applied to the rows already written — so the platform kept serving
+ * Google links until somebody ran a fresh search, which is not a fix a person
+ * should have to be told about.
+ */
+describe("stored results never serve a search engine", () => {
+  it("drops a stored row whose destination is a Google search", async () => {
+    const { normaliseResults } = await import("@/lib/jobs/run-search");
+    const row = (url: string) => ({ title: "ITSM Manager", url, employer: "Acme" });
+
+    const kept = normaliseResults([
+      row("https://www.google.com/search?q=itsm+manager"),
+      row("https://google.com/search?q=x&ibp=htl;jobs"),
+      row("https://jobs.example.com/42"),
+    ]);
+
+    expect(kept.map((r) => r.url)).toEqual(["https://jobs.example.com/42"]);
+  });
+
+  it("keeps careers.google.com, which is a direct employer", async () => {
+    const { normaliseResults } = await import("@/lib/jobs/run-search");
+    const kept = normaliseResults([
+      { title: "SRE", url: "https://careers.google.com/jobs/results/123", employer: "Google" },
+    ]);
+    expect(kept).toHaveLength(1);
+  });
+
+  it("returns nothing rather than a page of dead links", async () => {
+    /*
+     * When every stored row is a search page the honest answer is an empty
+     * stored search, which prompts a fresh one — not a list nobody can apply
+     * through.
+     */
+    const { normaliseResults } = await import("@/lib/jobs/run-search");
+    expect(normaliseResults([
+      { title: "A", url: "https://www.google.com/search?q=a" },
+      { title: "B", url: "https://www.google.com/search?q=b" },
+    ])).toEqual([]);
+  });
+});
