@@ -6,7 +6,7 @@ import {
   isAggregatorBoard,
   isDirectEmployerDestination,
 } from "./destination";
-import { getStoredSearch, isAuthoritativeEmptySearch, keepDirectEmployers } from "./run-search";
+import { getStoredSearch, keepDirectEmployers } from "./run-search";
 import { chooseApplyUrl } from "./serpapi";
 
 /*
@@ -168,15 +168,16 @@ describe("keepDirectEmployers", () => {
 });
 
 /*
- * "Searched, and nothing survived" is not the same as "never searched".
+ * A stored row is a snapshot of the settings in force when it was written.
  *
- * They look identical from the results array, and reading only the array is
- * what made the page auto-run a fresh provider search on every visit. A
- * strict-filter run that legitimately ends empty would have fed that loop
- * forever, so the row's existence — not its length — is what answers the
- * question now.
+ * Reading it back through the person's *current* source preference is what
+ * stops somebody who has just turned "Direct employers only" on being shown
+ * yesterday's job-board links. It also replaced a much larger mechanism:
+ * storing empty strict runs so they could overwrite the stale set, which
+ * required deciding whether a given empty run had really finished. Seven
+ * rounds of review found seven ways that decision was wrong.
  */
-describe("getStoredSearch tells an empty search from no search", () => {
+describe("getStoredSearch reads through the current source preference", () => {
   const clientReturning = (row: unknown) => ({
     from: () => ({
       select: () => ({
@@ -185,96 +186,51 @@ describe("getStoredSearch tells an empty search from no search", () => {
     }),
   }) as unknown as Parameters<typeof getStoredSearch>[0];
 
-  const row = (results: unknown[]) => ({
-    results,
-    criteria: { country: "uk", jobBoardHidden: 4, searchComplete: true },
-    searched_at: "2026-09-27T00:00:00.000Z",
+  const board = { title: "Ops Lead", url: "https://www.linkedin.com/jobs/view/1", description: "x", employer: "Acme Corp" };
+  const direct = { title: "Ops Lead", url: "https://boards.greenhouse.io/acme/2", description: "x", employer: "Acme Corp" };
+  const row = (results: unknown[]) => ({ results, criteria: { country: "uk" }, searched_at: "2026-09-27T00:00:00.000Z" });
+
+  it("returns everything when the person has not asked for direct employers", async () => {
+    const stored = await getStoredSearch(clientReturning(row([board, direct])), "u1", false);
+    expect(stored!.results).toHaveLength(2);
   });
 
-  it("answers null only when there is no row at all", async () => {
-    expect(await getStoredSearch(clientReturning(null), "u1")).toBeNull();
-  });
-
-  it("keeps the criteria of a run whose results were all filtered away", async () => {
-    const stored = await getStoredSearch(clientReturning(row([])), "u1");
-    expect(stored, "an empty run is still a run").not.toBeNull();
-    expect(stored!.results).toEqual([]);
-    /* The count is what lets the page explain itself rather than look untouched. */
-    expect(stored!.criteria.jobBoardHidden).toBe(4);
-    expect(stored!.searchedAt).toBe("2026-09-27T00:00:00.000Z");
-  });
-
-  /*
-   * Rows like this already exist, written by the upsert when it was
-   * unconditional — some of them by provider outages. Reading one as a
-   * finished search would leave that person on a permanently empty page with
-   * the arrival search suppressed forever and no note to explain any of it.
-   */
-  it("does not mistake a legacy empty row for a filtered search", async () => {
-    const legacy = { results: [], criteria: { country: "uk" }, searched_at: "2026-09-01T00:00:00.000Z" };
-    expect(await getStoredSearch(clientReturning(legacy), "u1"), "no provenance, so not an answer").toBeNull();
-  });
-
-  it("accepts an empty row explained by either of our own filters", async () => {
-    for (const criteria of [
-      { searchComplete: true, jobBoardHidden: 3 },
-      { searchComplete: true, agencyOrUnverifiedHidden: 2 },
-    ]) {
-      const stored = await getStoredSearch(
-        clientReturning({ results: [], criteria, searched_at: "2026-09-27T00:00:00.000Z" }),
-        "u1",
-      );
-      expect(stored, JSON.stringify(criteria)).not.toBeNull();
-    }
-  });
-
-  /*
-   * An incomplete run is not an authoritative empty answer. One provider
-   * dying while the survivor happens to return only board links produces a
-   * positive hidden count from a search that never finished — and freezing
-   * that into the stored row would suppress the arrival retry for as long as
-   * it sat there.
-   */
-  it("will not accept an empty row from a run that did not finish", async () => {
-    const partial = {
-      results: [],
-      criteria: { jobBoardHidden: 5, searchComplete: false },
-      searched_at: "2026-09-27T00:00:00.000Z",
-    };
-    expect(await getStoredSearch(clientReturning(partial), "u1")).toBeNull();
-  });
-
-  it("will not accept one from a legacy row that never recorded completeness", async () => {
+  it("drops the board links from a row written before the toggle went on", async () => {
     /*
-     * Absent is not true. Rows predating the field must not be mistaken for
-     * finished searches, or their owners sit on a blank page indefinitely.
+     * The whole point. No provider call and no re-search: the setting takes
+     * effect on what is already stored, the moment they come back.
      */
-    const legacy = {
-      results: [],
-      criteria: { jobBoardHidden: 5 },
-      searched_at: "2026-09-27T00:00:00.000Z",
-    };
-    expect(await getStoredSearch(clientReturning(legacy), "u1")).toBeNull();
+    const stored = await getStoredSearch(clientReturning(row([board, direct])), "u1", true);
+    expect(stored!.results.map((item) => item.url)).toEqual(["https://boards.greenhouse.io/acme/2"]);
   });
 
-  it("still drops individual rows it cannot render, without discarding the search", async () =>{
+  it("answers null when nothing in the stored row survives the preference", async () => {
+    /*
+     * Null rather than an empty set, so the page treats it as no usable
+     * stored search and runs a fresh one on arrival — the useful response to
+     * "none of your saved roles are direct", rather than an explanation.
+     */
+    expect(await getStoredSearch(clientReturning(row([board])), "u1", true)).toBeNull();
+  });
+
+  it("answers null when there is no row at all", async () => {
+    expect(await getStoredSearch(clientReturning(null), "u1", true)).toBeNull();
+  });
+
+  it("still drops rows it could not render either way", async () => {
     const stored = await getStoredSearch(
       clientReturning(row([
-        { title: "Reliability Engineer", url: "https://careers.acmecorp.com/1", description: "Ops." },
-        { title: "Dead end", url: "https://www.google.com/search?q=x", description: "" },
-        { title: "", url: "https://careers.acmecorp.com/3", description: "" },
+        direct,
+        { title: "Dead end", url: "https://www.google.com/search?q=x", description: "", employer: "Acme Corp" },
+        { title: "", url: "https://boards.greenhouse.io/acme/3", description: "", employer: "Acme Corp" },
       ])),
       "u1",
+      true,
     );
-    expect(stored!.results.map((item) => item.url)).toEqual(["https://careers.acmecorp.com/1"]);
+    expect(stored!.results.map((item) => item.url)).toEqual(["https://boards.greenhouse.io/acme/2"]);
   });
 });
 
-
-/*
- * The hole this filter opened in `chooseApplyUrl`, and the reason the two
- * host lists are now consulted in order.
- */
 describe("an advert carrying both a board and a direct route", () => {
   const advert = (...links: string[]) => ({
     company_name: "Northwind Logistics",
@@ -331,36 +287,3 @@ describe("an advert carrying both a board and a direct route", () => {
  * function, the disagreement between them produced defects on two separate
  * review rounds.
  */
-describe("isAuthoritativeEmptySearch", () => {
-  it("accepts an empty page a finished run's own filtering produced", () => {
-    expect(isAuthoritativeEmptySearch({ searchComplete: true, jobBoardHidden: 3 })).toBe(true);
-    expect(isAuthoritativeEmptySearch({ searchComplete: true, agencyOrUnverifiedHidden: 1 })).toBe(true);
-  });
-
-  it("rejects an empty page nothing accounts for", () => {
-    /* The run finished, but no advert was removed, so nothing explains the bare page. */
-    expect(isAuthoritativeEmptySearch({ searchComplete: true })).toBe(false);
-    expect(isAuthoritativeEmptySearch({ searchComplete: true, jobBoardHidden: 0 })).toBe(false);
-  });
-
-  /*
-   * The whole point of `searchComplete`, and of it being one field.
-   *
-   * This predicate used to reconstruct "did the run finish?" from the
-   * diagnostics — providerErrors, then also timeouts, then also the stop
-   * reason — and review found another missed field on three consecutive
-   * rounds, ending with three at once. The run now states it.
-   */
-  it("rejects an unfinished run however much was filtered", () => {
-    expect(isAuthoritativeEmptySearch({ searchComplete: false, jobBoardHidden: 12 })).toBe(false);
-  });
-
-  it("treats a row that never recorded it as unfinished", () => {
-    /*
-     * Every row written before this field existed. Absent must read as
-     * incomplete: being wrong that way costs one provider call, while the
-     * other way freezes an empty page into the database.
-     */
-    expect(isAuthoritativeEmptySearch({ jobBoardHidden: 12 })).toBe(false);
-  });
-});

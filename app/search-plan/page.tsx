@@ -23,13 +23,25 @@ export const metadata = constructMetadata("Find Roles", "Find live job listings 
 
 export default async function SearchPlanPage() {
   const { supabase, user } = await requireUser();
-  const [lanes, preferences, journey, profileResult, stored] = await Promise.all([
+  /*
+   * Preferences first, on its own, because the stored search is read through
+   * them.
+   *
+   * A stored row is a snapshot of the settings in force when it was written,
+   * and `getStoredSearch` applies the person's *current* source choice to it
+   * — so somebody who has just turned "Direct employers only" on is not shown
+   * yesterday's job-board links. That costs one sequential round trip on a
+   * page that already makes several, and buys the filter having exactly one
+   * home rather than a second copy out here that a future caller could
+   * forget.
+   */
+  const preferences = await getSearchPreferences(supabase, user.id);
+  const [lanes, journey, profileResult, stored] = await Promise.all([
     getTargetLanes(supabase, user.id),
-    getSearchPreferences(supabase, user.id),
     loadProductJourneyStatus(supabase, user.id),
     supabase.from("profiles").select("country,total_experience_years").eq("id", user.id).maybeSingle(),
-    // The last search, so arriving here shows matches without re-querying.
-    getStoredSearch(supabase, user.id),
+    // The last search, so arriving here is normally a read rather than a provider call.
+    getStoredSearch(supabase, user.id, preferences.directEmployersOnly ?? false),
   ]);
   const inferredCountry = normaliseCountryCode(
     typeof profileResult.data?.country === "string" ? profileResult.data.country : null,

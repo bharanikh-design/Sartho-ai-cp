@@ -250,8 +250,6 @@ export type SearchCriteria = {
    * on every run, which is a bad thing for a page to say about itself.
    */
   queriesStoppedBecause?: "budget" | "no_providers" | "enough_results";
-  /** Whether the run finished its whole plan with nothing failing. */
-  searchComplete?: boolean;
   /**
    * Deep answers that cost nothing — served from the shared cache, or collected
    * from a search an earlier run had already paid for.
@@ -482,54 +480,6 @@ export function dropSearchEnginePages<T extends { url: string }>(
  * undo in one click is theirs to be wrong about; quietly overriding it would
  * be the same lie the old stand-down told.
  */
-/**
- * Whether an empty page is an answer or an accident.
- *
- * `search_results` holds one row per person, so writing an empty one throws
- * away whatever was there. That is right when our own filtering emptied the
- * page — the person asked for direct employers and none of today's matches
- * were, and they should see that rather than yesterday's board links — and
- * wrong when the page is empty because the search did not finish.
- *
- * This asks one question of the run rather than reconstructing the answer,
- * and the difference matters more than it looks.
- *
- * It began by checking `providerErrors`. Review then found that timeouts
- * never reach that field; then that a stop for budget or exhausted providers
- * did not either; then three more at once — a failed employer portal, a
- * provider that answered one query and died on the next (which
- * `errorsThatCostResults` deliberately filters out, being a list written for
- * the person rather than for this), and `"enough_results"`, which fires at
- * twenty-five *raw* URLs before a single filter has run and so says nothing
- * about whether anything survived.
- *
- * Five rounds, each adding a field. The mistake was not any one omission: it
- * was inferring a fact about the run from diagnostics shaped for the page.
- * `runBriefSearch` knows whether it finished, so it now says so once, and
- * this reads that. A signal is impossible to miss when there is only one.
- *
- * `searchComplete` absent — every row written before this — reads as
- * incomplete, which costs one provider call and is the cheap direction. The
- * expensive one freezes an empty page into the database, where it suppresses
- * the arrival search and the person sees nothing until they think to press
- * the button themselves.
- *
- * Both sides of the row ask this same question, which is why it is a
- * function rather than an expression written twice. The write side decides
- * whether an empty run may replace a good stored set; the read side decides
- * whether an empty stored row is a finished search or something to search
- * past. They were two expressions for one rule, and two of this change's
- * defects came from exactly that.
- */
-export function isAuthoritativeEmptySearch(criteria: {
-  searchComplete?: boolean;
-  jobBoardHidden?: number;
-  agencyOrUnverifiedHidden?: number;
-}): boolean {
-  if (criteria.searchComplete !== true) return false;
-  return (criteria.jobBoardHidden ?? 0) > 0 || (criteria.agencyOrUnverifiedHidden ?? 0) > 0;
-}
-
 export function keepDirectEmployers<T extends { url: string; employer?: string | null }>(
   matches: T[],
   directOnly: boolean,
@@ -1506,26 +1456,6 @@ export async function runBriefSearch(
     queriesRun,
     queriesSkipped,
     queriesStoppedBecause,
-    /*
-     * Did this run get all the way through its plan?
-     *
-     * Stated here, at the only point that can honestly answer it, so nothing
-     * downstream has to infer it — see `isAuthoritativeEmptySearch` for the
-     * five rounds of review that taught us inference does not work.
-     *
-     * `queriesSkipped` covers every early exit in one number, including
-     * "enough_results": that stop counts twenty-five raw URLs before any
-     * filtering, so it is emphatically not a guarantee that anything
-     * survived. The cascade's own `errors` and `timeouts` are read raw
-     * rather than through `errorsThatCostResults()`, which drops failures
-     * from a provider that answered earlier — right for a note under
-     * somebody's results, wrong for deciding whether the search ran.
-     */
-    searchComplete:
-      queriesSkipped === 0
-      && cascade.errors.length === 0
-      && cascade.timeouts.size === 0
-      && !employerPortals.some((portal) => portal.status === "failed"),
     deepFromCache,
     deepWarming,
     targetRolesRequested: activeLanes.length,
@@ -1539,31 +1469,23 @@ export async function runBriefSearch(
    * again to see the same roles.
    */
   /*
-   * A bad run does not overwrite a good one — but an empty answer is not a
-   * bad run.
+   * A run that found nothing does not overwrite a run that found something.
    *
-   * The upsert was once unconditional, so a single failed run replaced a
-   * good stored set with an empty one, and the row that exists to stop
-   * Sartho paying twice became the thing that guaranteed it.
+   * The upsert was once unconditional, so a single bad run — every provider
+   * timed out, the budget gone mid-plan — replaced a good stored set with an
+   * empty one. The row that exists to stop Sartho paying twice became the
+   * thing that guaranteed it.
    *
-   * Guarding on `results.length` alone then went too far the other way,
-   * because it cannot tell "every provider timed out" from "the person asked
-   * for direct employers and none of today's matches were". Treating the
-   * second as a failure defeats the filter on the next page load: the stored
-   * row still holds yesterday's job-board links, which is precisely what
-   * they switched the toggle on to avoid, and no note appears to explain the
-   * page they are looking at.
-   *
-   * The hidden counts separate the two. Either being above zero means there
-   * were adverts and our own filtering is what removed them, which a
-   * provider outage cannot produce — so that empty page is a real answer and
-   * is stored with the criteria that explain it. An empty run with both
-   * counts at zero is still treated as a failure and still cannot overwrite
-   * anything.
+   * An empty run is therefore never stored, and whether a particular empty
+   * run "really finished" is not asked. It was, for a while, so that a
+   * strict-filter run ending empty could replace a stored set full of
+   * job-board links — and answering it proved to be beyond what a search
+   * records about itself. A skipped country-widening, a pending SerpApi
+   * ticket, and a provider that failed only after answering once all look
+   * identical to a clean run from here. `getStoredSearch` removes the need
+   * for the question by filtering what it reads instead.
    */
-  const filteredToNothing = !results.length && isAuthoritativeEmptySearch(criteria);
-
-  if (results.length || filteredToNothing) {
+  if (results.length) {
     const { error: storeError } = await supabase.from("search_results").upsert({
       user_id: userId,
       results,
@@ -1587,6 +1509,7 @@ export async function runBriefSearch(
 export async function getStoredSearch(
   supabase: SupabaseClient,
   userId: string,
+  directEmployersOnly = false,
 ): Promise<{ results: ScoredJobMatch[]; criteria: SearchCriteria; searchedAt: string } | null> {
   const { data } = await supabase
     .from("search_results")
@@ -1594,34 +1517,39 @@ export async function getStoredSearch(
     .eq("user_id", userId)
     .maybeSingle();
 
+  if (!data || !Array.isArray(data.results) || !data.results.length) return null;
+
   /*
-   * An empty row counts as a search only when it says why it is empty.
+   * The person's current choice of sources, applied to what was stored under
+   * their previous one.
    *
-   * Both length checks used to answer null, which the page could not tell
-   * apart from "never searched" — so it started a fresh provider search on
-   * arrival, every arrival. That is the loop review caught on #233, and a
-   * strict-filter run that legitimately ends empty would have fed it forever.
+   * A stored row is a snapshot of the settings in force when it was written.
+   * Somebody who turns "Direct employers only" on and returns to this page
+   * would otherwise be shown yesterday's job-board links — the exact thing
+   * they just asked not to see — until they thought to search again.
    *
-   * Answering on the row's mere existence went too far the other way. Empty
-   * rows already exist in the database, written by the upsert back when it
-   * was unconditional, including ones a provider outage produced. Treating
-   * those as a finished search would leave the page permanently empty and
-   * permanently sure it had nothing to do — no results, no note, and the
-   * arrival search suppressed forever.
+   * Filtering here rather than at write time is what makes that impossible
+   * without asking an unanswerable question. The alternative was storing
+   * empty strict runs so they could replace the stale set, which required
+   * knowing whether a given empty run had really finished; seven rounds of
+   * review found seven ways it had not, because a skipped country-widening,
+   * a pending SerpApi ticket and a provider that failed after answering once
+   * are all indistinguishable from a clean run after the fact. Reading is
+   * the one moment the current preference and the stored results are both in
+   * hand, so it is the cheapest place to reconcile them.
    *
-   * `isAuthoritativeEmptySearch` is the provenance, and it is the very same
-   * call the write side makes when deciding the row was worth storing — one
-   * rule, asked once from each side, rather than two expressions drifting
-   * apart. Anything else empty reads as no usable search, and the page goes
-   * and gets one.
+   * Turning the toggle on therefore takes effect immediately on results
+   * already stored, with no provider call. If nothing survives, this answers
+   * null and the page runs a fresh search on arrival — which is the useful
+   * response to "none of your saved roles are direct", rather than an
+   * explanation of it.
    */
-  if (!data || !Array.isArray(data.results)) return null;
-  const results = normaliseResults(data.results);
-  const criteria = normaliseCriteria(data.criteria);
-  if (!results.length && !isAuthoritativeEmptySearch(criteria)) return null;
+  const results = keepDirectEmployers(normaliseResults(data.results), directEmployersOnly).kept;
+  if (!results.length) return null;
+
   return {
     results,
-    criteria,
+    criteria: normaliseCriteria(data.criteria),
     searchedAt: typeof data.searched_at === "string" ? data.searched_at : new Date().toISOString(),
   };
 }
@@ -1788,8 +1716,6 @@ export function normaliseCriteria(stored: unknown): SearchCriteria {
     queriesSkipped: count(value.queriesSkipped),
     deepFromCache: count(value.deepFromCache),
     deepWarming: count(value.deepWarming),
-    /* Absent on every row written before this existed, and absent reads as incomplete. */
-    searchComplete: value.searchComplete === true,
     queriesStoppedBecause: value.queriesStoppedBecause === "budget"
       || value.queriesStoppedBecause === "no_providers"
       || value.queriesStoppedBecause === "enough_results"

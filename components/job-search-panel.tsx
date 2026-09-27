@@ -82,19 +82,8 @@ export function JobSearchPanel({
   initialCriteria?: SearchCriteria | null;
   searchedAt?: string | null;
 }) {
-  /*
-   * A stored search with nothing in it is still a search that ran.
-   *
-   * `initialCriteria` is what separates "this person has never searched" from
-   * "they searched and every match was filtered out" — the results array
-   * looks identical in both cases. Reading only the array meant the second
-   * one presented as the first: the page looked untouched and auto-ran a
-   * fresh provider search on every single visit, which is the loop that
-   * `getStoredSearch` now avoids feeding.
-   */
-  const hasStoredSearch = Boolean(initialCriteria);
   const [status, setStatus] = useState<"idle" | "loading" | "ready" | "error" | "not_configured" | "no_targets">(
-    initialResults.length || hasStoredSearch ? "ready" : "idle",
+    initialResults.length ? "ready" : "idle",
   );
   const [error, setError] = useState<string | null>(null);
   const [results, setResults] = useState<SearchResult[]>(initialResults);
@@ -191,19 +180,18 @@ export function JobSearchPanel({
    * search is stored, so arriving is normally a read. Only someone who has
    * never searched triggers a live one; "Search again" always runs fresh.
    *
-   * "Never searched" means no stored row, not an empty one. A run that ended
-   * with nothing — every match was a job board and the person asked for
-   * direct employers only — is an answer, and re-running it on arrival would
-   * spend a provider call to produce the same empty page while hiding the
-   * note that explains it.
+   * `getStoredSearch` answers null when nothing in the stored row survives
+   * the person's current source preference, so this runs then too — which is
+   * the useful response to "none of your saved roles are direct", rather
+   * than an explanation of it.
    */
   const autoRan = useRef(false);
   useEffect(() => {
-    if (!autoRun || autoRan.current || initialResults.length || hasStoredSearch) return;
+    if (!autoRun || autoRan.current || initialResults.length) return;
     autoRan.current = true;
     void runSearch();
     // runSearch is a stable in-component handler; the ref keeps this to one run.
-  }, [autoRun, initialResults.length, hasStoredSearch]);
+  }, [autoRun, initialResults.length]);
 
   async function save(result: SearchResult) {
     if (savingUrl) return;
