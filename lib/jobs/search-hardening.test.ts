@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dropSearchEnginePages, isSearchEnginePage, normaliseResults } from "./run-search";
+import { dropSearchEnginePages, isSearchEnginePage, normaliseResults, rankApplicable } from "./run-search";
 import { chooseApplyUrl, extractSerpApiJobs, keepScheduleTypes, mapSerpApiResult } from "./serpapi";
 
 /*
@@ -154,6 +154,94 @@ describe("the live path and the stored path agree on what a dead end is", () => 
       expect(keptStored, "stored path disagrees with the live path").toBe(keptLive);
     });
   }
+});
+
+/*
+ * Removing dead ends and choosing the closest-role fallback, in that order.
+ *
+ * Both rules already existed; only their order was wrong, and the order was
+ * the whole defect. The fallback is what stops the page being empty when
+ * nothing in scope qualifies, so a removal that runs after it can empty a
+ * page the fallback would have filled.
+ */
+describe("rankApplicable", () => {
+  const match = (url: string, relevanceTier: "strong" | "possible" | "outside", overallMatch = 50) =>
+    ({ url, relevanceTier, overallMatch });
+
+  /*
+   * The case that made this a function instead of three inline lines.
+   *
+   * Every in-scope match is a search-engine link and one out-of-scope match
+   * is a real vacancy. Filtering last, `visible` is non-empty so the fallback
+   * never runs, and then the filter takes all of `visible` away — leaving an
+   * empty page with a usable job sitting unexamined in the set the fallback
+   * declined to use.
+   */
+  it("keeps the closest-role fallback reachable when every in-scope match is a dead end", () => {
+    const relevant = [
+      match("https://www.google.com/search?q=a", "strong"),
+      match("https://google.com/search?q=b", "possible"),
+      match("https://acme.com/careers/real-job", "outside"),
+    ];
+
+    const { ranked } = rankApplicable(relevant);
+    expect(ranked.map((item) => item.url)).toEqual(["https://acme.com/careers/real-job"]);
+  });
+
+  it("still prefers in-scope matches when any of them survive", () => {
+    const relevant = [
+      match("https://www.google.com/search?q=a", "strong"),
+      match("https://acme.com/in-scope", "possible"),
+      match("https://beta.com/out-of-scope", "outside"),
+    ];
+
+    const { ranked } = rankApplicable(relevant);
+    expect(ranked.map((item) => item.url)).toEqual(["https://acme.com/in-scope"]);
+  });
+
+  /*
+   * The count has to describe the page the person is looking at. Their
+   * in-scope results are untouched here, and the dead ends were out-of-scope
+   * listings that were never going to be shown — so reporting them as hidden
+   * would describe a loss that did not happen.
+   */
+  it("does not report dead ends the person was never going to see", () => {
+    const relevant = [
+      match("https://acme.com/in-scope-1", "strong"),
+      match("https://acme.com/in-scope-2", "possible"),
+      match("https://www.google.com/search?q=x", "outside"),
+      match("https://www.google.com/search?q=y", "outside"),
+    ];
+
+    const { ranked, hidden } = rankApplicable(relevant);
+    expect(ranked).toHaveLength(2);
+    expect(hidden, "out-of-scope dead ends are not a loss to report").toBe(0);
+  });
+
+  it("counts the dead ends that did cost the person results", () => {
+    const relevant = [
+      match("https://www.google.com/search?q=a", "strong"),
+      match("https://www.google.com/search?q=b", "strong"),
+      match("https://acme.com/in-scope", "possible"),
+    ];
+
+    const { ranked, hidden } = rankApplicable(relevant);
+    expect(ranked.map((item) => item.url)).toEqual(["https://acme.com/in-scope"]);
+    expect(hidden).toBe(2);
+  });
+
+  it("returns an empty page, honestly counted, when nothing at all can be applied to", () => {
+    const relevant = [
+      match("https://www.google.com/search?q=a", "strong"),
+      match("https://google.co.uk/search?q=b", "outside"),
+    ];
+
+    expect(rankApplicable(relevant)).toEqual({ ranked: [], hidden: 2 });
+  });
+
+  it("is a no-op on an empty set", () => {
+    expect(rankApplicable([])).toEqual({ ranked: [], hidden: 0 });
+  });
 });
 
 describe("chooseApplyUrl — negative input", () => {

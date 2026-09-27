@@ -443,6 +443,41 @@ export function dropSearchEnginePages<T extends { url: string }>(
   return { kept, hidden: ranked.length - kept.length };
 }
 
+/**
+ * The set to put on the page, and how many dead ends it cost to get there.
+ *
+ * Two rules that have to be applied in this order, and were not.
+ *
+ * The relevance fallback exists so the page is never empty for want of a
+ * perfect match: when nothing in scope qualifies, it shows the closest roles
+ * rather than nothing. Removing destinations that are not an application has
+ * to happen *before* that choice is made. The other way round, a run whose
+ * in-scope matches are all search-engine links still leaves `visible`
+ * non-empty, so the fallback is never consulted — and the removal then
+ * empties the page while a real, merely out-of-scope vacancy sat in the set
+ * the fallback had just declined to use. Filtering first means both sets are
+ * already clean, so the fallback is choosing between real options and cannot
+ * be short-circuited by listings that were never going to survive.
+ *
+ * The count is taken against the tier actually being shown, not the whole
+ * pool. When the in-scope results are all fine and the only dead ends were
+ * out-of-scope ones nobody would have been shown, a note reporting hidden
+ * listings describes a loss that did not happen, and `searchFilterNotes`
+ * exists to report what really did.
+ */
+export function rankApplicable<
+  T extends { url: string; relevanceTier?: SearchRelevanceTier; overallMatch: number; rankingScore?: number },
+>(relevant: T[]): { ranked: T[]; hidden: number } {
+  const inScope = (matches: T[]) => matches.filter((match) => match.relevanceTier !== "outside");
+
+  const applicable = dropSearchEnginePages(relevant).kept;
+  const visible = sortByRelevance(inScope(applicable));
+  const ranked = visible.length ? visible : sortByRelevance(applicable);
+
+  const shownTier = visible.length ? inScope(relevant) : relevant;
+  return { ranked, hidden: shownTier.length - ranked.length };
+}
+
 export function retrievalBreadthComplete(
   queries: JobSearchQuery[],
   searchedTargetRoles: Set<string>,
@@ -1226,30 +1261,26 @@ export async function runBriefSearch(
    * Outside-search jobs remain auditable in diagnostics but do not crowd the
    * user-facing result set. Tier decides visibility/order; the canonical
    * numeric score remains unchanged and orders jobs only within a tier.
-   */
-  const visible = sortByRelevance(relevant.filter((match) => match.relevanceTier !== "outside"));
-  const fallback = sortByRelevance(relevant);
-  const ranked = visible.length ? visible : fallback;
-
-  /*
-   * Destinations that are not an application, gone — unconditionally, and
-   * before anything downstream can see them.
    *
-   * This is the choke point. `results` below is the single value that becomes
-   * the API response, the stored `search_results` row and the set the alert
-   * mailer compares against, so a listing removed here cannot reappear on any
-   * of those three paths. It is not gated on `directEmployersOnly`: that
-   * toggle still describes a preference between employers and agencies, but
-   * "leads nowhere you can apply" was never a matter of taste.
+   * Destinations that are not an application come out inside this, before the
+   * fallback picks a set — `rankApplicable` explains why that order is the
+   * load-bearing part. It is not gated on `directEmployersOnly`: that toggle
+   * describes a preference between employers and agencies, but "leads nowhere
+   * you can apply" was never a matter of taste.
+   *
+   * This is also the choke point. `results` below is the single value that
+   * becomes the API response, the stored `search_results` row and the set the
+   * alert mailer compares against, so a listing removed here cannot reappear
+   * on any of those three paths.
    */
-  const { kept: directKept, hidden: agencyOrUnverifiedHidden } = dropSearchEnginePages(ranked);
+  const { ranked, hidden: agencyOrUnverifiedHidden } = rankApplicable(relevant);
 
   /*
    * "How do you want to work?", applied for the first time. Read off the
    * advert rather than asked of the provider — see lib/jobs/work-model.ts.
    */
   const { kept: workModelKept, hidden: workModelHidden } = keepWorkModels(
-    directKept,
+    ranked,
     contextRemotePreferences,
     (match) => `${match.title}. ${match.location ?? ""}. ${match.description}`,
   );
