@@ -22,7 +22,14 @@ describe("searchFilterNotes", () => {
     expect(notes).toHaveLength(1);
     expect(notes[0].id).toBe("direct-employers");
     expect(notes[0].text).toContain("4 listings");
-    expect(notes[0].text).toContain("Direct employers only");
+    /*
+     * It no longer credits the toggle. Removing a listing whose only link is
+     * a search results page happens on every run now, including for the
+     * people who never opened that setting, so naming it would explain the
+     * page wrongly.
+     */
+    expect(notes[0].text).not.toContain("Direct employers only");
+    expect(notes[0].text).toContain("search results page");
   });
 
   it("reports adverts the work-model filter removed, and names the pattern", () => {

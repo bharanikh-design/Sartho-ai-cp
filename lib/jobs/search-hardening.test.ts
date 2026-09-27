@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyDirectEmployerFilter, isSearchEnginePage } from "./run-search";
+import { dropSearchEnginePages, isSearchEnginePage, normaliseResults, rankApplicable } from "./run-search";
 import { chooseApplyUrl, extractSerpApiJobs, keepScheduleTypes, mapSerpApiResult } from "./serpapi";
 
 /*
@@ -63,12 +63,21 @@ describe("isSearchEnginePage — adversarial input", () => {
   });
 });
 
-describe("applyDirectEmployerFilter", () => {
+describe("dropSearchEnginePages", () => {
   const job = (url: string) => ({ url });
 
-  it("changes nothing at all when the toggle is off", () => {
+  /*
+   * The regression that survived three fixes. Each of those changed how a
+   * destination is *chosen*; none of them reached this step, which ran only
+   * for people who had switched "Direct employers only" on. With it off — the
+   * default, and what most people have — a Google results page went straight
+   * through to the screen and into the stored row.
+   */
+  it("removes them for everybody, with no toggle left to leave off", () => {
     const ranked = [job("https://www.google.com/search?q=x"), job("https://acme.com/1")];
-    expect(applyDirectEmployerFilter(ranked, false)).toEqual({ kept: ranked, hidden: 0 });
+    const { kept, hidden } = dropSearchEnginePages(ranked);
+    expect(kept.map((item) => item.url)).toEqual(["https://acme.com/1"]);
+    expect(hidden).toBe(1);
   });
 
   it("removes the search-engine dead ends and counts them", () => {
@@ -78,7 +87,7 @@ describe("applyDirectEmployerFilter", () => {
       job("https://google.co.uk/search?q=b"),
       job("https://acme.com/careers/2"),
     ];
-    const { kept, hidden } = applyDirectEmployerFilter(ranked, true);
+    const { kept, hidden } = dropSearchEnginePages(ranked);
     expect(kept.map((item) => item.url)).toEqual([
       "https://www.mycareersfuture.gov.sg/job/1",
       "https://acme.com/careers/2",
@@ -87,17 +96,151 @@ describe("applyDirectEmployerFilter", () => {
   });
 
   /*
-   * The promise not to hand back an empty page. A filter that removes
-   * everything is worse than the reposts it removed, and it must not then
-   * claim a hidden count for results it put straight back.
+   * The exact inverse of what this used to promise, and the whole point of
+   * the change.
+   *
+   * It stood down whenever removing everything would have emptied the page —
+   * which is precisely the run where every single card leads back to a search
+   * box. That was the second escape hatch, and it is why somebody with the
+   * toggle ON could still be looking at a full page of Google links. An empty
+   * list carrying a note that explains it beats a full page of dead ends.
    */
-  it("stands down rather than empty the page, and says it hid nothing", () => {
+  it("empties the page rather than hand back a set of dead ends", () => {
     const ranked = [job("https://www.google.com/search?q=a"), job("https://google.com/search?q=b")];
-    expect(applyDirectEmployerFilter(ranked, true)).toEqual({ kept: ranked, hidden: 0 });
+    expect(dropSearchEnginePages(ranked)).toEqual({ kept: [], hidden: 2 });
   });
 
   it("is a no-op on an already empty result set", () => {
-    expect(applyDirectEmployerFilter([], true)).toEqual({ kept: [], hidden: 0 });
+    expect(dropSearchEnginePages([])).toEqual({ kept: [], hidden: 0 });
+  });
+
+  it("leaves a page with nothing to remove exactly as it was", () => {
+    const ranked = [job("https://acme.com/1"), job("https://careers.google.com/jobs/2")];
+    expect(dropSearchEnginePages(ranked)).toEqual({ kept: ranked, hidden: 0 });
+  });
+});
+
+/*
+ * The live path and the stored path, held to one rule.
+ *
+ * `dropSearchEnginePages` decides what a run returns and writes;
+ * `normaliseResults` decides what a stored row gives back. They sit a
+ * thousand lines apart in the same file and were written months apart, which
+ * is the shape of every bug this feature has had: a rule declared in one
+ * place and assumed in another. Drift either way is a defect with a face —
+ * too lenient on the write side and a dead end reaches somebody's screen, too
+ * strict on the read side and a real vacancy vanishes from a stored search.
+ *
+ * This asserts they agree, not what they agree on. `/searchdirect` is in the
+ * list for that reason: the prefix test arguably over-matches it, but the
+ * cost of the two halves disagreeing is far higher than the cost of one
+ * improbable path being judged harshly by both.
+ */
+describe("the live path and the stored path agree on what a dead end is", () => {
+  const row = (url: string) => ({ title: "Reliability Engineer", url, description: "Ops." });
+
+  for (const url of [
+    "https://www.google.com/search?q=mechanical+engineer",
+    "https://google.com/search?q=b",
+    "https://google.co.uk/search?q=c",
+    "https://www.google.com/searchdirect",
+    "https://careers.google.com/jobs/results/1",
+    "https://acme.com/careers/2",
+    "https://www.mycareersfuture.gov.sg/job/1",
+  ]) {
+    it(`judges ${url} the same on the way out and the way back`, () => {
+      const keptLive = dropSearchEnginePages([{ url }]).kept.length === 1;
+      const keptStored = normaliseResults([row(url)]).length === 1;
+      expect(keptStored, "stored path disagrees with the live path").toBe(keptLive);
+    });
+  }
+});
+
+/*
+ * Removing dead ends and choosing the closest-role fallback, in that order.
+ *
+ * Both rules already existed; only their order was wrong, and the order was
+ * the whole defect. The fallback is what stops the page being empty when
+ * nothing in scope qualifies, so a removal that runs after it can empty a
+ * page the fallback would have filled.
+ */
+describe("rankApplicable", () => {
+  const match = (url: string, relevanceTier: "strong" | "possible" | "outside", overallMatch = 50) =>
+    ({ url, relevanceTier, overallMatch });
+
+  /*
+   * The case that made this a function instead of three inline lines.
+   *
+   * Every in-scope match is a search-engine link and one out-of-scope match
+   * is a real vacancy. Filtering last, `visible` is non-empty so the fallback
+   * never runs, and then the filter takes all of `visible` away — leaving an
+   * empty page with a usable job sitting unexamined in the set the fallback
+   * declined to use.
+   */
+  it("keeps the closest-role fallback reachable when every in-scope match is a dead end", () => {
+    const relevant = [
+      match("https://www.google.com/search?q=a", "strong"),
+      match("https://google.com/search?q=b", "possible"),
+      match("https://acme.com/careers/real-job", "outside"),
+    ];
+
+    const { ranked } = rankApplicable(relevant);
+    expect(ranked.map((item) => item.url)).toEqual(["https://acme.com/careers/real-job"]);
+  });
+
+  it("still prefers in-scope matches when any of them survive", () => {
+    const relevant = [
+      match("https://www.google.com/search?q=a", "strong"),
+      match("https://acme.com/in-scope", "possible"),
+      match("https://beta.com/out-of-scope", "outside"),
+    ];
+
+    const { ranked } = rankApplicable(relevant);
+    expect(ranked.map((item) => item.url)).toEqual(["https://acme.com/in-scope"]);
+  });
+
+  /*
+   * The count has to describe the page the person is looking at. Their
+   * in-scope results are untouched here, and the dead ends were out-of-scope
+   * listings that were never going to be shown — so reporting them as hidden
+   * would describe a loss that did not happen.
+   */
+  it("does not report dead ends the person was never going to see", () => {
+    const relevant = [
+      match("https://acme.com/in-scope-1", "strong"),
+      match("https://acme.com/in-scope-2", "possible"),
+      match("https://www.google.com/search?q=x", "outside"),
+      match("https://www.google.com/search?q=y", "outside"),
+    ];
+
+    const { ranked, hidden } = rankApplicable(relevant);
+    expect(ranked).toHaveLength(2);
+    expect(hidden, "out-of-scope dead ends are not a loss to report").toBe(0);
+  });
+
+  it("counts the dead ends that did cost the person results", () => {
+    const relevant = [
+      match("https://www.google.com/search?q=a", "strong"),
+      match("https://www.google.com/search?q=b", "strong"),
+      match("https://acme.com/in-scope", "possible"),
+    ];
+
+    const { ranked, hidden } = rankApplicable(relevant);
+    expect(ranked.map((item) => item.url)).toEqual(["https://acme.com/in-scope"]);
+    expect(hidden).toBe(2);
+  });
+
+  it("returns an empty page, honestly counted, when nothing at all can be applied to", () => {
+    const relevant = [
+      match("https://www.google.com/search?q=a", "strong"),
+      match("https://google.co.uk/search?q=b", "outside"),
+    ];
+
+    expect(rankApplicable(relevant)).toEqual({ ranked: [], hidden: 2 });
+  });
+
+  it("is a no-op on an empty set", () => {
+    expect(rankApplicable([])).toEqual({ ranked: [], hidden: 0 });
   });
 });
 
@@ -210,7 +353,7 @@ describe("stress", () => {
     }));
 
     const started = Date.now();
-    const { kept, hidden } = applyDirectEmployerFilter(ranked, true);
+    const { kept, hidden } = dropSearchEnginePages(ranked);
     expect(kept).toHaveLength(5_000);
     expect(hidden).toBe(5_000);
     expect(Date.now() - started).toBeLessThan(2_000);
