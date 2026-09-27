@@ -415,12 +415,19 @@ export function SearchPlanEditor({
             <label>
               <strong>Who should the job come from?</strong>
               {/*
-                * Says what the filter does, which is narrower than what this
-                * line used to claim. Nothing verifies a careers channel and
-                * nothing identifies agencies by name — guessing that from a
-                * company name hides real employers.
+                * Describes the choice, not the guarantee.
+                *
+                * This line used to promise that listings leading to a search
+                * results page are removed — which was true, and is now true
+                * whichever button is selected, so it described no choice at
+                * all. What the buttons actually decide is whether to also
+                * leave out roles you would apply for through a marketplace.
+                *
+                * Still says nothing about agencies. Nothing identifies one,
+                * and guessing from a company name hides real employers; the
+                * distinction drawn is where the apply link goes.
                 */}
-              <small>Hides listings that lead to a search results page instead of a real application, so every role you see can actually be applied for. Where an employer&rsquo;s own careers page is known, Sartho sends you there first.</small>
+              <small>Every role you see can be applied for either way &mdash; listings that only lead to a search results page are always removed. This chooses whether to also leave out roles you would apply for on a job board such as LinkedIn or Indeed, rather than on the employer&rsquo;s own site or their hiring system. Choosing direct employers can make for a much shorter list.</small>
             </label>
             <div className="work-model-options" role="group" aria-label="Job source" style={{ marginTop: 0 }}>
               <button type="button" aria-pressed={!directEmployersOnly} className={!directEmployersOnly ? "is-selected" : ""} onClick={() => setDirectEmployersOnly(false)}>Employers + agencies</button>

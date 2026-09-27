@@ -28,6 +28,7 @@ import { searchSerpApiCached } from "@/lib/jobs/cached-serpapi";
 import { findEmployerPortal, searchEmployerDirectly } from "@/lib/jobs/company-careers/registry";
 import { loadEmployerCareerSources } from "@/lib/jobs/company-careers/saved-sources";
 import { createSearchCacheStore } from "@/lib/jobs/search-cache-store";
+import { isDirectEmployerDestination } from "@/lib/jobs/destination";
 import { deduplicateSearchResults, isMarketLocationConsistent } from "@/lib/jobs/location-guard";
 import {
   affinityDelta,
@@ -209,9 +210,11 @@ export type SearchCriteria = {
   workModels?: string[];
   workModelHidden?: number;
   providers: string[];
-  /** Whether this run intentionally hid unverified/agency postings. */
+  /** Whether this run intentionally hid job-board reposts. */
   directEmployersOnly?: boolean;
   agencyOrUnverifiedHidden?: number;
+  /** Listings removed because they route through a job board, not the employer. */
+  jobBoardHidden?: number;
   providerErrors?: string[];
   /**
    * Providers that ran out of time, and how often. Said out loud because a
@@ -444,6 +447,49 @@ export function dropSearchEnginePages<T extends { url: string }>(
 }
 
 /**
+ * "Direct employers only", meaning something at last.
+ *
+ * The toggle shipped decorative and stayed that way. Its entire
+ * implementation was removing search-engine dead ends, and once that became
+ * unconditional — it is not a preference; a card that leads to a search box
+ * is not a vacancy — the control was left doing nothing at all while its
+ * label still promised a choice. This gives it the one honest distinction
+ * the data supports: does applying take you to the employer, or to a
+ * marketplace reposting them?
+ *
+ * `isDirectEmployerDestination` draws that line, and draws it leniently. An
+ * employer's own domain qualifies, and so does their applicant tracking
+ * system — a Greenhouse or Workday link is that employer's hiring pipeline
+ * under a vendor's roof, not a third party standing in the way. Only hosts
+ * recognised as job boards are removed. Crucially an *unfamiliar* host is
+ * kept: the likeliest explanation for one is a careers site whose domain
+ * does not string-match the company name, and hiding unless recognised would
+ * bury the very employers this setting exists to surface.
+ *
+ * It still does not guess at agencies from a company name. Nothing here
+ * identifies an agency, and the old comments warning that such a guess hides
+ * real employers remain correct — which is exactly why the rule is about
+ * where the link goes rather than who is named on it.
+ *
+ * No stand-down, and unlike the one removed from `dropSearchEnginePages`
+ * that is safe rather than reckless. What this removes are real jobs, not
+ * dead ends, so an empty page is a genuine loss — but it can only happen to
+ * somebody who deliberately chose the strict option, the note under the
+ * results names the count and says which button brings them back, and the
+ * default setting never removes a single listing. A filter the person can
+ * undo in one click is theirs to be wrong about; quietly overriding it would
+ * be the same lie the old stand-down told.
+ */
+export function keepDirectEmployers<T extends { url: string; employer?: string | null }>(
+  matches: T[],
+  directOnly: boolean,
+): { kept: T[]; hidden: number } {
+  if (!directOnly) return { kept: matches, hidden: 0 };
+  const kept = matches.filter((match) => isDirectEmployerDestination(match.url, match.employer));
+  return { kept, hidden: matches.length - kept.length };
+}
+
+/**
  * The set to put on the page, and how many dead ends it cost to get there.
  *
  * Two rules that have to be applied in this order, and were not.
@@ -466,16 +512,39 @@ export function dropSearchEnginePages<T extends { url: string }>(
  * exists to report what really did.
  */
 export function rankApplicable<
-  T extends { url: string; relevanceTier?: SearchRelevanceTier; overallMatch: number; rankingScore?: number },
->(relevant: T[]): { ranked: T[]; hidden: number } {
+  T extends {
+    url: string;
+    employer?: string | null;
+    relevanceTier?: SearchRelevanceTier;
+    overallMatch: number;
+    rankingScore?: number;
+  },
+>(relevant: T[], directEmployersOnly = false): { ranked: T[]; hidden: number; jobBoardHidden: number } {
   const inScope = (matches: T[]) => matches.filter((match) => match.relevanceTier !== "outside");
+  const chosenSources = (matches: T[]) => keepDirectEmployers(matches, directEmployersOnly).kept;
 
-  const applicable = dropSearchEnginePages(relevant).kept;
+  const applicable = dropSearchEnginePages(chosenSources(relevant)).kept;
   const visible = sortByRelevance(inScope(applicable));
   const ranked = visible.length ? visible : sortByRelevance(applicable);
 
+  /*
+   * Both counts are taken against the tier actually being shown, and split
+   * between the two causes so each note describes its own doing.
+   *
+   * Counting either against the whole pool overstates it. Ten board listings
+   * sitting out of scope, with one in-scope direct role surviving, would have
+   * the page claim ten listings were hidden and offer a switch that reveals
+   * none of them — the relevance fallback was never going to show those.
+   * They sum to shownTier.length - ranked.length, so nothing goes unexplained.
+   */
   const shownTier = visible.length ? inScope(relevant) : relevant;
-  return { ranked, hidden: shownTier.length - ranked.length };
+  const shownFromChosenSources = chosenSources(shownTier);
+
+  return {
+    ranked,
+    hidden: shownFromChosenSources.length - ranked.length,
+    jobBoardHidden: shownTier.length - shownFromChosenSources.length,
+  };
 }
 
 export function retrievalBreadthComplete(
@@ -1264,16 +1333,24 @@ export async function runBriefSearch(
    *
    * Destinations that are not an application come out inside this, before the
    * fallback picks a set — `rankApplicable` explains why that order is the
-   * load-bearing part. It is not gated on `directEmployersOnly`: that toggle
-   * describes a preference between employers and agencies, but "leads nowhere
-   * you can apply" was never a matter of taste.
+   * load-bearing part. That removal is gated on nothing: "leads nowhere you
+   * can apply" was never a matter of taste.
+   *
+   * The person's own choice of sources is applied first, for the same
+   * ordering reason. Both filters run before the fallback chooses, so when
+   * the in-scope matches are all job-board reposts it can reach for a
+   * direct-employer role slightly outside scope rather than being handed a
+   * set that is about to be emptied underneath it.
    *
    * This is also the choke point. `results` below is the single value that
    * becomes the API response, the stored `search_results` row and the set the
    * alert mailer compares against, so a listing removed here cannot reappear
    * on any of those three paths.
    */
-  const { ranked, hidden: agencyOrUnverifiedHidden } = rankApplicable(relevant);
+  const { ranked, hidden: agencyOrUnverifiedHidden, jobBoardHidden } = rankApplicable(
+    relevant,
+    searchIntent.directEmployersOnly === true,
+  );
 
   /*
    * "How do you want to work?", applied for the first time. Read off the
@@ -1352,6 +1429,7 @@ export async function runBriefSearch(
      * stored search rather than improve anything a person can see.
      */
     agencyOrUnverifiedHidden: agencyOrUnverifiedHidden || undefined,
+    jobBoardHidden: jobBoardHidden || undefined,
     /*
      * Only the failures that changed what came back. A provider behind the one
      * that answered was never reached, so its trouble is a server-log fact
@@ -1393,12 +1471,19 @@ export async function runBriefSearch(
   /*
    * A run that found nothing does not overwrite a run that found something.
    *
-   * The upsert was unconditional, so one bad run — every provider timed out,
-   * or a filter removed the lot — replaced a good stored set with an empty
-   * one. getStoredSearch then answers null for an empty array, the page loads
-   * with no results, and the panel starts a fresh live search on every single
-   * visit from then on. The row that exists to stop Sartho paying twice was
-   * the thing that guaranteed it.
+   * The upsert was once unconditional, so a single bad run — every provider
+   * timed out, the budget gone mid-plan — replaced a good stored set with an
+   * empty one. The row that exists to stop Sartho paying twice became the
+   * thing that guaranteed it.
+   *
+   * An empty run is therefore never stored, and whether a particular empty
+   * run "really finished" is not asked. It was, for a while, so that a
+   * strict-filter run ending empty could replace a stored set full of
+   * job-board links — and answering it proved to be beyond what a search
+   * records about itself. A skipped country-widening, a pending SerpApi
+   * ticket, and a provider that failed only after answering once all look
+   * identical to a clean run from here. `getStoredSearch` removes the need
+   * for the question by filtering what it reads instead.
    */
   if (results.length) {
     const { error: storeError } = await supabase.from("search_results").upsert({
@@ -1434,6 +1519,20 @@ export async function getStoredSearch(
   if (!data || !Array.isArray(data.results) || !data.results.length) return null;
   const results = normaliseResults(data.results);
   if (!results.length) return null;
+
+  /*
+   * Returned as stored, under the settings that were in force when it was
+   * written — `criteria.directEmployersOnly` records which those were.
+   *
+   * Filtering here against the person's *current* preference was tried and
+   * withdrawn. The stored row is already narrowed by the same filter at write
+   * time, so narrowing it again on read is a one-way ratchet: somebody
+   * switching back to "Employers + agencies" would get the pruned set with no
+   * way to recover the listings, and the stored note could tell them to
+   * switch to the mode they were already in. Search Brief compares the two
+   * settings instead and asks for a fresh search when they differ, which is
+   * the only thing that can actually widen a narrowed set.
+   */
   return {
     results,
     criteria: normaliseCriteria(data.criteria),
@@ -1583,6 +1682,7 @@ export function normaliseCriteria(stored: unknown): SearchCriteria {
     providers: strings(value.providers),
     directEmployersOnly: value.directEmployersOnly === true,
     agencyOrUnverifiedHidden: count(value.agencyOrUnverifiedHidden),
+    jobBoardHidden: count(value.jobBoardHidden),
     providerErrors: strings(value.providerErrors),
     providerTimeouts: Array.isArray(value.providerTimeouts)
       ? value.providerTimeouts.filter((entry) => entry && typeof entry.name === "string").map((entry) => ({

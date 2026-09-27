@@ -28,9 +28,10 @@ export default async function SearchPlanPage() {
     getSearchPreferences(supabase, user.id),
     loadProductJourneyStatus(supabase, user.id),
     supabase.from("profiles").select("country,total_experience_years").eq("id", user.id).maybeSingle(),
-    // The last search, so arriving here shows matches without re-querying.
+    // The last search, so arriving here is normally a read rather than a provider call.
     getStoredSearch(supabase, user.id),
   ]);
+
   const inferredCountry = normaliseCountryCode(
     typeof profileResult.data?.country === "string" ? profileResult.data.country : null,
   );
@@ -45,6 +46,25 @@ export default async function SearchPlanPage() {
     : null;
   const country = normaliseCountryCode(preferences.country);
   const split = splitMisfiledCompanies(preferences.targetLocations, preferences.targetCompanies);
+  /*
+   * A stored search is only usable while it still answers the question that
+   * was asked of it.
+   *
+   * `directEmployersOnly` decides which listings a run keeps, so a row
+   * written under one setting cannot describe the other — and it is narrowed
+   * rather than annotated, so the listings it left out are simply not there
+   * to show. Handing it over after the toggle moved would display the wrong
+   * set and, worse, a note telling the person to switch to the mode they are
+   * already in.
+   *
+   * Withholding it is all that is needed: the panel treats "no stored
+   * results" as its cue to run a fresh search on arrival, which is the only
+   * thing that can widen a set that was narrowed at write time.
+   */
+  const sourcesChanged = Boolean(stored)
+    && (stored!.criteria.directEmployersOnly ?? false) !== (preferences.directEmployersOnly ?? false);
+  const usableStored = sourcesChanged ? null : stored;
+
   const briefReady = Boolean(country ?? inferredCountry) && lanes.length > 0 && isJobSearchConfigured();
 
   return (
@@ -72,9 +92,9 @@ export default async function SearchPlanPage() {
       />
       <JobSearchPanel
         autoRun={briefReady}
-        initialResults={stored?.results ?? []}
-        initialCriteria={stored?.criteria ?? null}
-        searchedAt={stored?.searchedAt ?? null}
+        initialResults={usableStored?.results ?? []}
+        initialCriteria={usableStored?.criteria ?? null}
+        searchedAt={usableStored?.searchedAt ?? null}
       />
     </div>
   );

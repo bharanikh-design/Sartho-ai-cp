@@ -17,6 +17,32 @@ describe("searchFilterNotes", () => {
     expect(searchFilterNotes({ agencyOrUnverifiedHidden: 0, workModelHidden: 0, providerErrors: [] })).toEqual([]);
   });
 
+  describe("the job-board note", () => {
+    /*
+     * The only note here that can accompany an empty page, and the only one
+     * the person can undo in one click. "Direct employers only" removing
+     * everything is the setting working — but that is only true if the page
+     * says so and names the button that brings the listings back.
+     */
+    it("names the count, the reason and the way back", () => {
+      const notes = searchFilterNotes({ jobBoardHidden: 6 });
+      expect(notes).toHaveLength(1);
+      expect(notes[0].id).toBe("job-board");
+      expect(notes[0].text).toContain("6 listings");
+      expect(notes[0].text).toContain("job board");
+      expect(notes[0].text, "the remedy is the point").toContain("Employers + agencies");
+    });
+
+    it("says nothing when the toggle removed nothing", () => {
+      expect(searchFilterNotes({ jobBoardHidden: 0 })).toEqual([]);
+      expect(searchFilterNotes({})).toEqual([]);
+    });
+
+    it("comes first, because it is the one the person can act on", () => {
+      expect(ids({ jobBoardHidden: 2, agencyOrUnverifiedHidden: 3, workModelHidden: 1 })[0]).toBe("job-board");
+    });
+  });
+
   it("reports adverts the direct-employers filter removed", () => {
     const notes = searchFilterNotes({ agencyOrUnverifiedHidden: 4 });
     expect(notes).toHaveLength(1);

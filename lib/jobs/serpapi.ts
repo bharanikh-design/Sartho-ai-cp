@@ -1,5 +1,9 @@
 import { serpapiScheduleWords } from "@/lib/jobs/employment-types";
-import { canonicalDestination } from "@/lib/jobs/destination";
+import {
+  AGGREGATOR_BOARD_HOSTS,
+  APPLICANT_TRACKING_HOSTS,
+  canonicalDestination,
+} from "@/lib/jobs/destination";
 import { countryName } from "@/lib/jobs/countries";
 import type { JobSearchQuery, JobSearchResult } from "@/lib/jobs/search-provider";
 
@@ -155,32 +159,14 @@ export function readSerpApiPlatforms(raw: SerpApiJob): { platforms: string[]; ap
  * one that fails safe. Anything unrecognised is used only when there is
  * nothing better, and Google's own listing page beats it — that page opens on
  * a real advert, which a dead mirror does not.
+ *
+ * The hosts live in lib/jobs/destination.ts, split into job boards and
+ * applicant tracking systems. "Direct employers only" needs that distinction
+ * — and so, it turns out, does this ranking: an employer's own tracking
+ * system is a better destination than somebody else's repost of the same
+ * role, so the two halves are consulted in that order rather than as one
+ * undifferentiated set.
  */
-const KNOWN_BOARDS = [
-  "linkedin.com", "indeed.com", "seek.com", "glassdoor.", "ziprecruiter.com",
-  "monster.com", "dice.com", "builtin.com", "wellfound.com", "totaljobs.com",
-  "reed.co.uk", "efinancialcareers.", "naukri.com", "jobstreet.com", "jobsdb.com",
-  "jora.com", "careerjet.", "jobleads.com", "bebee.com", "adzuna.",
-  /*
-   * Singapore and the wider APAC market, which this list did not cover.
-   *
-   * MyCareersFuture is the Singapore government's own job bank and Google for
-   * Jobs routinely carries its listings — "via MyCareersFuture" sits in
-   * apply_options beside LinkedIn. Unrecognised, it lost to Google's own
-   * listing page below, so a Singapore vacancy with a perfectly good
-   * government apply link sent the person to a Google search instead. foundit
-   * (Monster's rebrand across APAC) had exactly the same problem, and
-   * "monster.com" did not match "foundit.sg".
-   */
-  "mycareersfuture.gov.sg", "mycareersfuture.sg", "foundit.", "monsterapac.",
-  "jobsbank.gov.sg", "techinasia.com", "glints.com", "nodeflair.com",
-  /* Applicant tracking systems: these are the employer's own front door. */
-  "myworkdayjobs.com", "workday.com", "greenhouse.io", "lever.co",
-  "smartrecruiters.com", "workable.com", "ashbyhq.com", "bamboohr.com",
-  "icims.com", "taleo.net", "successfactors.", "oraclecloud.com",
-  "eightfold.ai", "jobvite.com", "recruitee.com", "teamtailor.com",
-  "personio.", "breezy.hr", "rippling.com", "phenompeople.com", "avature.net",
-];
 
 function hostOf(url: string): string {
   try {
@@ -200,12 +186,12 @@ function hostOf(url: string): string {
  * That last step is the whole point, and it was the other way round for a
  * long time. `share_link` is a google.com/search URL — Google's results page
  * for the vacancy, not the vacancy — and it sat ABOVE `links[0]`. So an
- * advert whose only apply route was a board missing from KNOWN_BOARDS was
+ * advert whose only apply route was a board missing from that list was
  * sent to a Google search even though a perfectly good apply link was sitting
  * right there in `apply_options`.
  *
  * This shipped as a "View goes to Google" bug three times. Twice it was
- * treated as a gap in KNOWN_BOARDS and fixed by adding the boards that had
+ * treated as a gap in that list and fixed by adding the boards that had
  * been reported — which fixes those boards and leaves every other board on
  * earth pointing at Google. The list cannot be completed; the ordering can.
  *
@@ -242,9 +228,28 @@ export function chooseApplyUrl(raw: SerpApiJob): string | null {
     : undefined;
   if (own) return own;
 
+  /*
+   * Then the employer's applicant tracking system, ahead of any job board.
+   *
+   * These used to be ranked together as one set of "recognised" hosts, so
+   * whichever appeared first in `apply_options` won. An advert listing
+   * LinkedIn before Greenhouse sent people to the repost when the employer's
+   * own application was sitting right there, and — once "Direct employers
+   * only" started reading this URL — that advert was then hidden from anybody
+   * using the setting, for a route the advert did not actually lack.
+   *
+   * Preferring the tracking system is the better destination either way: it
+   * is where the application is actually filed, without the intermediate hop.
+   */
+  const tracking = links.find((link) => {
+    const host = hostOf(link);
+    return APPLICANT_TRACKING_HOSTS.some((known) => host.includes(known));
+  });
+  if (tracking) return tracking;
+
   const board = links.find((link) => {
     const host = hostOf(link);
-    return KNOWN_BOARDS.some((known) => host.includes(known));
+    return AGGREGATOR_BOARD_HOSTS.some((known) => host.includes(known));
   });
   if (board) return board;
 

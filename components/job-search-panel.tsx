@@ -179,6 +179,11 @@ export function JobSearchPanel({
    * The matches are this page's content, so they load on arrival — but the last
    * search is stored, so arriving is normally a read. Only someone who has
    * never searched triggers a live one; "Search again" always runs fresh.
+   *
+   * `getStoredSearch` answers null when nothing in the stored row survives
+   * the person's current source preference, so this runs then too — which is
+   * the useful response to "none of your saved roles are direct", rather
+   * than an explanation of it.
    */
   const autoRan = useRef(false);
   useEffect(() => {
