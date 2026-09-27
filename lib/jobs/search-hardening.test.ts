@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dropSearchEnginePages, isSearchEnginePage, normaliseResults, rankApplicable } from "./run-search";
+import { dropSearchEnginePages, isSearchEnginePage, isWorthShowing, normaliseResults, rankApplicable } from "./run-search";
 import { chooseApplyUrl, extractSerpApiJobs, keepScheduleTypes, mapSerpApiResult } from "./serpapi";
 
 /*
@@ -754,5 +754,45 @@ describe("stored results never serve a search engine", () => {
       { title: "A", url: "https://www.google.com/search?q=a" },
       { title: "B", url: "https://www.google.com/search?q=b" },
     ])).toEqual([]);
+  });
+});
+
+/*
+ * What "enough results" counts.
+ *
+ * The retrieval loop stops early once it believes it has found plenty. That
+ * belief used to be `byUrl.size >= 25` — twenty-five URLs collected, counted
+ * before scoring and before any destination filtering. All twenty-five could
+ * then be thrown away while the queries that might have found real matches
+ * had already been skipped, which is the mechanism behind a page showing
+ * three roles in a market that had far more.
+ */
+describe("isWorthShowing", () => {
+  const match = (recommendation: string, url = "https://careers.acmecorp.com/1") => ({ recommendation, url });
+
+  it("counts a role the scorer did not reject", () => {
+    expect(isWorthShowing(match("apply"))).toBe(true);
+    expect(isWorthShowing(match("review"))).toBe(true);
+  });
+
+  it("does not count one the scorer rejected", () => {
+    expect(isWorthShowing(match("skip"))).toBe(false);
+  });
+
+  it("does not count a dead end, however well it scored", () => {
+    /*
+     * These are removed further down the pipeline without fail, so counting
+     * them towards "enough" is counting results that cannot reach the page.
+     */
+    expect(isWorthShowing(match("apply", "https://www.google.com/search?q=x"))).toBe(false);
+  });
+
+  it("is the measure the loop uses, so twenty-five rejects are not enough", () => {
+    /*
+     * The regression in one line: under the old count this set would have
+     * stopped the search; under this one it contributes nothing.
+     */
+    const rejected = Array.from({ length: 25 }, (_, index) => match("skip", `https://acme.com/${index}`));
+    expect(rejected.filter(isWorthShowing)).toHaveLength(0);
   });
 });
