@@ -7,7 +7,7 @@ import {
   isDirectEmployerDestination,
   KNOWN_DESTINATION_HOSTS,
 } from "./destination";
-import { keepDirectEmployers } from "./run-search";
+import { getStoredSearch, keepDirectEmployers } from "./run-search";
 
 /*
  * "Direct employers only" used to do nothing. Removing search-engine dead
@@ -165,5 +165,55 @@ describe("keepDirectEmployers", () => {
 
   it("is a no-op on an empty set", () => {
     expect(keepDirectEmployers([], true)).toEqual({ kept: [], hidden: 0 });
+  });
+});
+
+/*
+ * "Searched, and nothing survived" is not the same as "never searched".
+ *
+ * They look identical from the results array, and reading only the array is
+ * what made the page auto-run a fresh provider search on every visit. A
+ * strict-filter run that legitimately ends empty would have fed that loop
+ * forever, so the row's existence — not its length — is what answers the
+ * question now.
+ */
+describe("getStoredSearch tells an empty search from no search", () => {
+  const clientReturning = (row: unknown) => ({
+    from: () => ({
+      select: () => ({
+        eq: () => ({ maybeSingle: async () => ({ data: row, error: null }) }),
+      }),
+    }),
+  }) as unknown as Parameters<typeof getStoredSearch>[0];
+
+  const row = (results: unknown[]) => ({
+    results,
+    criteria: { country: "uk", jobBoardHidden: 4 },
+    searched_at: "2026-09-27T00:00:00.000Z",
+  });
+
+  it("answers null only when there is no row at all", async () => {
+    expect(await getStoredSearch(clientReturning(null), "u1")).toBeNull();
+  });
+
+  it("keeps the criteria of a run whose results were all filtered away", async () => {
+    const stored = await getStoredSearch(clientReturning(row([])), "u1");
+    expect(stored, "an empty run is still a run").not.toBeNull();
+    expect(stored!.results).toEqual([]);
+    /* The count is what lets the page explain itself rather than look untouched. */
+    expect(stored!.criteria.jobBoardHidden).toBe(4);
+    expect(stored!.searchedAt).toBe("2026-09-27T00:00:00.000Z");
+  });
+
+  it("still drops individual rows it cannot render, without discarding the search", async () => {
+    const stored = await getStoredSearch(
+      clientReturning(row([
+        { title: "Reliability Engineer", url: "https://careers.acmecorp.com/1", description: "Ops." },
+        { title: "Dead end", url: "https://www.google.com/search?q=x", description: "" },
+        { title: "", url: "https://careers.acmecorp.com/3", description: "" },
+      ])),
+      "u1",
+    );
+    expect(stored!.results.map((item) => item.url)).toEqual(["https://careers.acmecorp.com/1"]);
   });
 });

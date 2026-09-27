@@ -512,16 +512,39 @@ export function keepDirectEmployers<T extends { url: string; employer?: string |
  * exists to report what really did.
  */
 export function rankApplicable<
-  T extends { url: string; relevanceTier?: SearchRelevanceTier; overallMatch: number; rankingScore?: number },
->(relevant: T[]): { ranked: T[]; hidden: number } {
+  T extends {
+    url: string;
+    employer?: string | null;
+    relevanceTier?: SearchRelevanceTier;
+    overallMatch: number;
+    rankingScore?: number;
+  },
+>(relevant: T[], directEmployersOnly = false): { ranked: T[]; hidden: number; jobBoardHidden: number } {
   const inScope = (matches: T[]) => matches.filter((match) => match.relevanceTier !== "outside");
+  const chosenSources = (matches: T[]) => keepDirectEmployers(matches, directEmployersOnly).kept;
 
-  const applicable = dropSearchEnginePages(relevant).kept;
+  const applicable = dropSearchEnginePages(chosenSources(relevant)).kept;
   const visible = sortByRelevance(inScope(applicable));
   const ranked = visible.length ? visible : sortByRelevance(applicable);
 
+  /*
+   * Both counts are taken against the tier actually being shown, and split
+   * between the two causes so each note describes its own doing.
+   *
+   * Counting either against the whole pool overstates it. Ten board listings
+   * sitting out of scope, with one in-scope direct role surviving, would have
+   * the page claim ten listings were hidden and offer a switch that reveals
+   * none of them — the relevance fallback was never going to show those.
+   * They sum to shownTier.length - ranked.length, so nothing goes unexplained.
+   */
   const shownTier = visible.length ? inScope(relevant) : relevant;
-  return { ranked, hidden: shownTier.length - ranked.length };
+  const shownFromChosenSources = chosenSources(shownTier);
+
+  return {
+    ranked,
+    hidden: shownFromChosenSources.length - ranked.length,
+    jobBoardHidden: shownTier.length - shownFromChosenSources.length,
+  };
 }
 
 export function retrievalBreadthComplete(
@@ -1324,11 +1347,10 @@ export async function runBriefSearch(
    * alert mailer compares against, so a listing removed here cannot reappear
    * on any of those three paths.
    */
-  const { kept: fromChosenSources, hidden: jobBoardHidden } = keepDirectEmployers(
+  const { ranked, hidden: agencyOrUnverifiedHidden, jobBoardHidden } = rankApplicable(
     relevant,
     searchIntent.directEmployersOnly === true,
   );
-  const { ranked, hidden: agencyOrUnverifiedHidden } = rankApplicable(fromChosenSources);
 
   /*
    * "How do you want to work?", applied for the first time. Read off the
@@ -1456,7 +1478,22 @@ export async function runBriefSearch(
    * visit from then on. The row that exists to stop Sartho paying twice was
    * the thing that guaranteed it.
    */
-  if (results.length) {
+  /*
+   * A run our own filtering emptied is a real answer and must be stored.
+   *
+   * The guard above protects a good stored set from a bad run. It cannot tell
+   * the difference on its own between "every provider timed out" and "the
+   * person asked for direct employers and none of today's matches were" — and
+   * treating the second as a bad run defeats the filter on the next page
+   * load: getStoredSearch hands back yesterday's board links, which is
+   * precisely what they switched the toggle on to avoid, with no note to
+   * explain it. So an empty page counts as a result whenever one of our own
+   * filters is what emptied it, because that only happens when there were
+   * adverts to remove.
+   */
+  const filteredToNothing = !results.length && (jobBoardHidden > 0 || agencyOrUnverifiedHidden > 0);
+
+  if (results.length || filteredToNothing) {
     const { error: storeError } = await supabase.from("search_results").upsert({
       user_id: userId,
       results,
@@ -1487,9 +1524,19 @@ export async function getStoredSearch(
     .eq("user_id", userId)
     .maybeSingle();
 
-  if (!data || !Array.isArray(data.results) || !data.results.length) return null;
+  /*
+   * A row that exists means a search ran, even when nothing is left in it.
+   *
+   * Both length checks used to answer null here, which the page could not
+   * tell apart from "never searched" — so it started a fresh provider search
+   * on arrival, every arrival. That is the loop review caught on #233, and a
+   * strict-filter run that legitimately ends empty would have fed it forever.
+   * Returning the empty set with its criteria lets the page say what happened
+   * and offer the switch back, instead of silently spending a provider call
+   * to be told the same thing again.
+   */
+  if (!data || !Array.isArray(data.results)) return null;
   const results = normaliseResults(data.results);
-  if (!results.length) return null;
   return {
     results,
     criteria: normaliseCriteria(data.criteria),

@@ -236,11 +236,78 @@ describe("rankApplicable", () => {
       match("https://google.co.uk/search?q=b", "outside"),
     ];
 
-    expect(rankApplicable(relevant)).toEqual({ ranked: [], hidden: 2 });
+    expect(rankApplicable(relevant)).toEqual({ ranked: [], hidden: 2, jobBoardHidden: 0 });
   });
 
   it("is a no-op on an empty set", () => {
-    expect(rankApplicable([])).toEqual({ ranked: [], hidden: 0 });
+    expect(rankApplicable([])).toEqual({ ranked: [], hidden: 0, jobBoardHidden: 0 });
+  });
+
+  /*
+   * The person's own source filter, counted the same careful way.
+   *
+   * It lives in here rather than beside the call so that both filters run
+   * before the fallback chooses a tier, and so both counts can be taken
+   * against the tier that was actually shown.
+   */
+  describe("with \u201cDirect employers only\u201d on", () => {
+    const board = (tier: "strong" | "possible" | "outside") =>
+      match("https://www.linkedin.com/jobs/view/" + Math.random(), tier);
+    const direct = (tier: "strong" | "possible" | "outside") =>
+      match("https://careers.acmecorp.com/" + Math.random(), tier);
+
+    it("changes nothing when it is off", () => {
+      const relevant = [board("strong"), direct("possible")];
+      const { ranked, jobBoardHidden } = rankApplicable(relevant, false);
+      expect(ranked).toHaveLength(2);
+      expect(jobBoardHidden).toBe(0);
+    });
+
+    it("removes board listings and counts them when it is on", () => {
+      const relevant = [board("strong"), direct("possible")];
+      const { ranked, jobBoardHidden } = rankApplicable(relevant, true);
+      expect(ranked).toHaveLength(1);
+      expect(ranked[0].url).toContain("careers.acmecorp.com");
+      expect(jobBoardHidden).toBe(1);
+    });
+
+    /*
+     * The miscount this was reported for. Ten board roles sitting out of
+     * scope, one in-scope direct role surviving: the page would have claimed
+     * ten listings hidden and offered a switch revealing none of them,
+     * because the relevance fallback was never going to show those.
+     */
+    it("does not count board listings the fallback was never going to show", () => {
+      const relevant = [direct("strong"), ...Array.from({ length: 10 }, () => board("outside"))];
+      const { ranked, jobBoardHidden } = rankApplicable(relevant, true);
+      expect(ranked).toHaveLength(1);
+      expect(jobBoardHidden, "out-of-scope boards are not a loss to report").toBe(0);
+    });
+
+    it("does count them once the fallback is the tier being shown", () => {
+      /* No in-scope match survives, so the out-of-scope set is what is on offer. */
+      const relevant = [board("strong"), board("outside"), direct("outside")];
+      const { ranked, jobBoardHidden } = rankApplicable(relevant, true);
+      expect(ranked).toHaveLength(1);
+      expect(jobBoardHidden).toBe(2);
+    });
+
+    it("keeps both counts adding up to what left the shown tier", () => {
+      /*
+       * Nothing may go unexplained: every listing missing from the page is
+       * accounted for by one note or the other.
+       */
+      const relevant = [
+        board("strong"),
+        match("https://www.google.com/search?q=x", "strong"),
+        direct("strong"),
+      ];
+      const { ranked, hidden, jobBoardHidden } = rankApplicable(relevant, true);
+      expect(ranked).toHaveLength(1);
+      expect(hidden).toBe(1);
+      expect(jobBoardHidden).toBe(1);
+      expect(hidden + jobBoardHidden + ranked.length).toBe(relevant.length);
+    });
   });
 });
 

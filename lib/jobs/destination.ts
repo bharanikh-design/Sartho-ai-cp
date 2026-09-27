@@ -107,6 +107,13 @@ export const APPLICANT_TRACKING_HOSTS = [
   "icims.com", "taleo.net", "successfactors.", "oraclecloud.com",
   "eightfold.ai", "jobvite.com", "recruitee.com", "teamtailor.com",
   "personio.", "breezy.hr", "rippling.com", "phenompeople.com", "avature.net",
+  /*
+   * ADP WorkforceNow, which `chooseApplyUrl`'s own fixtures already carry as
+   * an apply destination. It is an HR platform hosting an employer's hiring,
+   * so it belongs on this side of the line rather than passing as an
+   * unfamiliar host.
+   */
+  "workforcenow.adp.com",
 ];
 
 /**
@@ -135,6 +142,16 @@ export const AGGREGATOR_BOARD_HOSTS = [
    */
   "mycareersfuture.gov.sg", "mycareersfuture.sg", "foundit.", "monsterapac.",
   "jobsbank.gov.sg", "techinasia.com", "glints.com", "nodeflair.com",
+  /*
+   * Marketplaces this repository already knew about and this list did not.
+   *
+   * Both appear in `chooseApplyUrl`'s regression fixtures as board
+   * destinations, so leaving them out meant "Direct employers only" silently
+   * passed them through as unfamiliar hosts. Keeping a genuinely unknown
+   * careers domain is the intended leniency; letting through a marketplace
+   * the codebase can already name is just an out-of-date list.
+   */
+  "stellenanzeigen.de", "hh.ru",
 ];
 
 /**
