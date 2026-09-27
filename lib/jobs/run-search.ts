@@ -1469,27 +1469,27 @@ export async function runBriefSearch(
    * again to see the same roles.
    */
   /*
-   * A run that found nothing does not overwrite a run that found something.
+   * A bad run does not overwrite a good one — but an empty answer is not a
+   * bad run.
    *
-   * The upsert was unconditional, so one bad run — every provider timed out,
-   * or a filter removed the lot — replaced a good stored set with an empty
-   * one. getStoredSearch then answers null for an empty array, the page loads
-   * with no results, and the panel starts a fresh live search on every single
-   * visit from then on. The row that exists to stop Sartho paying twice was
-   * the thing that guaranteed it.
-   */
-  /*
-   * A run our own filtering emptied is a real answer and must be stored.
+   * The upsert was once unconditional, so a single failed run replaced a
+   * good stored set with an empty one, and the row that exists to stop
+   * Sartho paying twice became the thing that guaranteed it.
    *
-   * The guard above protects a good stored set from a bad run. It cannot tell
-   * the difference on its own between "every provider timed out" and "the
-   * person asked for direct employers and none of today's matches were" — and
-   * treating the second as a bad run defeats the filter on the next page
-   * load: getStoredSearch hands back yesterday's board links, which is
-   * precisely what they switched the toggle on to avoid, with no note to
-   * explain it. So an empty page counts as a result whenever one of our own
-   * filters is what emptied it, because that only happens when there were
-   * adverts to remove.
+   * Guarding on `results.length` alone then went too far the other way,
+   * because it cannot tell "every provider timed out" from "the person asked
+   * for direct employers and none of today's matches were". Treating the
+   * second as a failure defeats the filter on the next page load: the stored
+   * row still holds yesterday's job-board links, which is precisely what
+   * they switched the toggle on to avoid, and no note appears to explain the
+   * page they are looking at.
+   *
+   * The hidden counts separate the two. Either being above zero means there
+   * were adverts and our own filtering is what removed them, which a
+   * provider outage cannot produce — so that empty page is a real answer and
+   * is stored with the criteria that explain it. An empty run with both
+   * counts at zero is still treated as a failure and still cannot overwrite
+   * anything.
    */
   const filteredToNothing = !results.length && (jobBoardHidden > 0 || agencyOrUnverifiedHidden > 0);
 
