@@ -14,6 +14,12 @@
  * Two rules here. Silence when there is nothing to say — a note reading "0
  * hidden" is noise that teaches people to stop reading notes. And the
  * person's own filters come first, because those are the ones they can undo.
+ *
+ * The first note no longer credits "Direct employers only". Removing a
+ * listing whose only link is a search results page stopped being that
+ * toggle's doing and became unconditional, so attributing it to a setting
+ * most people never touched would have been the page explaining itself
+ * wrongly.
  */
 
 export type SearchFilterNote = {
@@ -51,7 +57,7 @@ export function searchFilterNotes(criteria: Diagnostics | null | undefined): Sea
   if (agency) {
     notes.push({
       id: "direct-employers",
-      text: `${listing(agency)} hidden — they led to a search results page rather than somewhere to apply. That is “Direct employers only” doing its job.`,
+      text: `${listing(agency)} hidden — the only link on offer was a search results page, not somewhere to apply.`,
     });
   }
 

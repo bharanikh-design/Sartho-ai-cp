@@ -408,25 +408,38 @@ export function isSearchEnginePage(url: string): boolean {
 }
 
 /**
- * "Direct employers only", actually applied.
+ * Search-engine results pages, removed from every run.
  *
- * The toggle promises to hide agency and unverified reposts. The plainest
- * breach of that promise is a card whose only destination is a search engine,
- * so those are what this removes — it does not guess at which employers are
- * agencies, because guessing from a company name hides real employers.
+ * Not a filter and not a preference. A card whose only destination is Google's
+ * own results page is not a vacancy, so there is no setting under which it
+ * belongs on the page.
  *
- * It never empties the page. A filter that leaves nothing is worse than the
- * reposts it removed, so it stands down and reports honestly that it hid
- * nothing rather than claiming a hidden count for results it put back.
+ * It used to be both, and had two ways out. Gated behind "Direct employers
+ * only" it did nothing whatsoever for anybody who never touched that toggle,
+ * which is most people; and with the toggle on it stood down and put the whole
+ * set back whenever removing them would have emptied the page.
+ *
+ * Those two escapes are why "View" still opened a Google search after three
+ * separate fixes to how a destination is *chosen*. The mapper stopped picking
+ * them, but a provider offering nothing else still produced them, and this was
+ * the step that waved them through — onto the screen, into `search_results`,
+ * and into the alert history. Dropping them here, before all three, is what
+ * makes that impossible rather than unlikely.
+ *
+ * It can empty the page, and that is the deliberate part. The old stand-down
+ * assumed an empty list was the worse outcome; it is not. A page of cards that
+ * every one of them lead back to a search box costs somebody an afternoon and
+ * teaches them the product is lying. `searchFilterNotes` reports how many went
+ * and why, so a short list reads as an honest one.
+ *
+ * Deliberately narrow. This removes destinations that are not an application;
+ * it does not guess at which employers are agencies, because guessing from a
+ * company name hides real employers.
  */
-export function applyDirectEmployerFilter<T extends { url: string }>(
+export function dropSearchEnginePages<T extends { url: string }>(
   ranked: T[],
-  directOnly: boolean,
 ): { kept: T[]; hidden: number } {
-  if (!directOnly) return { kept: ranked, hidden: 0 };
-
   const kept = ranked.filter((match) => !isSearchEnginePage(match.url));
-  if (!kept.length) return { kept: ranked, hidden: 0 };
   return { kept, hidden: ranked.length - kept.length };
 }
 
@@ -1219,25 +1232,17 @@ export async function runBriefSearch(
   const ranked = visible.length ? visible : fallback;
 
   /*
-   * "Direct employers only" was read from the brief, stored, and reported in
-   * the criteria — and never applied to a single result. The toggle has been
-   * decorative since it shipped.
+   * Destinations that are not an application, gone — unconditionally, and
+   * before anything downstream can see them.
    *
-   * It promises to hide agency and unverified reposts, and the plainest breach
-   * of that promise is a card whose only destination is a search engine: "View"
-   * opened a Google results page rather than a vacancy, which is not an
-   * application by anybody's reading.
-   *
-   * Deliberately narrow. This removes destinations that are not an application;
-   * it does not guess at which employers are agencies, because guessing from a
-   * company name hides real employers. And it never empties the page — a filter
-   * that leaves nothing is worse than the reposts it removed, so it stands down
-   * and reports honestly that it hid nothing.
+   * This is the choke point. `results` below is the single value that becomes
+   * the API response, the stored `search_results` row and the set the alert
+   * mailer compares against, so a listing removed here cannot reappear on any
+   * of those three paths. It is not gated on `directEmployersOnly`: that
+   * toggle still describes a preference between employers and agencies, but
+   * "leads nowhere you can apply" was never a matter of taste.
    */
-  const { kept: directKept, hidden: agencyOrUnverifiedHidden } = applyDirectEmployerFilter(
-    ranked,
-    searchIntent.directEmployersOnly === true,
-  );
+  const { kept: directKept, hidden: agencyOrUnverifiedHidden } = dropSearchEnginePages(ranked);
 
   /*
    * "How do you want to work?", applied for the first time. Read off the
@@ -1308,7 +1313,13 @@ export async function runBriefSearch(
     semanticJobsFailed,
     familyWarnings,
     directEmployersOnly: searchIntent.directEmployersOnly ?? undefined,
-    /* Reposts with nowhere real to apply, removed by the toggle above. */
+    /*
+     * Listings with nowhere to apply, removed above.
+     *
+     * The key keeps its original name because it is a JSON field on rows
+     * already written: renaming it would silently zero the count on every
+     * stored search rather than improve anything a person can see.
+     */
     agencyOrUnverifiedHidden: agencyOrUnverifiedHidden || undefined,
     /*
      * Only the failures that changed what came back. A provider behind the one
