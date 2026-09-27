@@ -487,14 +487,35 @@ export function dropSearchEnginePages<T extends { url: string }>(
  * away whatever was there. That is right when our own filtering is what
  * emptied the page — the person asked for direct employers and none of
  * today's matches were, and they should see that rather than yesterday's
- * board links — and wrong when the page is empty because something broke.
+ * board links — and wrong when the page is empty because the search did not
+ * finish.
  *
- * Two things have to hold. A hidden count above zero means there were
- * adverts and we removed them, which an outage cannot fake. And no provider
- * may have failed in a way that cost results: a run where one provider died
- * and the survivor happened to return only board links produces a positive
- * count from an incomplete search, and persisting that would freeze a
- * partial outage into an authoritative empty answer.
+ * So two things must hold. A hidden count above zero, which means there were
+ * adverts and we removed them and no outage can fake. And no sign that the
+ * run was cut short — because a search that only got half way through its
+ * plan can produce a positive count and still be missing the very
+ * direct-employer roles the person was looking for.
+ *
+ * EVERY SIGN OF A SHORT RUN, not just the obvious one. The criteria record
+ * incompleteness in three separate places, and checking only the first was a
+ * defect twice over:
+ *
+ *   - `providerErrors` — a provider that failed in a way that cost results.
+ *   - `providerTimeouts` — a provider that timed out. These never reach
+ *     `providerErrors`: provider-cascade.ts deliberately records a timeout
+ *     to the console rather than to the person, and returns before `record`
+ *     is called. It is also the expensive case, since a lead provider that
+ *     burns its budget is retired and leaves most of the plan unrun.
+ *   - `queriesStoppedBecause` of "budget" or "no_providers" — the loop gave
+ *     up with queries still on the list. Its third value, "enough_results",
+ *     is the one benign stop and does not count.
+ *
+ * The asymmetry is what makes this worth being thorough about, and it points
+ * one way. Wrongly calling a run incomplete costs one extra provider call.
+ * Wrongly calling it complete freezes an empty page into the database, where
+ * it suppresses the arrival search and the person sees nothing until they
+ * think to press the button themselves. Any future signal of a short run
+ * belongs on this list, and failing closed is always the cheaper mistake.
  *
  * Both sides of the row ask this same question, which is why it is a
  * function rather than an expression written twice. The write side decides
@@ -505,10 +526,15 @@ export function dropSearchEnginePages<T extends { url: string }>(
  */
 export function isAuthoritativeEmptySearch(criteria: {
   providerErrors?: string[];
+  providerTimeouts?: Array<{ name: string; count: number; waitedMs: number }>;
+  queriesStoppedBecause?: "budget" | "no_providers" | "enough_results";
   jobBoardHidden?: number;
   agencyOrUnverifiedHidden?: number;
 }): boolean {
   if ((criteria.providerErrors ?? []).length) return false;
+  if ((criteria.providerTimeouts ?? []).length) return false;
+  if (criteria.queriesStoppedBecause === "budget" || criteria.queriesStoppedBecause === "no_providers") return false;
+
   return (criteria.jobBoardHidden ?? 0) > 0 || (criteria.agencyOrUnverifiedHidden ?? 0) > 0;
 }
 

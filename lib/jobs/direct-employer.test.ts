@@ -241,6 +241,20 @@ describe("getStoredSearch tells an empty search from no search", () => {
     expect(await getStoredSearch(clientReturning(partial), "u1")).toBeNull();
   });
 
+  it("will not accept one from a run a timeout cut short either", async () => {
+    /*
+     * The case a plain providerErrors check misses entirely: a timeout is
+     * recorded to the console rather than to the person, so it never reaches
+     * that field, and a retired lead provider leaves most of the plan unrun.
+     */
+    const timedOut = {
+      results: [],
+      criteria: { jobBoardHidden: 5, providerTimeouts: [{ name: "SerpApi", count: 3, waitedMs: 20_000 }] },
+      searched_at: "2026-09-27T00:00:00.000Z",
+    };
+    expect(await getStoredSearch(clientReturning(timedOut), "u1")).toBeNull();
+  });
+
   it("still drops individual rows it cannot render, without discarding the search", async () =>{
     const stored = await getStoredSearch(
       clientReturning(row([
@@ -327,15 +341,36 @@ describe("isAuthoritativeEmptySearch", () => {
     expect(isAuthoritativeEmptySearch({ jobBoardHidden: 0, agencyOrUnverifiedHidden: 0 })).toBe(false);
   });
 
-  it("rejects a run where a provider failed, however much was filtered", () => {
-    /*
-     * The count is real but the search is not complete: a provider that never
-     * answered might have carried the direct-employer roles. Treating this as
-     * the final word would bury a transient outage in the database.
-     */
-    expect(isAuthoritativeEmptySearch({
-      jobBoardHidden: 12,
-      providerErrors: ["Google for Jobs (SerpApi) is not configured."],
-    })).toBe(false);
+  /*
+   * Every sign of a short run, not just the obvious one. The count is real
+   * in all of these, but the search is not complete — and the provider that
+   * never answered is exactly the one that might have carried the
+   * direct-employer roles. Treating any of them as the final word buries a
+   * transient failure in the database.
+   *
+   * Table-driven because the list is the point: it was checked one signal at
+   * a time and that was a defect twice. Anything new that records a short
+   * run belongs here.
+   */
+  const shortRun: Array<[string, Parameters<typeof isAuthoritativeEmptySearch>[0]]> = [
+    ["a provider errored", { providerErrors: ["Google for Jobs (SerpApi) is not configured."] }],
+    ["a provider timed out", { providerTimeouts: [{ name: "SerpApi", count: 3, waitedMs: 20_000 }] }],
+    ["the budget ran out", { queriesStoppedBecause: "budget" }],
+    ["every provider was exhausted", { queriesStoppedBecause: "no_providers" }],
+  ];
+
+  for (const [reason, incomplete] of shortRun) {
+    it(`rejects a run cut short because ${reason}, however much was filtered`, () => {
+      expect(isAuthoritativeEmptySearch({ jobBoardHidden: 12, ...incomplete })).toBe(false);
+    });
+  }
+
+  it("accepts a run that stopped only because it had found enough", () => {
+    /* The one benign stop: the loop chose to end, it was not cut off. */
+    expect(isAuthoritativeEmptySearch({ jobBoardHidden: 4, queriesStoppedBecause: "enough_results" })).toBe(true);
+  });
+
+  it("is not fooled by empty collections", () => {
+    expect(isAuthoritativeEmptySearch({ jobBoardHidden: 4, providerErrors: [], providerTimeouts: [] })).toBe(true);
   });
 });
