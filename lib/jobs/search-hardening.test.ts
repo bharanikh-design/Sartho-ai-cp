@@ -451,14 +451,22 @@ describe("canonicalising a URL does not re-alert a vacancy", () => {
     expect(selectNewMatches([result as never], ["https://example.com/"]), "already canonical").toEqual([]);
   });
 
-  it("matches a legacy http row against the https form it is now returned as", async () => {
+  it("leaves the scheme alone, because the data is canonical now", async () => {
     const { selectNewMatches } = await import("@/lib/notifications/match-alerts");
     /*
-     * The interaction between the two fixes above, and the reason the history
-     * key collapses schemes. Destinations are https-only now, so the mapper
-     * can never emit the http form of a vacancy again — every legacy http row
-     * in seen_job_matches would stay permanently unmatched and every one of
-     * those vacancies would be emailed a second time.
+     * This asserted the opposite until 20260927003000_canonical_seen_job_matches
+     * — that a legacy `http://` row matched the https form the mapper now
+     * returns, because destinationKey folded the schemes together.
+     *
+     * The fold was doing the data's job. It also meant a host serving
+     * different content per scheme would have had a genuine alert silently
+     * suppressed, which is the worse failure even though it is much rarer.
+     * The migration rewrites the stored rows to https, so the key can be exact
+     * again and that suppression cannot happen.
+     *
+     * The corollary, asserted here so it is not a surprise: an http row that
+     * the migration has NOT reached is a miss, and gets alerted once. That is
+     * why the two ship together.
      */
     const result = {
       title: "ITSM Manager", employer: "Acme", location: "Melbourne",
@@ -466,12 +474,12 @@ describe("canonicalising a URL does not re-alert a vacancy", () => {
       salary: null, source: "Google for Jobs", overallMatch: 90, recommendation: "strong",
       matchedSkills: [],
     };
-    expect(selectNewMatches([result as never], ["http://jobs.example.com/42"]), "legacy http row").toEqual([]);
-    expect(selectNewMatches([result as never], ["HTTP://Jobs.Example.COM/42"]), "legacy, mixed case").toEqual([]);
+    expect(selectNewMatches([result as never], ["https://jobs.example.com/42"]), "migrated row").toEqual([]);
+    expect(selectNewMatches([result as never], ["HTTPS://Jobs.Example.COM/42"]), "migrated, mixed case").toEqual([]);
+    expect(selectNewMatches([result as never], ["http://jobs.example.com/42"]), "unmigrated row is a miss").toHaveLength(1);
   });
 
-  it("does not collapse two genuinely different vacancies", () => {
-    /* Scheme is the only thing folded — a different path is still new. */
+  it("still treats a different vacancy as new", () => {
     return import("@/lib/notifications/match-alerts").then(({ selectNewMatches }) => {
       const result = {
         title: "ITSM Manager", employer: "Acme", location: "Melbourne",
@@ -479,7 +487,7 @@ describe("canonicalising a URL does not re-alert a vacancy", () => {
         salary: null, source: "Google for Jobs", overallMatch: 90, recommendation: "strong",
         matchedSkills: [],
       };
-      expect(selectNewMatches([result as never], ["http://jobs.example.com/42"])).toHaveLength(1);
+      expect(selectNewMatches([result as never], ["https://jobs.example.com/42"])).toHaveLength(1);
     });
   });
 

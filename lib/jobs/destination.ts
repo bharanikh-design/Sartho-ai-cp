@@ -57,26 +57,29 @@ export function canonicalDestination(url: string | null | undefined): string | n
  * stored row: the same vacancy would be emailed a second time, against a
  * once-ever promise.
  *
- * Normalising both sides through here fixes that without migrating the table.
- * Anything unparseable falls back to the trimmed original, so a row in some
+ * Normalising both sides through here is what makes a stored row and a fresh
+ * result comparable at all: `URL.href` settles the trailing slash, the host
+ * case and a default port, none of which the two sides are guaranteed to agree
+ * on. Anything unparseable falls back to the trimmed original, so a row in some
  * older shape still compares equal to itself.
  *
- * http and https collapse to one key, and that is the whole reason this is
- * separate from `canonicalDestination` rather than a flag on it. Destinations
- * are https-only now, so the mapper can never again emit the http form of a
- * vacancy — which means every legacy `http://` row would stay permanently
- * unmatched and every one of those vacancies would be emailed a second time.
- * Two URLs differing only in scheme are the same page, so treating them as one
- * identity costs nothing and is what keeps the once-ever promise across the
- * change.
+ * It does NOT fold `http:` into `https:`, and that is a recent, deliberate
+ * narrowing. It did, briefly: destinations became https-only, so legacy http
+ * rows could never match and those vacancies would have been emailed twice.
+ * Folding fixed that and introduced a quieter fault — a host serving different
+ * content per scheme would have had a real alert silently suppressed, which is
+ * the worse failure of the two even though it is far rarer.
+ *
+ * `20260927003000_canonical_seen_job_matches.sql` rewrote the stored rows to
+ * https instead, so the data no longer needs the code to paper over it. That
+ * migration and this function are only correct together: run the code without
+ * the migration and every legacy http row re-alerts once.
  */
 export function destinationKey(url: string | null | undefined): string {
   const trimmed = (url ?? "").trim();
   if (!trimmed) return "";
   try {
-    const parsed = new URL(trimmed);
-    if (parsed.protocol === "http:") parsed.protocol = "https:";
-    return parsed.href;
+    return new URL(trimmed).href;
   } catch {
     return trimmed;
   }
