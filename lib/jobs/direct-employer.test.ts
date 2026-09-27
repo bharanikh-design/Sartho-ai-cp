@@ -187,7 +187,7 @@ describe("getStoredSearch tells an empty search from no search", () => {
 
   const row = (results: unknown[]) => ({
     results,
-    criteria: { country: "uk", jobBoardHidden: 4 },
+    criteria: { country: "uk", jobBoardHidden: 4, searchComplete: true },
     searched_at: "2026-09-27T00:00:00.000Z",
   });
 
@@ -216,7 +216,10 @@ describe("getStoredSearch tells an empty search from no search", () => {
   });
 
   it("accepts an empty row explained by either of our own filters", async () => {
-    for (const criteria of [{ jobBoardHidden: 3 }, { agencyOrUnverifiedHidden: 2 }]) {
+    for (const criteria of [
+      { searchComplete: true, jobBoardHidden: 3 },
+      { searchComplete: true, agencyOrUnverifiedHidden: 2 },
+    ]) {
       const stored = await getStoredSearch(
         clientReturning({ results: [], criteria, searched_at: "2026-09-27T00:00:00.000Z" }),
         "u1",
@@ -232,27 +235,26 @@ describe("getStoredSearch tells an empty search from no search", () => {
    * that into the stored row would suppress the arrival retry for as long as
    * it sat there.
    */
-  it("will not accept an empty row from a run where a provider failed", async () => {
+  it("will not accept an empty row from a run that did not finish", async () => {
     const partial = {
       results: [],
-      criteria: { jobBoardHidden: 5, providerErrors: ["Adzuna: 429 Too Many Requests"] },
+      criteria: { jobBoardHidden: 5, searchComplete: false },
       searched_at: "2026-09-27T00:00:00.000Z",
     };
     expect(await getStoredSearch(clientReturning(partial), "u1")).toBeNull();
   });
 
-  it("will not accept one from a run a timeout cut short either", async () => {
+  it("will not accept one from a legacy row that never recorded completeness", async () => {
     /*
-     * The case a plain providerErrors check misses entirely: a timeout is
-     * recorded to the console rather than to the person, so it never reaches
-     * that field, and a retired lead provider leaves most of the plan unrun.
+     * Absent is not true. Rows predating the field must not be mistaken for
+     * finished searches, or their owners sit on a blank page indefinitely.
      */
-    const timedOut = {
+    const legacy = {
       results: [],
-      criteria: { jobBoardHidden: 5, providerTimeouts: [{ name: "SerpApi", count: 3, waitedMs: 20_000 }] },
+      criteria: { jobBoardHidden: 5 },
       searched_at: "2026-09-27T00:00:00.000Z",
     };
-    expect(await getStoredSearch(clientReturning(timedOut), "u1")).toBeNull();
+    expect(await getStoredSearch(clientReturning(legacy), "u1")).toBeNull();
   });
 
   it("still drops individual rows it cannot render, without discarding the search", async () =>{
@@ -330,47 +332,35 @@ describe("an advert carrying both a board and a direct route", () => {
  * review rounds.
  */
 describe("isAuthoritativeEmptySearch", () => {
-  it("accepts an empty page our own filtering produced", () => {
-    expect(isAuthoritativeEmptySearch({ jobBoardHidden: 3 })).toBe(true);
-    expect(isAuthoritativeEmptySearch({ agencyOrUnverifiedHidden: 1 })).toBe(true);
+  it("accepts an empty page a finished run's own filtering produced", () => {
+    expect(isAuthoritativeEmptySearch({ searchComplete: true, jobBoardHidden: 3 })).toBe(true);
+    expect(isAuthoritativeEmptySearch({ searchComplete: true, agencyOrUnverifiedHidden: 1 })).toBe(true);
   });
 
   it("rejects an empty page nothing accounts for", () => {
-    /* No advert was removed, so nothing here explains why the page is bare. */
-    expect(isAuthoritativeEmptySearch({})).toBe(false);
-    expect(isAuthoritativeEmptySearch({ jobBoardHidden: 0, agencyOrUnverifiedHidden: 0 })).toBe(false);
+    /* The run finished, but no advert was removed, so nothing explains the bare page. */
+    expect(isAuthoritativeEmptySearch({ searchComplete: true })).toBe(false);
+    expect(isAuthoritativeEmptySearch({ searchComplete: true, jobBoardHidden: 0 })).toBe(false);
   });
 
   /*
-   * Every sign of a short run, not just the obvious one. The count is real
-   * in all of these, but the search is not complete — and the provider that
-   * never answered is exactly the one that might have carried the
-   * direct-employer roles. Treating any of them as the final word buries a
-   * transient failure in the database.
+   * The whole point of `searchComplete`, and of it being one field.
    *
-   * Table-driven because the list is the point: it was checked one signal at
-   * a time and that was a defect twice. Anything new that records a short
-   * run belongs here.
+   * This predicate used to reconstruct "did the run finish?" from the
+   * diagnostics — providerErrors, then also timeouts, then also the stop
+   * reason — and review found another missed field on three consecutive
+   * rounds, ending with three at once. The run now states it.
    */
-  const shortRun: Array<[string, Parameters<typeof isAuthoritativeEmptySearch>[0]]> = [
-    ["a provider errored", { providerErrors: ["Google for Jobs (SerpApi) is not configured."] }],
-    ["a provider timed out", { providerTimeouts: [{ name: "SerpApi", count: 3, waitedMs: 20_000 }] }],
-    ["the budget ran out", { queriesStoppedBecause: "budget" }],
-    ["every provider was exhausted", { queriesStoppedBecause: "no_providers" }],
-  ];
-
-  for (const [reason, incomplete] of shortRun) {
-    it(`rejects a run cut short because ${reason}, however much was filtered`, () => {
-      expect(isAuthoritativeEmptySearch({ jobBoardHidden: 12, ...incomplete })).toBe(false);
-    });
-  }
-
-  it("accepts a run that stopped only because it had found enough", () => {
-    /* The one benign stop: the loop chose to end, it was not cut off. */
-    expect(isAuthoritativeEmptySearch({ jobBoardHidden: 4, queriesStoppedBecause: "enough_results" })).toBe(true);
+  it("rejects an unfinished run however much was filtered", () => {
+    expect(isAuthoritativeEmptySearch({ searchComplete: false, jobBoardHidden: 12 })).toBe(false);
   });
 
-  it("is not fooled by empty collections", () => {
-    expect(isAuthoritativeEmptySearch({ jobBoardHidden: 4, providerErrors: [], providerTimeouts: [] })).toBe(true);
+  it("treats a row that never recorded it as unfinished", () => {
+    /*
+     * Every row written before this field existed. Absent must read as
+     * incomplete: being wrong that way costs one provider call, while the
+     * other way freezes an empty page into the database.
+     */
+    expect(isAuthoritativeEmptySearch({ jobBoardHidden: 12 })).toBe(false);
   });
 });

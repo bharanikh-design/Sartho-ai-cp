@@ -250,6 +250,8 @@ export type SearchCriteria = {
    * on every run, which is a bad thing for a page to say about itself.
    */
   queriesStoppedBecause?: "budget" | "no_providers" | "enough_results";
+  /** Whether the run finished its whole plan with nothing failing. */
+  searchComplete?: boolean;
   /**
    * Deep answers that cost nothing — served from the shared cache, or collected
    * from a search an earlier run had already paid for.
@@ -484,57 +486,47 @@ export function dropSearchEnginePages<T extends { url: string }>(
  * Whether an empty page is an answer or an accident.
  *
  * `search_results` holds one row per person, so writing an empty one throws
- * away whatever was there. That is right when our own filtering is what
- * emptied the page — the person asked for direct employers and none of
- * today's matches were, and they should see that rather than yesterday's
- * board links — and wrong when the page is empty because the search did not
- * finish.
+ * away whatever was there. That is right when our own filtering emptied the
+ * page — the person asked for direct employers and none of today's matches
+ * were, and they should see that rather than yesterday's board links — and
+ * wrong when the page is empty because the search did not finish.
  *
- * So two things must hold. A hidden count above zero, which means there were
- * adverts and we removed them and no outage can fake. And no sign that the
- * run was cut short — because a search that only got half way through its
- * plan can produce a positive count and still be missing the very
- * direct-employer roles the person was looking for.
+ * This asks one question of the run rather than reconstructing the answer,
+ * and the difference matters more than it looks.
  *
- * EVERY SIGN OF A SHORT RUN, not just the obvious one. The criteria record
- * incompleteness in three separate places, and checking only the first was a
- * defect twice over:
+ * It began by checking `providerErrors`. Review then found that timeouts
+ * never reach that field; then that a stop for budget or exhausted providers
+ * did not either; then three more at once — a failed employer portal, a
+ * provider that answered one query and died on the next (which
+ * `errorsThatCostResults` deliberately filters out, being a list written for
+ * the person rather than for this), and `"enough_results"`, which fires at
+ * twenty-five *raw* URLs before a single filter has run and so says nothing
+ * about whether anything survived.
  *
- *   - `providerErrors` — a provider that failed in a way that cost results.
- *   - `providerTimeouts` — a provider that timed out. These never reach
- *     `providerErrors`: provider-cascade.ts deliberately records a timeout
- *     to the console rather than to the person, and returns before `record`
- *     is called. It is also the expensive case, since a lead provider that
- *     burns its budget is retired and leaves most of the plan unrun.
- *   - `queriesStoppedBecause` of "budget" or "no_providers" — the loop gave
- *     up with queries still on the list. Its third value, "enough_results",
- *     is the one benign stop and does not count.
+ * Five rounds, each adding a field. The mistake was not any one omission: it
+ * was inferring a fact about the run from diagnostics shaped for the page.
+ * `runBriefSearch` knows whether it finished, so it now says so once, and
+ * this reads that. A signal is impossible to miss when there is only one.
  *
- * The asymmetry is what makes this worth being thorough about, and it points
- * one way. Wrongly calling a run incomplete costs one extra provider call.
- * Wrongly calling it complete freezes an empty page into the database, where
- * it suppresses the arrival search and the person sees nothing until they
- * think to press the button themselves. Any future signal of a short run
- * belongs on this list, and failing closed is always the cheaper mistake.
+ * `searchComplete` absent — every row written before this — reads as
+ * incomplete, which costs one provider call and is the cheap direction. The
+ * expensive one freezes an empty page into the database, where it suppresses
+ * the arrival search and the person sees nothing until they think to press
+ * the button themselves.
  *
  * Both sides of the row ask this same question, which is why it is a
  * function rather than an expression written twice. The write side decides
- * whether the empty run may replace a good stored set; the read side decides
+ * whether an empty run may replace a good stored set; the read side decides
  * whether an empty stored row is a finished search or something to search
  * past. They were two expressions for one rule, and two of this change's
- * defects came from exactly that shape of duplication.
+ * defects came from exactly that.
  */
 export function isAuthoritativeEmptySearch(criteria: {
-  providerErrors?: string[];
-  providerTimeouts?: Array<{ name: string; count: number; waitedMs: number }>;
-  queriesStoppedBecause?: "budget" | "no_providers" | "enough_results";
+  searchComplete?: boolean;
   jobBoardHidden?: number;
   agencyOrUnverifiedHidden?: number;
 }): boolean {
-  if ((criteria.providerErrors ?? []).length) return false;
-  if ((criteria.providerTimeouts ?? []).length) return false;
-  if (criteria.queriesStoppedBecause === "budget" || criteria.queriesStoppedBecause === "no_providers") return false;
-
+  if (criteria.searchComplete !== true) return false;
   return (criteria.jobBoardHidden ?? 0) > 0 || (criteria.agencyOrUnverifiedHidden ?? 0) > 0;
 }
 
@@ -1514,6 +1506,26 @@ export async function runBriefSearch(
     queriesRun,
     queriesSkipped,
     queriesStoppedBecause,
+    /*
+     * Did this run get all the way through its plan?
+     *
+     * Stated here, at the only point that can honestly answer it, so nothing
+     * downstream has to infer it — see `isAuthoritativeEmptySearch` for the
+     * five rounds of review that taught us inference does not work.
+     *
+     * `queriesSkipped` covers every early exit in one number, including
+     * "enough_results": that stop counts twenty-five raw URLs before any
+     * filtering, so it is emphatically not a guarantee that anything
+     * survived. The cascade's own `errors` and `timeouts` are read raw
+     * rather than through `errorsThatCostResults()`, which drops failures
+     * from a provider that answered earlier — right for a note under
+     * somebody's results, wrong for deciding whether the search ran.
+     */
+    searchComplete:
+      queriesSkipped === 0
+      && cascade.errors.length === 0
+      && cascade.timeouts.size === 0
+      && !employerPortals.some((portal) => portal.status === "failed"),
     deepFromCache,
     deepWarming,
     targetRolesRequested: activeLanes.length,
@@ -1776,6 +1788,8 @@ export function normaliseCriteria(stored: unknown): SearchCriteria {
     queriesSkipped: count(value.queriesSkipped),
     deepFromCache: count(value.deepFromCache),
     deepWarming: count(value.deepWarming),
+    /* Absent on every row written before this existed, and absent reads as incomplete. */
+    searchComplete: value.searchComplete === true,
     queriesStoppedBecause: value.queriesStoppedBecause === "budget"
       || value.queriesStoppedBecause === "no_providers"
       || value.queriesStoppedBecause === "enough_results"
