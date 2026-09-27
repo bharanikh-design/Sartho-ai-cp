@@ -1145,11 +1145,14 @@ export async function runBriefSearch(
   let broadened = false;
   if (usedLocations.length && strongCount() < MIN_STRONG_BEFORE_WIDENING && !cascade.exhausted() && (Date.now() - startedAt < budgetMs - 2_500)) {
     broadened = true;
-    const before = new Set(byUrl.keys());
     await run(widenToCountry(queries));
-    for (const [url, result] of byUrl) {
-      if (!before.has(url)) scoredByUrl.set(url, score(result));
-    }
+    /*
+     * `run` scores as it collects, so this only catches anything that
+     * reached `byUrl` by another route. It used to re-score everything the
+     * widening added, which was harmless — `score` is pure — but meant three
+     * places deciding separately what had been scored.
+     */
+    for (const [url, result] of byUrl) if (!scoredByUrl.has(url)) scoredByUrl.set(url, score(result));
   }
 
   /*
