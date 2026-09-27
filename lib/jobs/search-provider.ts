@@ -407,15 +407,27 @@ export function mapJSearchResult(raw: JSearchResult): JobSearchResult | null {
   const title = raw.job_title?.trim();
   const applyOptions = Array.isArray(raw.apply_options) ? raw.apply_options : [];
   /*
-   * Send the person to a real posting they can act on. Prefer the direct apply
-   * link, then a direct-employer apply option, then any apply option, and only
-   * then Google for Jobs' own deep-link — which is flaky and often opens a
-   * generic jobs panel on an unrelated listing, so it must never win over a real
-   * apply URL. "View" going to a generic Google search is a broken promise.
+   * Send the person to a real posting they can act on. An option JSearch has
+   * marked `is_direct` first, then its headline apply link, then any other
+   * option, and only then Google for Jobs' own deep-link — which is flaky and
+   * often opens a generic jobs panel on an unrelated listing, so it must never
+   * win over a real apply URL. "View" going to a generic Google search is a
+   * broken promise.
+   *
+   * `job_apply_link` used to outrank the direct option, which mattered once
+   * "Direct employers only" started reading this URL: JSearch routinely puts
+   * a LinkedIn repost in `job_apply_link` while listing the employer's own
+   * route beside it as `is_direct`, so the filter saw the repost and hid a
+   * role that had a direct application available. The same ordering defect
+   * was fixed in `chooseApplyUrl` for SerpApi; this is the other provider.
+   *
+   * `is_direct` is the provider's own assertion rather than our inference,
+   * which makes it the best evidence available here — better than the host
+   * matching we fall back to elsewhere.
    */
   const directApply = applyOptions.find((option) => option?.is_direct === true && option?.apply_link)?.apply_link;
   const anyApply = applyOptions.find((option) => option?.apply_link)?.apply_link;
-  const url = (raw.job_apply_link || directApply || anyApply || raw.job_google_link)?.trim();
+  const url = (directApply || raw.job_apply_link || anyApply || raw.job_google_link)?.trim();
   const description = raw.job_description?.trim();
 
   /*

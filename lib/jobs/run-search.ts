@@ -1509,7 +1509,6 @@ export async function runBriefSearch(
 export async function getStoredSearch(
   supabase: SupabaseClient,
   userId: string,
-  directEmployersOnly = false,
 ): Promise<{ results: ScoredJobMatch[]; criteria: SearchCriteria; searchedAt: string } | null> {
   const { data } = await supabase
     .from("search_results")
@@ -1518,35 +1517,22 @@ export async function getStoredSearch(
     .maybeSingle();
 
   if (!data || !Array.isArray(data.results) || !data.results.length) return null;
-
-  /*
-   * The person's current choice of sources, applied to what was stored under
-   * their previous one.
-   *
-   * A stored row is a snapshot of the settings in force when it was written.
-   * Somebody who turns "Direct employers only" on and returns to this page
-   * would otherwise be shown yesterday's job-board links — the exact thing
-   * they just asked not to see — until they thought to search again.
-   *
-   * Filtering here rather than at write time is what makes that impossible
-   * without asking an unanswerable question. The alternative was storing
-   * empty strict runs so they could replace the stale set, which required
-   * knowing whether a given empty run had really finished; seven rounds of
-   * review found seven ways it had not, because a skipped country-widening,
-   * a pending SerpApi ticket and a provider that failed after answering once
-   * are all indistinguishable from a clean run after the fact. Reading is
-   * the one moment the current preference and the stored results are both in
-   * hand, so it is the cheapest place to reconcile them.
-   *
-   * Turning the toggle on therefore takes effect immediately on results
-   * already stored, with no provider call. If nothing survives, this answers
-   * null and the page runs a fresh search on arrival — which is the useful
-   * response to "none of your saved roles are direct", rather than an
-   * explanation of it.
-   */
-  const results = keepDirectEmployers(normaliseResults(data.results), directEmployersOnly).kept;
+  const results = normaliseResults(data.results);
   if (!results.length) return null;
 
+  /*
+   * Returned as stored, under the settings that were in force when it was
+   * written — `criteria.directEmployersOnly` records which those were.
+   *
+   * Filtering here against the person's *current* preference was tried and
+   * withdrawn. The stored row is already narrowed by the same filter at write
+   * time, so narrowing it again on read is a one-way ratchet: somebody
+   * switching back to "Employers + agencies" would get the pruned set with no
+   * way to recover the listings, and the stored note could tell them to
+   * switch to the mode they were already in. Search Brief compares the two
+   * settings instead and asks for a fresh search when they differ, which is
+   * the only thing that can actually widen a narrowed set.
+   */
   return {
     results,
     criteria: normaliseCriteria(data.criteria),

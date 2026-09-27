@@ -23,26 +23,15 @@ export const metadata = constructMetadata("Find Roles", "Find live job listings 
 
 export default async function SearchPlanPage() {
   const { supabase, user } = await requireUser();
-  /*
-   * Preferences first, on its own, because the stored search is read through
-   * them.
-   *
-   * A stored row is a snapshot of the settings in force when it was written,
-   * and `getStoredSearch` applies the person's *current* source choice to it
-   * — so somebody who has just turned "Direct employers only" on is not shown
-   * yesterday's job-board links. That costs one sequential round trip on a
-   * page that already makes several, and buys the filter having exactly one
-   * home rather than a second copy out here that a future caller could
-   * forget.
-   */
-  const preferences = await getSearchPreferences(supabase, user.id);
-  const [lanes, journey, profileResult, stored] = await Promise.all([
+  const [lanes, preferences, journey, profileResult, stored] = await Promise.all([
     getTargetLanes(supabase, user.id),
+    getSearchPreferences(supabase, user.id),
     loadProductJourneyStatus(supabase, user.id),
     supabase.from("profiles").select("country,total_experience_years").eq("id", user.id).maybeSingle(),
     // The last search, so arriving here is normally a read rather than a provider call.
-    getStoredSearch(supabase, user.id, preferences.directEmployersOnly ?? false),
+    getStoredSearch(supabase, user.id),
   ]);
+
   const inferredCountry = normaliseCountryCode(
     typeof profileResult.data?.country === "string" ? profileResult.data.country : null,
   );
@@ -57,6 +46,25 @@ export default async function SearchPlanPage() {
     : null;
   const country = normaliseCountryCode(preferences.country);
   const split = splitMisfiledCompanies(preferences.targetLocations, preferences.targetCompanies);
+  /*
+   * A stored search is only usable while it still answers the question that
+   * was asked of it.
+   *
+   * `directEmployersOnly` decides which listings a run keeps, so a row
+   * written under one setting cannot describe the other — and it is narrowed
+   * rather than annotated, so the listings it left out are simply not there
+   * to show. Handing it over after the toggle moved would display the wrong
+   * set and, worse, a note telling the person to switch to the mode they are
+   * already in.
+   *
+   * Withholding it is all that is needed: the panel treats "no stored
+   * results" as its cue to run a fresh search on arrival, which is the only
+   * thing that can widen a set that was narrowed at write time.
+   */
+  const sourcesChanged = Boolean(stored)
+    && (stored!.criteria.directEmployersOnly ?? false) !== (preferences.directEmployersOnly ?? false);
+  const usableStored = sourcesChanged ? null : stored;
+
   const briefReady = Boolean(country ?? inferredCountry) && lanes.length > 0 && isJobSearchConfigured();
 
   return (
@@ -84,9 +92,9 @@ export default async function SearchPlanPage() {
       />
       <JobSearchPanel
         autoRun={briefReady}
-        initialResults={stored?.results ?? []}
-        initialCriteria={stored?.criteria ?? null}
-        searchedAt={stored?.searchedAt ?? null}
+        initialResults={usableStored?.results ?? []}
+        initialCriteria={usableStored?.criteria ?? null}
+        searchedAt={usableStored?.searchedAt ?? null}
       />
     </div>
   );

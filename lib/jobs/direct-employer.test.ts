@@ -168,16 +168,17 @@ describe("keepDirectEmployers", () => {
 });
 
 /*
- * A stored row is a snapshot of the settings in force when it was written.
+ * A stored row is a snapshot of the settings that produced it.
  *
- * Reading it back through the person's *current* source preference is what
- * stops somebody who has just turned "Direct employers only" on being shown
- * yesterday's job-board links. It also replaced a much larger mechanism:
- * storing empty strict runs so they could overwrite the stale set, which
- * required deciding whether a given empty run had really finished. Seven
- * rounds of review found seven ways that decision was wrong.
+ * It is narrowed at write time rather than annotated, so the listings a
+ * strict run left out are simply not in it. Filtering it again on read was
+ * tried and withdrawn: it is a one-way ratchet, and somebody switching back
+ * to "Employers + agencies" could never recover what had been pruned. The
+ * stored criteria record which setting was in force, and Search Brief
+ * compares that with the current one and asks for a fresh search when they
+ * differ — the only thing that can widen a narrowed set.
  */
-describe("getStoredSearch reads through the current source preference", () => {
+describe("getStoredSearch returns the row as stored", () => {
   const clientReturning = (row: unknown) => ({
     from: () => ({
       select: () => ({
@@ -188,46 +189,31 @@ describe("getStoredSearch reads through the current source preference", () => {
 
   const board = { title: "Ops Lead", url: "https://www.linkedin.com/jobs/view/1", description: "x", employer: "Acme Corp" };
   const direct = { title: "Ops Lead", url: "https://boards.greenhouse.io/acme/2", description: "x", employer: "Acme Corp" };
-  const row = (results: unknown[]) => ({ results, criteria: { country: "uk" }, searched_at: "2026-09-27T00:00:00.000Z" });
 
-  it("returns everything when the person has not asked for direct employers", async () => {
-    const stored = await getStoredSearch(clientReturning(row([board, direct])), "u1", false);
-    expect(stored!.results).toHaveLength(2);
-  });
-
-  it("drops the board links from a row written before the toggle went on", async () => {
-    /*
-     * The whole point. No provider call and no re-search: the setting takes
-     * effect on what is already stored, the moment they come back.
-     */
-    const stored = await getStoredSearch(clientReturning(row([board, direct])), "u1", true);
-    expect(stored!.results.map((item) => item.url)).toEqual(["https://boards.greenhouse.io/acme/2"]);
-  });
-
-  it("answers null when nothing in the stored row survives the preference", async () => {
-    /*
-     * Null rather than an empty set, so the page treats it as no usable
-     * stored search and runs a fresh one on arrival — the useful response to
-     * "none of your saved roles are direct", rather than an explanation.
-     */
-    expect(await getStoredSearch(clientReturning(row([board])), "u1", true)).toBeNull();
-  });
-
-  it("answers null when there is no row at all", async () => {
-    expect(await getStoredSearch(clientReturning(null), "u1", true)).toBeNull();
-  });
-
-  it("still drops rows it could not render either way", async () => {
-    const stored = await getStoredSearch(
-      clientReturning(row([
-        direct,
-        { title: "Dead end", url: "https://www.google.com/search?q=x", description: "", employer: "Acme Corp" },
-        { title: "", url: "https://boards.greenhouse.io/acme/3", description: "", employer: "Acme Corp" },
-      ])),
+  it("does not second-guess the run that wrote it", () => {
+    return getStoredSearch(
+      clientReturning({ results: [board, direct], criteria: { directEmployersOnly: false }, searched_at: "2026-09-27T00:00:00.000Z" }),
       "u1",
-      true,
+    ).then((stored) => {
+      expect(stored!.results).toHaveLength(2);
+      /* The setting it ran under, so the page can tell whether it is still current. */
+      expect(stored!.criteria.directEmployersOnly).toBe(false);
+    });
+  });
+
+  it("carries the strict setting through so a change can be detected", async () => {
+    const stored = await getStoredSearch(
+      clientReturning({ results: [direct], criteria: { directEmployersOnly: true }, searched_at: "2026-09-27T00:00:00.000Z" }),
+      "u1",
     );
-    expect(stored!.results.map((item) => item.url)).toEqual(["https://boards.greenhouse.io/acme/2"]);
+    expect(stored!.criteria.directEmployersOnly).toBe(true);
+  });
+
+  it("answers null when there is no row, or nothing renderable in it", async () => {
+    expect(await getStoredSearch(clientReturning(null), "u1")).toBeNull();
+    expect(await getStoredSearch(clientReturning({ results: [], criteria: {}, searched_at: null }), "u1")).toBeNull();
+    const unrenderable = { results: [{ title: "", url: "" }], criteria: {}, searched_at: null };
+    expect(await getStoredSearch(clientReturning(unrenderable), "u1")).toBeNull();
   });
 });
 

@@ -70,8 +70,30 @@ export async function loadDashboardData(
     (async (): Promise<{ count: number; searchedAt: string | null } | null> => {
       try {
         const { data } = await supabase
-          .from("search_results").select("results,searched_at").eq("user_id", userId).maybeSingle();
+          .from("search_results").select("results,criteria,searched_at").eq("user_id", userId).maybeSingle();
         if (!data || !Array.isArray(data.results)) return null;
+
+        /*
+         * Stay quiet when the stored run no longer answers the question the
+         * person is asking.
+         *
+         * "Direct employers only" decides which listings a run keeps, so a
+         * row written under the other setting holds a count for a search
+         * nobody asked for. Reporting it would have the brief announce roles
+         * as waiting while Find Roles — which re-runs the search when it
+         * notices the same mismatch — shows a different number entirely.
+         *
+         * Reading the preference rather than trusting the row is the point:
+         * this is a second reader of `search_results`, and the first version
+         * of the direct-employer work missed it, which is how a rule ends up
+         * applied in one place and assumed in another.
+         */
+        const criteria = (data.criteria ?? {}) as { directEmployersOnly?: boolean };
+        const { data: preference } = await supabase
+          .from("search_preferences").select("direct_employers_only").eq("user_id", userId).maybeSingle();
+        const wanted = (preference as { direct_employers_only?: boolean } | null)?.direct_employers_only === true;
+        if ((criteria.directEmployersOnly === true) !== wanted) return null;
+
         return {
           count: data.results.length,
           searchedAt: typeof data.searched_at === "string" ? data.searched_at : null,
