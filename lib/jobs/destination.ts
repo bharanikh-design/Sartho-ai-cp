@@ -151,7 +151,7 @@ export const AGGREGATOR_BOARD_HOSTS = [
    * careers domain is the intended leniency; letting through a marketplace
    * the codebase can already name is just an out-of-date list.
    */
-  "stellenanzeigen.de", "hh.ru",
+  "stellenanzeigen.de", "hh.ru", "jobzmall.com",
 ];
 
 

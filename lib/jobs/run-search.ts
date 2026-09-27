@@ -480,6 +480,38 @@ export function dropSearchEnginePages<T extends { url: string }>(
  * undo in one click is theirs to be wrong about; quietly overriding it would
  * be the same lie the old stand-down told.
  */
+/**
+ * Whether an empty page is an answer or an accident.
+ *
+ * `search_results` holds one row per person, so writing an empty one throws
+ * away whatever was there. That is right when our own filtering is what
+ * emptied the page — the person asked for direct employers and none of
+ * today's matches were, and they should see that rather than yesterday's
+ * board links — and wrong when the page is empty because something broke.
+ *
+ * Two things have to hold. A hidden count above zero means there were
+ * adverts and we removed them, which an outage cannot fake. And no provider
+ * may have failed in a way that cost results: a run where one provider died
+ * and the survivor happened to return only board links produces a positive
+ * count from an incomplete search, and persisting that would freeze a
+ * partial outage into an authoritative empty answer.
+ *
+ * Both sides of the row ask this same question, which is why it is a
+ * function rather than an expression written twice. The write side decides
+ * whether the empty run may replace a good stored set; the read side decides
+ * whether an empty stored row is a finished search or something to search
+ * past. They were two expressions for one rule, and two of this change's
+ * defects came from exactly that shape of duplication.
+ */
+export function isAuthoritativeEmptySearch(criteria: {
+  providerErrors?: string[];
+  jobBoardHidden?: number;
+  agencyOrUnverifiedHidden?: number;
+}): boolean {
+  if ((criteria.providerErrors ?? []).length) return false;
+  return (criteria.jobBoardHidden ?? 0) > 0 || (criteria.agencyOrUnverifiedHidden ?? 0) > 0;
+}
+
 export function keepDirectEmployers<T extends { url: string; employer?: string | null }>(
   matches: T[],
   directOnly: boolean,
@@ -1491,7 +1523,7 @@ export async function runBriefSearch(
    * counts at zero is still treated as a failure and still cannot overwrite
    * anything.
    */
-  const filteredToNothing = !results.length && (jobBoardHidden > 0 || agencyOrUnverifiedHidden > 0);
+  const filteredToNothing = !results.length && isAuthoritativeEmptySearch(criteria);
 
   if (results.length || filteredToNothing) {
     const { error: storeError } = await supabase.from("search_results").upsert({
@@ -1539,17 +1571,16 @@ export async function getStoredSearch(
    * permanently sure it had nothing to do — no results, no note, and the
    * arrival search suppressed forever.
    *
-   * The hidden counts are the provenance. They are only ever above zero when
-   * our own filtering removed adverts that existed, which is exactly the case
-   * worth preserving, and it is the same condition the write side uses to
-   * decide the row was worth storing at all. Anything else empty reads as no
-   * usable search, and the page goes and gets one.
+   * `isAuthoritativeEmptySearch` is the provenance, and it is the very same
+   * call the write side makes when deciding the row was worth storing — one
+   * rule, asked once from each side, rather than two expressions drifting
+   * apart. Anything else empty reads as no usable search, and the page goes
+   * and gets one.
    */
   if (!data || !Array.isArray(data.results)) return null;
   const results = normaliseResults(data.results);
   const criteria = normaliseCriteria(data.criteria);
-  const emptyButExplained = (criteria.jobBoardHidden ?? 0) > 0 || (criteria.agencyOrUnverifiedHidden ?? 0) > 0;
-  if (!results.length && !emptyButExplained) return null;
+  if (!results.length && !isAuthoritativeEmptySearch(criteria)) return null;
   return {
     results,
     criteria,

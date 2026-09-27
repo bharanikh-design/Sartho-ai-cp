@@ -6,7 +6,7 @@ import {
   isAggregatorBoard,
   isDirectEmployerDestination,
 } from "./destination";
-import { getStoredSearch, keepDirectEmployers } from "./run-search";
+import { getStoredSearch, isAuthoritativeEmptySearch, keepDirectEmployers } from "./run-search";
 import { chooseApplyUrl } from "./serpapi";
 
 /*
@@ -225,7 +225,23 @@ describe("getStoredSearch tells an empty search from no search", () => {
     }
   });
 
-  it("still drops individual rows it cannot render, without discarding the search", async () => {
+  /*
+   * An incomplete run is not an authoritative empty answer. One provider
+   * dying while the survivor happens to return only board links produces a
+   * positive hidden count from a search that never finished — and freezing
+   * that into the stored row would suppress the arrival retry for as long as
+   * it sat there.
+   */
+  it("will not accept an empty row from a run where a provider failed", async () => {
+    const partial = {
+      results: [],
+      criteria: { jobBoardHidden: 5, providerErrors: ["Adzuna: 429 Too Many Requests"] },
+      searched_at: "2026-09-27T00:00:00.000Z",
+    };
+    expect(await getStoredSearch(clientReturning(partial), "u1")).toBeNull();
+  });
+
+  it("still drops individual rows it cannot render, without discarding the search", async () =>{
     const stored = await getStoredSearch(
       clientReturning(row([
         { title: "Reliability Engineer", url: "https://careers.acmecorp.com/1", description: "Ops." },
@@ -286,5 +302,40 @@ describe("an advert carrying both a board and a direct route", () => {
       "https://boards.greenhouse.io/northwind/jobs/2",
       "https://careers.northwindlogistics.com/3",
     ))).toBe("https://careers.northwindlogistics.com/3");
+  });
+});
+
+
+/*
+ * The rule both sides of the stored row ask, in one place.
+ *
+ * The write side decides whether an empty run may replace a good stored set;
+ * the read side decides whether an empty stored row is a finished search.
+ * Same question — and when they were two expressions rather than one
+ * function, the disagreement between them produced defects on two separate
+ * review rounds.
+ */
+describe("isAuthoritativeEmptySearch", () => {
+  it("accepts an empty page our own filtering produced", () => {
+    expect(isAuthoritativeEmptySearch({ jobBoardHidden: 3 })).toBe(true);
+    expect(isAuthoritativeEmptySearch({ agencyOrUnverifiedHidden: 1 })).toBe(true);
+  });
+
+  it("rejects an empty page nothing accounts for", () => {
+    /* No advert was removed, so nothing here explains why the page is bare. */
+    expect(isAuthoritativeEmptySearch({})).toBe(false);
+    expect(isAuthoritativeEmptySearch({ jobBoardHidden: 0, agencyOrUnverifiedHidden: 0 })).toBe(false);
+  });
+
+  it("rejects a run where a provider failed, however much was filtered", () => {
+    /*
+     * The count is real but the search is not complete: a provider that never
+     * answered might have carried the direct-employer roles. Treating this as
+     * the final word would bury a transient outage in the database.
+     */
+    expect(isAuthoritativeEmptySearch({
+      jobBoardHidden: 12,
+      providerErrors: ["Google for Jobs (SerpApi) is not configured."],
+    })).toBe(false);
   });
 });
