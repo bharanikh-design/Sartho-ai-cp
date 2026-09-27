@@ -1,5 +1,9 @@
 import { serpapiScheduleWords } from "@/lib/jobs/employment-types";
-import { canonicalDestination, KNOWN_DESTINATION_HOSTS } from "@/lib/jobs/destination";
+import {
+  AGGREGATOR_BOARD_HOSTS,
+  APPLICANT_TRACKING_HOSTS,
+  canonicalDestination,
+} from "@/lib/jobs/destination";
 import { countryName } from "@/lib/jobs/countries";
 import type { JobSearchQuery, JobSearchResult } from "@/lib/jobs/search-provider";
 
@@ -156,12 +160,12 @@ export function readSerpApiPlatforms(raw: SerpApiJob): { platforms: string[]; ap
  * nothing better, and Google's own listing page beats it — that page opens on
  * a real advert, which a dead mirror does not.
  *
- * The hosts themselves live in lib/jobs/destination.ts, split into job boards
- * and applicant tracking systems. They moved there because "Direct employers
- * only" needs that distinction and this ranking does not: the same list
- * written down twice is how a rule declared in one file ends up assumed in
- * another. `KNOWN_DESTINATION_HOSTS` is both halves concatenated in the order
- * they sat in here, so nothing about this ranking changes.
+ * The hosts live in lib/jobs/destination.ts, split into job boards and
+ * applicant tracking systems. "Direct employers only" needs that distinction
+ * — and so, it turns out, does this ranking: an employer's own tracking
+ * system is a better destination than somebody else's repost of the same
+ * role, so the two halves are consulted in that order rather than as one
+ * undifferentiated set.
  */
 
 function hostOf(url: string): string {
@@ -224,9 +228,28 @@ export function chooseApplyUrl(raw: SerpApiJob): string | null {
     : undefined;
   if (own) return own;
 
+  /*
+   * Then the employer's applicant tracking system, ahead of any job board.
+   *
+   * These used to be ranked together as one set of "recognised" hosts, so
+   * whichever appeared first in `apply_options` won. An advert listing
+   * LinkedIn before Greenhouse sent people to the repost when the employer's
+   * own application was sitting right there, and — once "Direct employers
+   * only" started reading this URL — that advert was then hidden from anybody
+   * using the setting, for a route the advert did not actually lack.
+   *
+   * Preferring the tracking system is the better destination either way: it
+   * is where the application is actually filed, without the intermediate hop.
+   */
+  const tracking = links.find((link) => {
+    const host = hostOf(link);
+    return APPLICANT_TRACKING_HOSTS.some((known) => host.includes(known));
+  });
+  if (tracking) return tracking;
+
   const board = links.find((link) => {
     const host = hostOf(link);
-    return KNOWN_DESTINATION_HOSTS.some((known) => host.includes(known));
+    return AGGREGATOR_BOARD_HOSTS.some((known) => host.includes(known));
   });
   if (board) return board;
 

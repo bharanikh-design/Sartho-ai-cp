@@ -5,9 +5,9 @@ import {
   employerOwnsHost,
   isAggregatorBoard,
   isDirectEmployerDestination,
-  KNOWN_DESTINATION_HOSTS,
 } from "./destination";
 import { getStoredSearch, keepDirectEmployers } from "./run-search";
+import { chooseApplyUrl } from "./serpapi";
 
 /*
  * "Direct employers only" used to do nothing. Removing search-engine dead
@@ -95,17 +95,16 @@ describe("what counts as a direct employer", () => {
     });
   });
 
-  it("keeps the ranking list a faithful concatenation of the two halves", () => {
+  it("never files a host in both halves", () => {
     /*
-     * `chooseApplyUrl` ranks on one list and does not care which half a host
-     * came from, so the split must not change what it recognises. Asserted
-     * on order as well as membership: the two drifting apart is how a rule
-     * declared in one file ends up assumed in another.
+     * The halves are now consulted in order — tracking system first, board
+     * second — by both `chooseApplyUrl` and this filter. A host appearing in
+     * both would make the answer depend on which list was checked first,
+     * which is the kind of ambiguity that only shows up as a bug months
+     * later.
      */
-    expect(KNOWN_DESTINATION_HOSTS).toEqual([...AGGREGATOR_BOARD_HOSTS, ...APPLICANT_TRACKING_HOSTS]);
-    expect(new Set(KNOWN_DESTINATION_HOSTS).size, "a host listed in both halves").toBe(
-      KNOWN_DESTINATION_HOSTS.length,
-    );
+    const overlap = AGGREGATOR_BOARD_HOSTS.filter((host) => APPLICANT_TRACKING_HOSTS.includes(host));
+    expect(overlap, "hosts filed as both a marketplace and a tracking system").toEqual([]);
   });
 });
 
@@ -205,6 +204,27 @@ describe("getStoredSearch tells an empty search from no search", () => {
     expect(stored!.searchedAt).toBe("2026-09-27T00:00:00.000Z");
   });
 
+  /*
+   * Rows like this already exist, written by the upsert when it was
+   * unconditional — some of them by provider outages. Reading one as a
+   * finished search would leave that person on a permanently empty page with
+   * the arrival search suppressed forever and no note to explain any of it.
+   */
+  it("does not mistake a legacy empty row for a filtered search", async () => {
+    const legacy = { results: [], criteria: { country: "uk" }, searched_at: "2026-09-01T00:00:00.000Z" };
+    expect(await getStoredSearch(clientReturning(legacy), "u1"), "no provenance, so not an answer").toBeNull();
+  });
+
+  it("accepts an empty row explained by either of our own filters", async () => {
+    for (const criteria of [{ jobBoardHidden: 3 }, { agencyOrUnverifiedHidden: 2 }]) {
+      const stored = await getStoredSearch(
+        clientReturning({ results: [], criteria, searched_at: "2026-09-27T00:00:00.000Z" }),
+        "u1",
+      );
+      expect(stored, JSON.stringify(criteria)).not.toBeNull();
+    }
+  });
+
   it("still drops individual rows it cannot render, without discarding the search", async () => {
     const stored = await getStoredSearch(
       clientReturning(row([
@@ -215,5 +235,56 @@ describe("getStoredSearch tells an empty search from no search", () => {
       "u1",
     );
     expect(stored!.results.map((item) => item.url)).toEqual(["https://careers.acmecorp.com/1"]);
+  });
+});
+
+
+/*
+ * The hole this filter opened in `chooseApplyUrl`, and the reason the two
+ * host lists are now consulted in order.
+ */
+describe("an advert carrying both a board and a direct route", () => {
+  const advert = (...links: string[]) => ({
+    company_name: "Northwind Logistics",
+    share_link: "https://www.google.com/search?q=northwind#job",
+    apply_options: links.map((link) => ({ title: "Apply", link })),
+  });
+
+  it("sends people to the tracking system even when the board is listed first", () => {
+    /*
+     * Ranked as one undifferentiated set, whichever came first in
+     * apply_options won — so this advert sent people to the repost while the
+     * employer's own application sat one entry below it.
+     */
+    expect(chooseApplyUrl(advert(
+      "https://www.linkedin.com/jobs/view/1",
+      "https://boards.greenhouse.io/northwind/jobs/2",
+    ))).toBe("https://boards.greenhouse.io/northwind/jobs/2");
+  });
+
+  it("survives Direct employers only, because it was never board-only", () => {
+    /*
+     * The consequence that made the ordering a defect rather than a
+     * preference: the filter reads the chosen URL, so picking the board
+     * route hid an advert that carried a perfectly good direct one.
+     */
+    const url = chooseApplyUrl(advert(
+      "https://www.linkedin.com/jobs/view/1",
+      "https://boards.greenhouse.io/northwind/jobs/2",
+    ))!;
+    const { kept } = keepDirectEmployers([{ url, employer: "Northwind Logistics" }], true);
+    expect(kept).toHaveLength(1);
+  });
+
+  it("still uses the board when that is the only route on offer", () => {
+    expect(chooseApplyUrl(advert("https://www.linkedin.com/jobs/view/1")))
+      .toBe("https://www.linkedin.com/jobs/view/1");
+  });
+
+  it("keeps the employer's own domain ahead of both", () => {
+    expect(chooseApplyUrl(advert(
+      "https://boards.greenhouse.io/northwind/jobs/2",
+      "https://careers.northwindlogistics.com/3",
+    ))).toBe("https://careers.northwindlogistics.com/3");
   });
 });

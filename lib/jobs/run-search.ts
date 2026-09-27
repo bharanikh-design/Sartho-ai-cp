@@ -1525,21 +1525,34 @@ export async function getStoredSearch(
     .maybeSingle();
 
   /*
-   * A row that exists means a search ran, even when nothing is left in it.
+   * An empty row counts as a search only when it says why it is empty.
    *
-   * Both length checks used to answer null here, which the page could not
-   * tell apart from "never searched" — so it started a fresh provider search
-   * on arrival, every arrival. That is the loop review caught on #233, and a
+   * Both length checks used to answer null, which the page could not tell
+   * apart from "never searched" — so it started a fresh provider search on
+   * arrival, every arrival. That is the loop review caught on #233, and a
    * strict-filter run that legitimately ends empty would have fed it forever.
-   * Returning the empty set with its criteria lets the page say what happened
-   * and offer the switch back, instead of silently spending a provider call
-   * to be told the same thing again.
+   *
+   * Answering on the row's mere existence went too far the other way. Empty
+   * rows already exist in the database, written by the upsert back when it
+   * was unconditional, including ones a provider outage produced. Treating
+   * those as a finished search would leave the page permanently empty and
+   * permanently sure it had nothing to do — no results, no note, and the
+   * arrival search suppressed forever.
+   *
+   * The hidden counts are the provenance. They are only ever above zero when
+   * our own filtering removed adverts that existed, which is exactly the case
+   * worth preserving, and it is the same condition the write side uses to
+   * decide the row was worth storing at all. Anything else empty reads as no
+   * usable search, and the page goes and gets one.
    */
   if (!data || !Array.isArray(data.results)) return null;
   const results = normaliseResults(data.results);
+  const criteria = normaliseCriteria(data.criteria);
+  const emptyButExplained = (criteria.jobBoardHidden ?? 0) > 0 || (criteria.agencyOrUnverifiedHidden ?? 0) > 0;
+  if (!results.length && !emptyButExplained) return null;
   return {
     results,
-    criteria: normaliseCriteria(data.criteria),
+    criteria,
     searchedAt: typeof data.searched_at === "string" ? data.searched_at : new Date().toISOString(),
   };
 }

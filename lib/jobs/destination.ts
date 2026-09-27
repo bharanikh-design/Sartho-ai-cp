@@ -154,16 +154,6 @@ export const AGGREGATOR_BOARD_HOSTS = [
   "stellenanzeigen.de", "hh.ru",
 ];
 
-/**
- * Every destination host Sartho recognises, for ranking rather than filtering.
- *
- * `chooseApplyUrl` wants one list: a recognised destination of either kind
- * beats an unrecognised one, and it does not care which kind. Kept as the
- * concatenation so there is exactly one place a host is written down — the
- * two halves drifting apart is how a rule declared here ends up assumed
- * somewhere else.
- */
-export const KNOWN_DESTINATION_HOSTS = [...AGGREGATOR_BOARD_HOSTS, ...APPLICANT_TRACKING_HOSTS];
 
 /** A destination that belongs to a marketplace rather than to the employer. */
 export function isAggregatorBoard(url: string): boolean {
