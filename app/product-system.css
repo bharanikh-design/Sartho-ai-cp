@@ -1315,6 +1315,11 @@
 .email-settings__address input { width: 100%; min-height: 40px; padding: 0 13px; border: 1px solid var(--line); border-radius: 11px; color: var(--text); background: rgba(255, 255, 255, .04); font: inherit; font-size: var(--text-sm); }
 .email-settings__address input:focus-visible { outline: none; border-color: var(--line-bright); }
 .email-settings__warn { margin: 0; color: var(--amber); font-size: var(--text-xs); }
+/* Confirmed, waiting, or nothing yet: the one line that says whether the address may be emailed. */
+.email-settings__verify { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: baseline; margin: -8px 0 0; color: var(--text-tertiary); font-size: var(--text-xs); line-height: 1.5; }
+.email-settings__verify.is-concerning { color: var(--amber); }
+.email-settings__link { padding: 0; border: 0; background: none; color: var(--mint); font: inherit; font-size: var(--text-xs); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.email-settings__link:disabled { opacity: .5; cursor: not-allowed; }
 
 .email-settings__rows { display: grid; margin: 0; padding: 0; list-style: none; }
 .email-settings__row { display: flex; gap: 20px; align-items: center; justify-content: space-between; padding: 14px 0; border-top: 1px solid var(--line); }

@@ -3,9 +3,11 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 /*
  * A way out of every email Sartho sends, that needs no account.
  *
- * The addresses in notification_preferences are typed in, not verified, so
- * an email can reach somebody who never signed up. Whoever holds the message
- * must be able to stop the next one from the message itself. The link
+ * Every address in notification_preferences has said yes — it is the
+ * account's own sign-in address, or one confirmed from a link sent to it —
+ * but a message can still reach the wrong person: a shared inbox, a forwarded
+ * email, a link used in a hurry. Whoever holds the message must be able to
+ * stop the next one from the message itself. The link
  * carries a signed token naming the account the preference belongs to, and
  * nothing else: no email address, no user data, nothing that reads as a
  * secret if the message is forwarded.

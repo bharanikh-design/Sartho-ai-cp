@@ -311,3 +311,54 @@ test.describe("Every outbound link is a real destination", () => {
     }
   });
 });
+
+/*
+ * Email alerts, end to end: the page, the switch route, the address route and
+ * the service-role writes behind them, against the mock database. There is
+ * no email provider in this environment, which is itself the important case:
+ * an address that cannot be sent its link must not be put in force.
+ */
+test.describe("Email alerts", () => {
+  test("the sign-in address needs no confirmation, and a switch saves on its own", async ({ page }) => {
+    await page.goto("/notifications");
+    await expect(page).toHaveURL(/\/notifications$/);
+
+    await expect(page.getByLabel("Send to")).toHaveValue("e2e@sartho.test");
+    await expect(page.locator(".email-settings__verify")).toContainText("sign-in address");
+
+    const digest = page.getByRole("switch", { name: "Daily summary" });
+    await expect(digest).toHaveAttribute("aria-checked", "false");
+    await digest.click();
+    await expect(page.locator(".email-settings__note")).toContainText("On — saved.");
+    await expect(digest).toHaveAttribute("aria-checked", "true");
+
+    /* The row was created with the sign-in address already confirmed, so it survives a reload. */
+    await page.reload();
+    await expect(page.getByRole("switch", { name: "Daily summary" })).toHaveAttribute("aria-checked", "true");
+    await expect(page.locator(".email-settings__verify")).toContainText("Confirmed");
+  });
+
+  test("another address is not put in force until it is confirmed", async ({ page }) => {
+    await page.goto("/notifications");
+    const input = page.getByLabel("Send to");
+    await input.fill("colleague@example.com");
+    await input.blur();
+
+    /* No provider, so no link can go out — and the page says so rather than pretending. */
+    await expect(page.locator(".email-settings__note")).toContainText("confirmation link");
+    await expect(page.locator(".email-settings__verify")).not.toContainText("colleague@example.com");
+    await expect(page.locator(".email-settings__verify")).toContainText("e2e@sartho.test");
+  });
+
+  test("the confirmation link confirms nothing until its button is pressed", async ({ page }) => {
+    const token = "Zm9v".repeat(10) + "Zm8";
+    const response = await page.request.get(`/api/notifications/verify?token=${token}`);
+    expect(response.status()).toBe(200);
+    expect(await response.text()).toContain('<form method="post"');
+
+    /* A token nobody was sent is refused when the button is pressed. */
+    const pressed = await page.request.post("/api/notifications/verify", { form: { token } });
+    expect(pressed.status()).toBe(400);
+    expect(await pressed.text()).toContain("not valid");
+  });
+});

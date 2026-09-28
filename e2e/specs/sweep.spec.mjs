@@ -98,9 +98,15 @@ for (const path of PAGES) {
     });
 
     await openSignedIn(page, path);
-    /* /jobs is an old address kept alive as a redirect to Opportunities; landing there is its success. */
-    const landing = path === "/jobs" ? "/applications" : path === "/" ? "" : path;
-    expect(page.url(), `${path} bounced to ${page.url()}`).toContain(landing);
+    /*
+     * /jobs is an old address kept alive as a redirect to Opportunities;
+     * landing there is its success. Polled rather than read once: the shell
+     * is visible before the page segment streams in, and the redirect is
+     * applied only when it does, so a single read raced it and lost one run
+     * in three.
+     */
+    const landing = path === "/jobs" ? "/applications" : path;
+    await expect.poll(() => new URL(page.url()).pathname, { message: `${path} bounced to ${page.url()}` }).toBe(landing);
 
     /* Next renders its error boundary as visible text rather than a bad status. */
     const body = (await page.locator("body").innerText()).slice(0, 4000);
