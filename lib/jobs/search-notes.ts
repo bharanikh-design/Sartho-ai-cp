@@ -24,7 +24,7 @@
 
 export type SearchFilterNote = {
   /** Stable key for React, and for asserting on the right note in a test. */
-  id: "job-board" | "direct-employers" | "work-model" | "provider-trouble";
+  id: "job-board" | "direct-employers" | "work-model" | "retried" | "provider-trouble";
   text: string;
 };
 
@@ -34,6 +34,8 @@ type Diagnostics = {
   workModelHidden?: number;
   workModels?: string[];
   providerErrors?: string[];
+  retried?: boolean;
+  retryReason?: string;
 };
 
 const listing = (count: number) => `${count} listing${count === 1 ? "" : "s"}`;
@@ -83,6 +85,21 @@ export function searchFilterNotes(criteria: Diagnostics | null | undefined): Sea
     notes.push({
       id: "work-model",
       text: `${listing(workModel)} hidden — the advert stated a working pattern other than ${chosen}. Adverts that say nothing either way are kept.`,
+    });
+  }
+
+  /*
+   * A second attempt was needed. Said before any provider trouble, because it
+   * explains trouble the person did not see: the first attempt found nothing,
+   * the search waited and asked again, and what is on the page came from
+   * that. A search that quietly took twice as long should not read as a slow
+   * market.
+   */
+  if (criteria.retried) {
+    const reason = criteria.retryReason?.trim().replace(/[.!?]+$/, "");
+    notes.push({
+      id: "retried",
+      text: `The job boards gave nothing on the first attempt${reason ? ` (${reason})` : ""}, so Sartho waited a moment and tried again. These results are from the second attempt.`,
     });
   }
 

@@ -77,6 +77,19 @@ export function JobSearchPanel({
   const [criteria, setCriteria] = useState<SearchCriteria | null>(initialCriteria);
   const filterNotes = searchFilterNotes(criteria);
   const [lastRun, setLastRun] = useState<string | null>(searchedAt);
+  /*
+   * The last answer that worked, kept so a failed refresh can put it back.
+   *
+   * A refresh that failed used to leave an empty page and an error, even
+   * though the results from an hour ago were in the stored search and on this
+   * very screen a moment earlier. The person loses nothing by seeing them
+   * again under a note saying they could not be refreshed, and loses their
+   * whole shortlist otherwise.
+   */
+  const lastGood = useRef<{ results: SearchResult[]; criteria: SearchCriteria | null; searchedAt: string | null } | null>(
+    initialResults.length ? { results: initialResults, criteria: initialCriteria, searchedAt } : null,
+  );
+  const [refreshFailure, setRefreshFailure] = useState<string | null>(null);
   const [savingUrl, setSavingUrl] = useState<string | null>(null);
   const [savedUrls, setSavedUrls] = useState<string[]>([]);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -122,6 +135,7 @@ export function JobSearchPanel({
     setStatus("loading");
     setError(null);
     setSaveError(null);
+    setRefreshFailure(null);
     // Clear the previous run outright. Leaving old rows on screen while new
     // ones arrive was showing two different searches at once.
     setResults([]);
@@ -151,13 +165,29 @@ export function JobSearchPanel({
         }
         throw new Error(`Search request failed with status ${response.status}.`);
       }
-      setResults(data.results ?? []);
-      setCriteria(data.criteria ?? null);
-      setLastRun(new Date().toISOString());
+      const fresh = data.results ?? [];
+      const freshCriteria = data.criteria ?? null;
+      const ranAt = new Date().toISOString();
+      setResults(fresh);
+      setCriteria(freshCriteria);
+      setLastRun(ranAt);
       setPage(0);
       setStatus("ready");
+      /* Only a search that found something is worth going back to. */
+      if (fresh.length) lastGood.current = { results: fresh, criteria: freshCriteria, searchedAt: ranAt };
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Search failed.");
+      const message = caught instanceof Error ? caught.message : "Search failed.";
+      const kept = lastGood.current;
+      if (kept?.results.length) {
+        setResults(kept.results);
+        setCriteria(kept.criteria);
+        setLastRun(kept.searchedAt);
+        setPage(0);
+        setRefreshFailure(message);
+        setStatus("ready");
+        return;
+      }
+      setError(message);
       setStatus("error");
     }
   }
@@ -366,6 +396,13 @@ export function JobSearchPanel({
       ) : null}
 
       {status === "error" ? <div className="inline-error" role="alert">{error}</div> : null}
+
+      {status === "ready" && refreshFailure ? (
+        <div className="search-refresh-notice" role="status">
+          <strong>Couldn&apos;t refresh your matches.</strong> {refreshFailure} You&apos;re looking at the results from{" "}
+          {lastRun ? new Date(lastRun).toLocaleString() : "your last search"}; press Search again to retry.
+        </div>
+      ) : null}
 
       {status === "ready" && criteria ? (
         <div className="search-summary-chips" aria-label="Search summary">

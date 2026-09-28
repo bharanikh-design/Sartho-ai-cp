@@ -49,3 +49,33 @@ export async function notifyOperator(input: { subject: string; lines: string[] }
     return "logged";
   }
 }
+
+/*
+ * The same alert, not more than once per window.
+ *
+ * A provider that has spent its monthly allowance stays spent for the month,
+ * and every search in that month discovers it again. The operator needs to
+ * hear it once, not once per search. Kept in memory per server instance,
+ * which is the throttle a serverless function can keep without a table: a
+ * fresh instance may repeat an alert once, and that is the accepted cost.
+ */
+const recentAlerts = new Map<string, number>();
+
+export async function notifyOperatorThrottled(input: {
+  key: string;
+  windowMs: number;
+  subject: string;
+  lines: string[];
+  now?: () => number;
+}): Promise<"emailed" | "logged" | "suppressed"> {
+  const now = input.now?.() ?? Date.now();
+  const last = recentAlerts.get(input.key);
+  if (last !== undefined && now - last < input.windowMs) return "suppressed";
+  recentAlerts.set(input.key, now);
+  return notifyOperator({ subject: input.subject, lines: input.lines });
+}
+
+/** For tests, which share one module instance. */
+export function resetOperatorAlertThrottle(): void {
+  recentAlerts.clear();
+}
