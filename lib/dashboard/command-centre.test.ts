@@ -88,7 +88,7 @@ describe("career command centre", () => {
       "Résumé Studio",
     ]);
     expect(result.stages.find((stage) => stage.id === "applications")?.state).toBe("current");
-    expect(result.nextAction.href).toBe("/applications#add-role");
+    expect(result.nextAction.href).toBe("/analyse");
     expect(result.aiBrief).toBeNull();
   });
 

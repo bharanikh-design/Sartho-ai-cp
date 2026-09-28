@@ -42,6 +42,15 @@ function literal(raw) {
 }
 
 function matches(row, column, op, raw) {
+  /*
+   * `not.` inverts whatever follows it: `resume_draft=not.is.null` arrives as
+   * op "not", rest "is.null". Unwrapped here rather than in the switch, so the
+   * inverted form of every operator below is supported for free.
+   */
+  if (op === "not") {
+    const [inner, ...rest] = raw.split(".");
+    return !matches(row, column, inner, rest.join("."));
+  }
   const actual = row[column];
   const want = literal(raw);
   switch (op) {
@@ -61,7 +70,19 @@ function matches(row, column, op, raw) {
       const pattern = new RegExp(`^${String(want).replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/%/g, ".*").replace(/_/g, ".")}$`, op === "ilike" ? "i" : "");
       return pattern.test(String(actual ?? ""));
     }
-    default: return true;
+    /*
+     * Never pass a row through a filter this mock does not understand.
+     *
+     * This used to `return true`, which meant an unimplemented operator
+     * silently matched everything. `.not("resume_draft", "is", null)` was
+     * therefore ignored, Resume Studio was handed a row Postgres would never
+     * have returned, and the page crashed on a column that is `not null` in
+     * the real schema. A test harness that fails open turns a red into a
+     * green and invents bugs that do not exist; failing loudly is the whole
+     * value of a fake.
+     */
+    default:
+      throw new Error(`mock-supabase: unsupported filter operator "${op}" on column "${column}" — implement it rather than matching everything`);
   }
 }
 
@@ -76,8 +97,25 @@ function project(row, select) {
 
 export function createMockSupabase({ seed = {}, user, port = 0, onRequest } = {}) {
   /* Deep copy so one test run's writes never leak into the next. */
-  const tables = new Map(Object.entries(structuredClone(seed)).map(([name, rows]) => [name, rows]));
+  let tables = new Map(Object.entries(structuredClone(seed)).map(([name, rows]) => [name, rows]));
   const requests = [];
+  /*
+   * Putting the fixture back.
+   *
+   * Writes land in `tables` and stay there for the life of the process, and
+   * the process outlives a single `playwright test` run whenever
+   * `reuseExistingServer` is on — which is every local run. So one spec that
+   * presses a Dismiss button leaves the next spec reading a fixture that no
+   * longer matches the file it was seeded from, and the failure surfaces
+   * somewhere else entirely, looking like a product bug.
+   *
+   * That is not hypothetical: the button sweep dismissed every seeded career
+   * suggestion, and two Career Direction specs then failed for an afternoon
+   * in a way that read as a regression in the page.
+   */
+  const reseed = () => {
+    tables = new Map(Object.entries(structuredClone(seed)).map(([name, rows]) => [name, rows]));
+  };
   const rowsOf = (table) => {
     if (!tables.has(table)) tables.set(table, []);
     return tables.get(table);
@@ -94,6 +132,12 @@ export function createMockSupabase({ seed = {}, user, port = 0, onRequest } = {}
     onRequest?.({ method: req.method, path: url.pathname, search: url.search });
 
     if (req.method === "OPTIONS") return send(204);
+
+    /* Not a PostgREST route: the fixture reset, for specs that write. */
+    if (url.pathname === "/__reset") {
+      reseed();
+      return send(200, { ok: true });
+    }
 
     /* ---------------- Auth ---------------- */
     if (url.pathname === "/auth/v1/user") {
@@ -117,12 +161,24 @@ export function createMockSupabase({ seed = {}, user, port = 0, onRequest } = {}
       const body = await readBody(req);
       const all = rowsOf(table);
 
-      const filtered = all.filter((row) =>
-        [...url.searchParams.entries()].every(([key, value]) => {
-          if (["select", "order", "limit", "offset", "columns", "on_conflict"].includes(key)) return true;
-          const [op, ...rest] = value.split(".");
-          return matches(row, key, op, rest.join("."));
-        }));
+      /*
+       * An unsupported operator throws. Answered as a 500 rather than left to
+       * reject the handler's promise: an unanswered request hangs the page for
+       * the full timeout and reports as something else entirely.
+       */
+      let filtered;
+      try {
+        filtered = all.filter((row) =>
+          [...url.searchParams.entries()].every(([key, value]) => {
+            if (["select", "order", "limit", "offset", "columns", "on_conflict"].includes(key)) return true;
+            const [op, ...rest] = value.split(".");
+            return matches(row, key, op, rest.join("."));
+          }));
+      } catch (caught) {
+        const message = caught instanceof Error ? caught.message : String(caught);
+        console.error(`[mock-supabase] ${req.method} ${url.pathname}${url.search}: ${message}`);
+        return send(500, { code: "MOCK01", message, details: null, hint: null });
+      }
 
       if (req.method === "GET" || req.method === "HEAD") {
         let result = filtered;
@@ -190,7 +246,8 @@ export function createMockSupabase({ seed = {}, user, port = 0, onRequest } = {}
   return {
     server,
     requests,
-    tables,
+    get tables() { return tables; },
+    reseed,
     listen: () => new Promise((resolve) => server.listen(port, "127.0.0.1", () => resolve(server.address().port))),
     close: () => new Promise((resolve) => server.close(resolve)),
   };

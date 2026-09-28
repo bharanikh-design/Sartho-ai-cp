@@ -365,6 +365,18 @@ export function AppShell({ children }: { children: ReactNode }) {
         })}
       </nav>
 
+      {/*
+        * The only mount. The dashboard used to render one of these as well —
+        * in each of its two branches — so the home page always carried two
+        * `role="dialog" aria-modal="true"` tours at once: two focus traps
+        * fighting over Tab, `body.overflow` set and unset twice, and the upper
+        * backdrop swallowing every click meant for the lower one. It reads as
+        * a tour whose buttons do nothing.
+        *
+        * Here rather than on the page because a modal belongs outside the page
+        * tree, and because the shell renders once for every route while the
+        * component itself decides it only belongs on "/".
+        */}
       <OnboardingCarousel user={session.user} />
       {/*
         * Beside the page, never over it: the shell already refetches the

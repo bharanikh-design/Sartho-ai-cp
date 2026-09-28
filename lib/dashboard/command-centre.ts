@@ -118,7 +118,7 @@ export function buildCareerCommandCentre({
       title: "Analyse your first promising role",
       description: "Add one complete job description. Sartho will compare it with your approved career evidence before recommending what to do.",
       reason: "Your career foundation and search strategy are ready; a real opportunity is the next input the workflow needs.",
-      href: "/applications#add-role",
+      href: "/analyse",
       label: "Add and analyse a role",
     };
   } else if (priorityOpportunity && priorityOpportunity.deep_analysis_status !== "complete" && priorityOpportunity.recommendation !== "skip") {
@@ -164,7 +164,7 @@ export function buildCareerCommandCentre({
       title: "Find the next worthwhile opportunity",
       description: "Your saved opportunities have outcomes. Add another role and let Sartho compare it with your approved career evidence.",
       reason: `${plural(outcomes.length, "outcome")} recorded; there is no open opportunity waiting for action.`,
-      href: "/applications#add-role",
+      href: "/analyse",
       label: "Analyse another role",
     };
   }
