@@ -23,8 +23,8 @@ describe("employerKey", () => {
 
 describe("findEmployerPortal", () => {
   it("still finds the hardcoded companies", () => {
-    expect(findEmployerPortal("Deloitte")?.tenant).toBe("deloitte");
-    expect(findEmployerPortal("ernst and young")?.id).toBe("ey");
+    expect(findEmployerPortal("Accenture")?.tenant).toBe("accenture");
+    expect(findEmployerPortal("PricewaterhouseCoopers")?.id).toBe("pwc");
     expect(findEmployerPortal("nobody")).toBeNull();
     expect(findEmployerPortal("")).toBeNull();
   });
@@ -32,7 +32,7 @@ describe("findEmployerPortal", () => {
   /*
    * The reported failure: somebody verifies their employer's careers page,
    * sees "✓ Connected", and the search reports that employer as unknown
-   * because it only ever consulted the nine companies in registry.ts.
+   * because it only ever consulted the companies in registry.ts.
    */
   it("finds an employer the person verified themselves", () => {
     expect(findEmployerPortal("AtkinsRéalis")).toBeNull();
@@ -41,8 +41,8 @@ describe("findEmployerPortal", () => {
 
   /* Their own tenant beats our guess at the same company's name. */
   it("prefers a saved source over the hardcoded one", () => {
-    const theirs: EmployerPortalConfig = { ...saved, id: "deloitte", name: "Deloitte", aliases: ["Deloitte"], tenant: "deloitte-anz" };
-    expect(findEmployerPortal("Deloitte", [theirs])?.tenant).toBe("deloitte-anz");
+    const theirs: EmployerPortalConfig = { ...saved, id: "pwc", name: "PwC", aliases: ["PwC"], tenant: "pwc-au" };
+    expect(findEmployerPortal("PwC", [theirs])?.tenant).toBe("pwc-au");
   });
 });
 

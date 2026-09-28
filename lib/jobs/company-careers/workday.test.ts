@@ -10,17 +10,26 @@ describe("findEmployerPortal", () => {
     expect(findEmployerPortal("PwC")?.id).toBe("pwc");
     expect(findEmployerPortal("pwc")?.id).toBe("pwc");
     expect(findEmployerPortal("PricewaterhouseCoopers")?.id).toBe("pwc");
-    expect(findEmployerPortal("Deloitte")?.id).toBe("deloitte");
-    expect(findEmployerPortal("Deloitte Consulting")?.id).toBe("deloitte");
-    expect(findEmployerPortal("KPMG")?.id).toBe("kpmg");
-    expect(findEmployerPortal("Ernst & Young")?.id).toBe("ey");
-    expect(findEmployerPortal("EY")?.id).toBe("ey");
     expect(findEmployerPortal("Accenture")?.id).toBe("accenture");
+    expect(findEmployerPortal("CommBank")?.id).toBe("cba");
+    expect(findEmployerPortal("Commonwealth Bank")?.id).toBe("cba");
     expect(findEmployerPortal("Canva")?.id).toBe("canva");
   });
 
   it("returns null for unknown employers", () => {
     expect(findEmployerPortal("Unknown Boutique Ltd")).toBeNull();
+  });
+
+  /*
+   * These four used to be listed with invented Workday tenants, so a brief
+   * naming them logged a DNS failure on every search. None of them is on
+   * Workday; unknown is the honest answer, and it is what sends the person to
+   * paste the real careers URL on the Search Brief.
+   */
+  it("does not pretend to know a portal for employers that are not on Workday", () => {
+    for (const employer of ["Deloitte", "Deloitte Consulting", "KPMG", "EY", "Ernst & Young", "Macquarie Group"]) {
+      expect(findEmployerPortal(employer), employer).toBeNull();
+    }
   });
 });
 
@@ -31,27 +40,35 @@ describe("Workday URL builders", () => {
     aliases: ["pwc"],
     type: "workday",
     tenant: "pwc",
-    site: "Campus_Careers",
+    site: "Global_Experienced_Careers",
+    domain: "pwc.wd3.myworkdayjobs.com",
   };
 
-  it("builds the CXS API URL correctly", () => {
-    expect(buildWorkdayApiUrl(config)).toBe("https://pwc.myworkdayjobs.com/wday/cxs/pwc/Campus_Careers/jobs");
+  it("builds the CXS API URL on the stored Workday host", () => {
+    expect(buildWorkdayApiUrl(config)).toBe("https://pwc.wd3.myworkdayjobs.com/wday/cxs/pwc/Global_Experienced_Careers/jobs");
   });
 
-  it("builds the job detail application URL correctly", () => {
+  it("builds the job detail application URL on the stored Workday host", () => {
     expect(buildWorkdayJobUrl(config, "/job/Sydney/2026-Graduate-Program_JR123"))
-      .toBe("https://pwc.myworkdayjobs.com/en-US/Campus_Careers/job/Sydney/2026-Graduate-Program_JR123");
+      .toBe("https://pwc.wd3.myworkdayjobs.com/en-US/Global_Experienced_Careers/job/Sydney/2026-Graduate-Program_JR123");
+  });
+
+  /* A host that is not Workday's is refused, whatever a saved row says. */
+  it("ignores a stored domain that is not a Workday host", () => {
+    expect(buildWorkdayApiUrl({ ...config, domain: "evil.example.com" }))
+      .toBe("https://pwc.myworkdayjobs.com/wday/cxs/pwc/Global_Experienced_Careers/jobs");
   });
 });
 
 describe("mapWorkdayPosting", () => {
   const config: EmployerPortalConfig = {
-    id: "deloitte",
-    name: "Deloitte",
-    aliases: ["deloitte"],
+    id: "accenture",
+    name: "Accenture",
+    aliases: ["accenture"],
     type: "workday",
-    tenant: "deloitte",
-    site: "Deloitte_Careers",
+    tenant: "accenture",
+    site: "AccentureCareers",
+    domain: "accenture.wd103.myworkdayjobs.com",
   };
 
   it("maps clean Workday JSON to JobSearchResult with direct apply metadata", () => {
@@ -65,12 +82,12 @@ describe("mapWorkdayPosting", () => {
     const mapped = mapWorkdayPosting(raw, config);
     expect(mapped).not.toBeNull();
     expect(mapped?.title).toBe("2026 Technology Graduate Program");
-    expect(mapped?.employer).toBe("Deloitte");
+    expect(mapped?.employer).toBe("Accenture");
     expect(mapped?.location).toBe("Sydney, New South Wales, Australia");
     expect(mapped?.source).toBe("Company Careers");
     expect(mapped?.applyDirect).toBe(true);
-    expect(mapped?.platforms).toEqual(["Deloitte", "Direct Apply"]);
-    expect(mapped?.url).toContain("https://deloitte.myworkdayjobs.com/en-US/Deloitte_Careers/job/Sydney-NSW/2026-Technology-Graduate_12345");
+    expect(mapped?.platforms).toEqual(["Accenture", "Direct Apply"]);
+    expect(mapped?.url).toBe("https://accenture.wd103.myworkdayjobs.com/en-US/AccentureCareers/job/Sydney-NSW/2026-Technology-Graduate_12345");
   });
 
   it("drops malformed postings without title or path", () => {
