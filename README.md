@@ -128,9 +128,29 @@ After configuring a paid OpenAI key, run `npm run check:ai` deliberately to
 exercise the redacted Luna extraction and Terra evidence-linking contracts.
 Ordinary test runs never contact an AI provider.
 
+## Operations
+
+- `GET /api/health` answers a 200 when the database is reachable and both
+  scheduled jobs succeeded within the last 30 hours, and a 503 with the reason
+  otherwise. Point an uptime monitor at it; it needs no session and reports
+  states, never data.
+- Each scheduled run records itself in `scheduled_runs`, and each job checks
+  the other's record when it finishes. Failures and a silent sibling job are
+  emailed to `SARTHO_ALERT_EMAIL`, or written to the server log when that is
+  unset. The diagnostics page shows the same log.
+- Google Drive grants are sealed with `INTEGRATION_TOKEN_KEY` before they are
+  stored. Generate one with `openssl rand -base64 32`; without it the
+  integration stays off. Rotate by moving the old key to
+  `INTEGRATION_TOKEN_KEY_PREVIOUS` and setting a new one.
+
 ## Security boundaries
 
-- `proxy.ts` refreshes Supabase sessions and performs early redirects.
+- `proxy.ts` refreshes Supabase sessions, performs early redirects, refuses
+  cross-site API writes, and issues a per-request nonce for the
+  Content-Security-Policy so only the page's own scripts can run. Every page
+  therefore renders per request.
+- `/api/cron/*` and `/api/health` carry no session by design and verify their
+  callers themselves; the guard passes them straight through.
 - Every route handler independently verifies the authenticated user.
 - Row Level Security scopes profile, evidence, jobs, requirements and applications to their owner.
 - Deep-analysis writes are atomic through `replace_job_requirements`.

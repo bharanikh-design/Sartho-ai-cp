@@ -98,7 +98,9 @@ for (const path of PAGES) {
     });
 
     await openSignedIn(page, path);
-    expect(page.url(), `${path} bounced to ${page.url()}`).toContain(path === "/" ? "" : path);
+    /* /jobs is an old address kept alive as a redirect to Opportunities; landing there is its success. */
+    const landing = path === "/jobs" ? "/applications" : path === "/" ? "" : path;
+    expect(page.url(), `${path} bounced to ${page.url()}`).toContain(landing);
 
     /* Next renders its error boundary as visible text rather than a bad status. */
     const body = (await page.locator("body").innerText()).slice(0, 4000);

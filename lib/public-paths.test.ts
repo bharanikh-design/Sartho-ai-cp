@@ -1,5 +1,31 @@
 import { describe, expect, it } from "vitest";
-import { PUBLIC_PATHS, isPublicPath } from "@/lib/public-paths";
+import { PUBLIC_PATHS, isPublicPath, isSessionFreePath } from "@/lib/public-paths";
+
+/*
+ * The scheduled jobs and the health check carry no session by design. They
+ * are not public pages — each checks its caller itself — but the guard must
+ * hand them to the route rather than answer for it.
+ */
+describe("isSessionFreePath", () => {
+  it("names the cron routes and the health check", () => {
+    expect(isSessionFreePath("/api/cron/daily-digest")).toBe(true);
+    expect(isSessionFreePath("/api/cron/match-alerts")).toBe(true);
+    expect(isSessionFreePath("/api/cron/match-alerts/")).toBe(true);
+    expect(isSessionFreePath("/api/health")).toBe(true);
+    expect(isSessionFreePath("/api/health/")).toBe(true);
+  });
+
+  it("leaves every other route, and every look-alike, behind the session", () => {
+    for (const path of ["/api/jobs", "/api/cronjobs", "/api/cron", "/api/healthcheck", "/api/health/deep", "/health", "/", "/login"]) {
+      expect(isSessionFreePath(path), path).toBe(false);
+    }
+  });
+
+  it("does not make those routes public pages", () => {
+    expect(isPublicPath("/api/cron/daily-digest")).toBe(false);
+    expect(isPublicPath("/api/health")).toBe(false);
+  });
+});
 
 /*
  * These were two lists that disagreed: the request proxy let /extension

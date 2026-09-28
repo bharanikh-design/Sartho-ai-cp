@@ -9,6 +9,8 @@
  * Nothing here logs a token, returns one, or puts one in an error message.
  */
 
+import { isSecretCipherConfigured, secretCipherStatus } from "@/lib/security/secret-cipher";
+
 export const GOOGLE_PROVIDER = "google";
 
 /*
@@ -41,11 +43,63 @@ export function googleOAuthConfig(): { clientId: string; clientSecret: string } 
   const clientId = process.env.GOOGLE_CLIENT_ID?.trim();
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET?.trim();
   if (!clientId || !clientSecret) return null;
+  /*
+   * The grant is stored sealed. Without the key there is nowhere safe to
+   * put it, so the integration is off rather than quietly on in plaintext:
+   * the Integrations page says it is not set up, the connect route refuses,
+   * and the Drive picker reports nothing connected.
+   */
+  if (!isSecretCipherConfigured()) return null;
   return { clientId, clientSecret };
 }
 
 export function isGoogleConfigured(): boolean {
   return googleOAuthConfig() !== null;
+}
+
+export type IntegrationRequirement = {
+  envVar: string;
+  purpose: string;
+  present: boolean;
+  /** A value that is set but unusable, which is worse than absent. */
+  problem: string | null;
+};
+
+/*
+ * Why the Drive integration is or is not available, one line per setting.
+ * Names and presence only, never a value — the same rule as every other
+ * diagnostic.
+ */
+export function googleIntegrationDiagnostics(): { requirements: IntegrationRequirement[]; ready: boolean; remedy: string | null } {
+  const cipher = secretCipherStatus();
+  const requirements: IntegrationRequirement[] = [
+    {
+      envVar: "GOOGLE_CLIENT_ID",
+      purpose: "The OAuth client Google issues for this app.",
+      present: Boolean(process.env.GOOGLE_CLIENT_ID?.trim()),
+      problem: null,
+    },
+    {
+      envVar: "GOOGLE_CLIENT_SECRET",
+      purpose: "Its secret, used server-side to exchange and refresh grants.",
+      present: Boolean(process.env.GOOGLE_CLIENT_SECRET?.trim()),
+      problem: null,
+    },
+    {
+      envVar: "INTEGRATION_TOKEN_KEY",
+      purpose: "Seals every stored Drive grant. Without it no grant is stored and the integration stays off.",
+      present: cipher.configured,
+      problem: cipher.problem,
+    },
+  ];
+  const missing = requirements.filter((requirement) => !requirement.present);
+  return {
+    requirements,
+    ready: missing.length === 0,
+    remedy: missing.length
+      ? `Set ${missing.map((requirement) => requirement.envVar).join(" and ")} in the deployment settings, then redeploy.`
+      : null,
+  };
 }
 
 /** The redirect Google is configured to send people back to. */

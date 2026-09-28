@@ -38,6 +38,11 @@ export type DeliveryDiagnostics = {
   ready: boolean;
   /** What to do next, or null when there is nothing to fix. */
   remedy: string | null;
+  /**
+   * Where a scheduled job reports trouble. Optional: without it the report
+   * goes to the server log, which is why it is shown rather than required.
+   */
+  alerts: { envVar: "SARTHO_ALERT_EMAIL"; present: boolean };
 };
 
 const isSet = (name: string): boolean => Boolean(process.env[name]?.trim());
@@ -101,5 +106,6 @@ export function deliveryDiagnostics(): DeliveryDiagnostics {
     remedy: missing.length
       ? `Set ${missing.map((requirement) => requirement.envVar).join(" and ")} in the deployment settings, then redeploy — environment changes do not reach a running deployment.`
       : null,
+    alerts: { envVar: "SARTHO_ALERT_EMAIL", present: isSet("SARTHO_ALERT_EMAIL") },
   };
 }

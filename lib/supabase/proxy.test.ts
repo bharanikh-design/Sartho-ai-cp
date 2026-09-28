@@ -1,7 +1,86 @@
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import { updateSession } from "@/lib/supabase/proxy";
 import { config } from "@/proxy";
+
+/*
+ * The session lookup, without a network: nobody is signed in. Every test in
+ * this file that reaches the lookup sees that answer, which is the one that
+ * matters — the guard's decisions are all about what happens with no user.
+ */
+vi.mock("@supabase/ssr", () => ({
+  createServerClient: () => ({
+    auth: { getUser: async () => ({ data: { user: null }, error: null }) },
+  }),
+}));
+
+function withSupabaseEnv() {
+  const saved = { url: process.env.NEXT_PUBLIC_SUPABASE_URL, key: process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY };
+  beforeAll(() => {
+    process.env.NEXT_PUBLIC_SUPABASE_URL = "https://project.supabase.co";
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = "sb_publishable_test";
+  });
+  afterAll(() => {
+    if (saved.url === undefined) delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+    else process.env.NEXT_PUBLIC_SUPABASE_URL = saved.url;
+    if (saved.key === undefined) delete process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+    else process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = saved.key;
+  });
+}
+
+/*
+ * Vercel invokes a scheduled job with a bearer secret and no cookies, and an
+ * uptime monitor sends nothing at all. The guard used to answer both with
+ * 401 before the route could look at the request, which is how neither
+ * scheduled email ever went out.
+ */
+describe("session-free routes", () => {
+  withSupabaseEnv();
+
+  it("still guards an ordinary API route when nobody is signed in", async () => {
+    const response = await updateSession(new NextRequest("https://sartho.tech/api/jobs"));
+    expect(response.status).toBe(401);
+  });
+
+  it.each(["/api/cron/daily-digest", "/api/cron/match-alerts", "/api/health"])(
+    "hands %s to the route without asking for a session",
+    async (pathname) => {
+      const response = await updateSession(new NextRequest(`https://sartho.tech${pathname}`));
+      expect(response.status).toBe(200);
+      expect(response.headers.get("location")).toBeNull();
+    },
+  );
+});
+
+/*
+ * A fresh nonce on every response, carried both to the browser (the response
+ * header it enforces) and to the renderer (the request header Next reads to
+ * put the nonce on every script it emits).
+ */
+describe("content security policy", () => {
+  withSupabaseEnv();
+
+  it("issues a policy with a nonce on a public page", async () => {
+    const response = await updateSession(new NextRequest("https://sartho.tech/privacy"));
+    expect(response.status).toBe(200);
+    const policy = response.headers.get("content-security-policy") ?? "";
+    expect(policy).toMatch(/script-src 'self' 'nonce-[A-Za-z0-9+/=]+' 'strict-dynamic'/);
+    expect(policy).toContain("connect-src 'self' https://project.supabase.co wss://project.supabase.co");
+    expect(policy).toContain("frame-ancestors 'none'");
+    expect(policy).toContain("upgrade-insecure-requests");
+  });
+
+  it("never repeats a nonce", async () => {
+    const first = (await updateSession(new NextRequest("https://sartho.tech/privacy"))).headers.get("content-security-policy");
+    const second = (await updateSession(new NextRequest("https://sartho.tech/privacy"))).headers.get("content-security-policy");
+    expect(first).not.toBe(second);
+  });
+
+  it("does not ask a local http server to upgrade its own requests", async () => {
+    const response = await updateSession(new NextRequest("http://localhost:3000/privacy"));
+    expect(response.headers.get("content-security-policy")).not.toContain("upgrade-insecure-requests");
+  });
+});
 
 describe("Supabase auth proxy", () => {
   it.each(["/", "/login"])(
