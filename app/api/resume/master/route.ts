@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isMissingColumnError } from "@/lib/supabase/errors";
 import { z } from "zod";
 import { approvedEvidenceIds, keepGroundedIds } from "@/lib/ai/grounding";
 import { createSafetyIdentifier, generateStructuredJson } from "@/lib/ai/provider";
@@ -47,12 +48,6 @@ export const maxDuration = 120;
  * plainly beats a 500 that reads as a provider fault, which is the failure this
  * whole route exists downstream of.
  */
-function isMissingColumn(error: { code?: string; message?: string } | null): boolean {
-  if (!error) return false;
-  if (error.code === "PGRST204") return true;
-  const message = (error.message ?? "").toLowerCase();
-  return message.includes("master_resume") && (message.includes("does not exist") || message.includes("could not find"));
-}
 
 export async function POST() {
   const { supabase, user } = await getAuthenticatedUser();
@@ -279,7 +274,7 @@ export async function POST() {
       })
       .eq("id", user.id);
 
-    if (isMissingColumn(saveError)) {
+    if (isMissingColumnError(saveError)) {
       console.error("Master résumé columns are missing", saveError);
       return NextResponse.json(
         { error: "Sartho built the master résumé but has nowhere to keep it: this deployment is missing the master_resume columns. The administrator needs to run the 20260912080000_master_resume migration." },
@@ -342,7 +337,7 @@ export async function PUT(request: Request) {
     })
     .eq("id", user.id);
 
-  if (isMissingColumn(saveError)) {
+  if (isMissingColumnError(saveError)) {
     return NextResponse.json(
       { error: "This deployment is missing the master_resume columns. The administrator needs to run the 20260912080000_master_resume migration." },
       { status: 503 },

@@ -112,8 +112,9 @@ export async function loadUserTable(): Promise<{
     searches,
     jobs,
     audienceLoad,
+    masterResumes,
   ] = await Promise.all([
-    softQuery("profiles", () => admin.from("profiles").select("id,full_name,location,strengths,master_resume,master_resume_text").in("id", ids), []),
+    softQuery("profiles", () => admin.from("profiles").select("id,full_name,location,strengths").in("id", ids), []),
     softQuery("activity", () => admin.from("user_activity").select("user_id,last_seen_at,active_seconds,visit_count").in("user_id", ids), []),
     softQuery("resumes", () => admin.from("resume_imports").select("user_id,status,is_master").eq("status", "complete").is("archived_at", null).in("user_id", ids), []),
     softQuery("direction", () => admin.from("target_lanes").select("user_id,weight,active").eq("active", true).in("user_id", ids), []),
@@ -126,6 +127,12 @@ export async function loadUserTable(): Promise<{
         console.warn("Admin audience telemetry unavailable", error);
         return { data: audienceFallback, unavailable: true };
       }),
+    /*
+     * Only whether a master résumé exists — never its contents. This used to
+     * select the whole structured résumé and its text for every account on
+     * the page, to test them for emptiness.
+     */
+    softQuery("master_resumes", () => admin.from("profiles").select("id").in("id", ids).or("master_resume.not.is.null,master_resume_text.neq."), []),
   ]);
 
   const unavailable = [
@@ -149,10 +156,8 @@ export async function loadUserTable(): Promise<{
     if (row.is_master === true) masterResumeReady.add(userId);
   }
 
-  for (const profile of profiles.data) {
-    if (profile.master_resume || (typeof profile.master_resume_text === "string" && profile.master_resume_text.trim())) {
-      masterResumeReady.add(profile.id as string);
-    }
+  for (const row of masterResumes.data) {
+    masterResumeReady.add(row.id as string);
   }
 
   const laneState = new Map<string, { count: number; weight: number }>();

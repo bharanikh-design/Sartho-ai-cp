@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
+import { isAuthorisedCronRequest } from "@/lib/security/cron-secret";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { APP_URL } from "@/lib/site";
 
 import { buildDailyDigest, renderDigestEmail, type DigestJob } from "@/lib/notifications/digest";
+import { unsubscribeUrl } from "@/lib/notifications/unsubscribe";
 import { isEmailDeliveryConfigured, sendEmail } from "@/lib/notifications/send-email";
 
 export const runtime = "nodejs";
@@ -36,8 +38,7 @@ function maxUsersPerRun(): number {
 }
 
 export async function GET(request: Request) {
-  const secret = process.env.CRON_SECRET;
-  if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) {
+  if (!isAuthorisedCronRequest(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   if (!isEmailDeliveryConfigured()) {
@@ -87,8 +88,9 @@ export async function GET(request: Request) {
       const digest = buildDailyDigest((jobs ?? []) as DigestJob[], since);
       const origin = APP_URL;
       const firstName = profile?.full_name?.split(/\s+/)[0] || "there";
-      const email = renderDigestEmail(firstName, digest, origin);
-      await sendEmail(preference.email, email.subject, email.html);
+      const optOut = unsubscribeUrl(origin, preference.user_id);
+      const email = renderDigestEmail(firstName, digest, origin, optOut);
+      await sendEmail(preference.email, email.subject, email.html, { unsubscribeUrl: optOut });
       await admin.from("notification_preferences").update({ last_sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq("user_id", preference.user_id);
       sent += 1;
     } catch (caught) {

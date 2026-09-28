@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
+import { isAuthorisedCronRequest } from "@/lib/security/cron-secret";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { APP_URL } from "@/lib/site";
 import { runBriefSearch } from "@/lib/jobs/run-search";
 import { isJobSearchConfigured } from "@/lib/jobs/search-provider";
 import { renderMatchAlertEmail, selectNewMatches } from "@/lib/notifications/match-alerts";
+import { unsubscribeUrl } from "@/lib/notifications/unsubscribe";
 import { isEmailDeliveryConfigured, sendEmail } from "@/lib/notifications/send-email";
 
 /*
@@ -60,8 +62,7 @@ function maxUsersPerRun(): number {
 }
 
 export async function GET(request: Request) {
-  const secret = process.env.CRON_SECRET;
-  if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) {
+  if (!isAuthorisedCronRequest(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   if (!isEmailDeliveryConfigured()) {
@@ -118,8 +119,9 @@ export async function GET(request: Request) {
       if (matches.length) {
         const { data: profile } = await admin.from("profiles").select("full_name").eq("id", userId).maybeSingle();
         const firstName = (profile?.full_name as string | null)?.split(/\s+/)[0] || "there";
-        const email = renderMatchAlertEmail({ firstName, matches, criteria: outcome.criteria, appUrl: origin });
-        await sendEmail(preference.email as string, email.subject, email.html);
+        const optOut = unsubscribeUrl(origin, preference.user_id as string);
+        const email = renderMatchAlertEmail({ firstName, matches, criteria: outcome.criteria, appUrl: origin, unsubscribeUrl: optOut });
+        await sendEmail(preference.email as string, email.subject, email.html, { unsubscribeUrl: optOut });
         // Recorded after the send: a failed send leaves the matches for next
         // time rather than marking them as delivered.
         await admin.from("seen_job_matches").upsert(

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { getAuthenticatedUser } from "@/lib/auth";
 import { downloadDriveFile, downloadFileName } from "@/lib/integrations/drive";
 import { googleAccessToken } from "@/lib/integrations/store";
+import { scanUploadBytes, UploadRejectedError } from "@/lib/resume/scan-upload";
 import { MAX_UPLOAD_BYTES, RESUME_UPLOAD_BUCKET, detectKind, makeResumeObjectPath, normaliseResumeMimeType } from "@/lib/resume/upload";
 
 /*
@@ -74,6 +75,21 @@ export async function POST(request: Request) {
   const kind = detectKind(fileName, mimeType);
   if (!kind) {
     return NextResponse.json({ error: "Sartho can read PDF, Word and plain-text résumés." }, { status: 400 });
+  }
+
+  /*
+   * And the same content scan, before the bytes touch the bucket. A file from
+   * Drive is still a file somebody else may have made; if it carries scripts,
+   * macros or embedded programs it is refused here and never stored.
+   */
+  try {
+    scanUploadBytes(kind, bytes);
+  } catch (caught) {
+    if (caught instanceof UploadRejectedError) {
+      console.warn("Blocked a Drive résumé import", { userId: user.id, reason: caught.reason });
+      return NextResponse.json({ error: caught.message }, { status: 400 });
+    }
+    return NextResponse.json({ error: "Sartho could not read that file." }, { status: 400 });
   }
 
   const objectPath = makeResumeObjectPath(user.id, fileName);

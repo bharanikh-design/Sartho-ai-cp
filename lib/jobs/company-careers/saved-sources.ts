@@ -43,8 +43,21 @@ function readConfig(value: unknown, employer: string): EmployerPortalConfig | nu
     type,
     tenant: tenant.trim(),
     site: typeof raw.site === "string" && raw.site ? raw.site : undefined,
-    domain: typeof raw.domain === "string" && raw.domain ? raw.domain : undefined,
+    /*
+     * The stored host is only honoured when it is a Workday host. The row is
+     * writable by its owner straight through PostgREST, and a search — or the
+     * scheduled alert run, under the service role — fetches whatever host is
+     * here. An arbitrary host would make the server a proxy for probing.
+     */
+    domain: workdayHost(raw.domain),
   };
+}
+
+export function workdayHost(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const host = value.trim().toLowerCase();
+  if (!/^[a-z0-9][a-z0-9.-]*\.myworkdayjobs\.com$/.test(host)) return undefined;
+  return host;
 }
 
 export async function loadEmployerCareerSources(

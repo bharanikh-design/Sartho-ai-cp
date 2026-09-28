@@ -4,6 +4,7 @@ import { getAuthenticatedUser } from "@/lib/auth";
 import { APP_URL } from "@/lib/site";
 import { buildDailyDigest, renderDigestEmail, type DigestJob } from "@/lib/notifications/digest";
 import { isEmailDeliveryConfigured, sendEmail } from "@/lib/notifications/send-email";
+import { unsubscribeUrl } from "@/lib/notifications/unsubscribe";
 
 /*
  * Send the daily summary now, so delivery can be proved in ten seconds rather
@@ -48,7 +49,7 @@ export async function POST(request: Request) {
 
   const { data: existing } = await supabase
     .from("notification_preferences")
-    .select("daily_digest_last_test_at")
+    .select("email,daily_digest_last_test_at")
     .eq("user_id", user.id)
     .maybeSingle();
   const lastTest = existing?.daily_digest_last_test_at ? new Date(existing.daily_digest_last_test_at).getTime() : 0;
@@ -77,10 +78,11 @@ export async function POST(request: Request) {
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
   const digest = buildDailyDigest((jobs ?? []) as DigestJob[], since);
   const firstName = (profile?.full_name as string | null)?.split(/\s+/)[0] || "there";
-  const email = renderDigestEmail(firstName, digest, APP_URL);
+  const optOut = unsubscribeUrl(APP_URL, user.id);
+  const email = renderDigestEmail(firstName, digest, APP_URL, optOut);
 
   try {
-    await sendEmail(parsed.data.email, `${email.subject} (test)`, email.html);
+    await sendEmail(parsed.data.email, `${email.subject} (test)`, email.html, { unsubscribeUrl: optOut });
   } catch (caught) {
     /*
      * The provider's own words. "Domain not verified" and "invalid key" are
@@ -93,9 +95,14 @@ export async function POST(request: Request) {
     );
   }
 
+  /*
+   * A test is a test. It must not change where the scheduled digest goes:
+   * that address is chosen on the preferences form, and a test sent to a
+   * colleague's inbox used to quietly re-point both scheduled emails at it.
+   */
   await supabase.from("notification_preferences").upsert({
     user_id: user.id,
-    email: parsed.data.email,
+    email: (existing?.email as string | null) || parsed.data.email,
     daily_digest_last_test_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   });

@@ -26,7 +26,11 @@
  * centre for somebody signed in, an explanation of the product for everybody
  * else.
  */
-export const PUBLIC_PATHS = ["/", "/login", "/auth/callback", "/extension", "/privacy", "/terms", "/contact"] as const;
+/*
+ * The unsubscribe link is public because the person holding the email may
+ * have no account at all; the signed token in the link is its only credential.
+ */
+export const PUBLIC_PATHS = ["/", "/login", "/auth/callback", "/extension", "/privacy", "/terms", "/contact", "/api/notifications/unsubscribe"] as const;
 
 export function isPublicPath(pathname: string): boolean {
   /* A trailing slash is the same page. */

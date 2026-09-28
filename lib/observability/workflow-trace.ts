@@ -16,8 +16,6 @@ export function workflowTraceFromMetadata(value: unknown): string | undefined {
   return normaliseWorkflowTraceId((value as { workflowTraceId?: unknown }).workflowTraceId);
 }
 
-export const workflowTraceFromRuleAnalysis = workflowTraceFromMetadata;
-
 export function logWorkflowTrace(
   stage: string,
   workflowTraceId: string,

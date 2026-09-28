@@ -4,6 +4,8 @@ import { resumeContentSchema } from "@/lib/resume/content-schema";
 import { parseResumeContent } from "@/lib/resume/content";
 import { resumeDocxBuffer } from "@/lib/resume/docx";
 import { parseFidelity, type ParseFidelity } from "@/lib/resume/parse-check";
+import { scanPdfBytes, UploadRejectedError } from "@/lib/resume/scan-upload";
+import { MAX_UPLOAD_BYTES } from "@/lib/resume/upload";
 
 /*
  * Read the files back the way an applicant tracking system would.
@@ -18,7 +20,8 @@ import { parseFidelity, type ParseFidelity } from "@/lib/resume/parse-check";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-const MAX_PDF_BYTES = 8 * 1024 * 1024;
+/* The same ceiling every other résumé file is held to. */
+const MAX_PDF_BYTES = MAX_UPLOAD_BYTES;
 
 export async function POST(request: Request) {
   const { user } = await getAuthenticatedUser();
@@ -50,9 +53,17 @@ export async function POST(request: Request) {
   const pdfFile = form?.get("pdf");
   if (pdfFile instanceof File && pdfFile.size > 0) {
     if (pdfFile.size > MAX_PDF_BYTES) return NextResponse.json({ error: "That PDF is larger than 8 MB." }, { status: 400 });
+    const pdfBytes = new Uint8Array(await pdfFile.arrayBuffer());
+    /* Drawn by the browser from the person's own document, but still bytes from a client. */
+    try {
+      scanPdfBytes(pdfBytes);
+    } catch (caught) {
+      if (caught instanceof UploadRejectedError) return NextResponse.json({ error: caught.message }, { status: 400 });
+      return NextResponse.json({ error: "Sartho could not read that PDF." }, { status: 400 });
+    }
     try {
       const { extractText, getDocumentProxy } = await import("unpdf");
-      const document = await getDocumentProxy(new Uint8Array(await pdfFile.arrayBuffer()));
+      const document = await getDocumentProxy(pdfBytes);
       const { text } = await extractText(document, { mergePages: true });
       pdf = parseFidelity(content, Array.isArray(text) ? text.join("\n") : text);
     } catch (caught) {

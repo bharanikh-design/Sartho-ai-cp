@@ -131,12 +131,13 @@ function adzunaConfig() {
  * career pages) is preferred unless JOBS_SEARCH_PROVIDER pins a choice.
  */
 export function activeJobSearchProvider(): JobSearchProviderName | null {
-  const override = process.env.JOBS_SEARCH_PROVIDER?.trim().toLowerCase();
-  if (override === "adzuna") return adzunaConfig() ? "adzuna" : null;
-  if (override === "jsearch") return jsearchConfig() ? "jsearch" : null;
-  if (jsearchConfig()) return "jsearch";
-  if (adzunaConfig()) return "adzuna";
-  return null;
+  /*
+   * One answer for "is search configured", shared with the diagnostics. This
+   * used to test JSearch and Adzuna only, so a deployment carrying nothing but
+   * a SerpApi key was reported healthy by /api/diagnostics/jobs and refused by
+   * every real search, the scheduled alerts and the Search Brief page.
+   */
+  return configuredJobSearchProviders()[0] ?? null;
 }
 
 export function isJobSearchConfigured(): boolean {
@@ -587,11 +588,11 @@ async function searchJSearch(query: JobSearchQuery): Promise<JobSearchResult[]> 
      * whatever else the provider said. A bad paste is still diagnosable; it is
      * diagnosable by the administrator, where it belongs.
      */
-    const key = config.key;
+    /* The key's length is enough to spot a bad paste; none of its characters go to the log. */
     console.error("JSearch request refused", {
       status: response.status,
       detail,
-      keyHint: `${key.length}ch ${key.slice(0, 3)}…${key.slice(-3)}`,
+      keyLength: config.key.length,
     });
     throw new Error(`JSearch returned ${response.status}${detail ? ` — ${detail}` : ""}`);
   }
