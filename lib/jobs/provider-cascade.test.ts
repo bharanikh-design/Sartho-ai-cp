@@ -64,6 +64,71 @@ describe("provider cascade", () => {
     expect(cascade.errors).toEqual([]);
   });
 
+  /*
+   * Why a provider stopped being asked, and whether a second attempt could
+   * change that. A refused key and a spent allowance are the operator's to
+   * fix; two timeouts are weather.
+   */
+  it("retires a provider for good on a refused key, and says so", async () => {
+    const { asked, search } = recorder({
+      jsearch: async () => { throw new Error("JSearch returned 401 — not subscribed"); },
+      adzuna: async () => [result("https://b")],
+    });
+    const cascade = createProviderCascade(BOTH, { search });
+
+    await cascade.run(query);
+    await cascade.run(query);
+    expect(asked).toEqual(["jsearch", "adzuna", "adzuna"]);
+    expect(cascade.retirements()).toEqual([
+      { provider: "jsearch", cause: "auth", message: "Google for Jobs: JSearch returned 401 — not subscribed" },
+    ]);
+    expect(cascade.retryable(), "Adzuna is still there to ask").toBe(true);
+  });
+
+  it("knows when a second attempt could not help", async () => {
+    const { search } = recorder({
+      jsearch: async () => { throw new JobSearchNotConfiguredError(); },
+      adzuna: async () => { throw new Error("Adzuna search failed (403) — you have exceeded the MONTHLY quota."); },
+    });
+    const cascade = createProviderCascade(BOTH, { search });
+
+    await cascade.run(query);
+    expect(cascade.exhausted()).toBe(true);
+    expect(cascade.retirements().map((entry) => entry.cause)).toEqual(["not_configured", "spent_allowance"]);
+    expect(cascade.retryable()).toBe(false);
+  });
+
+  it("keeps two timeouts as weather a retry may clear", async () => {
+    const timeout = () => {
+      const error = new Error("timed out");
+      error.name = "TimeoutError";
+      throw error;
+    };
+    const { search } = recorder({ jsearch: async () => timeout(), adzuna: async () => timeout() });
+    const cascade = createProviderCascade(BOTH, { search });
+
+    await cascade.run({ ...query, timeoutMs: 1_000 });
+    await cascade.run({ ...query, timeoutMs: 1_000 });
+    expect(cascade.exhausted()).toBe(true);
+    expect(cascade.retirements().map((entry) => entry.cause)).toEqual(["timeouts", "timeouts"]);
+    expect(cascade.retryable()).toBe(true);
+  });
+
+  it("carries retirements it was told to presume, without asking them again", async () => {
+    const { asked, search } = recorder({ adzuna: async () => [result("https://b")] });
+    const cascade = createProviderCascade(BOTH, {
+      search,
+      presumeDead: [{ provider: "jsearch", cause: "spent_allowance", message: "Google for Jobs: quota spent" }],
+    });
+
+    await expect(cascade.run(query)).resolves.toHaveLength(1);
+    expect(asked).toEqual(["adzuna"]);
+    expect(cascade.willAsk("jsearch")).toBe(false);
+    expect(cascade.retirements()).toEqual([{ provider: "jsearch", cause: "spent_allowance", message: "Google for Jobs: quota spent" }]);
+    /* The page served by Adzuna still says why it came from there. */
+    expect(cascade.errorsThatCostResults()).toEqual(["Google for Jobs: quota spent"]);
+  });
+
   it("falls through on a thrown error and reports it", async () => {
     const { asked, search } = recorder({
       jsearch: async () => { throw new Error("JSearch returned 401 — not subscribed"); },

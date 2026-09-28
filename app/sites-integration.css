@@ -522,3 +522,6 @@
 .search-filter-notes{display:grid;gap:6px;margin:10px 0 2px;padding:0 0 0 18px;list-style:disc}
 .search-filter-notes li{color:var(--text-tertiary);font-size:var(--text-2xs);line-height:1.55}
 .search-filter-notes li::marker{color:var(--line-bright)}
+/* A refresh that failed while the last good results stayed on the page. */
+.search-refresh-notice{margin:10px 0 2px;padding:10px 12px;border:1px solid rgba(255,211,122,.3);border-radius:10px;background:rgba(255,211,122,.07);color:var(--amber);font-size:var(--text-xs);line-height:1.55}
+.search-refresh-notice strong{color:inherit}

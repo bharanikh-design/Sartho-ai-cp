@@ -26,9 +26,41 @@ import {
  * query — which is what "fall-back order" meant all along.
  */
 
+/*
+ * Why a provider stopped being asked.
+ *
+ * Two kinds, and the difference decides everything downstream. Timeouts and a
+ * run of errors are weather: a second attempt after a pause may find the
+ * provider answering. A missing key, a spent monthly allowance and a refused
+ * key are not: no number of retries changes them, so a retry is told to
+ * presume them dead, and the operator is told to fix them.
+ */
+export type RetirementCause = "not_configured" | "spent_allowance" | "auth" | "timeouts" | "errors";
+
+export type ProviderRetirement = { provider: JobSearchProviderName; cause: RetirementCause; message: string };
+
+export function isTerminalCause(cause: RetirementCause): boolean {
+  return cause === "not_configured" || cause === "spent_allowance" || cause === "auth";
+}
+
+/*
+ * A refusal of the key itself: 401 and 403 from the jobs providers, "not
+ * subscribed" from RapidAPI, an invalid key from Adzuna. Matched narrowly,
+ * because a 429 is a rate limit and gets the ordinary two chances.
+ */
+export function isAuthRefusal(message: string): boolean {
+  return /\b(?:401|403)\b|not subscribed|unauthori[sz]ed|forbidden|invalid (?:api )?key|api key (?:is )?invalid|authentication failed/i.test(message);
+}
+
 export type ProviderCascadeOptions = {
   /** Injected so the cascade is testable without a network. */
   search?: (provider: JobSearchProviderName, query: JobSearchQuery) => Promise<JobSearchResult[]>;
+  /**
+   * What an earlier attempt already learned. A retry starts with fresh
+   * strikes for the providers that might answer, but a key that was missing
+   * a moment ago is still missing, so those are carried in as retired.
+   */
+  presumeDead?: ProviderRetirement[];
   /**
    * Consecutive failures before a provider is dropped for the rest of the run.
    * Two rather than one: a single timeout is weather, not a broken key, and
@@ -91,6 +123,10 @@ export type ProviderCascade = {
   calledLast: (provider: JobSearchProviderName) => boolean;
   /** True once no provider is left worth asking. */
   exhausted: () => boolean;
+  /** Every provider retired this run, with why; presumed retirements included. */
+  retirements: () => ProviderRetirement[];
+  /** Whether a second attempt could reach anyone: a provider still alive, or retired for a reason a pause can mend. */
+  retryable: () => boolean;
   /** Human-readable failures. Every one, for the log and the nobody-answered case. */
   errors: string[];
   /**
@@ -150,6 +186,7 @@ export function createProviderCascade(
   const maxCalls = options.maxCalls ?? {};
 
   const dead = new Set<JobSearchProviderName>();
+  const retired = new Map<JobSearchProviderName, ProviderRetirement>();
   const failures = new Map<JobSearchProviderName, number>();
   const errors: string[] = [];
   /* Kept beside the message so a failure can be placed in the order later. */
@@ -161,6 +198,22 @@ export function createProviderCascade(
   let lastCalled = new Set<JobSearchProviderName>();
   let lastAllowedMs = 0;
 
+  /* Retired once; the first cause is the one that counts. */
+  function retire(provider: JobSearchProviderName, cause: RetirementCause, message: string) {
+    dead.add(provider);
+    if (!retired.has(provider)) retired.set(provider, { provider, cause, message });
+  }
+
+  /*
+   * Carried in as failures as well as retirements, so a page served by the
+   * provider behind a presumed-dead one still says why it came from there.
+   */
+  for (const entry of options.presumeDead ?? []) {
+    if (!providers.includes(entry.provider)) continue;
+    retire(entry.provider, entry.cause, entry.message);
+    record(entry.provider, entry.message);
+  }
+
   function recordFailure(provider: JobSearchProviderName, caught: unknown) {
     /*
      * A missing key is not a flaky call. There is no number of retries that
@@ -168,8 +221,9 @@ export function createProviderCascade(
      * the first attempt rather than after the usual two.
      */
     if (caught instanceof JobSearchNotConfiguredError) {
-      dead.add(provider);
-      record(provider, `${providerLabel(provider)} is not configured.`);
+      const message = `${providerLabel(provider)} is not configured.`;
+      retire(provider, "not_configured", message);
+      record(provider, message);
       return;
     }
 
@@ -200,7 +254,7 @@ export function createProviderCascade(
       record(provider, `${label}: ${caught.message}`);
       const slow = (failures.get(provider) ?? 0) + 1;
       failures.set(provider, slow);
-      if (slow >= failuresBeforeDead) dead.add(provider);
+      if (slow >= failuresBeforeDead) retire(provider, "timeouts", `${label}: ${caught.message}`);
       return;
     }
 
@@ -212,21 +266,38 @@ export function createProviderCascade(
      * being asked twice a run to establish that again.
      */
     if (caught instanceof Error && isSpentAllowance(caught.message)) {
-      dead.add(provider);
-      record(provider, `${providerLabel(provider)}: ${caught.message}`);
+      const message = `${providerLabel(provider)}: ${caught.message}`;
+      retire(provider, "spent_allowance", message);
+      record(provider, message);
       return;
     }
 
+    /*
+     * A refused key, which is the same shape again: the provider will refuse
+     * the next call exactly as it refused this one. Retired at once, and it is
+     * the operator's to fix, so the cause is kept for them.
+     */
+    if (caught instanceof Error && isAuthRefusal(caught.message)) {
+      const message = `${providerLabel(provider)}: ${caught.message}`;
+      retire(provider, "auth", message);
+      record(provider, message);
+      return;
+    }
+
+    const isTimeout = caught instanceof Error && (caught.name === "TimeoutError" || caught.name === "AbortError");
+    const message = isTimeout
+      ? `${providerLabel(provider)} timed out after ${lastAllowedMs}ms`
+      : `${providerLabel(provider)}: ${caught instanceof Error ? caught.message : "unknown error"}`;
     const count = (failures.get(provider) ?? 0) + 1;
     failures.set(provider, count);
-    if (count >= failuresBeforeDead) dead.add(provider);
+    if (count >= failuresBeforeDead) retire(provider, isTimeout ? "timeouts" : "errors", message);
 
     /*
      * A timeout is reported to the console rather than to the person. It says
      * nothing they can act on, and one slow query should not put a red error
      * across a page that did find roles.
      */
-    if (caught instanceof Error && (caught.name === "TimeoutError" || caught.name === "AbortError")) {
+    if (isTimeout) {
       const label = providerLabel(provider);
       timeouts.set(label, (timeouts.get(label) ?? 0) + 1);
       timeoutWaits.set(label, Math.max(timeoutWaits.get(label) ?? 0, lastAllowedMs));
@@ -251,11 +322,11 @@ export function createProviderCascade(
        * is weather.
        */
       if (lastAllowedMs && lastAllowedMs >= providerCallBudgetMs(provider)) {
-        dead.add(provider);
+        retire(provider, "timeouts", `${message}, its full budget`);
       }
       return;
     }
-    record(provider, `${providerLabel(provider)}: ${caught instanceof Error ? caught.message : "unknown error"}`);
+    record(provider, message);
   }
 
   function record(provider: JobSearchProviderName, message: string) {
@@ -374,6 +445,8 @@ export function createProviderCascade(
     willAsk,
     calledLast: (provider) => lastCalled.has(provider),
     exhausted: () => providers.every((provider) => dead.has(provider)),
+    retirements: () => [...retired.values()],
+    retryable: () => providers.some((provider) => !dead.has(provider) || !isTerminalCause(retired.get(provider)?.cause ?? "errors")),
     errors,
     errorsThatCostResults,
     used,

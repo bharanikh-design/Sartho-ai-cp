@@ -144,3 +144,21 @@ describe("searchFilterNotes", () => {
     expect(text({ providerErrors: ["", RATE_LIMITED] })).toContain("Adzuna: 429 Too Many Requests.");
   });
 });
+
+describe("the retried note", () => {
+  /*
+   * A search that quietly took twice as long should not read as a slow
+   * market: the note says a second attempt was made, and why it was needed.
+   */
+  it("says a second attempt was made, and why", () => {
+    const notes = searchFilterNotes({ retried: true, retryReason: "Adzuna: 503 Service Unavailable." });
+    expect(notes.map((note) => note.id)).toEqual(["retried"]);
+    expect(notes[0].text).toContain("first attempt");
+    expect(notes[0].text).toContain("Adzuna: 503 Service Unavailable");
+    expect(notes[0].text).toContain("second attempt");
+  });
+
+  it("says nothing when the first attempt was enough", () => {
+    expect(searchFilterNotes({ retried: false })).toEqual([]);
+  });
+});

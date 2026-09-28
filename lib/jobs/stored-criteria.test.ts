@@ -104,6 +104,13 @@ describe("normaliseCriteria", () => {
     expect(criteria.employerPortals).toEqual([{ employer: "Example Co", status: "failed", found: 0 }]);
   });
 
+  it("keeps the record of a second attempt", () => {
+    const criteria = normaliseCriteria({ retried: true, retryReason: "Adzuna: 503 Service Unavailable." });
+    expect(criteria.retried).toBe(true);
+    expect(criteria.retryReason).toBe("Adzuna: 503 Service Unavailable.");
+    expect(normaliseCriteria({}).retried).toBeUndefined();
+  });
+
   it("preserves a valid workflow trace and ignores malformed legacy values", () => {
     const valid = "wft_123e4567-e89b-42d3-a456-426614174000";
     expect(normaliseCriteria({ workflowTraceId: valid }).workflowTraceId).toBe(valid);

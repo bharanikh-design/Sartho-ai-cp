@@ -38,7 +38,9 @@ import {
   sortByRelevance,
   type SearchRelevanceTier,
 } from "@/lib/jobs/search-relevance";
-import { createProviderCascade } from "@/lib/jobs/provider-cascade";
+import { createProviderCascade, isTerminalCause, type ProviderRetirement } from "@/lib/jobs/provider-cascade";
+import { alertProviderRetirements } from "@/lib/jobs/provider-alerts";
+import { RETRY_PAUSE_MS, shouldRetrySearch } from "@/lib/jobs/search-retry";
 import { keepWorkModels } from "@/lib/jobs/work-model";
 import {
   MAX_COMPANY_QUERIES,
@@ -216,6 +218,13 @@ export type SearchCriteria = {
   /** Listings removed because they route through a job board, not the employer. */
   jobBoardHidden?: number;
   providerErrors?: string[];
+  /**
+   * True when the first attempt found nothing and a second was made, and the
+   * reason the first came back empty. Reported because a search that quietly
+   * took twice as long should not look like a slow market.
+   */
+  retried?: boolean;
+  retryReason?: string;
   /**
    * Providers that ran out of time, and how often. Said out loud because a
    * provider quietly dropping out is indistinguishable, from the page, from a
@@ -871,7 +880,8 @@ export async function runBriefSearch(
   const cacheStore = createSearchCacheStore(supabase);
   let deepSearchesSpent = 0;
 
-  const cascade = createProviderCascade(providers, {
+  const buildCascade = (presumeDead: ProviderRetirement[]) => createProviderCascade(providers, {
+    presumeDead,
     search: async (provider, query) => {
       if (provider !== "serpapi") return searchWithProvider(provider, query);
       const outcome = await searchSerpApiCached(query, cacheStore, {
@@ -883,6 +893,7 @@ export async function runBriefSearch(
       return outcome.results;
     },
   });
+  let cascade = buildCascade([]);
 
   /*
    * What one provider call may spend, given what is left.
@@ -1063,6 +1074,50 @@ export async function runBriefSearch(
   await run(queries);
 
   /*
+   * One quiet second attempt.
+   *
+   * A search that found nothing because the providers were failing went
+   * straight to the page as an error, and the person's only recourse was to
+   * press the button again — which, for a rate-limit blip or a provider that
+   * was briefly unreachable, is exactly what would have worked. So the engine
+   * presses it for them, once, after a short pause, while there is still
+   * budget for a real attempt.
+   *
+   * Only once, and only for trouble a pause can mend. A missing key, a spent
+   * monthly allowance and a refused key are carried into the second attempt
+   * as already retired, so the pause is not spent asking them again. The
+   * page is told a second attempt was made and why, because a search that
+   * quietly took twice as long should not look like a slow market.
+   */
+  let retried = false;
+  let retryReason: string | undefined;
+  let firstAttemptErrors: string[] = [];
+  const terminal = cascade.retirements().filter((entry) => isTerminalCause(entry.cause));
+  const reviving = providers.filter((provider) => !terminal.some((entry) => entry.provider === provider));
+  if (
+    shouldRetrySearch({
+      found: byUrl.size,
+      troubled: cascade.errors.length > 0 || cascade.timeouts.size > 0,
+      retryable: cascade.retryable(),
+      remainingMs: remainingMs(),
+      leadCallBudgetMs: reviving.length ? providerCallBudgetMs(reviving[0]) : MAX_CALL_MS,
+    })
+  ) {
+    retried = true;
+    firstAttemptErrors = cascade.errorsThatCostResults();
+    retryReason = firstAttemptErrors.length
+      ? firstAttemptErrors.join(" ")
+      : `${[...cascade.timeouts.keys()].join(" and ")} did not answer in time`;
+    console.warn("Jobs search found nothing on its first attempt; trying once more", { reason: retryReason });
+    await new Promise((resolve) => setTimeout(resolve, RETRY_PAUSE_MS));
+    cascade = buildCascade(terminal);
+    queriesRun = 0;
+    queriesSkipped = 0;
+    queriesStoppedBecause = undefined;
+    await run(queries);
+  }
+
+  /*
    * Direct company career portal search: for target employers that have known
    * ATS endpoints (Workday CXS, Greenhouse), query them directly to fetch
    * authentic first-party listings with direct apply links and 0 CAPTCHAs.
@@ -1125,10 +1180,23 @@ export async function runBriefSearch(
     await Promise.allSettled(directQueries);
   }
 
-  if (!byUrl.size && cascade.errors.length) {
+  /*
+   * A provider that is out for good — no key, a spent allowance, a refused
+   * key — is the operator's to fix, and a live search is where it is noticed
+   * first. Said once per provider per window, whether or not this search
+   * survived it, and never allowed to cost the search anything.
+   */
+  await alertProviderRetirements(cascade.retirements());
+
+  if (!byUrl.size && (cascade.errors.length || firstAttemptErrors.length)) {
     /* The log keeps every word; the person gets the cause without the sales copy. */
-    console.error("Jobs search failed", cascade.errors);
-    return { ok: false, code: "provider_error", error: `Jobs provider error: ${cascade.errorsThatCostResults().join("; ")}` };
+    const costly = [...new Set([...firstAttemptErrors, ...cascade.errorsThatCostResults()])];
+    console.error("Jobs search failed", { attempts: retried ? 2 : 1, errors: cascade.errors, firstAttemptErrors });
+    return {
+      ok: false,
+      code: "provider_error",
+      error: `Jobs provider error${retried ? " after two attempts" : ""}: ${costly.join("; ")}`,
+    };
   }
 
 
@@ -1476,6 +1544,8 @@ export async function runBriefSearch(
     semanticJobsFailed,
     familyWarnings,
     directEmployersOnly: searchIntent.directEmployersOnly ?? undefined,
+    retried: retried || undefined,
+    retryReason: retried ? retryReason : undefined,
     /*
      * Listings with nowhere to apply, removed above.
      *
@@ -1736,6 +1806,8 @@ export function normaliseCriteria(stored: unknown): SearchCriteria {
     workModelHidden: count(value.workModelHidden),
     providers: strings(value.providers),
     directEmployersOnly: value.directEmployersOnly === true,
+    retried: value.retried === true ? true : undefined,
+    retryReason: typeof value.retryReason === "string" && value.retryReason ? value.retryReason : undefined,
     agencyOrUnverifiedHidden: count(value.agencyOrUnverifiedHidden),
     jobBoardHidden: count(value.jobBoardHidden),
     providerErrors: strings(value.providerErrors),
