@@ -132,3 +132,73 @@ describe("the seniority and function guard", () => {
     expect(ungated.map((suggestion) => suggestion.name)).toEqual(["Solutions Consultant"]);
   });
 });
+
+/*
+ * What happens when the guard removes everything.
+ *
+ * The guard itself is right, and worth not maligning: an eight-year Senior
+ * Business Analyst is still offered Data Manager, Analytics Manager, Lead
+ * Business Analyst and Principal Analyst. It drops Head of Data and Chief
+ * Data Officer on seniority — more than one grade up — and sales or marketing
+ * moves on function, both of which are the rules doing their job.
+ *
+ * The failure is narrower and it is a tail: on a round where the model happens
+ * to propose ONLY roles that each trip one of those rules, the whole set
+ * vanishes and the page says "AI could not create grounded suggestions right
+ * now" — which is false. The model worked. We discarded all of it.
+ *
+ * The route's recovery is to ground a second time with the guard omitted and
+ * label what comes back. These tests fix both halves: the guard is what empties
+ * it, and omitting the guard is what recovers it WITHOUT loosening the evidence
+ * rule, which must never bend.
+ */
+describe("recovering a set the guard emptied", () => {
+  const evidence = [
+    { id: "e1", claim: "Owned analytics delivery across a retail estate." },
+    { id: "e2", claim: "Ran the reporting function for three business units." },
+  ];
+  const analyst = {
+    heldTitles: ["Senior Business Analyst"],
+    totalExperienceYears: 8,
+    allowFunctionChange: false,
+  };
+  /* One trips seniority, the other trips function. Neither survives. */
+  const allBlocked = { suggestions: [
+    { name: "Chief Data Officer", path: "stretch" as const, rationale: "Builds on multi-unit reporting ownership.", evidenceIds: ["e2"] },
+    { name: "Enterprise Sales Manager", path: "adjacent" as const, rationale: "Transfers stakeholder work into revenue.", evidenceIds: ["e1"] },
+  ] };
+
+  it("is emptied by the guard, which is the bug the page was reporting", () => {
+    expect(groundDirectionSuggestions(allBlocked, evidence, [], analyst)).toEqual([]);
+  });
+
+  it("keeps the in-family progressions the guard was never meant to block", () => {
+    /* Named so a future tightening cannot quietly take these away too. */
+    for (const name of ["Data Manager", "Analytics Manager", "Lead Business Analyst", "Principal Analyst"]) {
+      const kept = groundDirectionSuggestions(
+        { suggestions: [{ name, path: "direct", rationale: "Supported by delivery evidence.", evidenceIds: ["e1"] }] },
+        evidence, [], analyst,
+      );
+      expect(kept.map((item) => item.name), name).toEqual([name]);
+    }
+  });
+
+  it("comes back once the guard is dropped", () => {
+    const recovered = groundDirectionSuggestions(allBlocked, evidence, []);
+    expect(recovered.map((item) => item.name)).toEqual(["Chief Data Officer", "Enterprise Sales Manager"]);
+    /* Still carrying their citations — the recovery is not a loosening of that. */
+    expect(recovered.every((item) => item.evidenceIds.length > 0)).toBe(true);
+  });
+
+  it("still refuses a fabrication with the guard dropped", () => {
+    /*
+     * The line the recovery must not cross. Relaxing "this may not suit you"
+     * is a judgement call; relaxing "you have never done this" is a lie, and
+     * an empty page is better than one.
+     */
+    const invented = { suggestions: [
+      { name: "Chief Technology Officer", path: "stretch" as const, rationale: "Nothing supplied supports this.", evidenceIds: ["not-a-real-id"] },
+    ] };
+    expect(groundDirectionSuggestions(invented, evidence, [])).toEqual([]);
+  });
+});
