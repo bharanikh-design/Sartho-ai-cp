@@ -68,6 +68,14 @@ export function CareerDirectionEditor({
   const [dismissed, setDismissed] = useState<string[]>(initialDismissed);
   const [aiStatus, setAiStatus] = useState<"idle" | "loading" | "ready" | "error">(initialSuggestions.length ? "ready" : "idle");
   const [aiError, setAiError] = useState<string | null>(null);
+  /*
+   * Something worth saying that is not a failure — the directions reach
+   * further than usual, or nothing could be grounded this time. Separate from
+   * `aiError` so it is not dressed as an alert: the difference between "this
+   * broke" and "here is what happened" is most of what makes a product feel
+   * trustworthy when it cannot do the thing.
+   */
+  const [aiNotice, setAiNotice] = useState<string | null>(null);
   const [rankings, setRankings] = useState<GroundedRoleRanking[]>([]);
   const [rankStatus, setRankStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [rankError, setRankError] = useState<string | null>(null);
@@ -168,6 +176,7 @@ export function CareerDirectionEditor({
     if (aiStatus === "loading") return;
     setAiStatus("loading");
     setAiError(null);
+    setAiNotice(null);
     setDismissed([]);
     try {
       const response = await fetch("/api/career/direction/suggestions", {
@@ -182,9 +191,24 @@ export function CareerDirectionEditor({
           existingLanes: lanes.map((lane) => lane.name),
         }),
       });
-      const result = await response.json() as { suggestions?: GroundedDirectionSuggestion[]; error?: string };
+      const result = await response.json() as {
+        suggestions?: GroundedDirectionSuggestion[];
+        notice?: string | null;
+        error?: string;
+      };
       if (!response.ok || !result.suggestions) throw new Error(result.error ?? "AI could not create suggestions.");
-      setSuggestions(result.suggestions);
+
+      /*
+       * A run that produced nothing must not take away what is already here.
+       *
+       * The route answers 200 with an empty list and a notice when the model
+       * was unreachable or nothing could be tied back to approved evidence —
+       * neither of which is a reason to clear the rail. Replacing only on a
+       * non-empty result means a failed refresh costs the person nothing but
+       * the wait.
+       */
+      if (result.suggestions.length) setSuggestions(result.suggestions);
+      setAiNotice(result.notice ?? null);
       setAiStatus("ready");
     } catch (caught) {
       setAiError(caught instanceof Error ? caught.message : "AI could not create suggestions.");
@@ -317,6 +341,7 @@ export function CareerDirectionEditor({
             ) : null}
           </div>
           {aiError ? <div className="direction-ai-message is-error" role="alert">{aiError}</div> : null}
+          {aiNotice ? <div className="direction-ai-message" role="status">{aiNotice}</div> : null}
         </div>
 
         {aiStatus === "loading" ? (
