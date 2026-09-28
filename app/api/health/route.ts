@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { isJobSearchConfigured } from "@/lib/jobs/search-provider";
 import { isEmailDeliveryConfigured } from "@/lib/notifications/send-email";
 import { recentScheduledRuns, scheduledJobsHealth, type ScheduledJobHealth } from "@/lib/operations/scheduled-runs";
+import { secretCipherStatus } from "@/lib/security/secret-cipher";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 /*
@@ -33,6 +34,12 @@ type HealthReport = {
     database: { ok: boolean; detail: string };
     email: { configured: boolean };
     jobSearch: { configured: boolean };
+    /*
+     * Whether the Drive integration can store a grant. The key itself is
+     * write-only everywhere, so this is the only place its shape can be
+     * confirmed from outside: `problem` names a malformed key, in fixed words.
+     */
+    integrations: { driveTokenKey: { configured: boolean; problem: string | null } };
     scheduledJobs:
       | { available: true; jobs: Array<Pick<ScheduledJobHealth, "job" | "label" | "state" | "lastRunAt" | "lastSuccessAt" | "message">> }
       | { available: false; detail: string };
@@ -70,6 +77,7 @@ async function inspect(): Promise<HealthReport> {
   }
 
   const jobsHealthy = scheduledJobs.available && scheduledJobs.jobs.every((job) => job.state === "healthy");
+  const cipher = secretCipherStatus();
 
   return {
     status: database.ok && jobsHealthy ? "ok" : "degraded",
@@ -79,6 +87,8 @@ async function inspect(): Promise<HealthReport> {
       database,
       email: { configured: isEmailDeliveryConfigured() },
       jobSearch: { configured: isJobSearchConfigured() },
+      /* Reported, not scored: a deployment without Drive is whole, not degraded. */
+      integrations: { driveTokenKey: { configured: cipher.configured, problem: cipher.problem } },
       scheduledJobs,
     },
   };
