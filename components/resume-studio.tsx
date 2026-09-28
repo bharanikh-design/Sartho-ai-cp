@@ -1499,10 +1499,31 @@ return (
           <span className="studio-quick-action-icon" aria-hidden="true">＋</span>
           <span><strong>Add résumé</strong><small>Upload or manage source documents</small></span>
         </button>
-        <a className="studio-quick-action" href="#create" aria-disabled={!canBuild}>
-          <span className="studio-quick-action-icon" aria-hidden="true">✦</span>
-          <span><strong>Build résumé</strong><small>{canBuild ? "Tailor to an analysed role" : "Analyse a role to unlock"}</small></span>
-        </a>
+        {/*
+          * A link only while there is somewhere to go.
+          *
+          * This was always an anchor to #create, and #create is rendered only
+          * when `canBuild`. So for everybody the studio cannot build for —
+          * no approved evidence, no saved roles, none analysed, or every
+          * analysed role already drafted — the tile looked live, read "Analyse
+          * a role to unlock", and did nothing at all when clicked.
+          *
+          * `aria-disabled` is not enough: it tells a screen reader the control
+          * is off and leaves the click working for everybody else. The empty
+          * state below already withholds its build button on exactly this
+          * condition; this nav was the copy of the rule that never got made.
+          */}
+        {canBuild ? (
+          <a className="studio-quick-action" href="#create">
+            <span className="studio-quick-action-icon" aria-hidden="true">✦</span>
+            <span><strong>Build résumé</strong><small>Tailor to an analysed role</small></span>
+          </a>
+        ) : (
+          <button type="button" className="studio-quick-action" disabled>
+            <span className="studio-quick-action-icon" aria-hidden="true">✦</span>
+            <span><strong>Build résumé</strong><small>Analyse a role to unlock</small></span>
+          </button>
+        )}
       </nav>
 
       <section className="glass-card content-card" id="drafts">

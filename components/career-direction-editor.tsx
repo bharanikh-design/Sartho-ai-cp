@@ -345,8 +345,50 @@ export function CareerDirectionEditor({
         </div>
 
         {aiStatus === "loading" ? (
-          <div className="direction-suggestion-rail" aria-label="Generating career suggestions">
-            {[1, 2, 3].map((item) => <div key={item} className="direction-suggestion-card direction-suggestion-skeleton" />)}
+          /*
+           * The wait, shaped like the answer.
+           *
+           * This was three empty 250px slabs with a faint wash moving across
+           * them. It told somebody nothing except that the page had stopped,
+           * and because the blocks matched nothing in the result, the arrival
+           * of the real cards read as a jolt rather than as the same thing
+           * filling in.
+           *
+           * Each placeholder is now the card's own anatomy — badge, role name,
+           * three lines of reasoning, the disclosure, the two evidence rows,
+           * the link and the action — in the card's own frame and padding. So
+           * the shape on screen while waiting is the shape that arrives, and
+           * the swap is a fade rather than a relayout.
+           */
+          <div className="direction-suggestion-rail" role="status" aria-busy="true" aria-label="Generating career suggestions">
+            <span className="skeleton-sr-only">Sartho is reading your evidence and drafting role suggestions.</span>
+            {[1, 2, 3].map((item) => (
+              <div key={item} className="direction-suggestion-card direction-suggestion-skeleton" aria-hidden="true">
+                <div className="skeleton-suggestion-top">
+                  <span className="skeleton-bar is-pill" />
+                  <span className="skeleton-bar is-dot" />
+                </div>
+                {/* Two lines, because most role titles take two. */}
+                <div className="skeleton-suggestion-title">
+                  <span className="skeleton-bar is-title" />
+                  <span className="skeleton-bar is-title is-short" />
+                </div>
+                <div className="skeleton-suggestion-lines">
+                  <span className="skeleton-bar" />
+                  <span className="skeleton-bar" />
+                  <span className="skeleton-bar" />
+                  <span className="skeleton-bar is-short" />
+                </div>
+                <span className="skeleton-bar is-summary" />
+                {/* Label and value, the shape of the Evidence / Move rows. */}
+                <div className="skeleton-suggestion-meta">
+                  <span><span className="skeleton-bar is-label" /><span className="skeleton-bar" /></span>
+                  <span><span className="skeleton-bar is-label" /><span className="skeleton-bar" /></span>
+                </div>
+                <span className="skeleton-bar is-link" />
+                <span className="skeleton-bar is-action" />
+              </div>
+            ))}
           </div>
         ) : visibleSuggestions.length ? (
           <div className="direction-suggestion-rail" ref={railRef} onScroll={measureRail} tabIndex={0} aria-live="polite">

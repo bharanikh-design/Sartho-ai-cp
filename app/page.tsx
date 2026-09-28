@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { OnboardingCarousel } from "@/components/onboarding-carousel";
 import { ProductPageHeader } from "@/components/product-page-header";
 import { ResumeImport } from "@/components/resume-import";
 import { SignedOutHome } from "@/components/signed-out-home";
@@ -85,7 +84,6 @@ export default async function DashboardPage({
     return (
       <>
       <div className="page-stack dashboard-page">
-        <OnboardingCarousel user={user} />
         <Link href="/welcome" className="tour-replay-link" title="Take the Sartho product tour" aria-label="Take the Sartho product tour"><span aria-hidden="true">▶</span> Tour</Link>
         <ProductPageHeader
           eyebrow="Welcome to Sartho"
@@ -128,7 +126,6 @@ export default async function DashboardPage({
   return (
     <>
     <div className="page-stack dashboard-page command-centre-page">
-      <OnboardingCarousel user={user} />
       <Link href="/welcome" className="tour-replay-link" title="Take the Sartho product tour" aria-label="Take the Sartho product tour"><span aria-hidden="true">▶</span> Tour</Link>
       <ProductPageHeader
         eyebrow="Career Command Centre"

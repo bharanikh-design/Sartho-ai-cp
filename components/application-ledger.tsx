@@ -220,7 +220,7 @@ export function ApplicationLedger({ initialJobs }: { initialJobs: JobRecord[] })
           </div>
           {filter
             ? <button type="button" className="secondary-button" onClick={() => setFilter(null)}>Show all</button>
-            : <Link href="#add-role" className="secondary-button">Analyse another role</Link>}
+            : <Link href="/analyse" className="secondary-button">Analyse another role</Link>}
         </div>
 
         {error ? <div className="inline-error" role="alert">{error}</div> : null}
@@ -256,7 +256,7 @@ export function ApplicationLedger({ initialJobs }: { initialJobs: JobRecord[] })
           </div>
         ) : (
           <div className="empty-inline-state">
-            No applications yet. <Link href="#add-role">Analyse and save your first role</Link> above — it will track here through interview and outcome.
+            No applications yet. <Link href="/analyse">Analyse your first role</Link> — every role you save tracks here through interview and outcome.
           </div>
         )}
       </section>

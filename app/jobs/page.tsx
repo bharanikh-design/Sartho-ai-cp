@@ -1,10 +1,14 @@
 import { redirect } from "next/navigation";
 
 /*
- * Opportunities has been folded into Applications — adding and analysing a role
- * now happens there. This route is kept only so old links land in the right
- * place; the saved-role detail pages at /jobs/[id] are unaffected.
+ * An old route kept alive for old links. The saved-role detail pages at
+ * /jobs/[id] are a different thing and are unaffected.
+ *
+ * It used to send people to /applications#add-role. That anchor was the
+ * "Add & analyse a role" card, which moved to its own page — so the link had
+ * been landing on Opportunities and scrolling nowhere. Opportunities is the
+ * right destination regardless: what /jobs listed is what that page shows.
  */
 export default function JobsPage() {
-  redirect("/applications#add-role");
+  redirect("/applications");
 }

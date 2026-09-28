@@ -245,11 +245,51 @@ export const SEED = {
     created_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
     updated_at: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
   }],
+  /*
+   * A drafted application, and the draft is the point.
+   *
+   * This row carried a status and two nulls and nothing else. Résumé Studio
+   * selects `.not("resume_draft", "is", null)`, so Postgres would never have
+   * returned it — but the mock ignored the operator it did not implement and
+   * handed it over anyway, and the page crashed reading `.length` of a column
+   * that is `not null default '[]'` in the real schema. A bug that existed
+   * only because the fake was more permissive than the database.
+   *
+   * With the filter honoured, a row shaped like this one is what keeps the
+   * studio's editor, version rail and ATS panel on the walked surface at all;
+   * without it the page renders its empty state and is never really tested.
+   */
   applications: [{
     id: "22222222-2222-4222-8222-222222222222",
     user_id: TEST_USER_ID,
     job_id: "11111111-1111-4111-8111-111111111111",
     status: "interview",
+    /* Text only, `resume_content` null: an older draft, recovered into
+     * structure by resumeContentOf, which is the path most stored drafts
+     * still take. */
+    resume_draft: [
+      "Evie Endtoend",
+      "Principal Platform Engineer",
+      "",
+      "Experience",
+      "Staff Platform Engineer — Seek (2019–2025)",
+      "- Cut deployment lead time from four days to six hours.",
+      "- Rolled a golden-path service template out to 40 teams.",
+    ].join("\n"),
+    resume_content: null,
+    resume_change_log: [
+      { type: "emphasised", description: "Led with deployment lead time, which the advert asks for first.", evidenceIds: ["ev-1"] },
+      { type: "reworded", description: "Named the 40 teams rather than \"at scale\".", evidenceIds: ["ev-2"] },
+    ],
+    resume_evidence_ids: ["ev-1", "ev-2"],
+    resume_generated_at: new Date(Date.now() - 20 * 60 * 60 * 1000).toISOString(),
+    outcome_stage: null,
+    outcome_reason: null,
+    outcome_note: null,
+    outcome_recorded_at: null,
+    cover_note: null,
+    submitted_at: null,
+    confirmation_reference: null,
     next_action: null,
     next_action_date: null,
     created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
