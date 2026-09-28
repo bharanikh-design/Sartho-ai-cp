@@ -6,6 +6,8 @@ import { APP_URL } from "@/lib/site";
 import { buildDailyDigest, renderDigestEmail, type DigestJob } from "@/lib/notifications/digest";
 import { unsubscribeUrl } from "@/lib/notifications/unsubscribe";
 import { isEmailDeliveryConfigured, sendEmail } from "@/lib/notifications/send-email";
+import { notifyOperator } from "@/lib/operations/alerts";
+import { beginScheduledRun, finishScheduledRun, reportScheduledRun } from "@/lib/operations/scheduled-runs";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -41,11 +43,30 @@ export async function GET(request: Request) {
   if (!isAuthorisedCronRequest(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  if (!isEmailDeliveryConfigured()) {
-    return NextResponse.json({ error: "Email delivery is not configured." }, { status: 503 });
+
+  let admin: ReturnType<typeof createAdminClient>;
+  try {
+    admin = createAdminClient();
+  } catch {
+    return NextResponse.json({ error: "The Supabase service role is not configured." }, { status: 503 });
   }
 
-  const admin = createAdminClient();
+  /*
+   * The run records itself before it does anything, so a run that dies
+   * part-way still leaves a row that says it started. Every way of stopping
+   * early closes that row with the reason, and the reason reaches the
+   * operator: a job that cannot run is exactly the silence the log exists
+   * to break.
+   */
+  const runId = await beginScheduledRun(admin, "daily-digest");
+  const abandon = async (status: number, error: string) => {
+    await finishScheduledRun(admin, runId, { status: "failed", error });
+    await notifyOperator({ subject: "Daily summary could not run", lines: [error] });
+    return NextResponse.json({ error }, { status });
+  };
+
+  if (!isEmailDeliveryConfigured()) return abandon(503, "Email delivery is not configured.");
+
   const { data: preferences, error } = await admin
     .from("notification_preferences")
     .select("user_id,email,last_sent_at")
@@ -54,7 +75,7 @@ export async function GET(request: Request) {
     .limit(maxUsersPerRun());
   if (error) {
     console.error("Unable to load daily digest preferences", { code: error.code });
-    return NextResponse.json({ error: "Unable to prepare daily digests." }, { status: 500 });
+    return abandon(500, "Unable to prepare daily digests.");
   }
 
   const startedAt = Date.now();
@@ -63,41 +84,57 @@ export async function GET(request: Request) {
   let failed = 0;
   let deferred = 0;
   let skipped = 0;
-  for (const preference of preferences ?? []) {
-    if (Date.now() - startedAt > RUN_BUDGET_MS) { deferred += 1; continue; }
-    /*
-     * Already served today. Without this, a re-triggered cron sends a second
-     * digest covering the few minutes since the first — an email whose every
-     * section is empty.
-     */
-    if (preference.last_sent_at && new Date(preference.last_sent_at).getTime() > cutoff) {
-      skipped += 1;
-      continue;
-    }
-    const since = preference.last_sent_at ? new Date(preference.last_sent_at) : new Date(Date.now() - 24 * 60 * 60 * 1000);
-    const [{ data: jobs, error: jobsError }, { data: profile }] = await Promise.all([
-      admin.from("jobs").select("title,employer,status,recommendation,created_at,updated_at").eq("user_id", preference.user_id),
-      admin.from("profiles").select("full_name").eq("id", preference.user_id).maybeSingle(),
-    ]);
-    if (jobsError) {
-      failed += 1;
-      continue;
-    }
+  const failures: string[] = [];
 
-    try {
-      const digest = buildDailyDigest((jobs ?? []) as DigestJob[], since);
-      const origin = APP_URL;
-      const firstName = profile?.full_name?.split(/\s+/)[0] || "there";
-      const optOut = unsubscribeUrl(origin, preference.user_id);
-      const email = renderDigestEmail(firstName, digest, origin, optOut);
-      await sendEmail(preference.email, email.subject, email.html, { unsubscribeUrl: optOut });
-      await admin.from("notification_preferences").update({ last_sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq("user_id", preference.user_id);
-      sent += 1;
-    } catch (caught) {
-      console.error("Daily digest delivery failed", { message: caught instanceof Error ? caught.message : "unknown" });
-      failed += 1;
+  try {
+    for (const preference of preferences ?? []) {
+      if (Date.now() - startedAt > RUN_BUDGET_MS) { deferred += 1; continue; }
+      /*
+       * Already served today. Without this, a re-triggered cron sends a second
+       * digest covering the few minutes since the first — an email whose every
+       * section is empty.
+       */
+      if (preference.last_sent_at && new Date(preference.last_sent_at).getTime() > cutoff) {
+        skipped += 1;
+        continue;
+      }
+      const since = preference.last_sent_at ? new Date(preference.last_sent_at) : new Date(Date.now() - 24 * 60 * 60 * 1000);
+      const [{ data: jobs, error: jobsError }, { data: profile }] = await Promise.all([
+        admin.from("jobs").select("title,employer,status,recommendation,created_at,updated_at").eq("user_id", preference.user_id),
+        admin.from("profiles").select("full_name").eq("id", preference.user_id).maybeSingle(),
+      ]);
+      if (jobsError) {
+        failed += 1;
+        failures.push(`${String(preference.user_id).slice(0, 8)}: could not read the pipeline`);
+        continue;
+      }
+
+      try {
+        const digest = buildDailyDigest((jobs ?? []) as DigestJob[], since);
+        const origin = APP_URL;
+        const firstName = profile?.full_name?.split(/\s+/)[0] || "there";
+        const optOut = unsubscribeUrl(origin, preference.user_id);
+        const email = renderDigestEmail(firstName, digest, origin, optOut);
+        await sendEmail(preference.email, email.subject, email.html, { unsubscribeUrl: optOut });
+        await admin.from("notification_preferences").update({ last_sent_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq("user_id", preference.user_id);
+        sent += 1;
+      } catch (caught) {
+        const message = caught instanceof Error ? caught.message : "unknown";
+        console.error("Daily digest delivery failed", { message });
+        failed += 1;
+        /* The account, not the address: the log and the alert carry no email addresses. */
+        failures.push(`${String(preference.user_id).slice(0, 8)}: ${message}`);
+      }
     }
+  } catch (caught) {
+    const message = caught instanceof Error ? caught.message : "The run stopped unexpectedly.";
+    console.error("Daily digest run failed", { message });
+    return abandon(500, message);
   }
 
-  return NextResponse.json({ sent, failed, skipped, deferred, elapsedMs: Date.now() - startedAt });
+  const summary = { sent, failed, skipped, deferred, elapsedMs: Date.now() - startedAt };
+  await finishScheduledRun(admin, runId, { status: "succeeded", summary });
+  await reportScheduledRun(admin, "daily-digest", { failed, details: failures });
+
+  return NextResponse.json(summary);
 }

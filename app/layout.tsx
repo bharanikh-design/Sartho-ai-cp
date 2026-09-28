@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { connection } from "next/server";
 import type { ReactNode } from "react";
 import localFont from "next/font/local";
 import "./globals.css";
@@ -46,7 +47,17 @@ const inter = localFont({
 
 export const metadata: Metadata = siteMetadata;
 
-export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
+export default async function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
+  /*
+   * Every page renders per request, none at build time. The request proxy
+   * issues a fresh script nonce for each response and Next writes it onto
+   * every script it emits, but only while rendering for a request — a page
+   * prerendered at build time carries no nonce, and under the policy its
+   * scripts would be refused. The public pages that used to be static are
+   * cheap to render, and a page that does not hydrate is not a page.
+   */
+  await connection();
+
   return (
     <html lang="en" className={inter.variable} suppressHydrationWarning>
       <body>

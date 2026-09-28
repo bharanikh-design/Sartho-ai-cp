@@ -37,3 +37,21 @@ export function isPublicPath(pathname: string): boolean {
   const path = pathname.replace(/\/+$/, "") || "/";
   return (PUBLIC_PATHS as readonly string[]).includes(path);
 }
+
+/*
+ * Routes that authenticate with something other than a session, and so must
+ * not be asked for one.
+ *
+ * Vercel invokes a scheduled job with a bearer secret and no cookies. The
+ * session guard answered every one of those invocations with 401 before the
+ * route could read the secret, so neither scheduled email ever went out. An
+ * uptime monitor hitting the health check sends nothing at all. Both kinds
+ * of route check the caller themselves; the guard's job is to stay out of
+ * the way. A trailing slash names a prefix; anything else is an exact path.
+ */
+export const SESSION_FREE_PATHS = ["/api/cron/", "/api/health"] as const;
+
+export function isSessionFreePath(pathname: string): boolean {
+  const path = pathname.replace(/\/+$/, "") || "/";
+  return SESSION_FREE_PATHS.some((entry) => (entry.endsWith("/") ? path.startsWith(entry) : path === entry));
+}

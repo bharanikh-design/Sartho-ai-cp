@@ -7,6 +7,8 @@ import { isJobSearchConfigured } from "@/lib/jobs/search-provider";
 import { renderMatchAlertEmail, selectNewMatches } from "@/lib/notifications/match-alerts";
 import { unsubscribeUrl } from "@/lib/notifications/unsubscribe";
 import { isEmailDeliveryConfigured, sendEmail } from "@/lib/notifications/send-email";
+import { notifyOperator } from "@/lib/operations/alerts";
+import { beginScheduledRun, finishScheduledRun, reportScheduledRun } from "@/lib/operations/scheduled-runs";
 
 /*
  * Scheduled match alerts.
@@ -65,14 +67,25 @@ export async function GET(request: Request) {
   if (!isAuthorisedCronRequest(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  if (!isEmailDeliveryConfigured()) {
-    return NextResponse.json({ error: "Email delivery is not configured (RESEND_API_KEY, SARTHO_EMAIL_FROM)." }, { status: 503 });
-  }
-  if (!isJobSearchConfigured()) {
-    return NextResponse.json({ error: "Jobs search is not configured." }, { status: 503 });
+
+  let admin: ReturnType<typeof createAdminClient>;
+  try {
+    admin = createAdminClient();
+  } catch {
+    return NextResponse.json({ error: "The Supabase service role is not configured." }, { status: 503 });
   }
 
-  const admin = createAdminClient();
+  /* Recorded first, closed on every exit, reported to the operator on a bad one. */
+  const runId = await beginScheduledRun(admin, "match-alerts");
+  const abandon = async (status: number, error: string) => {
+    await finishScheduledRun(admin, runId, { status: "failed", error });
+    await notifyOperator({ subject: "Match alerts could not run", lines: [error] });
+    return NextResponse.json({ error }, { status });
+  };
+
+  if (!isEmailDeliveryConfigured()) return abandon(503, "Email delivery is not configured (RESEND_API_KEY, SARTHO_EMAIL_FROM).");
+  if (!isJobSearchConfigured()) return abandon(503, "Jobs search is not configured.");
+
   const { data: preferences, error } = await admin
     .from("notification_preferences")
     .select("user_id,email,match_alerts_last_run_at")
@@ -81,7 +94,7 @@ export async function GET(request: Request) {
     .limit(maxUsersPerRun());
   if (error) {
     console.error("Unable to load match alert preferences", { code: error.code });
-    return NextResponse.json({ error: "Unable to prepare match alerts." }, { status: 500 });
+    return abandon(500, "Unable to prepare match alerts.");
   }
 
   const startedAt = Date.now();
@@ -91,65 +104,75 @@ export async function GET(request: Request) {
   const summary = { processed: 0, emailed: 0, quiet: 0, failed: 0, deferred: 0, skipped: 0 };
   const failures: string[] = [];
 
-  for (const preference of preferences ?? []) {
-    if (Date.now() - startedAt > RUN_BUDGET_MS) { summary.deferred += 1; continue; }
-    if (preference.match_alerts_last_run_at && new Date(preference.match_alerts_last_run_at).getTime() > cutoff) {
-      summary.skipped += 1;
-      continue;
-    }
-    summary.processed += 1;
-    const userId = preference.user_id as string;
-    const ranAt = new Date().toISOString();
-
-    try {
-      const outcome = await runBriefSearch(admin, userId, { budgetMs: searchBudgetMs, maxResults: 40 });
-      if (!outcome.ok) {
-        // A brief that cannot run (no target roles, provider down) is not
-        // retried in a loop; it is recorded and the person is picked up next run.
-        failures.push(`${userId.slice(0, 8)}: ${outcome.code}`);
-        summary.failed += 1;
-        await admin.from("notification_preferences").update({ match_alerts_last_run_at: ranAt }).eq("user_id", userId);
+  try {
+    for (const preference of preferences ?? []) {
+      if (Date.now() - startedAt > RUN_BUDGET_MS) { summary.deferred += 1; continue; }
+      if (preference.match_alerts_last_run_at && new Date(preference.match_alerts_last_run_at).getTime() > cutoff) {
+        summary.skipped += 1;
         continue;
       }
+      summary.processed += 1;
+      const userId = preference.user_id as string;
+      const ranAt = new Date().toISOString();
 
-      const { data: seenRows } = await admin.from("seen_job_matches").select("url").eq("user_id", userId);
-      const seenUrls = (seenRows ?? []).map((row) => row.url as string);
-      const matches = selectNewMatches(outcome.results, seenUrls);
+      try {
+        const outcome = await runBriefSearch(admin, userId, { budgetMs: searchBudgetMs, maxResults: 40 });
+        if (!outcome.ok) {
+          // A brief that cannot run (no target roles, provider down) is not
+          // retried in a loop; it is recorded and the person is picked up next run.
+          failures.push(`${userId.slice(0, 8)}: ${outcome.code}`);
+          summary.failed += 1;
+          await admin.from("notification_preferences").update({ match_alerts_last_run_at: ranAt }).eq("user_id", userId);
+          continue;
+        }
 
-      if (matches.length) {
-        const { data: profile } = await admin.from("profiles").select("full_name").eq("id", userId).maybeSingle();
-        const firstName = (profile?.full_name as string | null)?.split(/\s+/)[0] || "there";
-        const optOut = unsubscribeUrl(origin, preference.user_id as string);
-        const email = renderMatchAlertEmail({ firstName, matches, criteria: outcome.criteria, appUrl: origin, unsubscribeUrl: optOut });
-        await sendEmail(preference.email as string, email.subject, email.html, { unsubscribeUrl: optOut });
-        // Recorded after the send: a failed send leaves the matches for next
-        // time rather than marking them as delivered.
-        await admin.from("seen_job_matches").upsert(
-          matches.map((match) => ({
-            user_id: userId,
-            url: match.url,
-            title: match.title,
-            employer: match.employer,
-            location: match.location,
-            overall_match: match.overallMatch,
-            recommendation: match.recommendation,
-            source: match.source,
-            emailed_at: ranAt,
-          })),
-          { onConflict: "user_id,url" },
-        );
-        summary.emailed += 1;
-      } else {
-        summary.quiet += 1;
+        const { data: seenRows } = await admin.from("seen_job_matches").select("url").eq("user_id", userId);
+        const seenUrls = (seenRows ?? []).map((row) => row.url as string);
+        const matches = selectNewMatches(outcome.results, seenUrls);
+
+        if (matches.length) {
+          const { data: profile } = await admin.from("profiles").select("full_name").eq("id", userId).maybeSingle();
+          const firstName = (profile?.full_name as string | null)?.split(/\s+/)[0] || "there";
+          const optOut = unsubscribeUrl(origin, preference.user_id as string);
+          const email = renderMatchAlertEmail({ firstName, matches, criteria: outcome.criteria, appUrl: origin, unsubscribeUrl: optOut });
+          await sendEmail(preference.email as string, email.subject, email.html, { unsubscribeUrl: optOut });
+          // Recorded after the send: a failed send leaves the matches for next
+          // time rather than marking them as delivered.
+          await admin.from("seen_job_matches").upsert(
+            matches.map((match) => ({
+              user_id: userId,
+              url: match.url,
+              title: match.title,
+              employer: match.employer,
+              location: match.location,
+              overall_match: match.overallMatch,
+              recommendation: match.recommendation,
+              source: match.source,
+              emailed_at: ranAt,
+            })),
+            { onConflict: "user_id,url" },
+          );
+          summary.emailed += 1;
+        } else {
+          summary.quiet += 1;
+        }
+
+        await admin.from("notification_preferences").update({ match_alerts_last_run_at: ranAt }).eq("user_id", userId);
+      } catch (caught) {
+        summary.failed += 1;
+        failures.push(`${userId.slice(0, 8)}: ${caught instanceof Error ? caught.message : "unknown"}`);
+        console.error("Match alert failed", { user: userId, message: caught instanceof Error ? caught.message : "unknown" });
       }
-
-      await admin.from("notification_preferences").update({ match_alerts_last_run_at: ranAt }).eq("user_id", userId);
-    } catch (caught) {
-      summary.failed += 1;
-      failures.push(`${userId.slice(0, 8)}: ${caught instanceof Error ? caught.message : "unknown"}`);
-      console.error("Match alert failed", { user: userId, message: caught instanceof Error ? caught.message : "unknown" });
     }
+  } catch (caught) {
+    const message = caught instanceof Error ? caught.message : "The run stopped unexpectedly.";
+    console.error("Match alerts run failed", { message });
+    return abandon(500, message);
   }
 
-  return NextResponse.json({ ...summary, failures, elapsedMs: Date.now() - startedAt });
+  const elapsedMs = Date.now() - startedAt;
+  await finishScheduledRun(admin, runId, { status: "succeeded", summary: { ...summary, elapsedMs } });
+  await reportScheduledRun(admin, "match-alerts", { failed: summary.failed, details: failures });
+
+  return NextResponse.json({ ...summary, failures, elapsedMs });
 }
