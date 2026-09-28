@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 import { isPublicPath } from "@/lib/public-paths";
+import { isCrossSiteRequest, isMutatingMethod, publicHost } from "@/lib/security/same-origin";
 
 /*
  * Supabase normally returns an OAuth authorization code to /auth/callback.
@@ -28,6 +29,18 @@ function recoverOAuthCallback(request: NextRequest) {
 export async function updateSession(request: NextRequest) {
   const recoveredCallback = recoverOAuthCallback(request);
   if (recoveredCallback) return recoveredCallback;
+
+  /*
+   * A write to the API from another site is refused before the session is
+   * even looked up. The cookie would make it the signed-in person's write.
+   */
+  if (
+    request.nextUrl.pathname.startsWith("/api/")
+    && isMutatingMethod(request.method)
+    && isCrossSiteRequest(request.headers, publicHost(request.headers, request.nextUrl.host))
+  ) {
+    return NextResponse.json({ error: "Cross-site requests are not accepted." }, { status: 403 });
+  }
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;

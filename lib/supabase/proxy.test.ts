@@ -22,6 +22,37 @@ describe("Supabase auth proxy", () => {
 });
 
 /*
+ * A write to the API from another site is refused before any session lookup,
+ * with the browser's own account of where the request came from as the
+ * evidence. Reads, and requests with no browser provenance at all, go on to
+ * the route's own authentication.
+ */
+describe("cross-site API writes", () => {
+  const api = (method: string, headers: Record<string, string>) =>
+    updateSession(new NextRequest("https://sartho.tech/api/jobs", { method, headers }));
+
+  it("refuses a cross-site POST", async () => {
+    const response = await api("POST", { origin: "https://evil.example", "sec-fetch-site": "cross-site" });
+    expect(response.status).toBe(403);
+  });
+
+  it("refuses a POST whose Origin is another host even without Sec-Fetch-Site", async () => {
+    const response = await api("DELETE", { origin: "https://evil.example" });
+    expect(response.status).toBe(403);
+  });
+
+  it("does not refuse a cross-site read, which the route answers on its own terms", async () => {
+    const response = await api("GET", { origin: "https://evil.example", "sec-fetch-site": "cross-site" });
+    expect(response.status).not.toBe(403);
+  });
+
+  it("lets a same-origin write through to the route", async () => {
+    const response = await api("POST", { origin: "https://sartho.tech", "sec-fetch-site": "same-origin" });
+    expect(response.status).not.toBe(403);
+  });
+});
+
+/*
  * The guard runs before routing, so whatever its matcher covers is answered
  * with a redirect no matter what the app would have served. robots.txt and
  * sitemap.xml were covered, and crawlers were handed a sign-in page instead of

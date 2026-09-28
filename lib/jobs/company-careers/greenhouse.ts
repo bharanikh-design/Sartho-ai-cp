@@ -45,7 +45,7 @@ export async function searchGreenhousePortal(
   query: DirectCareerQuery,
   timeoutMs = 8_000,
 ): Promise<JobSearchResult[]> {
-  const endpoint = `https://boards-api.greenhouse.io/v1/boards/${config.tenant}/jobs?content=true`;
+  const endpoint = `https://boards-api.greenhouse.io/v1/boards/${encodeURIComponent(config.tenant)}/jobs?content=true`;
 
   try {
     const response = await fetch(endpoint, {

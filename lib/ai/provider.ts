@@ -646,6 +646,18 @@ const PROBE_SCHEMA = {
   properties: { ok: { type: "boolean" } },
 };
 
+/*
+ * Provider error bodies sometimes quote the credential they rejected, masked
+ * in the provider's own style ("sk-…abcd"). The diagnostics page shows raw
+ * messages to administrators; a key fragment has no business being there.
+ */
+function redactKeyLikeTokens(message: string): string {
+  return message
+    .replace(/sk-(?:ant-)?[A-Za-z0-9_\-…*.]{4,}/g, "sk-[redacted]")
+    .replace(/AIza[0-9A-Za-z_\-…*]{8,}/g, "AIza[redacted]")
+    .replace(/Bearer\s+[A-Za-z0-9_\-.…*]{8,}/gi, "Bearer [redacted]");
+}
+
 export async function probeProviders(): Promise<ProviderProbe[]> {
   const selected = getSelectedProvider();
   const request: StructuredRequest = {
@@ -720,7 +732,7 @@ export async function probeProviders(): Promise<ProviderProbe[]> {
       const probe: ProviderProbe = {
         name: provider.name, envVar: provider.envVar, selected: isSelected,
         configured: true, reachable: false, model: provider.model,
-        detail: shortAiFailure(message), raw: message,
+        detail: shortAiFailure(message), raw: redactKeyLikeTokens(message),
       };
       if (provider.id === "gemini") probe.models = await listGeminiModels(provider.key);
       return probe;

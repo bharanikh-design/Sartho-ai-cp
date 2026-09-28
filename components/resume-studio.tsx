@@ -15,7 +15,6 @@ import { RESUME_TEMPLATES, resumeTemplate, type ResumeTemplate, type ResumeTempl
 import { RESUME_MARKETS, resumeMarket } from "@/lib/resume/markets";
 import { recommendTemplate } from "@/lib/resume/template-recommendation";
 import { ResumeImport } from "@/components/resume-import";
-import { ResumeUploads } from "@/components/resume-uploads";
 import { AtsGatePanel } from "@/components/ats-gate-panel";
 import type { ResumeImportRecord } from "@/lib/data/career";
 import { ResumePdfRenderer } from "@/components/resume-pdf-templates";
@@ -516,41 +515,6 @@ export function ResumeStudio({
       });
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Unable to draft master résumé.");
-    } finally {
-      setGeneratingId(null);
-    }
-  }
-
-  /*
-   * The master upload, opened in the editor.
-   *
-   * Free when the editor already holds a document laid out from this file.
-   * Otherwise the file is laid out first — copied, never rewritten — and saved
-   * as the master, which replaces whatever the master was; that is said before
-   * it happens, because edits to the old one do not survive it.
-   */
-  async function openUploadInStudio(item: ResumeImportRecord, alreadyBuilt: boolean) {
-    const show = () => {
-      setOpenId(MASTER_ID);
-      setExpandedId(MASTER_ID);
-    };
-    if (alreadyBuilt) { show(); return; }
-    if (master && !window.confirm(`Open ${item.file_name} in Studio as your master résumé? The master currently in Studio, and any edits to it, will be replaced.`)) return;
-    if (generatingId) return;
-    setGeneratingId("master");
-    setError(null);
-    try {
-      const response = await fetch("/api/resume/master/from-upload", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ importId: item.id }),
-      });
-      const result = await response.json().catch(() => ({})) as { error?: string };
-      if (!response.ok) throw new Error(result.error ?? "Sartho could not open that résumé in Studio.");
-      router.refresh();
-      show();
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Sartho could not open that résumé in Studio.");
     } finally {
       setGeneratingId(null);
     }

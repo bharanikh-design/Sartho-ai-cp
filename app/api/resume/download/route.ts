@@ -3,6 +3,7 @@ import { z } from "zod";
 import { getAuthenticatedUser } from "@/lib/auth";
 import { resumeContentSchema } from "@/lib/resume/content-schema";
 import { resumeDocxBuffer, resumeFileName } from "@/lib/resume/docx";
+import { isOwnedResumeObjectPath, RESUME_UPLOAD_BUCKET } from "@/lib/resume/upload";
 
 /*
  * The résumé as a Word file.
@@ -54,8 +55,13 @@ export async function POST(request: Request) {
       .eq("id", content.sourceImportId)
       .eq("user_id", user.id)
       .maybeSingle();
-    if (source?.object_path && source.mime_type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
-      const { data: original } = await supabase.storage.from("resume-uploads").download(source.object_path);
+    if (
+      source?.object_path
+      && source.mime_type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+      /* The row is the person's, and so must be the object it points at — the same check the file route makes. */
+      && isOwnedResumeObjectPath(source.object_path as string, user.id)
+    ) {
+      const { data: original } = await supabase.storage.from(RESUME_UPLOAD_BUCKET).download(source.object_path);
       if (original) {
         const bytes = new Uint8Array(await original.arrayBuffer());
         return new NextResponse(bytes, {

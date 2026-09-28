@@ -51,6 +51,16 @@ function escapeHtml(value: string) {
   return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
 }
 
+/* A link in an email is http(s) or it is not a link. Provider data is not trusted with a scheme. */
+function safeHref(value: string): string | null {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" || url.protocol === "http:" ? url.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
 function describeCriteria(criteria: SearchCriteria): string {
   const parts = [criteria.countryName];
   if (criteria.locations.length) parts.push(criteria.locations.join(", ") + (criteria.broadened ? ` + rest of ${criteria.countryName}` : ""));
@@ -61,12 +71,23 @@ function describeCriteria(criteria: SearchCriteria): string {
   return parts.join(" · ");
 }
 
+/*
+ * Every email carries a way out that needs no account: the address was typed
+ * in, not verified, so the person reading this may never have signed up.
+ */
+export function unsubscribeFooter(url: string | null | undefined): string {
+  if (!url) return "";
+  return `<p style="color:#65756d;font-size:12px">Not you, or had enough? <a href="${escapeHtml(url)}" style="color:#65756d">Unsubscribe</a> and Sartho will stop sending email to this address.</p>`;
+}
+
 export function renderMatchAlertEmail(input: {
   firstName: string;
   matches: AlertMatch[];
   criteria: SearchCriteria;
   appUrl: string;
   isTest?: boolean;
+  /** Where the recipient can stop these without an account. Null when unsigned. */
+  unsubscribeUrl?: string | null;
 }) {
   const { firstName, matches, criteria, appUrl } = input;
   const count = matches.length;
@@ -77,16 +98,17 @@ export function renderMatchAlertEmail(input: {
 
   const rows = matches.map((match) => {
     const tone = match.recommendation === "apply" ? "#2f8b69" : "#a9752d";
+    const href = safeHref(match.url);
     const meta = [match.employer, match.location, match.salary].filter(Boolean).map((part) => escapeHtml(part as string)).join(" · ");
     const skills = match.matchedSkills.length
       ? `<div style="margin-top:6px;color:#4f6459;font-size:12px">Matches your evidence on: ${escapeHtml(match.matchedSkills.join(", "))}</div>`
       : "";
     return `<tr><td style="padding:14px 0;border-bottom:1px solid #dce7e1">
       <div style="font-size:12px;color:#65756d">${meta}</div>
-      <div style="font-size:16px;font-weight:700;margin:3px 0"><a href="${escapeHtml(match.url)}" style="color:#17211d;text-decoration:none">${escapeHtml(match.title)}</a></div>
+      <div style="font-size:16px;font-weight:700;margin:3px 0">${href ? `<a href="${escapeHtml(href)}" style="color:#17211d;text-decoration:none">${escapeHtml(match.title)}</a>` : escapeHtml(match.title)}</div>
       <div style="font-size:12px"><span style="display:inline-block;padding:2px 8px;border-radius:100px;border:1px solid ${tone};color:${tone};font-weight:700;text-transform:uppercase">${escapeHtml(match.recommendation)}</span> <span style="color:#4f6459">${match.overallMatch}% match · ${escapeHtml(match.source)}</span></div>
       ${skills}
-      <div style="margin-top:8px"><a href="${escapeHtml(match.url)}" style="font-size:13px;color:#155b45">View listing →</a></div>
+      ${href ? `<div style="margin-top:8px"><a href="${escapeHtml(href)}" style="font-size:13px;color:#155b45">View listing →</a></div>` : ""}
     </td></tr>`;
   }).join("");
 
@@ -102,6 +124,7 @@ export function renderMatchAlertEmail(input: {
     <table style="width:100%;border-collapse:collapse">${rows}</table>
     <p style="margin-top:20px"><a href="${escapeHtml(appUrl)}/search-plan#find-roles" style="display:inline-block;padding:12px 18px;background:#155b45;color:white;text-decoration:none;border-radius:10px">Open Find Roles to save any of these</a></p>
     <p style="color:#65756d;font-size:12px">Sartho never applies to a role or sends career information without your approval. Turn match alerts off from Find Roles.</p>
+    ${unsubscribeFooter(input.unsubscribeUrl)}
   </div>`;
 
   return { subject, html };

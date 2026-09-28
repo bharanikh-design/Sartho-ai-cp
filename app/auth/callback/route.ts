@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { safeNextPath } from "@/lib/auth/safe-next-path";
 import { createClient } from "@/lib/supabase/server";
 
 function safeMessage(value: string | null, fallback: string) {
@@ -27,8 +28,7 @@ export async function GET(request: Request) {
   const code = url.searchParams.get("code");
   const providerError = url.searchParams.get("error_description") ?? url.searchParams.get("error");
   const errorCode = url.searchParams.get("error_code");
-  const requestedNext = url.searchParams.get("next") ?? "/";
-  const next = requestedNext.startsWith("/") && !requestedNext.startsWith("//") ? requestedNext : "/";
+  const next = safeNextPath(url.searchParams.get("next"), url.origin);
 
   if (providerError) {
     const message = safeMessage(providerError, "Google sign-in was rejected by the authentication provider.");
