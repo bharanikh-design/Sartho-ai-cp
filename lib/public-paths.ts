@@ -30,7 +30,22 @@
  * The unsubscribe link is public because the person holding the email may
  * have no account at all; the signed token in the link is its only credential.
  */
-export const PUBLIC_PATHS = ["/", "/login", "/auth/callback", "/extension", "/privacy", "/terms", "/contact", "/api/notifications/unsubscribe"] as const;
+/*
+ * The address-confirmation link is public for the same reason: it is opened
+ * by whoever reads the inbox an account asked to email, and the token in it
+ * is the only credential. It can say yes to that one address and nothing else.
+ */
+export const PUBLIC_PATHS = [
+  "/",
+  "/login",
+  "/auth/callback",
+  "/extension",
+  "/privacy",
+  "/terms",
+  "/contact",
+  "/api/notifications/unsubscribe",
+  "/api/notifications/verify",
+] as const;
 
 export function isPublicPath(pathname: string): boolean {
   /* A trailing slash is the same page. */

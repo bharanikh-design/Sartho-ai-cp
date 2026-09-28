@@ -151,6 +151,13 @@ Ordinary test runs never contact an AI provider.
   therefore renders per request.
 - `/api/cron/*` and `/api/health` carry no session by design and verify their
   callers themselves; the guard passes them straight through.
+- Scheduled email goes only to an address that has said yes: the account's
+  own sign-in address, or one confirmed from a link sent to it (double
+  opt-in). The browser only reads its own row; the address, its confirmation
+  and the two switches are written by the server through the service role.
+  `/api/notifications/verify` (the confirmation link) and
+  `/api/notifications/unsubscribe` are public because the person holding the
+  email may have no account, and each token can do exactly one thing.
 - Every route handler independently verifies the authenticated user.
 - Row Level Security scopes profile, evidence, jobs, requirements and applications to their owner.
 - Deep-analysis writes are atomic through `replace_job_requirements`.

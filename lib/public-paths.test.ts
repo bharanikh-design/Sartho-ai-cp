@@ -105,6 +105,21 @@ describe("isPublicPath", () => {
     expect(isPublicPath("/contact/")).toBe(true);
   });
 
+  /*
+   * Both links in an email are opened by whoever holds the message, who may
+   * have no account. The routes that change the address are not public: they
+   * take a session, and the link can only say yes to one address.
+   */
+  it("lets the two email links through, and nothing else under /api/notifications", () => {
+    expect(PUBLIC_PATHS).toContain("/api/notifications/unsubscribe");
+    expect(PUBLIC_PATHS).toContain("/api/notifications/verify");
+    expect(isPublicPath("/api/notifications/verify")).toBe(true);
+    expect(isPublicPath("/api/notifications/verify/")).toBe(true);
+    for (const path of ["/api/notifications/address", "/api/notifications/address/resend", "/api/notifications/preferences", "/api/notifications/match-alerts", "/api/notifications/digest"]) {
+      expect(isPublicPath(path), path).toBe(false);
+    }
+  });
+
   it("does not make a page public for merely starting like a legal one", () => {
     expect(isPublicPath("/privacy-settings")).toBe(false);
     expect(isPublicPath("/terms-of-business")).toBe(false);

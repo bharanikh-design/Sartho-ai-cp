@@ -180,6 +180,24 @@ export function createMockSupabase({ seed = {}, user, port = 0, onRequest } = {}
         return send(500, { code: "MOCK01", message, details: null, hint: null });
       }
 
+      /*
+       * `.single()` after a write asks for one object, exactly as it does after
+       * a read. A write answered with an array hands the app a row it cannot
+       * read a field from, which surfaces as a switch that "saved" to nothing.
+       */
+      const wantsObject = (req.headers.accept ?? "").includes("vnd.pgrst.object+json");
+      const representation = (rows) => {
+        const projected = rows.map((row) => project(row, select));
+        if (!wantsObject) return { status: 200, payload: projected };
+        if (projected.length !== 1) {
+          return {
+            status: 406,
+            payload: { code: "PGRST116", details: `Results contain ${projected.length} rows`, hint: null, message: "JSON object requested, multiple (or no) rows returned" },
+          };
+        }
+        return { status: 200, payload: projected[0] };
+      };
+
       if (req.method === "GET" || req.method === "HEAD") {
         let result = filtered;
         const order = url.searchParams.get("order");
@@ -225,12 +243,16 @@ export function createMockSupabase({ seed = {}, user, port = 0, onRequest } = {}
           all.push(row);
           return row;
         });
-        return send(wantsRepresentation ? 200 : 201, wantsRepresentation ? written.map((row) => project(row, select)) : undefined);
+        if (!wantsRepresentation) return send(201);
+        const { status, payload } = representation(written);
+        return send(status, payload);
       }
 
       if (req.method === "PATCH") {
         const written = filtered.map((row) => Object.assign(row, body));
-        return send(wantsRepresentation ? 200 : 204, wantsRepresentation ? written.map((row) => project(row, select)) : undefined);
+        if (!wantsRepresentation) return send(204);
+        const { status, payload } = representation(written);
+        return send(status, payload);
       }
 
       if (req.method === "DELETE") {

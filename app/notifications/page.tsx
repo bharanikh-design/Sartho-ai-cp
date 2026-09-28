@@ -1,6 +1,8 @@
 import { EmailSettings } from "@/components/email-settings";
 import { ProductPageHeader } from "@/components/product-page-header";
 import { requireUser } from "@/lib/auth";
+import { loadNotificationAddress } from "@/lib/notifications/address";
+import { summariseAddress } from "@/lib/notifications/address-response";
 import { digestHealth } from "@/lib/notifications/digest-health";
 import { isEmailDeliveryConfigured } from "@/lib/notifications/send-email";
 
@@ -10,46 +12,40 @@ export const dynamic = "force-dynamic";
  * Every email Sartho can send, as two switches: the daily match alert from the
  * saved search brief, and the daily summary of the pipeline.
  *
- * Both used to be full cards with their own address field, checkbox and Save
- * button — two screens for four facts. The address is one column shared by
- * both, so it is asked for once.
+ * One address serves both, and it has to have said yes: the account's own
+ * sign-in address counts as having done so, anything else is sent a link.
+ * The row is read with the person's own client, which can still see it; the
+ * writes all happen server-side on the routes, with the service role.
  */
 export default async function NotificationsPage() {
   const { supabase, user } = await requireUser();
-  const { data } = await supabase
-    .from("notification_preferences")
-    .select("email,daily_digest_enabled,last_sent_at,updated_at,match_alerts_enabled,match_alerts_last_run_at")
-    .eq("user_id", user.id)
-    .maybeSingle();
+  const address = await loadNotificationAddress(supabase, user.id);
 
-  const email = (typeof data?.email === "string" && data.email) || user.email || "";
-  const digestEnabled = Boolean(data?.daily_digest_enabled);
-  const matchAlertsEnabled = Boolean(data?.match_alerts_enabled);
-  const matchAlertsLastRun = typeof data?.match_alerts_last_run_at === "string" ? data.match_alerts_last_run_at : null;
+  const digestEnabled = address?.digestEnabled ?? false;
+  const matchAlertsEnabled = address?.matchAlertsEnabled ?? false;
 
   const digest = digestHealth({
     enabled: digestEnabled,
     /* The only real evidence that the schedule is running. */
-    lastSentAt: typeof data?.last_sent_at === "string" ? data.last_sent_at : null,
+    lastSentAt: address?.lastSentAt ?? null,
     /*
      * The closest thing to "when was this switched on". It is the row's last
      * change of any kind, so it can only ever make the check more forgiving —
      * the right direction for a claim that the deployment is broken.
      */
-    enabledSince: typeof data?.updated_at === "string" ? data.updated_at : null,
+    enabledSince: address?.updatedAt ?? null,
   });
 
   /*
-   * Match alerts get the same treatment the digest already had, and for the
-   * same reason: the last run is the one piece of evidence that the schedule
-   * reaches Sartho at all. Rendered on the server because it compares a stored
-   * timestamp against "now", and the server's now and the browser's now are
-   * different numbers.
+   * Match alerts get the same treatment, and for the same reason: the last
+   * run is the one piece of evidence that the schedule reaches Sartho at all.
+   * Rendered on the server because it compares a stored timestamp against
+   * "now", and the server's now and the browser's now are different numbers.
    */
   const matchAlerts = digestHealth({
     enabled: matchAlertsEnabled,
-    lastSentAt: matchAlertsLastRun,
-    enabledSince: typeof data?.updated_at === "string" ? data.updated_at : null,
+    lastSentAt: address?.matchAlertsLastRunAt ?? null,
+    enabledSince: address?.updatedAt ?? null,
     noun: "match alert",
   });
 
@@ -58,10 +54,11 @@ export default async function NotificationsPage() {
       <ProductPageHeader
         eyebrow="Email alerts"
         title="What Sartho emails you."
-        description="Both are off until you turn them on. Nothing else is ever sent."
+        description="Both are off until you turn them on. Nothing else is ever sent, and nothing is sent to an address that hasn't said yes."
       />
       <EmailSettings
-        initialEmail={email}
+        accountEmail={user.email ?? null}
+        address={summariseAddress(address)}
         matchAlertsEnabled={matchAlertsEnabled}
         digestEnabled={digestEnabled}
         deliveryReady={isEmailDeliveryConfigured()}

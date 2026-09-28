@@ -1,49 +1,32 @@
 import { NextResponse } from "next/server";
-import { z } from "zod";
 import { getAuthenticatedUser } from "@/lib/auth";
 import { APP_URL } from "@/lib/site";
 import { runBriefSearch } from "@/lib/jobs/run-search";
+import { deliverableAddress, ensureNotificationRow, recordTestSend } from "@/lib/notifications/address";
 import { renderMatchAlertEmail, selectNewMatches } from "@/lib/notifications/match-alerts";
 import { isEmailDeliveryConfigured, sendEmail } from "@/lib/notifications/send-email";
+import { saveSwitch } from "@/lib/notifications/switch-route";
 import { unsubscribeUrl } from "@/lib/notifications/unsubscribe";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-const preferenceSchema = z.object({
-  email: z.string().trim().email().max(320),
-  enabled: z.boolean(),
-});
-
-/** Save the match-alert preference: the address and whether to send. */
+/** The match-alert switch. The address lives at /api/notifications/address. */
 export async function PUT(request: Request) {
-  const { supabase, user } = await getAuthenticatedUser();
-  if (!user) return NextResponse.json({ error: "Sign in again." }, { status: 401 });
-  const parsed = preferenceSchema.safeParse(await request.json().catch(() => null));
-  if (!parsed.success) return NextResponse.json({ error: "Enter a valid email address." }, { status: 400 });
-
-  const { error } = await supabase.from("notification_preferences").upsert({
-    user_id: user.id,
-    email: parsed.data.email,
-    match_alerts_enabled: parsed.data.enabled,
-    updated_at: new Date().toISOString(),
-  });
-  if (error) {
-    console.error("Unable to save match alert preference", { code: error.code });
-    return NextResponse.json({ error: "Sartho could not save your alert preference." }, { status: 500 });
-  }
-  return NextResponse.json({ ok: true });
+  return saveSwitch(request, "match_alerts_enabled");
 }
 
-const testSchema = z.object({ email: z.string().trim().email().max(320) });
 const MIN_MINUTES_BETWEEN_TESTS = 10;
 
 /**
- * Send a test alert now, to the given address, from a live run of the brief.
- * This is how a person confirms the whole chain — brief, providers, scoring,
- * email delivery — works, without waiting for the overnight schedule.
+ * Send a test alert now, from a live run of the brief, to the confirmed
+ * address and nowhere else. This is how a person proves the whole chain —
+ * brief, providers, scoring, delivery — without waiting for the schedule.
+ * It used to take an address of its own, which made it a way to email
+ * anybody a page of somebody's job matches.
  */
-export async function POST(request: Request) {
+export async function POST() {
   const { supabase, user } = await getAuthenticatedUser();
   if (!user) return NextResponse.json({ error: "Sign in again." }, { status: 401 });
   if (!isEmailDeliveryConfigured()) {
@@ -52,15 +35,28 @@ export async function POST(request: Request) {
       { status: 503 },
     );
   }
-  const parsed = testSchema.safeParse(await request.json().catch(() => null));
-  if (!parsed.success) return NextResponse.json({ error: "Enter a valid email address." }, { status: 400 });
 
-  const { data: existing } = await supabase
-    .from("notification_preferences")
-    .select("email,match_alerts_last_test_at")
-    .eq("user_id", user.id)
-    .maybeSingle();
-  const lastTest = existing?.match_alerts_last_test_at ? new Date(existing.match_alerts_last_test_at).getTime() : 0;
+  let admin: ReturnType<typeof createAdminClient>;
+  try {
+    admin = createAdminClient();
+  } catch {
+    return NextResponse.json({ error: "Sartho cannot send a test right now." }, { status: 503 });
+  }
+
+  const ensured = await ensureNotificationRow(admin, { userId: user.id, accountEmail: user.email });
+  if (!ensured.ok) {
+    if (ensured.reason === "no_address") return NextResponse.json({ error: "Add an email address first.", code: "no_address" }, { status: 409 });
+    return NextResponse.json({ error: "Sartho could not read your email settings." }, { status: 500 });
+  }
+  const to = deliverableAddress(ensured.address);
+  if (!to) {
+    return NextResponse.json(
+      { error: "Confirm the address first. A test goes only to a confirmed address, like every other email.", code: "unverified" },
+      { status: 409 },
+    );
+  }
+
+  const lastTest = ensured.address.matchAlertsLastTestAt ? new Date(ensured.address.matchAlertsLastTestAt).getTime() : 0;
   if (Date.now() - lastTest < MIN_MINUTES_BETWEEN_TESTS * 60 * 1000) {
     return NextResponse.json(
       { error: `A test was sent in the last ${MIN_MINUTES_BETWEEN_TESTS} minutes — check your inbox and spam folder.`, code: "too_soon" },
@@ -88,7 +84,7 @@ export async function POST(request: Request) {
   });
 
   try {
-    await sendEmail(parsed.data.email, email.subject, email.html, { unsubscribeUrl: optOut });
+    await sendEmail(to, email.subject, email.html, { unsubscribeUrl: optOut });
   } catch (caught) {
     return NextResponse.json(
       { error: caught instanceof Error ? caught.message : "Email delivery failed.", code: "email_failed" },
@@ -96,13 +92,8 @@ export async function POST(request: Request) {
     );
   }
 
-  /* A test never re-points the scheduled alerts at the address it was sent to. */
-  await supabase.from("notification_preferences").upsert({
-    user_id: user.id,
-    email: (existing?.email as string | null) || parsed.data.email,
-    match_alerts_last_test_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  });
+  /* The test's own timestamp, never the schedule's. */
+  await recordTestSend(admin, { userId: user.id, column: "match_alerts_last_test_at" });
 
   return NextResponse.json({ ok: true, matches: matches.length, criteria: outcome.criteria });
 }

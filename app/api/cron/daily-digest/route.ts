@@ -71,6 +71,8 @@ export async function GET(request: Request) {
     .from("notification_preferences")
     .select("user_id,email,last_sent_at")
     .eq("daily_digest_enabled", true)
+    /* Only an address that has said yes: the sign-in address, or one that clicked its link. */
+    .not("email_verified_at", "is", null)
     .order("last_sent_at", { ascending: true, nullsFirst: true })
     .limit(maxUsersPerRun());
   if (error) {
