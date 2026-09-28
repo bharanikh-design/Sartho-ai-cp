@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isMissingColumnError } from "@/lib/supabase/errors";
 import { z } from "zod";
 import { createSafetyIdentifier, generateStructuredJson } from "@/lib/ai/provider";
 import { describeAiFailure, DOCUMENT_SUBJECT } from "@/lib/ai/failure";
@@ -107,13 +108,6 @@ const uploadRequestSchema = z.object({
  * answers PGRST204 for a column it cannot find; the import then falls back to
  * the row shape it had before, and says so, rather than failing the upload.
  */
-function isMissingColumn(error: { code?: string; message?: string } | null): boolean {
-  if (!error) return false;
-  if (error.code === "PGRST204" || error.code === "42703") return true;
-  const message = (error.message ?? "").toLowerCase();
-  return message.includes("column") && (message.includes("does not exist") || message.includes("could not find"));
-}
-
 export async function POST(request: Request) {
   const { supabase, user } = await getAuthenticatedUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -160,7 +154,12 @@ export async function POST(request: Request) {
     const bytes = new Uint8Array(await storedFile.arrayBuffer());
     ({ text, raw } = await extractResumeText({ name: payload.fileName, type: actualMimeType, bytes }));
   } catch (caught) {
+    /* Refused files are removed from the bucket; nothing will ever refer to them. */
     await discardObject();
+    if (caught instanceof ResumeExtractionError && caught.rejection) {
+      /* The reason is logged; the file and its name are not. */
+      console.warn("Blocked a résumé upload", { userId: user.id, reason: caught.rejection });
+    }
     const message = caught instanceof ResumeExtractionError
       ? caught.message
       : "Sartho could not read that file.";
@@ -198,7 +197,7 @@ export async function POST(request: Request) {
     .select("id")
     .single());
 
-  if (isMissingColumn(importError)) {
+  if (isMissingColumnError(importError)) {
     /*
      * Schema behind the code. The upload is still read, but nothing can point
      * at the original, so it is removed as it always used to be.

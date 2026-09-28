@@ -74,6 +74,20 @@ describe("OAuth callback", () => {
     expect(code).toBe("AuthApiError");
   });
 
+  /*
+   * The parser reads "/\\evil.example" as "//evil.example". A guard that only
+   * looked at the first two characters let this one through to https://evil.example/.
+   */
+  it("refuses a backslash disguise for the same bounce", async () => {
+    exchangeCodeForSession.mockResolvedValue({ error: null });
+
+    const response = await callback("?code=one-time-code&next=%2F%5Cevil.example");
+
+    const location = new URL(response.headers.get("location") ?? "");
+    expect(location.origin).toBe("https://sartho.tech");
+    expect(location.pathname).toBe("/");
+  });
+
   it("refuses to bounce a sign-in off this host to somewhere else", async () => {
     exchangeCodeForSession.mockResolvedValue({ error: null });
 

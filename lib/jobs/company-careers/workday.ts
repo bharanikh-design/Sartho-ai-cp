@@ -22,15 +22,27 @@ export type WorkdaySearchResponse = {
   jobPostings?: WorkdayPosting[];
 };
 
+/*
+ * Only ever a Workday host. The tenant and site are path segments typed or
+ * scraped from a URL, so they are encoded; the host is checked against the
+ * one domain this client exists to talk to, whatever a saved row says.
+ */
+function workdayDomain(config: EmployerPortalConfig): string {
+  const tenant = encodeURIComponent(config.tenant).toLowerCase();
+  const stored = config.domain?.trim().toLowerCase();
+  if (stored && /^[a-z0-9][a-z0-9.-]*\.myworkdayjobs\.com$/.test(stored)) return stored;
+  return `${tenant}.myworkdayjobs.com`;
+}
+
 export function buildWorkdayApiUrl(config: EmployerPortalConfig): string {
-  const domain = config.domain || `${config.tenant}.myworkdayjobs.com`;
-  const site = config.site || "Careers";
-  return `https://${domain}/wday/cxs/${config.tenant}/${site}/jobs`;
+  const domain = workdayDomain(config);
+  const site = encodeURIComponent(config.site || "Careers");
+  return `https://${domain}/wday/cxs/${encodeURIComponent(config.tenant)}/${site}/jobs`;
 }
 
 export function buildWorkdayJobUrl(config: EmployerPortalConfig, externalPath: string): string {
-  const domain = config.domain || `${config.tenant}.myworkdayjobs.com`;
-  const site = config.site || "Careers";
+  const domain = workdayDomain(config);
+  const site = encodeURIComponent(config.site || "Careers");
   const cleanPath = externalPath.startsWith("/") ? externalPath : `/${externalPath}`;
   return `https://${domain}/en-US/${site}${cleanPath}`;
 }

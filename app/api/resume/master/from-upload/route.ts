@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isMissingColumnError } from "@/lib/supabase/errors";
 import { z } from "zod";
 import { createSafetyIdentifier, generateStructuredJson } from "@/lib/ai/provider";
 import { describeAiFailure, DOCUMENT_SUBJECT } from "@/lib/ai/failure";
@@ -31,13 +32,6 @@ export const runtime = "nodejs";
 export const maxDuration = 120;
 
 const inputSchema = z.object({ importId: z.string().uuid() });
-
-function isMissingColumn(error: { code?: string; message?: string } | null): boolean {
-  if (!error) return false;
-  if (error.code === "PGRST204" || error.code === "42703") return true;
-  const message = (error.message ?? "").toLowerCase();
-  return message.includes("column") && (message.includes("does not exist") || message.includes("could not find"));
-}
 
 export async function POST(request: Request) {
   const { supabase, user } = await getAuthenticatedUser();
@@ -86,7 +80,7 @@ export async function POST(request: Request) {
       .from("profiles")
       .update({ master_resume: content, master_resume_text: draft, master_resume_updated_at: new Date().toISOString() })
       .eq("id", user.id);
-    if (isMissingColumn(saveError)) {
+    if (isMissingColumnError(saveError)) {
       return NextResponse.json(
         { error: "This deployment is missing the master_resume columns. The administrator needs to run the 20260912080000_master_resume migration." },
         { status: 503 },

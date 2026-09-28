@@ -6,6 +6,7 @@
  * without an HTTP request, a session or a model behind it.
  */
 
+import { assertNoActiveContent, scanTextBytes, scanUploadBytes, UploadRejectedError, type UploadRejectionReason } from "@/lib/resume/scan-upload";
 import {
   detectKind,
   MAX_UPLOAD_BYTES,
@@ -30,8 +31,25 @@ export const MIN_USEFUL_CHARACTERS = 400;
  */
 export const MAX_RESUME_CHARACTERS = 120_000;
 
+/*
+ * A PDF with more pages than this is not a résumé, and every page is parser
+ * time and memory spent before the character cap below can say so.
+ */
+export const MAX_PDF_PAGES = 100;
+
 export class ResumeExtractionError extends Error {
   readonly userFacing = true;
+  /*
+   * Set when the file was refused by the content scan rather than merely
+   * unreadable, so a route can record that a hostile upload was blocked
+   * without recording anything of the upload itself.
+   */
+  readonly rejection: UploadRejectionReason | null;
+
+  constructor(message: string, rejection: UploadRejectionReason | null = null) {
+    super(message);
+    this.rejection = rejection;
+  }
 }
 
 /*
@@ -59,6 +77,11 @@ export function normaliseWhitespace(raw: string) {
 async function extractPdf(bytes: Uint8Array) {
   const { extractText, getDocumentProxy } = await import("unpdf");
   const document = await getDocumentProxy(bytes);
+  if (document.numPages > MAX_PDF_PAGES) {
+    throw new ResumeExtractionError(
+      `That PDF has ${document.numPages} pages. A résumé is read up to ${MAX_PDF_PAGES} pages; please upload a shorter document.`,
+    );
+  }
   const { text } = await extractText(document, { mergePages: true });
   return Array.isArray(text) ? text.join("\n") : text;
 }
@@ -83,6 +106,7 @@ async function extractDocx(bytes: Uint8Array) {
  */
 export type ExtractedResume = { raw: string; text: string; kind: SupportedKind };
 
+
 export async function extractResumeText(
   file: { name: string; type: string | null; bytes: Uint8Array },
 ): Promise<ExtractedResume> {
@@ -100,15 +124,43 @@ export async function extractResumeText(
     throw new ResumeExtractionError("Sartho reads PDF, Word (.docx) and plain text résumés.");
   }
 
+  /*
+   * The bytes are inspected before any parser sees them: a file that is not
+   * the format its name claims, or that carries scripts, macros, embedded
+   * programs or an archive bomb, is refused here. For a text file this also
+   * yields the decoded text, strictly as UTF-8.
+   */
+  let decodedText: string | null = null;
+  try {
+    if (kind === "text") decodedText = scanTextBytes(file.bytes);
+    else scanUploadBytes(kind, file.bytes);
+  } catch (caught) {
+    if (caught instanceof UploadRejectedError) throw new ResumeExtractionError(caught.message, caught.reason);
+    throw new ResumeExtractionError("Sartho could not read that file. It may be damaged.");
+  }
+
   let raw: string;
   try {
     if (kind === "pdf") raw = await extractPdf(file.bytes);
     else if (kind === "docx") raw = await extractDocx(file.bytes);
-    else raw = new TextDecoder().decode(file.bytes);
-  } catch {
+    else raw = decodedText ?? "";
+  } catch (caught) {
+    if (caught instanceof ResumeExtractionError) throw caught;
     throw new ResumeExtractionError(
       "Sartho could not read that file. It may be password protected or damaged.",
     );
+  }
+
+  /*
+   * The prose itself, whatever the container was. A PDF or Word file whose
+   * text is a script payload is refused the same way a .txt one is, before it
+   * is stored as a résumé or shown back to anybody.
+   */
+  try {
+    assertNoActiveContent(raw);
+  } catch (caught) {
+    if (caught instanceof UploadRejectedError) throw new ResumeExtractionError(caught.message, caught.reason);
+    throw caught;
   }
 
   const text = normaliseWhitespace(raw);

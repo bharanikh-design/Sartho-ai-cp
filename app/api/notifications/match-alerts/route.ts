@@ -5,6 +5,7 @@ import { APP_URL } from "@/lib/site";
 import { runBriefSearch } from "@/lib/jobs/run-search";
 import { renderMatchAlertEmail, selectNewMatches } from "@/lib/notifications/match-alerts";
 import { isEmailDeliveryConfigured, sendEmail } from "@/lib/notifications/send-email";
+import { unsubscribeUrl } from "@/lib/notifications/unsubscribe";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -56,7 +57,7 @@ export async function POST(request: Request) {
 
   const { data: existing } = await supabase
     .from("notification_preferences")
-    .select("match_alerts_last_test_at")
+    .select("email,match_alerts_last_test_at")
     .eq("user_id", user.id)
     .maybeSingle();
   const lastTest = existing?.match_alerts_last_test_at ? new Date(existing.match_alerts_last_test_at).getTime() : 0;
@@ -76,16 +77,18 @@ export async function POST(request: Request) {
   const firstName = (profile?.full_name as string | null)?.split(/\s+/)[0] || "there";
   // A test shows what the brief finds right now, seen or not — that is the point.
   const matches = selectNewMatches(outcome.results, []);
+  const optOut = unsubscribeUrl(APP_URL, user.id);
   const email = renderMatchAlertEmail({
     firstName,
     matches,
     criteria: outcome.criteria,
     appUrl: APP_URL,
     isTest: true,
+    unsubscribeUrl: optOut,
   });
 
   try {
-    await sendEmail(parsed.data.email, email.subject, email.html);
+    await sendEmail(parsed.data.email, email.subject, email.html, { unsubscribeUrl: optOut });
   } catch (caught) {
     return NextResponse.json(
       { error: caught instanceof Error ? caught.message : "Email delivery failed.", code: "email_failed" },
@@ -93,9 +96,10 @@ export async function POST(request: Request) {
     );
   }
 
+  /* A test never re-points the scheduled alerts at the address it was sent to. */
   await supabase.from("notification_preferences").upsert({
     user_id: user.id,
-    email: parsed.data.email,
+    email: (existing?.email as string | null) || parsed.data.email,
     match_alerts_last_test_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   });

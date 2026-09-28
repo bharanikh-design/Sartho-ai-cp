@@ -1,9 +1,5 @@
 import { NextResponse } from "next/server";
-import { z } from "zod";
 import { getAuthenticatedUser } from "@/lib/auth";
-import { normaliseCountryCode } from "@/lib/jobs/countries";
-import { isEmploymentType } from "@/lib/jobs/employment-types";
-import { normaliseExperienceBand } from "@/lib/jobs/experience";
 import { propagateCandidateMutation } from "@/lib/workflow/propagate-candidate-mutation";
 
 import { searchPlanSchema } from "./schema";

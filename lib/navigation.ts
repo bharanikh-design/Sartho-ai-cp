@@ -139,12 +139,6 @@ export function getPrimaryNavigation(_activated: boolean): NavigationItem[] {
   ];
 }
 
-/*
- * Email Alerts is a setting, not a step in the flow, so it lives in the profile
- * menu rather than the rail.
- */
-export const notificationsDestination = notificationsNavigation;
-
 export const integrationsNavigation: NavigationItem = {
   label: "Integrations",
   shortLabel: "Links",

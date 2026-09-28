@@ -1,3 +1,4 @@
+import { isMissingColumnError } from "@/lib/supabase/errors";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
   CareerRoleRecord,
@@ -102,13 +103,6 @@ export type ResumeImportRecord = {
 const IMPORT_COLUMNS =
   "id,file_name,label,status,error,roles_created,evidence_created,evidence_skipped,character_count,byte_size,created_at,completed_at";
 
-function isMissingColumn(error: { code?: string; message?: string } | null): boolean {
-  if (!error) return false;
-  if (error.code === "PGRST204" || error.code === "42703") return true;
-  const message = (error.message ?? "").toLowerCase();
-  return message.includes("column") && (message.includes("does not exist") || message.includes("could not find"));
-}
-
 export async function getResumeImports(supabase: SupabaseClient, userId: string) {
   const query = (columns: string) =>
     supabase
@@ -125,7 +119,7 @@ export async function getResumeImports(supabase: SupabaseClient, userId: string)
    * its schema is asked again for the columns it has, and the list still
    * renders — without originals or a master, which it cannot have anyway.
    */
-  if (isMissingColumn(error)) ({ data, error } = await query(IMPORT_COLUMNS));
+  if (isMissingColumnError(error)) ({ data, error } = await query(IMPORT_COLUMNS));
 
   if (error) throw error;
   return ((data ?? []) as unknown as Array<Partial<ResumeImportRecord>>).map((row) => ({

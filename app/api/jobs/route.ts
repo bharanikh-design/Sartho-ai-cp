@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { z } from "zod";
 import { jobInputSchema } from "./schema";
 import { getAuthenticatedUser } from "@/lib/auth";
 import { canonicalJobUrl } from "@/lib/jobs/source-url";

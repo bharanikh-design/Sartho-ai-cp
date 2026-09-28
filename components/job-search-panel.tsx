@@ -57,19 +57,6 @@ const recTone: Record<SearchResult["recommendation"], string> = {
   skip: "#e5917a",
 };
 
-/*
- * Why the search stopped asking, in the person's words.
- *
- * All three used to read "time limit", including the one that means the
- * search finished early because it had found everything it was looking for.
- * A working search described itself as starved on every single run.
- */
-const SKIPPED_REASON: Record<"budget" | "no_providers" | "enough_results", string> = {
-  budget: "time limit",
-  no_providers: "no provider left to ask",
-  enough_results: "enough roles found",
-};
-
 export function JobSearchPanel({
   autoRun = false,
   initialResults = [],

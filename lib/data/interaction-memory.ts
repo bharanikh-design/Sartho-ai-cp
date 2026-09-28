@@ -1,6 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
-  INTERACTION_EVENT_TYPES,
   type InteractionEventRecord,
   type InteractionEventType,
 } from "@/lib/context/interaction-memory";
@@ -36,10 +35,6 @@ function cleanMetadata(value: Record<string, unknown> | undefined): Record<strin
   const encoded = JSON.stringify(value);
   if (encoded.length > 4000) return {};
   return value;
-}
-
-export function isInteractionEventType(value: unknown): value is InteractionEventType {
-  return typeof value === "string" && (INTERACTION_EVENT_TYPES as readonly string[]).includes(value);
 }
 
 export async function recordCandidateInteraction(

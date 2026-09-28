@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { z } from "zod";
 import { getAuthenticatedUser } from "@/lib/auth";
 import { logError } from "@/lib/logger";
 import { propagateCandidateMutation } from "@/lib/workflow/propagate-candidate-mutation";
