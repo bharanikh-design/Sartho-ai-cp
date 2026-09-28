@@ -1125,7 +1125,7 @@ export async function runBriefSearch(
   if (brief.companies.length) {
     /*
      * The careers pages this person verified themselves, which take
-     * precedence over the nine hardcoded companies in the registry. Loaded
+     * precedence over the hardcoded companies in the registry. Loaded
      * once for the whole employer pass; an empty list is exactly the
      * behaviour there was before it existed.
      */

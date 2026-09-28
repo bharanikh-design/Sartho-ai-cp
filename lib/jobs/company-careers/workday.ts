@@ -1,8 +1,8 @@
 /*
  * Direct Workday Candidate Experience Service (CXS) client.
  *
- * Major enterprise employers (PwC, Deloitte, Accenture, Macquarie, CBA) run
- * their career portals on Workday. Their frontend queries an unauthenticated
+ * Major enterprise employers (PwC, Accenture, CommBank) run their career
+ * portals on Workday. Their frontend queries an unauthenticated
  * REST API (CXS) to search and retrieve postings with zero CAPTCHAs.
  */
 

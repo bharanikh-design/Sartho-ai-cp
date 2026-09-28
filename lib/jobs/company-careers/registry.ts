@@ -8,6 +8,21 @@ import { searchWorkdayPortal } from "./workday";
 import { searchGreenhousePortal } from "./greenhouse";
 import { searchLeverPortal } from "./lever";
 
+/*
+ * Every Workday career site lives on a data-centre host — pwc.wd3, cba.wd3,
+ * accenture.wd103 — and "<tenant>.myworkdayjobs.com" resolves for nobody. The
+ * seven Workday employers this list used to hold all lacked that host, so not
+ * one of them had ever answered a search: every brief naming PwC or Accenture
+ * logged a DNS failure and quietly got nothing from the portal. The hosts and
+ * site names below come from the employers' own indexed job postings.
+ *
+ * Deloitte, KPMG, EY and Macquarie Group are gone rather than guessed: their
+ * indexed postings show no Workday careers site for any of them (Deloitte has
+ * only regional tenants, and the Workday "Macquarie" is the university), so an
+ * entry here could only ever fail. An employer this list does not know is
+ * reported as unknown, and the person can paste the real careers URL on the
+ * Search Brief, which wins over this list anyway.
+ */
 export const EMPLOYER_PORTALS: EmployerPortalConfig[] = [
   {
     id: "pwc",
@@ -15,31 +30,8 @@ export const EMPLOYER_PORTALS: EmployerPortalConfig[] = [
     aliases: ["pwc", "pricewaterhousecoopers", "price waterhouse coopers"],
     type: "workday",
     tenant: "pwc",
-    site: "Campus_Careers",
-  },
-  {
-    id: "deloitte",
-    name: "Deloitte",
-    aliases: ["deloitte", "deloitte consulting", "deloitte touche", "deloitte & touche"],
-    type: "workday",
-    tenant: "deloitte",
-    site: "Deloitte_Careers",
-  },
-  {
-    id: "kpmg",
-    name: "KPMG",
-    aliases: ["kpmg"],
-    type: "workday",
-    tenant: "kpmg",
-    site: "KPMG_Careers",
-  },
-  {
-    id: "ey",
-    name: "EY",
-    aliases: ["ey", "ernst & young", "ernst and young"],
-    type: "workday",
-    tenant: "ey",
-    site: "EY_Careers",
+    site: "Global_Experienced_Careers",
+    domain: "pwc.wd3.myworkdayjobs.com",
   },
   {
     id: "accenture",
@@ -47,15 +39,8 @@ export const EMPLOYER_PORTALS: EmployerPortalConfig[] = [
     aliases: ["accenture"],
     type: "workday",
     tenant: "accenture",
-    site: "Accenture_Careers",
-  },
-  {
-    id: "macquarie",
-    name: "Macquarie Group",
-    aliases: ["macquarie", "macquarie group", "macquarie bank"],
-    type: "workday",
-    tenant: "macquarie",
-    site: "Macquarie_Careers",
+    site: "AccentureCareers",
+    domain: "accenture.wd103.myworkdayjobs.com",
   },
   {
     id: "cba",
@@ -63,7 +48,8 @@ export const EMPLOYER_PORTALS: EmployerPortalConfig[] = [
     aliases: ["cba", "commonwealth bank", "commbank"],
     type: "workday",
     tenant: "cba",
-    site: "CBA_Careers",
+    site: "CommBank_Careers",
+    domain: "cba.wd3.myworkdayjobs.com",
   },
   {
     id: "canva",
@@ -103,7 +89,7 @@ export function employerKey(employerName: string): string {
  * The careers portal for an employer, preferring the person's own.
  *
  * `saved` holds the sources somebody verified themselves on the Search Brief.
- * They win over this file's nine hardcoded companies deliberately: a person
+ * They win over this file's hardcoded companies deliberately: a person
  * who pasted their employer's careers URL and watched Sartho prove it knows
  * their target better than a static list compiled here does, and they may well
  * mean a different tenant of a company this list already names.

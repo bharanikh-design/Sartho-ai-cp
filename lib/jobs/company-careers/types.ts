@@ -13,7 +13,12 @@ export type EmployerPortalConfig = {
   tenant: string;
   /** Workday site name (e.g. "Campus_Careers", "Careers"). */
   site?: string;
-  /** Default domain if different from standard myworkdayjobs.com. */
+  /**
+   * The full Workday host, e.g. "cba.wd3.myworkdayjobs.com". Every Workday
+   * career site sits on a data-centre host (wd1, wd3, wd103, ...), so a
+   * registry entry must carry it: the "<tenant>.myworkdayjobs.com" fallback
+   * resolves for nobody. Saved sources always have it, from the pasted URL.
+   */
   domain?: string;
   /** ISO-3166 alpha-2 countries supported by this portal config. */
   countries?: string[];
